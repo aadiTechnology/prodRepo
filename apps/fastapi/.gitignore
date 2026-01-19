@@ -48,3 +48,8 @@ coverage.xml
 .mypy_cache/
 .dmypy.json
 .pyre/
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
