@@ -2,6 +2,39 @@
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
+## Setup
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Configure API base URL (optional):
+   - Create a `.env` file in the root directory
+   - Add `VITE_API_BASE_URL=http://127.0.0.1:8000` (or your API URL)
+   - Default is `http://127.0.0.1:8000` if not specified
+
+3. Run the development server:
+```bash
+npm run dev
+```
+
+4. Build for production:
+```bash
+npm run build
+```
+
+## Features
+
+- **Users Management**: Full CRUD operations for users
+  - View all users in a table
+  - Create new users
+  - Edit existing users
+  - Delete users with confirmation
+- Material-UI components for a modern, responsive UI
+- TypeScript for type safety
+- Axios for API calls with error handling
+
 Currently, two official plugins are available:
 
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
