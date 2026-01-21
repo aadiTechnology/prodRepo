@@ -11,7 +11,9 @@ import { spacing } from "./spacing";
 import { components } from "./components";
 
 const themeOptions: ThemeOptions = {
-  palette,
+  palette: {
+    // mode: "dark",
+  },
   typography,
   breakpoints,
   spacing,

@@ -95,5 +95,77 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """
+    Health check endpoint for monitoring and load balancers.
+    Returns basic health status.
+    """
     return {"status": "healthy"}
+
+
+@app.get("/health/ready")
+async def readiness_check():
+    """
+    Readiness probe endpoint.
+    Checks if the application is ready to serve traffic.
+    Verifies database connectivity.
+    """
+    from sqlalchemy import text
+    from app.core.database import SessionLocal
+    
+    health_status = {
+        "status": "ready",
+        "checks": {
+            "database": "unknown",
+        },
+        "timestamp": None,
+    }
+    
+    try:
+        from datetime import datetime
+        health_status["timestamp"] = datetime.utcnow().isoformat()
+        
+        # Check database connectivity
+        db = SessionLocal()
+        try:
+            # Simple query to verify database connection
+            db.execute(text("SELECT 1"))
+            health_status["checks"]["database"] = "healthy"
+        except Exception as e:
+            logger.error(f"Database health check failed: {str(e)}")
+            health_status["checks"]["database"] = "unhealthy"
+            health_status["status"] = "not_ready"
+        finally:
+            db.close()
+        
+        # If any check fails, return 503
+        if health_status["status"] == "not_ready":
+            from fastapi import status
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content=health_status
+            )
+        
+        return health_status
+    except Exception as e:
+        logger.error(f"Readiness check failed: {str(e)}")
+        health_status["status"] = "error"
+        health_status["error"] = str(e)
+        from fastapi import status
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=health_status
+        )
+
+
+@app.get("/health/live")
+async def liveness_check():
+    """
+    Liveness probe endpoint.
+    Checks if the application is alive and should be restarted if not.
+    """
+    return {
+        "status": "alive",
+        "timestamp": None,
+    }
