@@ -6,7 +6,7 @@
 import { AppBar, Toolbar, Typography, Button, Box, Container, IconButton, useMediaQuery, useTheme, Menu, MenuItem, Avatar, Chip } from "@mui/material";
 import { Menu as MenuIcon, Logout as LogoutIcon, AccountCircle } from "@mui/icons-material";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import { appName } from "../config";
 import { Container as PageContainer } from "../components/common";
 import { useAuth } from "../context/AuthContext";
@@ -22,7 +22,7 @@ const navLinks: NavLink[] = [
   { label: "Users", path: "/users" },
 ];
 
-export default function MainLayout() {
+function MainLayout() {
   const theme = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -31,21 +31,62 @@ export default function MainLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = useCallback((path: string) => location.pathname === path, [location.pathname]);
 
-  const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+  const handleUserMenuOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {
     setUserMenuAnchor(event.currentTarget);
-  };
+  }, []);
 
-  const handleUserMenuClose = () => {
+  const handleUserMenuClose = useCallback(() => {
     setUserMenuAnchor(null);
-  };
+  }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     handleUserMenuClose();
     logout();
     navigate("/login");
-  };
+  }, [handleUserMenuClose, logout, navigate]);
+
+  // Memoize navigation links to prevent re-renders
+  const navigationLinks = useMemo(() => (
+    <Box sx={{ display: "flex", gap: 1, flexGrow: 1 }}>
+      {navLinks.map((link) => (
+        <Button
+          key={link.path}
+          color="inherit"
+          component={Link}
+          to={link.path}
+          variant={isActive(link.path) ? "outlined" : "text"}
+          sx={{
+            borderColor: isActive(link.path) ? "rgba(255, 255, 255, 0.5)" : "transparent",
+          }}
+        >
+          {link.label}
+        </Button>
+      ))}
+    </Box>
+  ), [isActive]);
+
+  // Memoize mobile menu links
+  const mobileMenuLinks = useMemo(() => (
+    navLinks.map((link) => (
+      <Button
+        key={link.path}
+        color="inherit"
+        component={Link}
+        to={link.path}
+        fullWidth
+        variant={isActive(link.path) ? "outlined" : "text"}
+        onClick={() => setMobileMenuOpen(false)}
+        sx={{
+          justifyContent: "flex-start",
+          borderColor: isActive(link.path) ? "rgba(255, 255, 255, 0.5)" : "transparent",
+        }}
+      >
+        {link.label}
+      </Button>
+    ))
+  ), [isActive]);
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
@@ -78,22 +119,7 @@ export default function MainLayout() {
               </IconButton>
             </>
           ) : (
-            <Box sx={{ display: "flex", gap: 1, flexGrow: 1 }}>
-              {navLinks.map((link) => (
-                <Button
-                  key={link.path}
-                  color="inherit"
-                  component={Link}
-                  to={link.path}
-                  variant={isActive(link.path) ? "outlined" : "text"}
-                  sx={{
-                    borderColor: isActive(link.path) ? "rgba(255, 255, 255, 0.5)" : "transparent",
-                  }}
-                >
-                  {link.label}
-                </Button>
-              ))}
-            </Box>
+            navigationLinks
           )}
 
           {/* User menu */}
@@ -157,23 +183,7 @@ export default function MainLayout() {
               gap: 1,
             }}
           >
-            {navLinks.map((link) => (
-              <Button
-                key={link.path}
-                color="inherit"
-                component={Link}
-                to={link.path}
-                fullWidth
-                variant={isActive(link.path) ? "outlined" : "text"}
-                onClick={() => setMobileMenuOpen(false)}
-                sx={{
-                  justifyContent: "flex-start",
-                  borderColor: isActive(link.path) ? "rgba(255, 255, 255, 0.5)" : "transparent",
-                }}
-              >
-                {link.label}
-              </Button>
-            ))}
+            {mobileMenuLinks}
             {isAuthenticated && user && (
               <>
                 <Box sx={{ borderTop: "1px solid rgba(255, 255, 255, 0.2)", my: 1, pt: 1 }}>
@@ -231,3 +241,6 @@ export default function MainLayout() {
     </Box>
   );
 }
+
+// Memoize layout to prevent unnecessary re-renders
+export default memo(MainLayout);

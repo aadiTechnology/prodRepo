@@ -56,16 +56,24 @@ def get_database_url() -> str:
 
 DATABASE_URL = get_database_url()
 
-# Create engine with connection pool settings
-# pool_pre_ping=True helps detect stale connections
-# pool_recycle prevents connection timeouts
+# Create engine with optimized connection pool settings
+# These settings improve performance and scalability
 engine = create_engine(
     DATABASE_URL,
     echo=settings.DB_ECHO,
-    pool_pre_ping=True,  # Verify connections before using them
-    pool_recycle=3600,   # Recycle connections after 1 hour
+    # Connection pool settings for better performance
+    pool_pre_ping=True,        # Verify connections before using them (detects stale connections)
+    pool_recycle=3600,         # Recycle connections after 1 hour (prevents stale connections)
+    pool_size=10,              # Number of connections to maintain in the pool (default: 5)
+    max_overflow=20,            # Maximum number of connections to create beyond pool_size (default: 10)
+    pool_timeout=30,           # Seconds to wait before giving up on getting a connection (default: 30)
+    # Connection arguments
     connect_args={
-        "timeout": 10,   # Connection timeout in seconds
+        "timeout": 10,         # Connection timeout in seconds
+    },
+    # Execution options for better performance
+    execution_options={
+        "autocommit": False,   # Explicit transaction control
     }
 )
 

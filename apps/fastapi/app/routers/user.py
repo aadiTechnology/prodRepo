@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/users", tags=["Users"])
 
 @router.post("/", response_model=UserResponse, status_code=201)
-def create_user(
+async def create_user(
     user: UserCreate,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin)
@@ -21,7 +21,7 @@ def create_user(
     return user_service.create_user(db, user)
 
 @router.get("/", response_model=list[UserResponse])
-def read_all_users(
+async def read_all_users(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ) -> list[UserResponse]:
@@ -30,7 +30,7 @@ def read_all_users(
     return user_service.get_users(db)
 
 @router.get("/{user_id}", response_model=UserResponse)
-def read_user(
+async def read_user(
     user_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
@@ -40,7 +40,7 @@ def read_user(
     return user_service.get_user(db, user_id)
 
 @router.put("/{user_id}", response_model=UserResponse)
-def update_user(
+async def update_user(
     user_id: int,
     user: UserUpdate,
     db: Session = Depends(get_db),
@@ -57,7 +57,7 @@ def update_user(
     return user_service.update_user(db, user_id, user)
 
 @router.delete("/{user_id}")
-def delete_user(
+async def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin)

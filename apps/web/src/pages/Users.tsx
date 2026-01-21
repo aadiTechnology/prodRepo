@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Button,
@@ -24,7 +24,7 @@ import { User, UserCreate, UserUpdate } from "../types/user";
 import userService from "../api/services/userService";
 import UserForm from "../components/UserForm";
 
-export default function Users() {
+function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export default function Users() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -44,35 +44,35 @@ export default function Users() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
-  const handleCreate = async (userData: UserCreate | UserUpdate) => {
+  const handleCreate = useCallback(async (userData: UserCreate | UserUpdate) => {
     await userService.createUser(userData as UserCreate);
     fetchUsers();
-  };
+  }, [fetchUsers]);
 
-  const handleUpdate = async (userData: UserCreate | UserUpdate) => {
+  const handleUpdate = useCallback(async (userData: UserCreate | UserUpdate) => {
     if (selectedUser) {
       await userService.updateUser(selectedUser.id, userData as UserUpdate);
       fetchUsers();
     }
-  };
+  }, [selectedUser, fetchUsers]);
 
-  const handleEditClick = (user: User) => {
+  const handleEditClick = useCallback((user: User) => {
     setSelectedUser(user);
     setFormOpen(true);
-  };
+  }, []);
 
-  const handleDeleteClick = (user: User) => {
+  const handleDeleteClick = useCallback((user: User) => {
     setSelectedUser(user);
     setDeleteDialogOpen(true);
-  };
+  }, []);
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = useCallback(async () => {
     if (selectedUser) {
       try {
         setDeleteLoading(true);
@@ -86,12 +86,50 @@ export default function Users() {
         setDeleteLoading(false);
       }
     }
-  };
+  }, [selectedUser, fetchUsers]);
 
-  const handleFormClose = () => {
+  const handleFormClose = useCallback(() => {
     setFormOpen(false);
     setSelectedUser(null);
-  };
+  }, []);
+
+  // Memoize table rows to prevent unnecessary re-renders
+  const tableRows = useMemo(() => {
+    if (users.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={4} align="center">
+            <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+              No users found. Click "Add User" to create one.
+            </Typography>
+          </TableCell>
+        </TableRow>
+      );
+    }
+    return users.map((user) => (
+      <TableRow key={user.id} hover>
+        <TableCell>{user.id}</TableCell>
+        <TableCell>{user.email}</TableCell>
+        <TableCell>{user.full_name}</TableCell>
+        <TableCell align="right">
+          <IconButton
+            color="primary"
+            onClick={() => handleEditClick(user)}
+            aria-label="edit"
+          >
+            <EditIcon />
+          </IconButton>
+          <IconButton
+            color="error"
+            onClick={() => handleDeleteClick(user)}
+            aria-label="delete"
+          >
+            <DeleteIcon />
+          </IconButton>
+        </TableCell>
+      </TableRow>
+    ));
+  }, [users, handleEditClick, handleDeleteClick]);
 
   return (
     <Box>
@@ -131,39 +169,7 @@ export default function Users() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-                      No users found. Click "Add User" to create one.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                users.map((user) => (
-                  <TableRow key={user.id} hover>
-                    <TableCell>{user.id}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.full_name}</TableCell>
-                    <TableCell align="right">
-                      <IconButton
-                        color="primary"
-                        onClick={() => handleEditClick(user)}
-                        aria-label="edit"
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        color="error"
-                        onClick={() => handleDeleteClick(user)}
-                        aria-label="delete"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+              {tableRows}
             </TableBody>
           </Table>
         </TableContainer>
@@ -204,3 +210,5 @@ export default function Users() {
     </Box>
   );
 }
+
+export default Users;

@@ -19,11 +19,11 @@ class Settings(BaseSettings):
     DB_DRIVER: str = "ODBC Driver 18 for SQL Server"
     DB_ECHO: bool = False
     
-    # CORS
+    # CORS - Optimized for better security and performance
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
     CORS_CREDENTIALS: bool = True
-    CORS_METHODS: List[str] = ["*"]
-    CORS_HEADERS: List[str] = ["*"]
+    CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]  # Specific methods instead of "*"
+    CORS_HEADERS: List[str] = ["Content-Type", "Authorization", "Accept", "X-Requested-With"]  # Specific headers instead of "*"
     
     # JWT Authentication
     SECRET_KEY: str = "your-secret-key-change-in-production"  # Change in production

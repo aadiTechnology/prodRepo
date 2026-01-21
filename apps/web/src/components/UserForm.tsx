@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -19,7 +19,7 @@ interface UserFormProps {
   isEdit?: boolean;
 }
 
-export default function UserForm({
+function UserForm({
   open,
   onClose,
   onSubmit,
@@ -51,13 +51,13 @@ export default function UserForm({
     setError(null);
   }, [user, isEdit, open]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setError(null);
-  };
+  }, []);
 
-  const validateForm = (): boolean => {
+  const validateForm = useCallback((): boolean => {
     if (!formData.email.trim()) {
       setError("Email is required");
       return false;
@@ -75,9 +75,9 @@ export default function UserForm({
       return false;
     }
     return true;
-  };
+  }, [formData, isEdit]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -107,7 +107,7 @@ export default function UserForm({
     } finally {
       setLoading(false);
     }
-  };
+  }, [isEdit, formData, onSubmit, onClose]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -166,3 +166,6 @@ export default function UserForm({
     </Dialog>
   );
 }
+
+// Memoize component to prevent unnecessary re-renders
+export default memo(UserForm);

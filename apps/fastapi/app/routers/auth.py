@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register", response_model=UserResponse, status_code=201)
-def register(user_data: UserCreate, db: Session = Depends(get_db)) -> UserResponse:
+async def register(user_data: UserCreate, db: Session = Depends(get_db)) -> UserResponse:
     """
     Register a new user.
     
@@ -53,7 +53,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)) -> UserRespon
     )
 
 @router.post("/login", response_model=TokenResponse)
-def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+async def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     """
     Authenticate user and return JWT token.
     
@@ -90,7 +90,7 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> TokenRespo
     return TokenResponse(access_token=access_token)
 
 @router.get("/me", response_model=UserWithRole)
-def get_current_user_info(
+async def get_current_user_info(
     request: Request,
     current_user: CurrentUser = Depends(get_current_user)
 ) -> UserWithRole:

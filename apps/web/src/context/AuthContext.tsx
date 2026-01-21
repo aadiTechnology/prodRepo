@@ -3,7 +3,7 @@
  * Provides authentication state and methods throughout the application
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from "react";
 import { User, LoginRequest, AuthState } from "../types/auth";
 import authService from "../api/services/authService";
 import { ApiError } from "../api/client";
@@ -85,7 +85,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(getStoredToken());
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAuthenticated = !!token && !!user;
+  // Memoize isAuthenticated to prevent unnecessary recalculations
+  const isAuthenticated = useMemo(() => !!token && !!user, [token, user]);
 
   /**
    * Refresh current user information from API
@@ -170,15 +171,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initializeAuth();
   }, [refreshUser]);
 
-  const value: AuthContextType = {
-    user,
-    token,
-    isAuthenticated,
-    isLoading,
-    login,
-    logout,
-    refreshUser,
-  };
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const value: AuthContextType = useMemo(
+    () => ({
+      user,
+      token,
+      isAuthenticated,
+      isLoading,
+      login,
+      logout,
+      refreshUser,
+    }),
+    [user, token, isAuthenticated, isLoading, login, logout, refreshUser]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
