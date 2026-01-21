@@ -48,8 +48,9 @@ def update_user(
 ) -> UserResponse:
     """Update a user. Users can update themselves, admins can update anyone."""
     # Users can only update themselves unless they're admin
-    if current_user.role.value != "admin" and current_user.id != user_id:
-        logger.warning(f"User {current_user.email} attempted to update user {user_id}")
+    from app.models.user import UserRole
+    if current_user.role != UserRole.ADMIN and current_user.id != user_id:
+        logger.warning(f"User {current_user.email} (ID: {current_user.id}, Role: {current_user.role.value}) attempted to update user {user_id}")
         from app.core.exceptions import ForbiddenException
         raise ForbiddenException("You can only update your own profile")
     logger.info(f"User {current_user.email} updating user: {user_id}")
