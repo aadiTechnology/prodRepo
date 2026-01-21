@@ -47,11 +47,11 @@ const createAxiosInstance = (): AxiosInstance => {
         });
       }
 
-      // Add auth token here if needed in the future
-      // const token = getAuthToken();
-      // if (token) {
-      //   config.headers.Authorization = `Bearer ${token}`;
-      // }
+      // Add auth token from localStorage
+      const token = localStorage.getItem("auth_token");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
 
       return config;
     },
@@ -89,6 +89,18 @@ const createAxiosInstance = (): AxiosInstance => {
 
       // Handle different error scenarios
       if (error.response) {
+        // Handle 401 Unauthorized - clear auth and redirect to login
+        if (error.response.status === 401) {
+          // Clear authentication data
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("auth_user");
+          
+          // Only redirect if not already on login page
+          if (window.location.pathname !== "/login") {
+            window.location.href = "/login";
+          }
+        }
+
         // Server responded with error status
         const errorData = error.response.data || {};
         const errorMessage =

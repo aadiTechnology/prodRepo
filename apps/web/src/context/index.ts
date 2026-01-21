@@ -3,6 +3,4 @@
  * Centralized context exports
  */
 
-// Add context providers here as needed
-// Example:
-// export { AuthProvider, useAuth } from './AuthContext';
+export { AuthProvider, useAuth } from "./AuthContext";

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserUpdate
 from app.utils.security import hash_password
 from app.core.exceptions import NotFoundException, ConflictException
@@ -8,18 +8,19 @@ from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-def create_user(db: Session, user: UserCreate) -> User:
+def create_user(db: Session, user: UserCreate, role: UserRole = UserRole.USER) -> User:
     """Create a new user."""
     try:
         db_user = User(
             email=user.email,
             full_name=user.full_name,
-            hashed_password=hash_password(user.password)
+            hashed_password=hash_password(user.password),
+            role=role
         )
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
-        logger.info(f"User created successfully: {db_user.email}")
+        logger.info(f"User created successfully: {db_user.email} with role {db_user.role.value}")
         return db_user
     except IntegrityError:
         db.rollback()

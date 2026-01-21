@@ -11,7 +11,7 @@ from app.core.exception_handlers import (
     sqlalchemy_exception_handler,
     generic_exception_handler,
 )
-from app.routers import user
+from app.routers import user, auth
 from fastapi.exceptions import RequestValidationError
 
 # Setup logging first
@@ -42,6 +42,7 @@ app.add_exception_handler(Exception, generic_exception_handler)
 
 # Include routers
 # Note: API_V1_PREFIX is available for future versioning, but not used here to maintain backward compatibility
+app.include_router(auth.router)
 app.include_router(user.router)
 
 @app.on_event("startup")

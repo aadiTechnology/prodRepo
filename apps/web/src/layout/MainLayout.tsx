@@ -3,12 +3,13 @@
  * Main application layout with navigation and responsive design
  */
 
-import { AppBar, Toolbar, Typography, Button, Box, Container, IconButton, useMediaQuery, useTheme } from "@mui/material";
-import { Menu as MenuIcon } from "@mui/icons-material";
-import { Outlet, Link, useLocation } from "react-router-dom";
+import { AppBar, Toolbar, Typography, Button, Box, Container, IconButton, useMediaQuery, useTheme, Menu, MenuItem, Avatar, Chip } from "@mui/material";
+import { Menu as MenuIcon, Logout as LogoutIcon, AccountCircle } from "@mui/icons-material";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { appName } from "../config";
 import { Container as PageContainer } from "../components/common";
+import { useAuth } from "../context/AuthContext";
 
 interface NavLink {
   label: string;
@@ -24,10 +25,27 @@ const navLinks: NavLink[] = [
 export default function MainLayout() {
   const theme = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout, isAuthenticated } = useAuth();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setUserMenuAnchor(event.currentTarget);
+  };
+
+  const handleUserMenuClose = () => {
+    setUserMenuAnchor(null);
+  };
+
+  const handleLogout = () => {
+    handleUserMenuClose();
+    logout();
+    navigate("/login");
+  };
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
@@ -77,6 +95,56 @@ export default function MainLayout() {
               ))}
             </Box>
           )}
+
+          {/* User menu */}
+          {isAuthenticated && user && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: 2 }}>
+              <Chip
+                label={user.role === "admin" ? "Admin" : "User"}
+                size="small"
+                color={user.role === "admin" ? "secondary" : "default"}
+                sx={{ display: { xs: "none", sm: "flex" } }}
+              />
+              <IconButton
+                onClick={handleUserMenuOpen}
+                size="small"
+                sx={{ ml: 1 }}
+                aria-label="account menu"
+              >
+                <Avatar sx={{ width: 32, height: 32, bgcolor: "secondary.main" }}>
+                  {user.full_name.charAt(0).toUpperCase()}
+                </Avatar>
+              </IconButton>
+              <Menu
+                anchorEl={userMenuAnchor}
+                open={Boolean(userMenuAnchor)}
+                onClose={handleUserMenuClose}
+                anchorOrigin={{
+                  vertical: "bottom",
+                  horizontal: "right",
+                }}
+                transformOrigin={{
+                  vertical: "top",
+                  horizontal: "right",
+                }}
+              >
+                <MenuItem disabled>
+                  <Box>
+                    <Typography variant="body2" fontWeight="bold">
+                      {user.full_name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {user.email}
+                    </Typography>
+                  </Box>
+                </MenuItem>
+                <MenuItem onClick={handleLogout}>
+                  <LogoutIcon sx={{ mr: 1, fontSize: 20 }} />
+                  Logout
+                </MenuItem>
+              </Menu>
+            </Box>
+          )}
         </Toolbar>
 
         {isMobile && mobileMenuOpen && (
@@ -106,6 +174,33 @@ export default function MainLayout() {
                 {link.label}
               </Button>
             ))}
+            {isAuthenticated && user && (
+              <>
+                <Box sx={{ borderTop: "1px solid rgba(255, 255, 255, 0.2)", my: 1, pt: 1 }}>
+                  <Typography variant="caption" sx={{ px: 2, display: "block", mb: 1 }}>
+                    {user.full_name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ px: 2, display: "block", mb: 1 }}>
+                    {user.email}
+                  </Typography>
+                  <Chip
+                    label={user.role === "admin" ? "Admin" : "User"}
+                    size="small"
+                    color={user.role === "admin" ? "secondary" : "default"}
+                    sx={{ ml: 2, mb: 1 }}
+                  />
+                </Box>
+                <Button
+                  color="inherit"
+                  fullWidth
+                  startIcon={<LogoutIcon />}
+                  onClick={handleLogout}
+                  sx={{ justifyContent: "flex-start" }}
+                >
+                  Logout
+                </Button>
+              </>
+            )}
           </Box>
         )}
       </AppBar>
