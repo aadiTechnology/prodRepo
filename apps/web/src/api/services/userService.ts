@@ -1,4 +1,4 @@
-import axiosInstance from "../axiosInstance";
+import apiClient from "../client";
 import { User, UserCreate, UserUpdate, ApiError } from "../../types/user";
 
 export const userService = {
@@ -6,7 +6,7 @@ export const userService = {
    * Get all users
    */
   getAllUsers: async (): Promise<User[]> => {
-    const response = await axiosInstance.get<User[]>("/users");
+    const response = await apiClient.get<User[]>("/users");
     return response.data;
   },
 
@@ -14,7 +14,7 @@ export const userService = {
    * Get a single user by ID
    */
   getUserById: async (id: number): Promise<User> => {
-    const response = await axiosInstance.get<User>(`/users/${id}`);
+    const response = await apiClient.get<User>(`/users/${id}`);
     return response.data;
   },
 
@@ -22,7 +22,7 @@ export const userService = {
    * Create a new user
    */
   createUser: async (userData: UserCreate): Promise<User> => {
-    const response = await axiosInstance.post<User>("/users", userData);
+    const response = await apiClient.post<User>("/users", userData);
     return response.data;
   },
 
@@ -30,7 +30,7 @@ export const userService = {
    * Update an existing user
    */
   updateUser: async (id: number, userData: UserUpdate): Promise<User> => {
-    const response = await axiosInstance.put<User>(`/users/${id}`, userData);
+    const response = await apiClient.put<User>(`/users/${id}`, userData);
     return response.data;
   },
 
@@ -38,7 +38,7 @@ export const userService = {
    * Delete a user
    */
   deleteUser: async (id: number): Promise<void> => {
-    await axiosInstance.delete(`/users/${id}`);
+    await apiClient.delete(`/users/${id}`);
   },
 };
 
