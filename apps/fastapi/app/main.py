@@ -12,7 +12,7 @@ from app.core.exception_handlers import (
     sqlalchemy_exception_handler,
     generic_exception_handler,
 )
-from app.routers import user, auth
+from app.routers import user, auth, role, menu, feature, rbac
 from fastapi.exceptions import RequestValidationError
 
 # Setup logging first
@@ -55,6 +55,10 @@ app.add_exception_handler(Exception, generic_exception_handler)
 # Note: API_V1_PREFIX is available for future versioning, but not used here to maintain backward compatibility
 app.include_router(auth.router)
 app.include_router(user.router)
+app.include_router(role.router)
+app.include_router(menu.router)
+app.include_router(feature.router)
+app.include_router(rbac.router)
 
 @app.on_event("startup")
 async def startup_event():

@@ -3,9 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.core.database import get_db
-from app.schemas.auth import LoginRequest, TokenResponse, UserWithRole
+from app.schemas.auth import LoginRequest, TokenResponse, UserWithRole, LoginContextResponse
 from app.schemas.user import UserCreate, UserResponse
-from app.services import user_service
+from app.services import user_service, rbac_service
 from app.models.user import UserRole
 from app.utils.security import verify_password, create_access_token
 from app.core.exceptions import UnauthorizedException
@@ -88,6 +88,43 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> Toke
     
     logger.info(f"User logged in successfully: {user.email}. Token created (length: {len(access_token)})")
     return TokenResponse(access_token=access_token)
+
+
+@router.post("/login/context", response_model=LoginContextResponse)
+async def login_with_context(
+    login_data: LoginRequest,
+    db: Session = Depends(get_db),
+) -> LoginContextResponse:
+    """
+    Authenticate user and return JWT token plus RBAC context (roles, permissions, menus).
+
+    This is a non-breaking extension of the existing /auth/login.
+    """
+    logger.info(f"[RBAC] Login-with-context attempt for email: {login_data.email}")
+
+    # Reuse existing login logic
+    user = user_service.get_user_by_email(db, login_data.email)
+    if not user or not verify_password(login_data.password, user.hashed_password):
+        logger.warning(f"[RBAC] Invalid credentials for email: {login_data.email}")
+        raise UnauthorizedException("Invalid email or password")
+
+    access_token = create_access_token(
+        data={"sub": str(user.id), "email": user.email, "role": user.role.value}
+    )
+
+    # Resolve roles, permissions, menus
+    permissions, menus = rbac_service.resolve_user_permissions_and_menus(db, user)
+    roles = [r.code for r in rbac_service.get_user_roles(db, user.id)]
+
+    logger.info(f"[RBAC] User logged in with context: {user.email}, roles={roles}, perms={len(permissions)}")
+
+    return LoginContextResponse(
+        access_token=access_token,
+        user=UserWithRole(id=user.id, email=user.email, full_name=user.full_name, role=user.role),
+        roles=roles,
+        permissions=permissions,
+        menus=menus,
+    )
 
 @router.get("/me", response_model=UserWithRole)
 async def get_current_user_info(

@@ -1,7 +1,8 @@
 """Authentication schemas."""
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 from app.models.user import UserRole
+from app.schemas.menu import MenuNode
 
 class LoginRequest(BaseModel):
     """Login request schema."""
@@ -32,3 +33,14 @@ class CurrentUser(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class LoginContextResponse(BaseModel):
+    """Extended login response including RBAC context."""
+
+    access_token: str
+    token_type: str = "bearer"
+    user: UserWithRole
+    roles: List[str]
+    permissions: List[str]
+    menus: List[MenuNode]
