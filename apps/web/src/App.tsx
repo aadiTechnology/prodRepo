@@ -8,16 +8,16 @@ import ErrorBoundary from "./components/ErrorBoundary";
 export default function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <BrowserRouter>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <BrowserRouter>
           <ErrorBoundary>
             <AuthProvider>
-              <AppRoutes />
+        <AppRoutes />
             </AuthProvider>
           </ErrorBoundary>
-        </BrowserRouter>
-      </ThemeProvider>
+      </BrowserRouter>
+    </ThemeProvider>
     </ErrorBoundary>
   );
 }

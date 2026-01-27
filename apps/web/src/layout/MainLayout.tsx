@@ -217,7 +217,7 @@ function MainLayout() {
 
       <Box component="main" sx={{ flexGrow: 1, py: { xs: 2, md: 4 } }}>
         <PageContainer>
-          <Outlet />
+        <Outlet />
         </PageContainer>
       </Box>
 

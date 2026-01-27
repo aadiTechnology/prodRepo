@@ -28,13 +28,13 @@ const PageLoader = () => (
 export default function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
-      <Routes>
+    <Routes>
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
         {/* Protected routes with layout */}
-        <Route element={<MainLayout />}>
+      <Route element={<MainLayout />}>
           <Route
             path="/"
             element={
@@ -59,8 +59,8 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
-        </Route>
-      </Routes>
+      </Route>
+    </Routes>
     </Suspense>
   );
 }
