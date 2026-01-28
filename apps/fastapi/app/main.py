@@ -12,8 +12,19 @@ from app.core.exception_handlers import (
     sqlalchemy_exception_handler,
     generic_exception_handler,
 )
-from app.routers import user, auth, role, menu, feature, rbac
 from fastapi.exceptions import RequestValidationError
+
+# Import all models first to ensure SQLAlchemy relationships are properly configured
+# This must happen before any database operations or router imports
+from app.models import (  # noqa: F401
+    Tenant,
+    User,
+    Role,
+    Feature,
+    Menu,
+)
+
+from app.routers import user, auth, role, menu, feature, rbac
 
 # Setup logging first
 setup_logging()

@@ -53,5 +53,5 @@ class MenuNode(BaseModel):
     children: List["MenuNode"] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
