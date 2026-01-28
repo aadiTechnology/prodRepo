@@ -23,6 +23,7 @@ import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from "@mui/ico
 import { User, UserCreate, UserUpdate } from "../types/user";
 import userService from "../api/services/userService";
 import UserForm from "../components/UserForm";
+import PermissionGate from "../components/auth/PermissionGate";
 
 function Users() {
   const [users, setUsers] = useState<User[]>([]);
@@ -112,20 +113,24 @@ function Users() {
         <TableCell>{user.email}</TableCell>
         <TableCell>{user.full_name}</TableCell>
         <TableCell align="right">
-          <IconButton
-            color="primary"
-            onClick={() => handleEditClick(user)}
-            aria-label="edit"
-          >
-            <EditIcon />
-          </IconButton>
-          <IconButton
-            color="error"
-            onClick={() => handleDeleteClick(user)}
-            aria-label="delete"
-          >
-            <DeleteIcon />
-          </IconButton>
+          <PermissionGate permission="USER_EDIT">
+            <IconButton
+              color="primary"
+              onClick={() => handleEditClick(user)}
+              aria-label="edit"
+            >
+              <EditIcon />
+            </IconButton>
+          </PermissionGate>
+          <PermissionGate permission="USER_DELETE">
+            <IconButton
+              color="error"
+              onClick={() => handleDeleteClick(user)}
+              aria-label="delete"
+            >
+              <DeleteIcon />
+            </IconButton>
+          </PermissionGate>
         </TableCell>
       </TableRow>
     ));
@@ -135,16 +140,18 @@ function Users() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Typography variant="h4">Users Management</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => {
-            setSelectedUser(null);
-            setFormOpen(true);
-          }}
-        >
-          Add User
-        </Button>
+        <PermissionGate permission="USER_CREATE">
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setSelectedUser(null);
+              setFormOpen(true);
+            }}
+          >
+            Add User
+          </Button>
+        </PermissionGate>
       </Box>
 
       {error && (

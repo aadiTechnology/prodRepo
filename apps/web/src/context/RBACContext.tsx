@@ -16,6 +16,7 @@ interface RBACContextType extends RBACState {
   // Role checking
   hasRole: (role: string) => boolean;
   hasAnyRole: (roles: string[]) => boolean;
+  hasAllRoles: (roles: string[]) => boolean;
   
   // Menu utilities
   getMenuByPath: (path: string) => MenuNode | null;
@@ -170,6 +171,16 @@ export function RBACProvider({ children }: RBACProviderProps) {
   );
 
   /**
+   * Check if user has all of the specified roles
+   */
+  const hasAllRoles = useCallback(
+    (roleList: string[]): boolean => {
+      return roleList.every((role) => roles.includes(role));
+    },
+    [roles]
+  );
+
+  /**
    * Get menu by path
    */
   const getMenuByPath = useCallback(
@@ -228,6 +239,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
       hasAllPermissions,
       hasRole,
       hasAnyRole,
+      hasAllRoles,
       getMenuByPath,
       getMenuFeatures,
       setRBACData,
@@ -244,6 +256,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
       hasAllPermissions,
       hasRole,
       hasAnyRole,
+      hasAllRoles,
       getMenuByPath,
       getMenuFeatures,
       setRBACData,
