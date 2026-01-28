@@ -16,6 +16,6 @@ export interface MenuNode {
   icon: string | null;
   sort_order: number;
   level: 1 | 2;
-  features: Feature[];
+  features?: Feature[];
   children?: MenuNode[]; // Only for level 1 menus
 }

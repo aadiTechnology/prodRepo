@@ -72,16 +72,22 @@ const extractPermissions = (menus: MenuNode[]): string[] => {
   const permissions = new Set<string>();
   
   const traverseMenu = (menu: MenuNode) => {
-    menu.features.forEach((feature) => {
-      permissions.add(feature.code);
-    });
+    if (menu.features && Array.isArray(menu.features)) {
+      menu.features.forEach((feature) => {
+        if (feature && feature.code) {
+          permissions.add(feature.code);
+        }
+      });
+    }
     
     if (menu.children) {
       menu.children.forEach(traverseMenu);
     }
   };
   
-  menus.forEach(traverseMenu);
+  if (Array.isArray(menus)) {
+    menus.forEach(traverseMenu);
+  }
   return Array.from(permissions);
 };
 
