@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_admin, CurrentUser
-from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserPasswordUpdate
 from app.services import user_service
 from app.core.logging_config import get_logger
 
@@ -104,4 +104,21 @@ async def delete_user(
     """Soft delete a user. Requires admin role."""
     logger.info(f"Admin {current_user.email} soft-deleting user: {user_id}")
     user_service.soft_delete_user(db, user_id, deleted_by=current_user.id)
+    return None
+
+
+@router.put("/{user_id}/password", status_code=204)
+async def change_user_password(
+    user_id: int,
+    payload: UserPasswordUpdate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_admin),
+) -> None:
+    """
+    Change a user's password (admin-only).
+
+    This is used by admins to reset another user's password.
+    """
+    logger.info(f"Admin {current_user.email} changing password for user: {user_id}")
+    user_service.set_user_password(db, user_id, payload.new_password, updated_by=current_user.id)
     return None

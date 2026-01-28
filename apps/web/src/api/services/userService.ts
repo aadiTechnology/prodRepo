@@ -40,6 +40,15 @@ export const userService = {
   deleteUser: async (id: number): Promise<void> => {
     await apiClient.delete(`/users/${id}`);
   },
+
+  /**
+   * Change a user's password (admin-only)
+   */
+  changePassword: async (id: number, newPassword: string): Promise<void> => {
+    await apiClient.put(`/users/${id}/password`, {
+      new_password: newPassword,
+    });
+  },
 };
 
 export default userService;

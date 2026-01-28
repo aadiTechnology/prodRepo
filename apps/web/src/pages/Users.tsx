@@ -18,8 +18,9 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  TextField,
 } from "@mui/material";
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from "@mui/icons-material";
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, VpnKey as PasswordIcon } from "@mui/icons-material";
 import { User, UserCreate, UserUpdate } from "../types/user";
 import userService from "../api/services/userService";
 import UserForm from "../components/UserForm";
@@ -33,6 +34,10 @@ function Users() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -73,6 +78,13 @@ function Users() {
     setDeleteDialogOpen(true);
   }, []);
 
+  const handlePasswordClick = useCallback((user: User) => {
+    setSelectedUser(user);
+    setNewPassword("");
+    setPasswordError(null);
+    setPasswordDialogOpen(true);
+  }, []);
+
   const handleDeleteConfirm = useCallback(async () => {
     if (selectedUser) {
       try {
@@ -88,6 +100,28 @@ function Users() {
       }
     }
   }, [selectedUser, fetchUsers]);
+
+  const handlePasswordChangeConfirm = useCallback(async () => {
+    if (!selectedUser) return;
+
+    if (!newPassword.trim()) {
+      setPasswordError("New password is required");
+      return;
+    }
+
+    try {
+      setPasswordLoading(true);
+      setPasswordError(null);
+      await userService.changePassword(selectedUser.id, newPassword.trim());
+      setPasswordDialogOpen(false);
+      setSelectedUser(null);
+      setNewPassword("");
+    } catch (err: any) {
+      setPasswordError(err?.detail || "Failed to change password. Please try again.");
+    } finally {
+      setPasswordLoading(false);
+    }
+  }, [selectedUser, newPassword]);
 
   const handleFormClose = useCallback(() => {
     setFormOpen(false);
@@ -120,6 +154,15 @@ function Users() {
               aria-label="edit"
             >
               <EditIcon />
+            </IconButton>
+          </PermissionGate>
+          <PermissionGate permission="USER_EDIT">
+            <IconButton
+              color="secondary"
+              onClick={() => handlePasswordClick(user)}
+              aria-label="change-password"
+            >
+              <PasswordIcon />
             </IconButton>
           </PermissionGate>
           <PermissionGate permission="USER_DELETE">
@@ -211,6 +254,48 @@ function Users() {
             disabled={deleteLoading}
           >
             {deleteLoading ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={passwordDialogOpen}
+        onClose={() => !passwordLoading && setPasswordDialogOpen(false)}
+      >
+        <DialogTitle>Change Password</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+            <DialogContentText>
+              Set a new password for user <strong>{selectedUser?.email}</strong>.
+            </DialogContentText>
+            {passwordError && (
+              <Alert severity="error" onClose={() => setPasswordError(null)}>
+                {passwordError}
+              </Alert>
+            )}
+            <TextField
+              label="New Password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+                setPasswordError(null);
+              }}
+              fullWidth
+              autoFocus
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPasswordDialogOpen(false)} disabled={passwordLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handlePasswordChangeConfirm}
+            variant="contained"
+            disabled={passwordLoading}
+          >
+            {passwordLoading ? "Saving..." : "Change Password"}
           </Button>
         </DialogActions>
       </Dialog>

@@ -20,6 +20,12 @@ class UserUpdate(BaseModel):
     tenant_id: Optional[int] = None
 
 
+class UserPasswordUpdate(BaseModel):
+    """Payload for updating a user's password (admin-initiated)."""
+
+    new_password: str
+
+
 class UserResponse(BaseModel):
     id: int
     email: EmailStr

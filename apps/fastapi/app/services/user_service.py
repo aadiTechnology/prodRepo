@@ -103,3 +103,22 @@ def delete_user(db: Session, user_id: int) -> bool:
     """Soft delete a user (legacy function name for backward compatibility)."""
     soft_delete_user(db, user_id)
     return True
+
+
+def set_user_password(
+    db: Session,
+    user_id: int,
+    new_password: str,
+    updated_by: int | None = None,
+) -> User:
+    """Set a new password for a user (admin-initiated)."""
+    db_user = get_user(db, user_id)  # This will raise NotFoundException if not found
+
+    db_user.hashed_password = hash_password(new_password)
+    db_user.updated_at = datetime.utcnow()
+    db_user.updated_by = updated_by
+
+    db.commit()
+    db.refresh(db_user)
+    logger.info(f"Password changed for user: {db_user.email} (id={db_user.id})")
+    return db_user
