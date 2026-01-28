@@ -24,7 +24,7 @@ from app.models import (  # noqa: F401
     Menu,
 )
 
-from app.routers import user, auth, role, menu, feature, rbac
+from app.routers import user, auth, role, menu, feature, rbac, tenant
 
 # Setup logging first
 setup_logging()
@@ -66,6 +66,7 @@ app.add_exception_handler(Exception, generic_exception_handler)
 # Note: API_V1_PREFIX is available for future versioning, but not used here to maintain backward compatibility
 app.include_router(auth.router)
 app.include_router(user.router)
+app.include_router(tenant.router)
 app.include_router(role.router)
 app.include_router(menu.router)
 app.include_router(feature.router)

@@ -18,7 +18,16 @@ async def create_user(
 ) -> UserResponse:
     """Create a new user. Requires admin role."""
     logger.info(f"Admin {current_user.email} creating user: {user.email}")
-    return user_service.create_user(db, user)
+    db_user = user_service.create_user(db, user, created_by=current_user.id)
+    return UserResponse(
+        id=db_user.id,
+        email=db_user.email,
+        full_name=db_user.full_name,
+        tenant_id=db_user.tenant_id,
+        phone_number=db_user.phone_number,
+        is_active=db_user.is_active,
+        created_at=db_user.created_at,
+    )
 
 @router.get("/", response_model=list[UserResponse])
 async def read_all_users(
@@ -27,7 +36,19 @@ async def read_all_users(
 ) -> list[UserResponse]:
     """Get all users. Requires authentication."""
     logger.debug(f"User {current_user.email} fetching all users")
-    return user_service.get_users(db)
+    users = user_service.get_users(db)
+    return [
+        UserResponse(
+            id=u.id,
+            email=u.email,
+            full_name=u.full_name,
+            tenant_id=u.tenant_id,
+            phone_number=u.phone_number,
+            is_active=u.is_active,
+            created_at=u.created_at,
+        )
+        for u in users
+    ]
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def read_user(
@@ -37,7 +58,16 @@ async def read_user(
 ) -> UserResponse:
     """Get a user by ID. Requires authentication."""
     logger.debug(f"User {current_user.email} fetching user: {user_id}")
-    return user_service.get_user(db, user_id)
+    u = user_service.get_user(db, user_id)
+    return UserResponse(
+        id=u.id,
+        email=u.email,
+        full_name=u.full_name,
+        tenant_id=u.tenant_id,
+        phone_number=u.phone_number,
+        is_active=u.is_active,
+        created_at=u.created_at,
+    )
 
 @router.put("/{user_id}", response_model=UserResponse)
 async def update_user(
@@ -54,15 +84,24 @@ async def update_user(
         from app.core.exceptions import ForbiddenException
         raise ForbiddenException("You can only update your own profile")
     logger.info(f"User {current_user.email} updating user: {user_id}")
-    return user_service.update_user(db, user_id, user)
+    db_user = user_service.update_user(db, user_id, user, updated_by=current_user.id)
+    return UserResponse(
+        id=db_user.id,
+        email=db_user.email,
+        full_name=db_user.full_name,
+        tenant_id=db_user.tenant_id,
+        phone_number=db_user.phone_number,
+        is_active=db_user.is_active,
+        created_at=db_user.created_at,
+    )
 
-@router.delete("/{user_id}")
+@router.delete("/{user_id}", status_code=204)
 async def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin)
-) -> dict:
-    """Delete a user. Requires admin role."""
-    logger.info(f"Admin {current_user.email} deleting user: {user_id}")
-    user_service.delete_user(db, user_id)
-    return {"message": "User deleted successfully"}
+) -> None:
+    """Soft delete a user. Requires admin role."""
+    logger.info(f"Admin {current_user.email} soft-deleting user: {user_id}")
+    user_service.soft_delete_user(db, user_id, deleted_by=current_user.id)
+    return None

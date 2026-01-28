@@ -41,7 +41,8 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)) -> User
     role = UserRole.ADMIN if is_first_user else UserRole.USER
     
     logger.info(f"Registering new user: {user_data.email} with role: {role.value}")
-    created_user = user_service.create_user(db, user_data, role=role)
+    # First user doesn't have a creator, so created_by is None
+    created_user = user_service.create_user(db, user_data, role=role, created_by=None)
     
     if is_first_user:
         logger.info(f"First user created as admin: {created_user.email}")
@@ -49,7 +50,11 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)) -> User
     return UserResponse(
         id=created_user.id,
         email=created_user.email,
-        full_name=created_user.full_name
+        full_name=created_user.full_name,
+        tenant_id=created_user.tenant_id,
+        phone_number=created_user.phone_number,
+        is_active=created_user.is_active,
+        created_at=created_user.created_at,
     )
 
 @router.post("/login", response_model=TokenResponse)
