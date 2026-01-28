@@ -25,11 +25,11 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)) -> User
     Subsequent registrations will create regular users.
     
     Args:
-        user_data: User registration data (email, full_name, password)
+        user_data: User registration data (email, full_name, password, phone_number, tenant_id - optional)
         db: Database session
     
     Returns:
-        UserResponse: Created user information
+        UserResponse: Created user information including phone_number and tenant_id
     """
     from app.models.user import User
     

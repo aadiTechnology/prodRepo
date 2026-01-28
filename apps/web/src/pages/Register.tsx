@@ -25,6 +25,7 @@ export default function Register() {
     full_name: "",
     password: "",
     confirmPassword: "",
+    phone_number: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,6 +80,7 @@ export default function Register() {
         email: formData.email,
         full_name: formData.full_name,
         password: formData.password,
+        phone_number: formData.phone_number.trim() || undefined,
       });
       
       setSuccess(true);
@@ -172,6 +174,20 @@ export default function Register() {
               required
               fullWidth
               autoComplete="name"
+            />
+
+            <TextField
+              name="phone_number"
+              label="Phone Number"
+              type="tel"
+              value={formData.phone_number}
+              onChange={handleChange}
+              fullWidth
+              autoComplete="tel"
+              helperText="Optional - Include country code (e.g., +1234567890)"
+              inputProps={{
+                pattern: "[+]?[0-9\\s\\-()]+",
+              }}
             />
 
             <TextField
