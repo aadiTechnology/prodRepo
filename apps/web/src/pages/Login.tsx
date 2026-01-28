@@ -16,13 +16,15 @@ import {
   Link,
 } from "@mui/material";
 import { useAuth } from "../context/AuthContext";
+import { useRBAC } from "../context/RBACContext";
 import { LoginRequest } from "../types/auth";
 import { PageHeader } from "../components/common";
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { loginWithContext, isAuthenticated, isLoading } = useAuth();
+  const { setRBACData } = useRBAC();
   
   const [formData, setFormData] = useState<LoginRequest>({
     email: "",
@@ -51,7 +53,15 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      await login(formData);
+      // Use loginWithContext to get RBAC data
+      const response = await loginWithContext(formData);
+      
+      // Set RBAC data (roles and menus)
+      setRBACData({
+        roles: response.roles,
+        menus: response.menus,
+      });
+      
       // Navigation will happen via useEffect when isAuthenticated changes
       const from = (location.state as { from?: Location })?.from?.pathname || "/";
       navigate(from, { replace: true });

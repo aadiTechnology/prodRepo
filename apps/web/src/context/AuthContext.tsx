@@ -7,9 +7,11 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { User, LoginRequest, AuthState } from "../types/auth";
 import authService from "../api/services/authService";
 import { ApiError } from "../api/client";
+import { LoginContextResponse } from "../types/rbac";
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginRequest) => Promise<void>;
+  loginWithContext: (credentials: LoginRequest) => Promise<LoginContextResponse>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -110,7 +112,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [token]);
 
   /**
-   * Login user
+   * Login user (legacy method - uses basic login)
    */
   const login = useCallback(async (credentials: LoginRequest) => {
     try {
@@ -136,12 +138,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   /**
+   * Login user with RBAC context (recommended - includes roles, menus, permissions)
+   */
+  const loginWithContext = useCallback(async (credentials: LoginRequest): Promise<LoginContextResponse> => {
+    try {
+      setIsLoading(true);
+      const response = await authService.loginWithContext(credentials);
+      
+      // Save token
+      setToken(response.access_token);
+      saveToken(response.access_token);
+
+      // Save user information
+      setUser(response.user);
+      saveUser(response.user);
+
+      return response;
+    } catch (error) {
+      clearAuthData();
+      setToken(null);
+      setUser(null);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /**
    * Logout user
    */
   const logout = useCallback(() => {
     clearAuthData();
     setToken(null);
     setUser(null);
+    // Note: RBAC data clearing is handled by RBACProvider
   }, []);
 
   // Initialize: verify token and fetch user on mount
@@ -179,10 +209,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       isAuthenticated,
       isLoading,
       login,
+      loginWithContext,
       logout,
       refreshUser,
     }),
-    [user, token, isAuthenticated, isLoading, login, logout, refreshUser]
+    [user, token, isAuthenticated, isLoading, login, loginWithContext, logout, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
