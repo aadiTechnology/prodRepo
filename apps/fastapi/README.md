@@ -13,9 +13,11 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 python.exe -m pip install --upgrade pip
+pip install pydantic[email]
 3. Configure environment
 - Copy `.env.example` to `.env`
 - Update SQL Server credentials
+alembic upgrade head
 
 4. Ensure SQL Server ODBC Driver 17/18 is installed
 
