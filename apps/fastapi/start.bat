@@ -1,7 +1,7 @@
 @echo off
 cd C:\Users\lenovo\AadiTech\Product\code\apps\fastapi
 
-REM venv\\Scripts\\activate
+REM python -m venv venv
 
 echo Activating virtual environment...
 call venv\\Scripts\\activate
