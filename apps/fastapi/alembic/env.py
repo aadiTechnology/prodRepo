@@ -24,7 +24,7 @@ config = context.config
 #     "?driver=ODBC+Driver+17+for+SQL+Server"
 # )
 # db_url = db_url.replace('%', '%%')
-db_url = "mssql+pyodbc://LAPTOP-FC61VAQA\\SQLEXPRESS/erpdb?driver=ODBC+Driver+18+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes"
+db_url = "mssql+pyodbc://localhost\\SQLEXPRESS/erpdb?driver=ODBC+Driver+18+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes"
 
 config.set_main_option("sqlalchemy.url", db_url)
 

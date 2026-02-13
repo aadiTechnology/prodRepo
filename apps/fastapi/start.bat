@@ -10,7 +10,7 @@ REM pip install -r requirements.txt
 
 REM python.exe -m pip install --upgrade pip
 
-REM pip install 'pydantic[email]'
+REM pip install pydantic[email]
 
 echo Starting FastAPI server...
 uvicorn app.main:app --host 127.0.0.1 --port 8000
