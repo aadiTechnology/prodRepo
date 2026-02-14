@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 /**
  * Environment configuration
  * Provides type-safe access to environment variables
