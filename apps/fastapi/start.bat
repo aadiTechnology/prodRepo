@@ -14,7 +14,7 @@ REM pip install pydantic[email]
 REM pip uninstall bcrypt passlib -y
 REM pip install "passlib==1.7.4" "bcrypt==4.0.1"
 
-
+REM sadsa
 echo Starting FastAPI server...
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 
