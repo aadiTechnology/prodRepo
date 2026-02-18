@@ -71,13 +71,36 @@ def set_role_features(db: Session, role: Role, feature_ids: List[int], acting_us
 def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[str], List[MenuNode]]:
     """
     Resolve effective permission codes and menu tree for a user, based on roles.
+    SUPER_ADMIN users get all features and menus automatically.
     """
+    from app.models.user import UserRole
+    from app.core.dependencies import SYSTEM_ADMIN_ROLE_CODE
+    
+    logger.info(f"[RBAC] Resolving permissions for user: {user.email} (role={user.role}, tenant_id={user.tenant_id})")
+    
     roles = get_user_roles(db, user.id)
     role_ids = [r.id for r in roles]
-
+    role_codes = [r.code.lower() for r in roles]
+    
+    logger.info(f"[RBAC] User has roles: {role_codes}")
+    
+    # Check if user is SUPER_ADMIN
+    is_super_admin = (
+        user.role == UserRole.SUPER_ADMIN or 
+        (user.role == UserRole.ADMIN and user.tenant_id is None) or
+        SYSTEM_ADMIN_ROLE_CODE.lower() in role_codes
+    )
+    
+    logger.info(f"[RBAC] is_super_admin={is_super_admin}")
+    
     # Resolve feature codes
-    feature_codes = []
-    if role_ids:
+    if is_super_admin:
+        # Grant all active features to SUPER_ADMIN
+        features = db.query(Feature).filter(
+            Feature.is_deleted == False,  # noqa: E712
+            Feature.is_active == True,  # noqa: E712
+        ).all()
+    elif role_ids:
         features = (
             db.query(Feature)
             .join(role_features, role_features.c.feature_id == Feature.id)
@@ -89,11 +112,27 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
             .distinct()
             .all()
         )
-        feature_codes = [f.code for f in features]
-
+    else:
+        features = []
+    
+    feature_codes = [f.code for f in features]
+    
     # Resolve menus
-    menu_tree: List[MenuNode] = []
-    if role_ids:
+    if is_super_admin:
+        # Grant all active menus to SUPER_ADMIN (filter by tenant if applicable)
+        menu_rows = db.query(Menu).filter(
+            Menu.is_deleted == False,  # noqa: E712
+            Menu.is_active == True,  # noqa: E712
+        ).all()
+        logger.info(f"[RBAC] SUPER_ADMIN: Found {len(menu_rows)} active menus before tenant filter")
+        
+        # Filter by tenant (global menus + user's tenant menus)
+        menu_rows = [
+            m for m in menu_rows
+            if m.tenant_id is None or m.tenant_id == user.tenant_id
+        ]
+        logger.info(f"[RBAC] SUPER_ADMIN: After tenant filter: {len(menu_rows)} menus")
+    elif role_ids:
         menu_rows = (
             db.query(Menu)
             .join(role_menus, role_menus.c.menu_id == Menu.id)
@@ -111,7 +150,11 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
             for m in menu_rows
             if m.tenant_id is None or m.tenant_id == user.tenant_id
         ]
-        menu_tree = menu_service.build_menu_tree(menu_rows)
+    else:
+        menu_rows = []
+    
+    menu_tree = menu_service.build_menu_tree(menu_rows) if menu_rows else []
 
     return feature_codes, menu_tree
+
 

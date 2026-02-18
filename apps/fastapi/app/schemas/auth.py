@@ -30,6 +30,7 @@ class CurrentUser(BaseModel):
     email: EmailStr
     full_name: str
     role: UserRole
+    tenant_id: Optional[int] = None  # Added to support tenant-based authorization
 
     class Config:
         from_attributes = True

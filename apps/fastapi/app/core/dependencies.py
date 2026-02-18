@@ -87,33 +87,108 @@ def get_current_user(
         logger.warning(f"User not found for token user_id: {user_id}")
         raise UnauthorizedException("User not found")
     
-    logger.debug(f"User authenticated: {user.email} (role: {user.role.value})")
-    
+    logger.debug(f"User authenticated: {user.email} (role: {user.role.value}, tenant_id: {user.tenant_id})")
+
     return CurrentUser(
         id=user.id,
         email=user.email,
         full_name=user.full_name,
-        role=user.role
+        role=user.role,
+        tenant_id=user.tenant_id,
     )
+
+
+# RBAC role codes from DB that are treated as admin / system admin (see roles table in SSMS)
+
+SYSTEM_ADMIN_ROLE_CODE = "SYSTEM_ADMIN"  # Changed from SUPER_ADMIN to match database
+
+
+def _get_rbac_role_codes(db: Session, user_id: int) -> list[str]:
+    """Load role codes from DB (user_roles + roles) for the user. Used for permission checks."""
+    from app.models.role import user_roles, Role
+
+    rbac_roles = (
+        db.query(Role)
+        .join(user_roles, user_roles.c.role_id == Role.id)
+        .filter(
+            user_roles.c.user_id == user_id,
+            Role.is_deleted == False,  # noqa: E712
+        )
+        .all()
+    )
+    return [r.code.lower() for r in rbac_roles]
+
 
 def require_role(allowed_roles: list[UserRole]):
     """
     Dependency factory to require specific roles.
-    
-    Args:
-        allowed_roles: List of allowed roles
-    
-    Returns:
-        Dependency function that checks user role
+    Checks legacy User.role and RBAC user_roles table (database is source of truth).
+    For admin access, allows both 'admin' and 'system_admin' role codes from DB.
     """
-    def role_checker(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
-        if current_user.role not in allowed_roles:
-            logger.warning(f"User {current_user.email} attempted to access resource requiring roles: {allowed_roles}")
+    def role_checker(
+        current_user: CurrentUser = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> CurrentUser:
+        # SUPER_ADMIN users get full access to everything
+        if current_user.role == UserRole.SUPER_ADMIN:
+            return current_user
+        
+        # Legacy: users.role column
+        if current_user.role in allowed_roles:
+            return current_user
+
+        rbac_role_codes = _get_rbac_role_codes(db, current_user.id)
+        
+        # Check if user has SYSTEM_ADMIN role code from database
+        if SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_role_codes:
+            return current_user
+        
+        # Allow role codes from DB: enum values + SYSTEM_ADMIN (so sysadmin@server.com passes)
+        allowed_role_codes = [ur.value.lower() for ur in allowed_roles]
+        if UserRole.ADMIN in allowed_roles:
+            allowed_role_codes.append(SYSTEM_ADMIN_ROLE_CODE.lower())
+
+        if not any(code in allowed_role_codes for code in rbac_role_codes):
+            logger.warning(
+                f"User {current_user.email} attempted to access resource requiring roles: {allowed_roles} "
+                f"(legacy: {current_user.role}, rbac: {rbac_role_codes})"
+            )
             raise ForbiddenException("Insufficient permissions")
         return current_user
-    
+
     return role_checker
 
-# Convenience dependencies
+
+def require_system_admin(
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CurrentUser:
+    """
+    Only System Admin (org-level) can pass. Used for tenant CRUD and assigning
+    roles/features/menus to users. Tenant admins must not pass.
+    """
+    if current_user.tenant_id is not None:
+        logger.warning(
+            f"User {current_user.email} (tenant_id={current_user.tenant_id}) attempted system-admin-only resource"
+        )
+        raise ForbiddenException("Insufficient permissions")
+
+    # Check legacy role column for ADMIN or SUPER_ADMIN
+    if current_user.role in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+        return current_user
+
+    rbac_role_codes = _get_rbac_role_codes(db, current_user.id)
+    if SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_role_codes:
+        return current_user
+
+    logger.warning(
+        f"User {current_user.email} attempted system-admin-only resource "
+        f"(legacy: {current_user.role}, rbac: {rbac_role_codes})"
+    )
+    raise ForbiddenException("Insufficient permissions")
+
+
+# Convenience dependencies////
+#---
 require_admin = require_role([UserRole.ADMIN])
 require_user = require_role([UserRole.USER, UserRole.ADMIN])
