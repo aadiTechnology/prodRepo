@@ -10,6 +10,7 @@ const About = lazy(() => import("../pages/About"));
 const Users = lazy(() => import("../pages/Users"));
 const Login = lazy(() => import("../pages/Login"));
 const Register = lazy(() => import("../pages/Register"));
+const Profile = lazy(() => import("../pages/ProfilePage"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -28,13 +29,13 @@ const PageLoader = () => (
 export default function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
-    <Routes>
+      <Routes>
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
         {/* Protected routes with layout */}
-      <Route element={<MainLayout />}>
+        <Route element={<MainLayout />}>
           {/* Basic authentication - no permissions required */}
           <Route
             path="/"
@@ -67,6 +68,14 @@ export default function AppRoutes() {
           */}
 
           {/* Current implementation - basic auth only */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/users"
             element={
@@ -128,8 +137,8 @@ export default function AppRoutes() {
             }
           />
           */}
-      </Route>
-    </Routes>
+        </Route>
+      </Routes>
     </Suspense>
   );
 }

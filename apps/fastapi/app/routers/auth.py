@@ -87,8 +87,10 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> Toke
     
     # Create access token
     # Note: JWT 'sub' claim must be a string, so convert user.id to string
+    # Get actual role from RBAC roles relationship, with fallback to legacy role
+    user_role = user.roles[0].name if user.roles else user.role.value
     access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "role": user.role.value}
+        data={"sub": str(user.id), "email": user.email, "role": user_role}
     )
     
     logger.info(f"User logged in successfully: {user.email}. Token created (length: {len(access_token)})")
@@ -113,8 +115,10 @@ async def login_with_context(
         logger.warning(f"[RBAC] Invalid credentials for email: {login_data.email}")
         raise UnauthorizedException("Invalid email or password")
 
+    # Get actual role from RBAC roles relationship, with fallback to legacy role
+    user_role = user.roles[0].name if user.roles else user.role.value
     access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "role": user.role.value}
+        data={"sub": str(user.id), "email": user.email, "role": user_role}
     )
 
     # Resolve roles, permissions, menus

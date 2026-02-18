@@ -4,14 +4,16 @@
  */
 
 import { AppBar, Toolbar, Typography, Box, Container, IconButton, useMediaQuery, useTheme, Menu, MenuItem, Avatar, Chip } from "@mui/material";
-import { Menu as MenuIcon, Logout as LogoutIcon } from "@mui/icons-material";
+import { Menu as MenuIcon, Logout as LogoutIcon, Person as PersonIcon, Lock as LockIcon } from "@mui/icons-material";
 import { Outlet, Link, useNavigate } from "react-router-dom";
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, memo, useEffect } from "react";
 import { appName } from "../config";
 import { Container as PageContainer } from "../components/common";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 import Sidebar from "../components/layout/Sidebar";
+import profileService from "../api/services/profileService";
+import { apiBaseUrl } from "../config";
 
 function MainLayout() {
   const theme = useTheme();
@@ -21,6 +23,37 @@ function MainLayout() {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const [avatarSrc, setAvatarSrc] = useState<string | undefined>(undefined);
+
+  /** Convert stored path like "/profile-images/7.jpg" → full URL */
+  const toFullUrl = (path: string | null | undefined): string | undefined => {
+    if (!path) return undefined;
+    if (path.startsWith("http")) return path;
+    const root = apiBaseUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
+    return `${root}${path}`;
+  };
+
+  /** Fetch profile image and update avatar */
+  const refreshAvatar = useCallback(async () => {
+    try {
+      const data = await profileService.getProfile();
+      setAvatarSrc(toFullUrl(data.profile_image_path));
+    } catch {
+      // silently ignore — avatar will fall back to initials
+    }
+  }, []);
+
+  // Fetch on mount
+  useEffect(() => {
+    if (isAuthenticated) refreshAvatar();
+  }, [isAuthenticated, refreshAvatar]);
+
+  // Listen for profile-image-updated event fired by ProfilePage after upload
+  useEffect(() => {
+    const handler = () => refreshAvatar();
+    window.addEventListener("profile-image-updated", handler);
+    return () => window.removeEventListener("profile-image-updated", handler);
+  }, [refreshAvatar]);
 
   const handleUserMenuOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {
     setUserMenuAnchor(event.currentTarget);
@@ -29,6 +62,16 @@ function MainLayout() {
   const handleUserMenuClose = useCallback(() => {
     setUserMenuAnchor(null);
   }, []);
+
+  const handleProfileClick = useCallback(() => {
+    handleUserMenuClose();
+    navigate("/profile");
+  }, [handleUserMenuClose, navigate]);
+
+  const handleChangePasswordClick = useCallback(() => {
+    handleUserMenuClose();
+    navigate("/change-password");
+  }, [handleUserMenuClose, navigate]);
 
   const handleLogout = useCallback(() => {
     handleUserMenuClose();
@@ -87,9 +130,19 @@ function MainLayout() {
             {isAuthenticated && user && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Chip
-                  label={user.role === "admin" ? "Admin" : "User"}
+                  label={
+                    user.role === "SUPER_ADMIN"
+                      ? "System Admin"
+                      : user.role === "admin"
+                        ? "Admin"
+                        : "User"
+                  }
                   size="small"
-                  color={user.role === "admin" ? "secondary" : "default"}
+                  color={
+                    user.role === "SUPER_ADMIN" || user.role === "admin"
+                      ? "secondary"
+                      : "default"
+                  }
                   sx={{ display: { xs: "none", sm: "flex" } }}
                 />
                 <IconButton
@@ -98,8 +151,11 @@ function MainLayout() {
                   sx={{ ml: 1 }}
                   aria-label="account menu"
                 >
-                  <Avatar sx={{ width: 32, height: 32, bgcolor: "secondary.main" }}>
-                    {user.full_name.charAt(0).toUpperCase()}
+                  <Avatar
+                    src={avatarSrc}
+                    sx={{ width: 32, height: 32, bgcolor: "secondary.main" }}
+                  >
+                    {!avatarSrc && user.full_name.charAt(0).toUpperCase()}
                   </Avatar>
                 </IconButton>
                 <Menu
@@ -125,6 +181,14 @@ function MainLayout() {
                       </Typography>
                     </Box>
                   </MenuItem>
+                  <MenuItem onClick={handleProfileClick}>
+                    <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
+                    My Profile
+                  </MenuItem>
+                  <MenuItem onClick={handleChangePasswordClick}>
+                    <LockIcon sx={{ mr: 1, fontSize: 20 }} />
+                    Change Password
+                  </MenuItem>
                   <MenuItem onClick={handleLogout}>
                     <LogoutIcon sx={{ mr: 1, fontSize: 20 }} />
                     Logout
@@ -135,11 +199,11 @@ function MainLayout() {
           </Toolbar>
         </AppBar>
 
-      <Box component="main" sx={{ flexGrow: 1, py: { xs: 2, md: 4 } }}>
-        <PageContainer>
-        <Outlet />
-        </PageContainer>
-      </Box>
+        <Box component="main" sx={{ flexGrow: 1, py: { xs: 2, md: 4 } }}>
+          <PageContainer>
+            <Outlet />
+          </PageContainer>
+        </Box>
 
         <Box
           component="footer"
