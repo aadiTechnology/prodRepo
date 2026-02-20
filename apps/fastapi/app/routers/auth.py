@@ -104,9 +104,14 @@ async def login_with_context(
     db: Session = Depends(get_db),
 ) -> LoginContextResponse:
     """
-    Authenticate user and return JWT token plus RBAC context (roles, permissions, menus).
-
-    This is a non-breaking extension of the existing /auth/login.
+    Unified Authentication Endpoint.
+    
+    Performs user verification and returns:
+    1. JWT Access Token
+    2. User Profile Info
+    3. RBAC Context (Full list of roles, permissions, and hierarchical menus)
+    
+    This replaces the multi-step fetch process with a single, high-performance call.
     """
     logger.info(f"[RBAC] Login-with-context attempt for email: {login_data.email}")
 

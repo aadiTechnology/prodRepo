@@ -144,7 +144,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   /**
-   * Login user with RBAC context (recommended - includes roles, menus, permissions)
+   * Login user with RBAC context (recommended)
+   * Fetches access_token, user profile, and all RBAC data (roles/menus) in a single request.
    */
   const loginWithContext = useCallback(async (credentials: LoginRequest): Promise<LoginContextResponse> => {
     try {
