@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
+import re
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -97,3 +98,17 @@ def verify_token(token: str) -> bool:
     """
     payload = decode_access_token(token)
     return payload is not None
+
+
+def validate_new_password(password: str) -> str | None:
+    """
+    Validate new password according to business rules.
+    Returns None if valid, or error message string if invalid.
+    """
+    if len(password) < 8:
+        return "New password must be at least 8 characters."
+    if not re.search(r"[A-Za-z]", password):
+        return "New password must contain at least one letter."
+    if not re.search(r"\d", password):
+        return "New password must contain at least one number."
+    return None

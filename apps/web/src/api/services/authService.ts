@@ -31,6 +31,13 @@ export const authService = {
     const response = await apiClient.get<User>("/auth/me");
     return response.data;
   },
+
+  /**
+   * Logout user (invalidate session/token on backend)
+   */
+  logout: async (): Promise<void> => {
+    await apiClient.post("/auth/logout");
+  },
 };
 
 export default authService;

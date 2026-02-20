@@ -11,6 +11,7 @@ from app.utils.security import verify_password, create_access_token
 from app.core.exceptions import UnauthorizedException
 from app.core.logging_config import get_logger
 from app.core.dependencies import get_current_user, CurrentUser
+from app.services.auth_service import revoke_token
 
 logger = get_logger(__name__)
 
@@ -90,7 +91,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> Toke
     # Get actual role from RBAC roles relationship, with fallback to legacy role
     user_role = user.roles[0].name if user.roles else user.role.value
     access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "role": user_role}
+        data={"sub": str(user.id), "email": user.email, "role": user_role , "tenant_id": user.tenant_id,}
     )
     
     logger.info(f"User logged in successfully: {user.email}. Token created (length: {len(access_token)})")
@@ -118,7 +119,7 @@ async def login_with_context(
     # Get actual role from RBAC roles relationship, with fallback to legacy role
     user_role = user.roles[0].name if user.roles else user.role.value
     access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "role": user_role}
+        data={"sub": str(user.id), "email": user.email, "role": user_role,"tenant_id": user.tenant_id,}
     )
 
     # Resolve roles, permissions, menus
@@ -163,3 +164,19 @@ async def get_current_user_info(
         full_name=current_user.full_name,
         role=current_user.role
     )
+
+@router.post("/logout")
+async def logout(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Logout user and revoke token."""
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.split()[1] if auth_header.startswith("Bearer ") else None
+    if token:
+        revoke_token(db, token, current_user.id)
+        logger.info(f"User {current_user.email} (tenant={getattr(current_user, 'tenant_id', None)}) logged out")
+    else:
+        logger.warning("Logout called with missing token")
+    return {"message": "Logged out successfully"}

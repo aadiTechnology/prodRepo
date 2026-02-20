@@ -3,6 +3,7 @@ import { lazy, Suspense } from "react";
 import { Box, CircularProgress } from "@mui/material";
 import MainLayout from "../layout/MainLayout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
+import ChangePassword from "../pages/ChangePassword";
 
 // Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
@@ -84,6 +85,14 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
+           <Route
+            path="/change-password"
+            element={
+              <ProtectedRoute>
+                <ChangePassword />
+            </ProtectedRoute>
+                        }
+          />
 
           {/* Example: Route with permission requirement */}
           {/* 
@@ -121,6 +130,11 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/change-password"
+            element={
+              <ProtectedRoute>
+                <ChangePassword />
           */}
 
           {/* Example: Route with multiple permissions (AND) */}
