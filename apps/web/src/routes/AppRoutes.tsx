@@ -12,6 +12,7 @@ const Users = lazy(() => import("../pages/Users"));
 const Login = lazy(() => import("../pages/Login"));
 const Register = lazy(() => import("../pages/Register"));
 const Profile = lazy(() => import("../pages/ProfilePage"));
+const SessionExpired = lazy(() => import("../pages/SessionExpired"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -34,6 +35,7 @@ export default function AppRoutes() {
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/session-expired" element={<SessionExpired />} />
 
         {/* Protected routes with layout */}
         <Route element={<MainLayout />}>
@@ -85,13 +87,13 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
-           <Route
+          <Route
             path="/change-password"
             element={
               <ProtectedRoute>
                 <ChangePassword />
-            </ProtectedRoute>
-                        }
+              </ProtectedRoute>
+            }
           />
 
           {/* Example: Route with permission requirement */}

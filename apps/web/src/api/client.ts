@@ -89,15 +89,16 @@ const createAxiosInstance = (): AxiosInstance => {
 
       // Handle different error scenarios
       if (error.response) {
-        // Handle 401 Unauthorized - clear auth and redirect to login
+        // Handle 401 Unauthorized - clear auth and redirect to session expired page
         if (error.response.status === 401) {
           // Clear authentication data
           localStorage.removeItem("auth_token");
           localStorage.removeItem("auth_user");
-          
-          // Only redirect if not already on login page
-          if (window.location.pathname !== "/login") {
-            window.location.href = "/login";
+
+          // Only redirect if not already on login or session-expired page
+          const currentPath = window.location.pathname;
+          if (currentPath !== "/login" && currentPath !== "/session-expired") {
+            window.location.href = "/session-expired";
           }
         }
 

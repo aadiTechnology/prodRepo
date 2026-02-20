@@ -124,7 +124,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true);
       const tokenResponse = await authService.login(credentials);
-      
+
       // Save token
       setToken(tokenResponse.access_token);
       saveToken(tokenResponse.access_token);
@@ -150,7 +150,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true);
       const response = await authService.loginWithContext(credentials);
-      
+
       // Save token
       setToken(response.access_token);
       saveToken(response.access_token);
@@ -173,10 +173,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   /**
    * Logout user (calls API, clears storage, resets context, navigates)
    */
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (isTimeout: boolean = false) => {
     setLogoutLoading(true);
     try {
-      await authService.logout();
+      if (!isTimeout) {
+        await authService.logout();
+      }
     } catch (error) {
       // Ignore API errors, proceed to clear session
     } finally {
@@ -185,10 +187,50 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(null);
       setUser(null);
       setLogoutLoading(false);
-      navigate("/login", { replace: true });
-      enqueueSnackbar("You have been logged out successfully.", { variant: "success" });
+
+      if (isTimeout) {
+        window.location.href = "/session-expired";
+      } else {
+        navigate("/login", { replace: true });
+        enqueueSnackbar("You have been logged out successfully.", { variant: "success" });
+      }
     }
   }, [clearRBACData, navigate]);
+
+  /**
+   * Handle session timeout after inactivity
+   */
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+
+      const currentPath = window.location.pathname;
+      if (isAuthenticated && currentPath !== "/login" && currentPath !== "/session-expired") {
+        timeoutId = setTimeout(() => {
+          console.log("Session timed out due to inactivity");
+          logout(true);
+        }, 60000); // 1 minute inactivity
+      }
+    };
+
+    const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart"];
+
+    if (isAuthenticated) {
+      events.forEach((event) => {
+        window.addEventListener(event, resetTimer);
+      });
+      resetTimer();
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach((event) => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [isAuthenticated, logout]);
 
   // Initialize: verify token and fetch user on mount
   useEffect(() => {
@@ -199,7 +241,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(storedUser);
-        
+
         // Verify token is still valid by fetching current user
         try {
           await refreshUser();
@@ -210,7 +252,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(null);
         }
       }
-      
+
       setIsLoading(false);
     };
 
