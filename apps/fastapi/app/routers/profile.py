@@ -102,14 +102,26 @@ async def upload_profile_image(
     public_path = f"/profile-images/{filename}"
 
     # Upsert into UserProfile table
-    profile = db.query(UserProfile).filter(UserProfile.UserId == current_user.id).first()
-    if profile:
-        profile.ProfileImagePath = public_path
-    else:
-        profile = UserProfile(UserId=current_user.id, ProfileImagePath=public_path)
-        db.add(profile)
-    db.commit()
-    db.refresh(profile)
+    try:
+        profile = db.query(UserProfile).filter(UserProfile.UserId == current_user.id).first()
+        if profile:
+            profile.ProfileImagePath = public_path
+            logger.info(f"Updating existing profile for user {current_user.id}")
+        else:
+            profile = UserProfile(UserId=current_user.id, ProfileImagePath=public_path)
+            db.add(profile)
+            logger.info(f"Creating new profile for user {current_user.id}")
+        
+        db.commit()
+        db.refresh(profile)
+        logger.info(f"✓ Profile image committed to database for user {current_user.id}: {public_path}")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"✗ Failed to save profile to database: {type(e).__name__}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
 
     db_user = db.query(User).filter(User.id == current_user.id).first()
     logger.info(f"Profile image updated for user {current_user.id}: {public_path}")
@@ -131,12 +143,23 @@ async def delete_profile_image(
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
+                logger.info(f"Deleted image file: {file_path}")
         except Exception as e:
             logger.warning(f"Could not delete image file {file_path}: {e}")
 
-        profile.ProfileImagePath = None
-        db.commit()
-        db.refresh(profile)
+        # Update database
+        try:
+            profile.ProfileImagePath = None
+            db.commit()
+            db.refresh(profile)
+            logger.info(f"✓ Profile image deleted from database for user {current_user.id}")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"✗ Failed to delete profile from database: {type(e).__name__}: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database error: {str(e)}"
+            )
 
     db_user = db.query(User).filter(User.id == current_user.id).first()
     logger.info(f"Profile image deleted for user {current_user.id}")
