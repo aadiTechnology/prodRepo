@@ -101,15 +101,7 @@ export default function ProtectedRoute({
   redirectTo = "/",
   showUnauthorized = false,
 }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, user } = useAuth();
-  const {
-    hasPermission,
-    hasAnyPermission,
-    hasAllPermissions,
-    hasRole,
-    hasAnyRole,
-    hasAllRoles,
-  } = useRBAC();
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
   // Show loading spinner while checking authentication

@@ -11,6 +11,7 @@ from app.models.role import Role, user_roles, role_features, role_menus
 from app.models.feature import Feature
 from app.models.menu import Menu
 from app.models.user_profile import UserProfile
+from app.models.revoked_token import RevokedToken  # <-- Add this line
 
 # Export all models for convenience
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "user_roles",
     "role_features",
     "role_menus",
+    "RevokedToken",  # <-- Add this line
 ]

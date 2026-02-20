@@ -9,6 +9,7 @@ from app.schemas.auth import CurrentUser
 from app.utils.security import decode_access_token
 from app.core.exceptions import UnauthorizedException, ForbiddenException
 from app.core.logging_config import get_logger
+from app.models.revoked_token import RevokedToken
 
 logger = get_logger(__name__)
 
@@ -80,7 +81,12 @@ def get_current_user(
         raise UnauthorizedException("Invalid token payload - user ID must be an integer")
     
     logger.debug(f"Extracted user ID from token: {user_id}")
-    
+        
+    # Check if token is revoked
+    if db.query(RevokedToken).filter(RevokedToken.token == token).first():
+        logger.warning("Token is revoked/blacklisted")
+        raise UnauthorizedException("Token has been revoked. Please login again.")
+
     # Get user from database
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
