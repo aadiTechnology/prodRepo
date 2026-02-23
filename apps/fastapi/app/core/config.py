@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
-from pydantic import field_validator, Field
-from typing import List, Any
+from pydantic import field_validator, Field, computed_field
+from typing import List
 import os
 from dotenv import load_dotenv
 
@@ -27,11 +27,19 @@ class Settings(BaseSettings):
     DB_DRIVER: str = "ODBC Driver 18 for SQL Server"
     DB_ECHO: bool = False
     
-    # CORS - Optimized for better security and performance (comma-separated string in .env)
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173"]
+    # CORS - comma-separated string in .env (parsed to list via CORS_ORIGINS property)
+    CORS_ORIGINS_STR: str = Field(
+        env="CORS_ORIGINS",
+        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://erpui.aaditechnology.com",
+    )
     CORS_CREDENTIALS: bool = True
     CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
     CORS_HEADERS: List[str] = ["Content-Type", "Authorization", "Accept", "X-Requested-With"]
+
+    @computed_field
+    @property
+    def CORS_ORIGINS(self) -> List[str]:
+        return [x.strip() for x in self.CORS_ORIGINS_STR.split(",") if x.strip()]
     
     # JWT Authentication
     SECRET_KEY: str = "your-secret-key-change-in-production"
@@ -52,16 +60,6 @@ class Settings(BaseSettings):
             raise ValueError(f"ENVIRONMENT must be one of {allowed}")
         return v.lower()
 
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: Any) -> List[str]:
-        """Parse CORS_ORIGINS from comma-separated string or list."""
-        if isinstance(v, list):
-            return v
-        if isinstance(v, str):
-            return [x.strip() for x in v.split(",") if x.strip()]
-        return []
-    
     @field_validator("SECRET_KEY")
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
