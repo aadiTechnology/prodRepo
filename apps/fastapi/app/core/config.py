@@ -1,7 +1,10 @@
 from pydantic_settings import BaseSettings
 from pydantic import field_validator, Field
-from typing import List
+from typing import List, Any
 import os
+from dotenv import load_dotenv
+
+load_dotenv(os.getenv("ENV_FILE", ".env"))
 
 class Settings(BaseSettings):
     """
@@ -14,7 +17,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
-    ENVIRONMENT: str = Field(default="development", description="Environment: development, staging, production")
+    ENVIRONMENT: str = Field(default="development", description="Environment: development, test, staging, production")
     
     # Database
     DB_SERVER: str = ""
@@ -24,8 +27,8 @@ class Settings(BaseSettings):
     DB_DRIVER: str = "ODBC Driver 18 for SQL Server"
     DB_ECHO: bool = False
     
-    # CORS - Optimized for better security and performance
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    # CORS - Optimized for better security and performance (comma-separated string in .env)
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173"]
     CORS_CREDENTIALS: bool = True
     CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
     CORS_HEADERS: List[str] = ["Content-Type", "Authorization", "Accept", "X-Requested-With"]
@@ -44,10 +47,20 @@ class Settings(BaseSettings):
     @classmethod
     def validate_environment(cls, v: str) -> str:
         """Validate environment value."""
-        allowed = ["development", "staging", "production"]
+        allowed = ["development", "test", "staging", "production"]
         if v.lower() not in allowed:
             raise ValueError(f"ENVIRONMENT must be one of {allowed}")
         return v.lower()
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Any) -> List[str]:
+        """Parse CORS_ORIGINS from comma-separated string or list."""
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            return [x.strip() for x in v.split(",") if x.strip()]
+        return []
     
     @field_validator("SECRET_KEY")
     @classmethod
