@@ -30,6 +30,7 @@ class CurrentUser(BaseModel):
     email: EmailStr
     full_name: str
     role: UserRole
+    tenant_id: Optional[int] = None  # Added to support tenant-based authorization
 
     class Config:
         from_attributes = True
@@ -44,3 +45,13 @@ class LoginContextResponse(BaseModel):
     roles: List[str]
     permissions: List[str]
     menus: List[MenuNode]
+
+def create_user_with_role(user):
+    """Create a user with role."""
+    return CurrentUser(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        tenant_id=user.tenant_id
+    )

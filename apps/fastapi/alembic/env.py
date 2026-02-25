@@ -1,31 +1,22 @@
-from app.core.database import Base
-from app.models import user
-from logging.config import fileConfig
 import os
 from dotenv import load_dotenv
-from app.core.config import settings
-from urllib.parse import quote_plus
+
+load_dotenv(os.getenv("ENV_FILE", ".env"))
+
+from app.core.database import Base, get_database_url
+from app.models import user
+from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
 
-load_dotenv()  # Loads variables from .env into environment
-
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-# Build DB URL using settings, just like in app/core/database.py
-# db_url = (
-#     f"mssql+pyodbc://{settings.DB_USER}:{quote_plus(settings.DB_PASSWORD)}"
-#     f"@{quote_plus(settings.DB_SERVER)}/{settings.DB_NAME}"
-#     "?driver=ODBC+Driver+17+for+SQL+Server"
-# )
-# db_url = db_url.replace('%', '%%')
-db_url = "mssql+pyodbc://localhost\\SQLEXPRESS/erpdb?driver=ODBC+Driver+18+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes"
-
+db_url = get_database_url().replace("%", "%%")
 config.set_main_option("sqlalchemy.url", db_url)
 
 # Interpret the config file for Python logging.

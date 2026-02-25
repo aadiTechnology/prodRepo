@@ -8,6 +8,9 @@ import { User, LoginRequest, AuthState } from "../types/auth";
 import authService from "../api/services/authService";
 import { ApiError } from "../api/client";
 import { LoginContextResponse } from "../types/rbac";
+import { useNavigate } from "react-router-dom";
+import { useRBAC } from "./RBACContext";
+import { enqueueSnackbar } from "notistack";
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginRequest) => Promise<void>;
@@ -86,6 +89,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(getStoredUser());
   const [token, setToken] = useState<string | null>(getStoredToken());
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const { clearRBACData } = useRBAC();
+  const [logoutLoading, setLogoutLoading] = useState(false);
 
   // Memoize isAuthenticated to prevent unnecessary recalculations
   const isAuthenticated = useMemo(() => !!token && !!user, [token, user]);
@@ -118,7 +124,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true);
       const tokenResponse = await authService.login(credentials);
-      
+
       // Save token
       setToken(tokenResponse.access_token);
       saveToken(tokenResponse.access_token);
@@ -138,13 +144,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   /**
-   * Login user with RBAC context (recommended - includes roles, menus, permissions)
+   * Login user with RBAC context (recommended)
+   * Fetches access_token, user profile, and all RBAC data (roles/menus) in a single request.
    */
   const loginWithContext = useCallback(async (credentials: LoginRequest): Promise<LoginContextResponse> => {
     try {
       setIsLoading(true);
       const response = await authService.loginWithContext(credentials);
-      
+
       // Save token
       setToken(response.access_token);
       saveToken(response.access_token);
@@ -165,14 +172,66 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   /**
-   * Logout user
+   * Logout user (calls API, clears storage, resets context, navigates)
    */
-  const logout = useCallback(() => {
-    clearAuthData();
-    setToken(null);
-    setUser(null);
-    // Note: RBAC data clearing is handled by RBACProvider
-  }, []);
+  const logout = useCallback(async (isTimeout: boolean = false) => {
+    setLogoutLoading(true);
+    try {
+      if (!isTimeout) {
+        await authService.logout();
+      }
+    } catch (error) {
+      // Ignore API errors, proceed to clear session
+    } finally {
+      clearAuthData();
+      clearRBACData();
+      setToken(null);
+      setUser(null);
+      setLogoutLoading(false);
+
+      if (isTimeout) {
+        window.location.href = "/session-expired";
+      } else {
+        navigate("/login", { replace: true });
+        enqueueSnackbar("You have been logged out successfully.", { variant: "success" });
+      }
+    }
+  }, [clearRBACData, navigate]);
+
+  /**
+   * Handle session timeout after inactivity
+   */
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+
+      const currentPath = window.location.pathname;
+      if (isAuthenticated && currentPath !== "/login" && currentPath !== "/session-expired") {
+        timeoutId = setTimeout(() => {
+          console.log("Session timed out due to inactivity");
+          logout(true);
+        }, 60000); // 1 minute inactivity
+      }
+    };
+
+    const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart"];
+
+    if (isAuthenticated) {
+      events.forEach((event) => {
+        window.addEventListener(event, resetTimer);
+      });
+      resetTimer();
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach((event) => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [isAuthenticated, logout]);
 
   // Initialize: verify token and fetch user on mount
   useEffect(() => {
@@ -183,7 +242,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(storedUser);
-        
+
         // Verify token is still valid by fetching current user
         try {
           await refreshUser();
@@ -194,7 +253,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(null);
         }
       }
-      
+
       setIsLoading(false);
     };
 
@@ -211,9 +270,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       login,
       loginWithContext,
       logout,
+      logoutLoading,
       refreshUser,
     }),
-    [user, token, isAuthenticated, isLoading, login, loginWithContext, logout, refreshUser]
+    [user, token, isAuthenticated, isLoading, login, loginWithContext, logout, logoutLoading, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

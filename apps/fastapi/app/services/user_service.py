@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserUpdate
-from app.utils.security import hash_password
+from app.utils.security import hash_password, verify_password, validate_new_password
 from app.core.exceptions import NotFoundException, ConflictException
 from app.core.logging_config import get_logger
 
@@ -122,3 +122,68 @@ def set_user_password(
     db.refresh(db_user)
     logger.info(f"Password changed for user: {db_user.email} (id={db_user.id})")
     return db_user
+
+
+def change_user_password(
+    db: Session,
+    user_id: int,
+    tenant_id: int,
+    current_password: str,
+    new_password: str,
+) -> None:
+    """
+    Change the password for a user, validating current password and tenant.
+    Raises ConflictException or NotFoundException on error.
+    """
+    user = db.query(User).filter(
+        User.id == user_id,
+        User.tenant_id == tenant_id,
+        User.is_active == True,
+        User.is_deleted == False,
+    ).first()
+    if not user:
+        raise NotFoundException("User not found or inactive.")
+
+    # Constant-time password check
+    if not verify_password(current_password, user.hashed_password):
+        raise ConflictException("Current password is incorrect.")
+
+    # Hash and update password
+    user.hashed_password = hash_password(new_password)
+    user.updated_at = datetime.utcnow()
+    db.commit()
+
+
+def handle_change_password(
+    db: Session,
+    user_id: int,
+    tenant_id: int,
+    req: "ChangePasswordRequest",
+) -> dict:
+    """
+    Handles password change with all validation and business rules.
+    Returns dict with 'success' and 'message'.
+    """
+    # Validate new password
+    error = validate_new_password(req.newPassword)
+    if error:
+        return {"success": False, "message": error}
+
+    # if req.newPassword != req.confirmPassword:
+        # return {"success": False, "message": "Confirm password does not match new password."}
+
+    try:
+        change_user_password(
+            db=db,
+            user_id=user_id,
+            tenant_id=tenant_id,
+            current_password=req.currentPassword,
+            new_password=req.newPassword,
+        )
+        return {"success": True, "message": "Password updated successfully."}
+    except ConflictException as e:
+        return {"success": False, "message": str(e)}
+    except NotFoundException as e:
+        return {"success": False, "message": str(e)}
+    except Exception:
+        return {"success": False, "message": "An unexpected error occurred."}

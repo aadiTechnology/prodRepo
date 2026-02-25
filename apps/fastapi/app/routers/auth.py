@@ -11,6 +11,7 @@ from app.utils.security import verify_password, create_access_token
 from app.core.exceptions import UnauthorizedException
 from app.core.logging_config import get_logger
 from app.core.dependencies import get_current_user, CurrentUser
+from app.services.auth_service import revoke_token
 
 logger = get_logger(__name__)
 
@@ -87,8 +88,10 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> Toke
     
     # Create access token
     # Note: JWT 'sub' claim must be a string, so convert user.id to string
+    # Get actual role from RBAC roles relationship, with fallback to legacy role
+    user_role = user.roles[0].name if user.roles else user.role.value
     access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "role": user.role.value}
+        data={"sub": str(user.id), "email": user.email, "role": user_role , "tenant_id": user.tenant_id,}
     )
     
     logger.info(f"User logged in successfully: {user.email}. Token created (length: {len(access_token)})")
@@ -101,9 +104,14 @@ async def login_with_context(
     db: Session = Depends(get_db),
 ) -> LoginContextResponse:
     """
-    Authenticate user and return JWT token plus RBAC context (roles, permissions, menus).
-
-    This is a non-breaking extension of the existing /auth/login.
+    Unified Authentication Endpoint.
+    
+    Performs user verification and returns:
+    1. JWT Access Token
+    2. User Profile Info
+    3. RBAC Context (Full list of roles, permissions, and hierarchical menus)
+    
+    This replaces the multi-step fetch process with a single, high-performance call.
     """
     logger.info(f"[RBAC] Login-with-context attempt for email: {login_data.email}")
 
@@ -113,8 +121,10 @@ async def login_with_context(
         logger.warning(f"[RBAC] Invalid credentials for email: {login_data.email}")
         raise UnauthorizedException("Invalid email or password")
 
+    # Get actual role from RBAC roles relationship, with fallback to legacy role
+    user_role = user.roles[0].name if user.roles else user.role.value
     access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "role": user.role.value}
+        data={"sub": str(user.id), "email": user.email, "role": user_role,"tenant_id": user.tenant_id,}
     )
 
     # Resolve roles, permissions, menus
@@ -159,3 +169,19 @@ async def get_current_user_info(
         full_name=current_user.full_name,
         role=current_user.role
     )
+
+@router.post("/logout")
+async def logout(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Logout user and revoke token."""
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.split()[1] if auth_header.startswith("Bearer ") else None
+    if token:
+        revoke_token(db, token, current_user.id)
+        logger.info(f"User {current_user.email} (tenant={getattr(current_user, 'tenant_id', None)}) logged out")
+    else:
+        logger.warning("Logout called with missing token")
+    return {"message": "Logged out successfully"}

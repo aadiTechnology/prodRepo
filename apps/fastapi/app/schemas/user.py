@@ -37,3 +37,14 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ChangePasswordRequest(BaseModel):
+    currentPassword: str
+    newPassword: str
+    # confirmPassword: str
+
+
+class ChangePasswordResponse(BaseModel):
+    success: bool
+    message: str

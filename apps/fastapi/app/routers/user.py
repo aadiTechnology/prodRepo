@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_admin, CurrentUser
-from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserPasswordUpdate
+from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserPasswordUpdate, ChangePasswordRequest, ChangePasswordResponse
 from app.services import user_service
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/users", tags=["Users"])
+router = APIRouter(prefix="/api/account", tags=["Account"])
 
 @router.post("/", response_model=UserResponse, status_code=201)
 async def create_user(
@@ -122,3 +122,30 @@ async def change_user_password(
     logger.info(f"Admin {current_user.email} changing password for user: {user_id}")
     user_service.set_user_password(db, user_id, payload.new_password, updated_by=current_user.id)
     return None
+
+@router.post("/change-password", response_model=ChangePasswordResponse)
+async def change_password(
+    req: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ChangePasswordResponse:
+    """
+    Change password for the current user.
+    """
+    logger.info(f"Change password: current_user={current_user}")
+
+    user_id = current_user.id
+    tenant_id = getattr(current_user, "tenant_id", None)
+    logger.info(f"Change password: user_id={user_id}, tenant_id={tenant_id}, role={current_user.role}")
+
+    # Allow super admin (tenant_id is None)
+    if tenant_id is None and current_user.role == "SUPER_ADMIN":
+        result = user_service.handle_change_password(db, user_id, None, req)
+        return ChangePasswordResponse(**result)
+    elif tenant_id is None:
+        return ChangePasswordResponse(success=False, message="Tenant information missing.")
+    else:
+        result = user_service.handle_change_password(db, user_id, tenant_id, req)
+        return ChangePasswordResponse(**result)
+
+

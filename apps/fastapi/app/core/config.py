@@ -1,7 +1,10 @@
 from pydantic_settings import BaseSettings
-from pydantic import field_validator, Field
+from pydantic import field_validator, Field, computed_field
 from typing import List
 import os
+from dotenv import load_dotenv
+
+load_dotenv(os.getenv("ENV_FILE", ".env"))
 
 class Settings(BaseSettings):
     """
@@ -14,7 +17,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
-    ENVIRONMENT: str = Field(default="development", description="Environment: development, staging, production")
+    ENVIRONMENT: str = Field(default="development", description="Environment: development, test, staging, production")
     
     # Database
     DB_SERVER: str = ""
@@ -24,11 +27,19 @@ class Settings(BaseSettings):
     DB_DRIVER: str = "ODBC Driver 18 for SQL Server"
     DB_ECHO: bool = False
     
-    # CORS - Optimized for better security and performance
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    # CORS - comma-separated string in .env (parsed to list via CORS_ORIGINS property)
+    CORS_ORIGINS_STR: str = Field(
+        env="CORS_ORIGINS",
+        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://erpui.aaditechnology.com",
+    )
     CORS_CREDENTIALS: bool = True
     CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
     CORS_HEADERS: List[str] = ["Content-Type", "Authorization", "Accept", "X-Requested-With"]
+
+    @computed_field
+    @property
+    def CORS_ORIGINS(self) -> List[str]:
+        return [x.strip() for x in self.CORS_ORIGINS_STR.split(",") if x.strip()]
     
     # JWT Authentication
     SECRET_KEY: str = "your-secret-key-change-in-production"
@@ -44,11 +55,11 @@ class Settings(BaseSettings):
     @classmethod
     def validate_environment(cls, v: str) -> str:
         """Validate environment value."""
-        allowed = ["development", "staging", "production"]
+        allowed = ["development", "test", "staging", "production"]
         if v.lower() not in allowed:
             raise ValueError(f"ENVIRONMENT must be one of {allowed}")
         return v.lower()
-    
+
     @field_validator("SECRET_KEY")
     @classmethod
     def validate_secret_key(cls, v: str) -> str:

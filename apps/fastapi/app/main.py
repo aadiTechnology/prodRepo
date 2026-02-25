@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy.exc import SQLAlchemyError
@@ -24,7 +25,7 @@ from app.models import (  # noqa: F401
     Menu,
 )
 
-from app.routers import user, auth, role, menu, feature, rbac, tenant
+from app.routers import user, auth, role, menu, feature, rbac, tenant, profile
 
 # Setup logging first
 setup_logging()
@@ -71,6 +72,13 @@ app.include_router(role.router)
 app.include_router(menu.router)
 app.include_router(feature.router)
 app.include_router(rbac.router)
+app.include_router(profile.router)
+
+# Mount static files for profile images
+# Ensure the directory exists
+import os
+os.makedirs("static/profile-images", exist_ok=True)
+app.mount("/profile-images", StaticFiles(directory="static/profile-images"), name="profile-images")
 
 @app.on_event("startup")
 async def startup_event():

@@ -21,6 +21,7 @@ class UserRole(str, enum.Enum):
 
     USER = "user"
     ADMIN = "admin"
+    SUPER_ADMIN = "SUPER_ADMIN"  # System administrator role
 
 
 class UserRoleType(TypeDecorator):
@@ -45,6 +46,9 @@ class UserRoleType(TypeDecorator):
         if value is None:
             return None
         if isinstance(value, str):
+            # Handle SUPER_ADMIN directly (exact match)
+            if value == "SUPER_ADMIN":
+                return UserRole.SUPER_ADMIN
             # Try to find enum by value
             for role in UserRole:
                 if role.value == value:
