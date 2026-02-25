@@ -11,6 +11,7 @@ import {
   IconButton,
   InputAdornment,
 } from "@mui/material";
+import { CheckCircle } from "@mui/icons-material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../api/client";
@@ -143,12 +144,27 @@ export default function ChangePassword() {
             Change Password
           </Typography>
 
+          {/* Success Message */}
           {success && (
-            <Alert severity="success" sx={{ mb: 2 }}>
+            <Alert
+              icon={<CheckCircle fontSize="inherit" />}
+              severity="success"
+              variant="filled"
+              sx={{
+                mb: 2,
+                backgroundColor: "#5ed366",
+                color: "#fff",
+                fontSize: "1rem",      // <-- smaller font size
+                fontWeight: 500,       // <-- normal boldness
+                alignItems: "center",
+                py: 1,                 // <-- less vertical padding
+              }}
+            >
               Password updated successfully.
             </Alert>
           )}
 
+          {/* Error Message */}
           {errors.api && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {errors.api}
@@ -156,11 +172,14 @@ export default function ChangePassword() {
           )}
 
           <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {/* Current Password */}
+            <Typography fontWeight={600} sx={{ mb: 0.5 }}>
+              Current Password *
+            </Typography>
             <TextField
               name="currentPassword"
-              label="Current Password"
-              type="password"
               placeholder="Enter your current password"
+              type="password"
               value={form.currentPassword}
               onChange={handleChange}
               error={!!errors.currentPassword}
@@ -170,11 +189,14 @@ export default function ChangePassword() {
               autoComplete="current-password"
             />
 
+            {/* New Password */}
+            <Typography fontWeight={600} sx={{ mb: 0.5 }}>
+              New Password *
+            </Typography>
             <TextField
               name="newPassword"
-              label="New Password"
+              placeholder="Enter your new password"
               type={showNewPassword ? "text" : "password"}
-              placeholder="Enter new password"
               value={form.newPassword}
               onChange={handleChange}
               error={!!errors.newPassword}
@@ -200,11 +222,14 @@ export default function ChangePassword() {
               }}
             />
 
+            {/* Confirm New Password */}
+            <Typography fontWeight={600} sx={{ mb: 0.5 }}>
+              Confirm New Password *
+            </Typography>
             <TextField
               name="confirmPassword"
-              label="Confirm New Password"
+              placeholder="Enter your new password again"
               type={showConfirmPassword ? "text" : "password"}
-              placeholder="Re-enter new password"
               value={form.confirmPassword}
               onChange={handleChange}
               error={!!errors.confirmPassword}
@@ -227,6 +252,7 @@ export default function ChangePassword() {
               }}
             />
 
+            {/* Buttons */}
             <Box sx={{ display: "flex", gap: 2, mt: 2 }}>
               <Button
                 type="submit"
