@@ -4,6 +4,7 @@ import { Box, CircularProgress } from "@mui/material";
 import MainLayout from "../layout/MainLayout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import ChangePassword from "../pages/ChangePassword";
+import RoleManagementPage from "../pages/RoleManagementPage"; // <-- Add this import
 
 // Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
@@ -153,6 +154,15 @@ export default function AppRoutes() {
             }
           />
           */}
+
+          <Route
+            path="/roles"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}>
+                <RoleManagementPage />
+              </ProtectedRoute>
+            }
+          />
         </Route>
       </Routes>
     </Suspense>
