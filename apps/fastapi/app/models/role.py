@@ -1,4 +1,6 @@
 from datetime import datetime
+from enum import Enum
+
 
 from sqlalchemy import (
     Column,
@@ -8,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Table,
+    BINARY,
 )
 from sqlalchemy.orm import relationship
 
@@ -47,6 +50,11 @@ role_menus = Table(
 )
 
 
+class RoleScope(str, Enum):
+    PLATFORM = "Platform"
+    TENANT = "Tenant"
+
+
 class Role(Base):
     """Role model for RBAC."""
 
@@ -57,6 +65,7 @@ class Role(Base):
 
     code = Column(String(50), nullable=False)  # e.g. SUPER_ADMIN, ADMIN, USER
     name = Column(String(150), nullable=False)
+    scope_type = Column(String(20), nullable=False, index=True)  # Use RoleScope
     description = Column(String(500), nullable=True)
     is_system = Column(Boolean, nullable=False, default=False)
     is_active = Column(Boolean, nullable=False, default=True)

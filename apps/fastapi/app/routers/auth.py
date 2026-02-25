@@ -10,7 +10,7 @@ from app.models.user import UserRole
 from app.utils.security import verify_password, create_access_token
 from app.core.exceptions import UnauthorizedException
 from app.core.logging_config import get_logger
-from app.core.dependencies import get_current_user, CurrentUser
+from app.core.dependencies import get_current_user, CurrentUser, _get_rbac_role_codes
 from app.services.auth_service import revoke_token
 
 logger = get_logger(__name__)
@@ -89,9 +89,14 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> Toke
     # Create access token
     # Note: JWT 'sub' claim must be a string, so convert user.id to string
     # Get actual role from RBAC roles relationship, with fallback to legacy role
-    user_role = user.roles[0].name if user.roles else user.role.value
+    user_role = user.roles[0].code if user.roles else user.role.value
     access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "role": user_role , "tenant_id": user.tenant_id,}
+        data={
+            "sub": str(user.id),
+            "email": user.email,
+            "role": user.roles[0].code,  # ✅ Use the role code (e.g., "SUPER_ADMIN")
+            "tenant_id": user.tenant_id,
+        }
     )
     
     logger.info(f"User logged in successfully: {user.email}. Token created (length: {len(access_token)})")
@@ -122,14 +127,19 @@ async def login_with_context(
         raise UnauthorizedException("Invalid email or password")
 
     # Get actual role from RBAC roles relationship, with fallback to legacy role
-    user_role = user.roles[0].name if user.roles else user.role.value
+    user_role = user.roles[0].code if user.roles else user.role.value
     access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "role": user_role,"tenant_id": user.tenant_id,}
+        data={
+            "sub": str(user.id),
+            "email": user.email,
+            "role": user.roles[0].code,  # ✅ Use the role code (e.g., "SUPER_ADMIN")
+            "tenant_id": user.tenant_id,
+        }
     )
 
     # Resolve roles, permissions, menus
     permissions, menus = rbac_service.resolve_user_permissions_and_menus(db, user)
-    roles = [r.code for r in rbac_service.get_user_roles(db, user.id)]
+    roles = [role_code.upper().replace(" ", "_") for role_code in _get_rbac_role_codes(db, user.id)]
 
     logger.info(f"[RBAC] User logged in with context: {user.email}, roles={roles}, perms={len(permissions)}")
 
