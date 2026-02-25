@@ -1,10 +1,12 @@
 from datetime import datetime
-
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Enum as PgEnum, DateTime, Boolean  # <-- Add DateTime, Boolean
 from sqlalchemy.orm import relationship
-
 from app.core.database import Base
+from enum import Enum  # <-- Add this import
 
+class TenantStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
 
 class Tenant(Base):
     """Tenant model for multi-tenant support."""
@@ -12,10 +14,8 @@ class Tenant(Base):
     __tablename__ = "tenants"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    code = Column(String(50), nullable=False, unique=True)
     name = Column(String(200), nullable=False)
-    description = Column(String(500), nullable=True)
-    is_active = Column(Boolean, nullable=False, default=True)
+    status = Column(PgEnum(TenantStatus), nullable=False, default=TenantStatus.ACTIVE)
 
     # Audit fields
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

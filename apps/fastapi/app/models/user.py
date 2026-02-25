@@ -22,6 +22,7 @@ class UserRole(str, enum.Enum):
     USER = "user"
     ADMIN = "admin"
     SUPER_ADMIN = "SUPER_ADMIN"  # System administrator role
+    TENANT_ADMIN = "TENANT_ADMIN"  # Tenant administrator role
 
 
 class UserRoleType(TypeDecorator):
