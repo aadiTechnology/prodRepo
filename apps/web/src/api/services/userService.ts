@@ -6,7 +6,7 @@ export const userService = {
    * Get all users
    */
   getAllUsers: async (): Promise<User[]> => {
-    const response = await apiClient.get<User[]>("/users");
+    const response = await apiClient.get<User[]>("/api/account");
     return response.data;
   },
 
@@ -14,7 +14,7 @@ export const userService = {
    * Get a single user by ID
    */
   getUserById: async (id: number): Promise<User> => {
-    const response = await apiClient.get<User>(`/users/${id}`);
+    const response = await apiClient.get<User>(`/api/account/${id}`);
     return response.data;
   },
 
@@ -30,7 +30,7 @@ export const userService = {
    * Update an existing user
    */
   updateUser: async (id: number, userData: UserUpdate): Promise<User> => {
-    const response = await apiClient.put<User>(`/users/${id}`, userData);
+    const response = await apiClient.put<User>(`/api/account/${id}`, userData);
     return response.data;
   },
 
@@ -38,7 +38,7 @@ export const userService = {
    * Delete a user
    */
   deleteUser: async (id: number): Promise<void> => {
-    await apiClient.delete(`/users/${id}`);
+    await apiClient.delete(`/api/account/${id}`);
   },
 
   /**
@@ -46,7 +46,7 @@ export const userService = {
    */
   changePassword: async (id: number, newPassword: string): Promise<void> => {
     await apiClient.put(`/users/${id}/password`, {
-      new_password: newPassword,
+    new_password: newPassword,
     });
   },
 };

@@ -19,26 +19,40 @@ import {
   DialogContentText,
   DialogActions,
   TextField,
+  InputBase,
+  Stack,
 } from "@mui/material";
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, VpnKey as PasswordIcon } from "@mui/icons-material";
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Search as SearchIcon, Visibility as VisibilityIcon, MoreVert as MoreVertIcon } from "@mui/icons-material";
 import { User, UserCreate, UserUpdate } from "../types/user";
 import userService from "../api/services/userService";
-import UserForm from "../components/UserForm";
 import PermissionGate from "../components/auth/PermissionGate";
+import { Chip, Tooltip } from "@mui/material";
+import UserForm from "../components/UserForm";
+import { Block as BlockIcon } from "@mui/icons-material";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
+}
 
 function Users() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-
+  // All state hooks at the top!
+  // Removed duplicate selectedUser declaration
+  // Removed duplicate users declaration
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
+const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+const [deleteLoading, setDeleteLoading] = useState(false);
+const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
+const [deactivateLoading, setDeactivateLoading] = useState(false);
+const [search, setSearch] = useState("");
+const [selectedUser, setSelectedUser] = useState<User | null>(null);
+const [users, setUsers] = useState<User[]>([]);
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
@@ -56,33 +70,14 @@ function Users() {
     fetchUsers();
   }, [fetchUsers]);
 
-  const handleCreate = useCallback(async (userData: UserCreate | UserUpdate) => {
-    await userService.createUser(userData as UserCreate);
-    fetchUsers();
-  }, [fetchUsers]);
-
-  const handleUpdate = useCallback(async (userData: UserCreate | UserUpdate) => {
-    if (selectedUser) {
-      await userService.updateUser(selectedUser.id, userData as UserUpdate);
-      fetchUsers();
-    }
-  }, [selectedUser, fetchUsers]);
 
   const handleEditClick = useCallback((user: User) => {
-    setSelectedUser(user);
-    setFormOpen(true);
+    // Edit is disabled
   }, []);
 
   const handleDeleteClick = useCallback((user: User) => {
     setSelectedUser(user);
     setDeleteDialogOpen(true);
-  }, []);
-
-  const handlePasswordClick = useCallback((user: User) => {
-    setSelectedUser(user);
-    setNewPassword("");
-    setPasswordError(null);
-    setPasswordDialogOpen(true);
   }, []);
 
   const handleDeleteConfirm = useCallback(async () => {
@@ -101,39 +96,62 @@ function Users() {
     }
   }, [selectedUser, fetchUsers]);
 
-  const handlePasswordChangeConfirm = useCallback(async () => {
-    if (!selectedUser) return;
-
-    if (!newPassword.trim()) {
-      setPasswordError("New password is required");
-      return;
-    }
-
-    try {
-      setPasswordLoading(true);
-      setPasswordError(null);
-      await userService.changePassword(selectedUser.id, newPassword.trim());
-      setPasswordDialogOpen(false);
-      setSelectedUser(null);
-      setNewPassword("");
-    } catch (err: any) {
-      setPasswordError(err?.detail || "Failed to change password. Please try again.");
-    } finally {
-      setPasswordLoading(false);
-    }
-  }, [selectedUser, newPassword]);
-
-  const handleFormClose = useCallback(() => {
-    setFormOpen(false);
-    setSelectedUser(null);
+  const handleDeactivateClick = useCallback((user: User) => {
+    setSelectedUser(user);
+    setDeactivateDialogOpen(true);
   }, []);
+
+  const handleDeactivateConfirm = useCallback(async () => {
+    if (selectedUser) {
+      try {
+        setDeactivateLoading(true);
+        await userService.updateUser(selectedUser.id, {
+          full_name: selectedUser.full_name,
+          phone_number: selectedUser.phone_number,
+          tenant_id: selectedUser.tenant_id,
+          is_active: false,
+        });
+        setDeactivateDialogOpen(false);
+        setSelectedUser(null);
+        fetchUsers();
+      } catch (err) {
+        setError("Failed to deactivate user.");
+      } finally {
+        setDeactivateLoading(false);
+      }
+    }
+  }, [selectedUser, fetchUsers]);
+
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [menuUser, setMenuUser] = useState<User | null>(null);
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, user: User) => {
+    setMenuAnchorEl(event.currentTarget);
+    setMenuUser(user);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+    setMenuUser(null);
+  };
+
+  // Filter users by search
+  const filteredUsers = useMemo(() => {
+    if (!search.trim()) return users;
+    return users.filter(
+      (u) =>
+        u.full_name.toLowerCase().includes(search.toLowerCase()) ||
+        u.email.toLowerCase().includes(search.toLowerCase()) ||
+        String(u.id).includes(search)
+    );
+  }, [users, search]);
 
   // Memoize table rows to prevent unnecessary re-renders
   const tableRows = useMemo(() => {
-    if (users.length === 0) {
+    if (filteredUsers.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={4} align="center">
+          <TableCell colSpan={6} align="center">
             <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
               No users found. Click "Add User" to create one.
             </Typography>
@@ -141,60 +159,85 @@ function Users() {
         </TableRow>
       );
     }
-    return users.map((user) => (
-      <TableRow key={user.id} hover>
+    return filteredUsers.map((user) => (
+      <TableRow key={user.id} hover sx={{ height: 64, "&:hover": { background: "#F3F4F6" } }}>
         <TableCell>{user.id}</TableCell>
-        <TableCell>{user.email}</TableCell>
         <TableCell>{user.full_name}</TableCell>
+        <TableCell>{user.email}</TableCell>
+        <TableCell>
+          <Chip
+            label={
+              Array.isArray(user.roles) && user.roles.length > 0
+                ? user.roles.map(r =>
+                    r.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())
+                  ).join(", ")
+                : "Unknown"
+            }
+            color="primary"
+            variant="outlined"
+          />
+        </TableCell>
+        <TableCell>
+          <Chip
+            label={user.is_active ? "Active" : "Inactive"}
+            color={user.is_active ? "success" : "default"}
+            sx={{ fontWeight: 600 }}
+          />
+        </TableCell>
         <TableCell align="right">
-          <PermissionGate permission="USER_EDIT">
-            <IconButton
-              color="primary"
-              onClick={() => handleEditClick(user)}
-              aria-label="edit"
-            >
-              <EditIcon />
-            </IconButton>
-          </PermissionGate>
-          <PermissionGate permission="USER_EDIT">
-            <IconButton
-              color="secondary"
-              onClick={() => handlePasswordClick(user)}
-              aria-label="change-password"
-            >
-              <PasswordIcon />
-            </IconButton>
-          </PermissionGate>
-          <PermissionGate permission="USER_DELETE">
-            <IconButton
-              color="error"
-              onClick={() => handleDeleteClick(user)}
-              aria-label="delete"
-            >
-              <DeleteIcon />
-            </IconButton>
-          </PermissionGate>
+          <IconButton onClick={e => handleMenuOpen(e, user)}>
+            <MoreVertIcon />
+          </IconButton>
         </TableCell>
       </TableRow>
     ));
-  }, [users, handleEditClick, handleDeleteClick]);
+  }, [filteredUsers, handleEditClick, handleDeleteClick, handleDeactivateClick]);
 
   return (
     <Box>
+      {/* Header with stats, search, and add user */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Typography variant="h4">Users Management</Typography>
-        <PermissionGate permission="USER_CREATE">
+        <Stack direction="row" spacing={3}>
+          <Paper sx={{ p: 2, minWidth: 180, textAlign: "center" }}>
+            <Typography variant="h6">Total Users</Typography>
+            <Typography variant="h4" color="primary">{users.length}</Typography>
+          </Paper>
+          {/* Add more stats cards here if needed */}
+        </Stack>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Paper
+            component="form"
+            sx={{
+              p: "2px 8px",
+              display: "flex",
+              alignItems: "center",
+              width: 300,
+              borderRadius: 2,
+              boxShadow: "none",
+              background: "#F3F4F6",
+            }}
+            onSubmit={e => e.preventDefault()}
+          >
+            <SearchIcon sx={{ color: "#64748b", mr: 1 }} />
+            <InputBase
+              placeholder="Search by name, email, or ID"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              sx={{ flex: 1, fontSize: 16 }}
+            />
+          </Paper>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => {
-              setSelectedUser(null);
-              setFormOpen(true);
+              // User creation is disabled
+              // alert("User creation is disabled.");
             }}
+            sx={{ borderRadius: 2, fontWeight: 600 }}
           >
             Add User
           </Button>
-        </PermissionGate>
+        </Box>
       </Box>
 
       {error && (
@@ -211,10 +254,12 @@ function Users() {
         <TableContainer component={Paper}>
           <Table>
             <TableHead>
-              <TableRow>
+              <TableRow sx={{ background: "#F3F4F6", height: 56 }}>
                 <TableCell><strong>ID</strong></TableCell>
-                <TableCell><strong>Email</strong></TableCell>
                 <TableCell><strong>Full Name</strong></TableCell>
+                <TableCell><strong>Email</strong></TableCell>
+                <TableCell><strong>Role</strong></TableCell>
+                <TableCell><strong>Status</strong></TableCell>
                 <TableCell align="right"><strong>Actions</strong></TableCell>
               </TableRow>
             </TableHead>
@@ -225,13 +270,7 @@ function Users() {
         </TableContainer>
       )}
 
-      <UserForm
-        open={formOpen}
-        onClose={handleFormClose}
-        onSubmit={selectedUser ? handleUpdate : handleCreate}
-        user={selectedUser}
-        isEdit={!!selectedUser}
-      />
+      
 
       <Dialog
         open={deleteDialogOpen}
@@ -259,46 +298,48 @@ function Users() {
       </Dialog>
 
       <Dialog
-        open={passwordDialogOpen}
-        onClose={() => !passwordLoading && setPasswordDialogOpen(false)}
+        open={deactivateDialogOpen}
+        onClose={() => !deactivateLoading && setDeactivateDialogOpen(false)}
       >
-        <DialogTitle>Change Password</DialogTitle>
+        <DialogTitle>Confirm Deactivate</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-            <DialogContentText>
-              Set a new password for user <strong>{selectedUser?.email}</strong>.
-            </DialogContentText>
-            {passwordError && (
-              <Alert severity="error" onClose={() => setPasswordError(null)}>
-                {passwordError}
-              </Alert>
-            )}
-            <TextField
-              label="New Password"
-              type="password"
-              value={newPassword}
-              onChange={(e) => {
-                setNewPassword(e.target.value);
-                setPasswordError(null);
-              }}
-              fullWidth
-              autoFocus
-            />
-          </Box>
+          <DialogContentText>
+            Are you sure you want to deactivate this user{" "}
+            <strong>{selectedUser?.email}</strong>? This action cannot be undone.
+          </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPasswordDialogOpen(false)} disabled={passwordLoading}>
+          <Button onClick={() => setDeactivateDialogOpen(false)} disabled={deactivateLoading}>
             Cancel
           </Button>
           <Button
-            onClick={handlePasswordChangeConfirm}
+            onClick={handleDeactivateConfirm}
+            color="warning"
             variant="contained"
-            disabled={passwordLoading}
+            disabled={deactivateLoading}
           >
-            {passwordLoading ? "Saving..." : "Change Password"}
+            {deactivateLoading ? "Deactivating..." : "Deactivate"}
           </Button>
         </DialogActions>
       </Dialog>
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={Boolean(menuAnchorEl)}
+        onClose={handleMenuClose}
+      >
+        <MenuItem onClick={() => { handleViewClick(menuUser!); handleMenuClose(); }}>
+          <VisibilityIcon sx={{ mr: 1 }} /> View
+        </MenuItem>
+        <MenuItem onClick={() => { handleEditClick(menuUser!); handleMenuClose(); }}>
+          <EditIcon sx={{ mr: 1 }} /> Edit
+        </MenuItem>
+        <MenuItem onClick={() => { handleDeactivateClick(menuUser!); handleMenuClose(); }}>
+          <BlockIcon sx={{ mr: 1 }} /> Deactivate
+        </MenuItem>
+        <MenuItem onClick={() => { handleDeleteClick(menuUser!); handleMenuClose(); }}>
+          <DeleteIcon sx={{ mr: 1 }} /> Delete
+        </MenuItem>
+      </Menu>
     </Box>
   );
 }

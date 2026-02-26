@@ -13,7 +13,10 @@ export interface UserCreate {
 }
 
 export interface UserUpdate {
-  full_name: string;
+  full_name?: string;
+  phone_number?: string | null;
+  is_active?: boolean;
+  tenant_id?: number | null;
 }
 
 export interface ApiError {
