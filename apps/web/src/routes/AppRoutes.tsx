@@ -14,6 +14,9 @@ const Login = lazy(() => import("../pages/Login"));
 const Register = lazy(() => import("../pages/Register"));
 const Profile = lazy(() => import("../pages/ProfilePage"));
 const SessionExpired = lazy(() => import("../pages/SessionExpired"));
+const TenantList = lazy(() => import("../pages/tenants/TenantList"));
+const AddTenant = lazy(() => import("../pages/tenants/AddTenant"));
+const TenantDetail = lazy(() => import("../pages/tenants/TenantDetail"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -58,20 +61,6 @@ export default function AppRoutes() {
             }
           />
 
-          {/* Permission-based protection example */}
-          {/* Uncomment and adjust permissions based on your backend features */}
-          {/* 
-          <Route
-            path="/users"
-            element={
-              <ProtectedRoute requiredPermissions="USER_VIEW">
-                <Users />
-              </ProtectedRoute>
-            }
-          />
-          */}
-
-          {/* Current implementation - basic auth only */}
           <Route
             path="/profile"
             element={
@@ -97,69 +86,37 @@ export default function AppRoutes() {
             }
           />
 
-          {/* Example: Route with permission requirement */}
-          {/* 
-          <Route
-            path="/users/create"
-            element={
-              <ProtectedRoute requiredPermissions="USER_CREATE">
-                <CreateUserPage />
-              </ProtectedRoute>
-            }
-          />
-          */}
-
-          {/* Example: Route with role requirement */}
-          {/* 
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute requiredRoles="ADMIN">
-                <AdminPage />
-              </ProtectedRoute>
-            }
-          />
-          */}
-
-          {/* Example: Route with multiple permissions (OR) */}
-          {/* 
-          <Route
-            path="/users/actions"
-            element={
-              <ProtectedRoute
-                requiredPermissions={["USER_EDIT", "USER_DELETE"]}
-              >
-                <UserActionsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/change-password"
-            element={
-              <ProtectedRoute>
-                <ChangePassword />
-          */}
-
-          {/* Example: Route with multiple permissions (AND) */}
-          {/* 
-          <Route
-            path="/users/export"
-            element={
-              <ProtectedRoute
-                requiredPermissions={["USER_VIEW", "USER_EXPORT"]}
-                requireAllPermissions
-              >
-                <ExportPage />
-              </ProtectedRoute>
-            }
-          />
-          */}
-
           <Route
             path="/roles"
             element={
               <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}>
                 <RoleManagementPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Tenant Management - Super Admin Only */}
+          <Route
+            path="/tenants"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
+                <TenantList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tenants/add"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
+                <AddTenant />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tenants/:id"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
+                <TenantDetail />
               </ProtectedRoute>
             }
           />
