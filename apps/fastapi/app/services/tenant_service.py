@@ -18,9 +18,22 @@ from app.utils.security import hash_password
 logger = get_logger(__name__)
 
 
-def get_tenants(db: Session) -> list[Tenant]:
-    """Get all non-deleted tenants."""
-    return db.query(Tenant).filter(Tenant.is_deleted == False).all()  # noqa: E712
+def get_tenants(
+    db: Session,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+) -> list[Tenant]:
+    """Get non-deleted tenants with optional search and pagination."""
+    query = db.query(Tenant).filter(Tenant.is_deleted == False)  # noqa: E712
+    if search:
+        query = query.filter(Tenant.name.ilike(f"%{search}%"))
+    return (
+        query.order_by(Tenant.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
 
 
 def get_tenant(db: Session, tenant_id: int) -> Tenant:
@@ -130,7 +143,6 @@ def provision_tenant(db: Session, data: TenantProvision, created_by: int | None 
         raise AppException(f"Unable to provision tenant: {str(e)}", status_code=500)
 
 
-# 
 
 
 def update_tenant(db: Session, tenant_id: int, data: TenantUpdate, updated_by: int | None = None) -> Tenant:
@@ -159,7 +171,11 @@ def update_tenant(db: Session, tenant_id: int, data: TenantUpdate, updated_by: i
     
     # Sync all users in this tenant if status changed
     if status_changed:
-        db.query(User).filter(User.tenant_id == tenant_id).update({"is_active": new_status})
+        db.query(User).filter(User.tenant_id == tenant_id).update({
+            "is_active": new_status,
+            "updated_at": datetime.utcnow(),
+            "updated_by": updated_by,
+        })
         logger.info(f"Tenant {tenant.code} status changed to {new_status}. All users synchronized.")
 
     db.commit()
@@ -190,7 +206,11 @@ def activate_tenant(db: Session, tenant_id: int, updated_by: int | None = None) 
     tenant.updated_at = datetime.utcnow()
     
     # Also activate all users in this tenant
-    db.query(User).filter(User.tenant_id == tenant_id).update({"is_active": True})
+    db.query(User).filter(User.tenant_id == tenant_id).update({
+        "is_active": True,
+        "updated_at": datetime.utcnow(),
+        "updated_by": updated_by,
+    })
     
     db.commit()
     db.refresh(tenant)
@@ -206,7 +226,11 @@ def deactivate_tenant(db: Session, tenant_id: int, updated_by: int | None = None
     tenant.updated_at = datetime.utcnow()
     
     # Also deactivate all users in this tenant
-    db.query(User).filter(User.tenant_id == tenant_id).update({"is_active": False})
+    db.query(User).filter(User.tenant_id == tenant_id).update({
+        "is_active": False,
+        "updated_at": datetime.utcnow(),
+        "updated_by": updated_by,
+    })
     
     db.commit()
     db.refresh(tenant)

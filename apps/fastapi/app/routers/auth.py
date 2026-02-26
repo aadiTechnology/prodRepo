@@ -86,7 +86,7 @@ async def login_with_context(
     login_data: LoginRequest,
     db: Session = Depends(get_db),
 ) -> LoginContextResponse:
-    """Unified Authentication Endpoint with RBAC context."""
+    """Unified authentication endpoint — returns JWT token plus RBAC context (roles, permissions, menus)."""
     logger.info(f"[RBAC] Login-with-context attempt for email: {login_data.email}")
 
     user = user_service.get_user_by_email(db, login_data.email)
@@ -105,20 +105,22 @@ async def login_with_context(
             logger.warning(f"Login blocked (Context): Tenant {user.tenant_id} is inactive or deleted (User: {user.email})")
             raise ForbiddenException("Tenant is deactivated. Contact system administrator.")
 
-    # Resolve roles, permissions, menus
-    user_role = user.roles[0].code if user.roles else user.role.value
+    # Resolve roles BEFORE creating the token so they can be embedded
+    roles = [role.code for role in get_user_roles(db, user.id)]
+    user_role = roles[0] if roles else user.role.value
+
     access_token = create_access_token(
         data={
             "sub": str(user.id),
             "email": user.email,
-            "role": roles[0] if roles else user.role.value, 
+            "role": user_role,
             "tenant_id": user.tenant_id,
         }
     )
 
-    # Get roles, permissions, menus
-    roles = [role.code for role in get_user_roles(db, user.id)]
-    permissions, menus = rbac_service.resolve_user_permissions_and_menus(db, user) 
+    # Get permissions and menus
+    permissions, menus = rbac_service.resolve_user_permissions_and_menus(db, user)
+    logger.info(f"[RBAC] User logged in successfully: {user.email}. Role: {user_role}")
     return LoginContextResponse(
         access_token=access_token,
         user=UserWithRole(id=user.id, email=user.email, full_name=user.full_name, role=user.role),
@@ -146,9 +148,10 @@ async def logout(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    """Logout user and revoke token."""
+    """Revoke the current JWT token and log the user out."""
     auth_header = request.headers.get("Authorization", "")
     token = auth_header.split()[1] if auth_header.startswith("Bearer ") else None
     if token:
         revoke_token(db, token, current_user.id)
+        logger.info(f"User logged out: {current_user.email}")
     return {"message": "Logged out successfully"}

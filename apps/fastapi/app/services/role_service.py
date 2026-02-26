@@ -25,7 +25,9 @@ def get_roles(db: Session, search: str = None, page_number: int = 1, page_size: 
     elif tenant_id:
         query = query.filter(Role.scope_type == "Tenant", Role.tenant_id == tenant_id)
     else:
-        # Fallback: return nothing if no context provided
+        # Design decision: return no roles when the user has no tenant context
+        # (e.g., mid-onboarding or invalid state). This is intentional — callers
+        # should handle empty results gracefully and display a clear message to the user.
         return [], 0
         
     if search:

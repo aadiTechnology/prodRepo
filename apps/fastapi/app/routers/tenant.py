@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.core.database import get_db
 from app.core.dependencies import require_system_admin, CurrentUser
@@ -15,9 +15,12 @@ router = APIRouter(prefix="/tenants", tags=["Tenants"])
 async def list_tenants(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_system_admin),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(100, ge=1, le=500, description="Items per page"),
+    search: Optional[str] = Query(None, description="Filter tenants by name"),
 ) -> List[TenantResponse]:
-    """List all tenants. Only Super Admin can access."""
-    tenants = tenant_service.get_tenants(db)
+    """List tenants with optional search and pagination. Only Super Admin can access."""
+    tenants = tenant_service.get_tenants(db, search=search, page=page, page_size=page_size)
     return tenants
 
 
