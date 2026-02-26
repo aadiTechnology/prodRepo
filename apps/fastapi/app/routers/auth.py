@@ -8,7 +8,7 @@ from app.schemas.user import UserCreate, UserResponse
 from app.services import user_service, rbac_service
 from app.models.user import UserRole
 from app.utils.security import verify_password, create_access_token
-from app.core.exceptions import UnauthorizedException
+from app.core.exceptions import UnauthorizedException, ForbiddenException
 from app.core.logging_config import get_logger
 from app.core.dependencies import get_current_user, CurrentUser, _get_rbac_role_codes
 from app.services.auth_service import revoke_token
@@ -19,30 +19,16 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register", response_model=UserResponse, status_code=201)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)) -> UserResponse:
-    """
-    Register a new user.
-    
-    If no users exist in the database, the first user will be created as an admin.
-    Subsequent registrations will create regular users.
-    
-    Args:
-        user_data: User registration data (email, full_name, password, phone_number, tenant_id - optional)
-        db: Database session
-    
-    Returns:
-        UserResponse: Created user information including phone_number and tenant_id
-    """
+    """Register a new user."""
     from app.models.user import User
     
-    # Check if this is the first user (no users in database)
+    # Check if this is the first user
     existing_users = db.query(User).count()
     is_first_user = existing_users == 0
     
-    # First user becomes admin, others are regular users
     role = UserRole.ADMIN if is_first_user else UserRole.USER
     
     logger.info(f"Registering new user: {user_data.email} with role: {role.value}")
-    # First user doesn't have a creator, so created_by is None
     created_user = user_service.create_user(db, user_data, role=role, created_by=None)
     
     if is_first_user:
@@ -60,88 +46,77 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)) -> User
 
 @router.post("/login", response_model=TokenResponse)
 async def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    """
-    Authenticate user and return JWT token.
-    
-    Args:
-        login_data: Login credentials (email and password)
-        db: Database session
-    
-    Returns:
-        TokenResponse: JWT access token
-    
-    Raises:
-        UnauthorizedException: If credentials are invalid
-    """
+    """Authenticate user and return JWT token."""
     logger.info(f"Login attempt for email: {login_data.email}")
     
-    # Get user by email
     user = user_service.get_user_by_email(db, login_data.email)
-    if not user:
-        logger.warning(f"Login attempt with non-existent email: {login_data.email}")
+    if not user or not verify_password(login_data.password, user.hashed_password):
+        logger.warning(f"Invalid credentials for email: {login_data.email}")
         raise UnauthorizedException("Invalid email or password")
     
-    # Verify password
-    if not verify_password(login_data.password, user.hashed_password):
-        logger.warning(f"Invalid password attempt for email: {login_data.email}")
-        raise UnauthorizedException("Invalid email or password")
+    # Strict Tenant/User Activation Check
+    if not user.is_active:
+        raise UnauthorizedException("Your account is deactivated. Contact system administrator.")
     
-    # Create access token
-    # Note: JWT 'sub' claim must be a string, so convert user.id to string
-    # Get actual role from RBAC roles relationship, with fallback to legacy role
+    if user.tenant_id:
+        from app.models.tenant import Tenant
+        tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+        if not tenant or not tenant.is_active or tenant.is_deleted:
+            logger.warning(f"Login blocked: Tenant {user.tenant_id} is inactive or deleted (User: {user.email})")
+            raise ForbiddenException("Tenant is deactivated. Contact system administrator.")
+
+    # Resolve role from RBAC first
     user_role = user.roles[0].code if user.roles else user.role.value
+
     access_token = create_access_token(
         data={
             "sub": str(user.id),
             "email": user.email,
-            "role": user.roles[0].code,  # ✅ Use the role code (e.g., "SUPER_ADMIN")
+            "role": user_role,
             "tenant_id": user.tenant_id,
         }
     )
     
-    logger.info(f"User logged in successfully: {user.email}. Token created (length: {len(access_token)})")
+    logger.info(f"User logged in successfully: {user.email}. Role: {user_role}")
     return TokenResponse(access_token=access_token)
-
 
 @router.post("/login/context", response_model=LoginContextResponse)
 async def login_with_context(
     login_data: LoginRequest,
     db: Session = Depends(get_db),
 ) -> LoginContextResponse:
-    """
-    Unified Authentication Endpoint.
-    
-    Performs user verification and returns:
-    1. JWT Access Token
-    2. User Profile Info
-    3. RBAC Context (Full list of roles, permissions, and hierarchical menus)
-    
-    This replaces the multi-step fetch process with a single, high-performance call.
-    """
+    """Unified Authentication Endpoint with RBAC context."""
     logger.info(f"[RBAC] Login-with-context attempt for email: {login_data.email}")
 
-    # Reuse existing login logic
     user = user_service.get_user_by_email(db, login_data.email)
     if not user or not verify_password(login_data.password, user.hashed_password):
         logger.warning(f"[RBAC] Invalid credentials for email: {login_data.email}")
         raise UnauthorizedException("Invalid email or password")
 
-    # Get actual role from RBAC roles relationship, with fallback to legacy role
+    # Strict Tenant/User Activation Check
+    if not user.is_active:
+        raise UnauthorizedException("Your account is deactivated. Contact system administrator.")
+    
+    if user.tenant_id:
+        from app.models.tenant import Tenant
+        tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+        if not tenant or not tenant.is_active or tenant.is_deleted:
+            logger.warning(f"Login blocked (Context): Tenant {user.tenant_id} is inactive or deleted (User: {user.email})")
+            raise ForbiddenException("Tenant is deactivated. Contact system administrator.")
+
+    # Resolve roles, permissions, menus
     user_role = user.roles[0].code if user.roles else user.role.value
     access_token = create_access_token(
         data={
             "sub": str(user.id),
             "email": user.email,
-            "role": user.roles[0].code,  # ✅ Use the role code (e.g., "SUPER_ADMIN")
+            "role": user_role,
             "tenant_id": user.tenant_id,
         }
     )
 
-    # Resolve roles, permissions, menus
     permissions, menus = rbac_service.resolve_user_permissions_and_menus(db, user)
     roles = [role_code.upper().replace(" ", "_") for role_code in _get_rbac_role_codes(db, user.id)]
-
-    logger.info(f"[RBAC] User logged in with context: {user.email}, roles={roles}, perms={len(permissions)}")
 
     return LoginContextResponse(
         access_token=access_token,
@@ -156,23 +131,7 @@ async def get_current_user_info(
     request: Request,
     current_user: CurrentUser = Depends(get_current_user)
 ) -> UserWithRole:
-    """
-    Get current authenticated user information.
-    
-    Args:
-        request: FastAPI request object
-        current_user: Current authenticated user (from dependency)
-    
-    Returns:
-        UserWithRole: Current user information
-    """
-    # Log the authorization header for debugging (without exposing the full token)
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header:
-        logger.debug(f"Authorization header present (length: {len(auth_header)})")
-    else:
-        logger.warning("No Authorization header in request")
-    
+    """Get current authenticated user information."""
     return UserWithRole(
         id=current_user.id,
         email=current_user.email,
@@ -191,7 +150,4 @@ async def logout(
     token = auth_header.split()[1] if auth_header.startswith("Bearer ") else None
     if token:
         revoke_token(db, token, current_user.id)
-        logger.info(f"User {current_user.email} (tenant={getattr(current_user, 'tenant_id', None)}) logged out")
-    else:
-        logger.warning("Logout called with missing token")
     return {"message": "Logged out successfully"}

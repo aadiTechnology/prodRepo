@@ -14,8 +14,13 @@ class Tenant(Base):
     __tablename__ = "tenants"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    code = Column(String(50), nullable=False, unique=True, index=True)
     name = Column(String(200), nullable=False)
-    status = Column(PgEnum(TenantStatus), nullable=False, default=TenantStatus.ACTIVE)
+    owner_name = Column(String(150), nullable=True)
+    email = Column(String(150), nullable=True)
+    phone = Column(String(20), nullable=True)
+    description = Column(String(500), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
 
     # Audit fields
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
