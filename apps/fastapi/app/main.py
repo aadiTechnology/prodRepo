@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 from app.core.database import Base, engine, DATABASE_URL
@@ -45,16 +44,18 @@ app.add_middleware(
     minimum_size=1000,  # Only compress responses larger than 1KB
 )
 
-# CORS configuration - optimized for performance
-# Order matters: CORS should be added after compression but before other middleware
+
+# CORS configuration - use FastAPI's built-in CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,  # Specific origins instead of "*" for better security
-    allow_credentials=settings.CORS_CREDENTIALS,
-    allow_methods=settings.CORS_METHODS,  # Can be optimized to specific methods: ["GET", "POST", "PUT", "DELETE"]
-    allow_headers=settings.CORS_HEADERS,  # Can be optimized to specific headers: ["Content-Type", "Authorization"]
-    expose_headers=["Content-Length", "X-Request-ID"],  # Expose useful headers to client
-    max_age=3600,  # Cache preflight requests for 1 hour
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Register exception handlers
@@ -193,3 +194,5 @@ async def liveness_check():
         "status": "alive",
         "timestamp": None,
     }
+
+    # ...existing code...

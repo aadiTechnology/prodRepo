@@ -69,8 +69,7 @@ def update_user(
     updated_by: int | None = None,
 ) -> User:
     """Update a user."""
-    db_user = get_user(db, user_id)  # This will raise NotFoundException if not found
-
+    db_user = get_user(db, user_id)
     if user.full_name is not None:
         db_user.full_name = user.full_name
     if user.phone_number is not None:
@@ -79,12 +78,10 @@ def update_user(
         db_user.is_active = user.is_active
     if user.tenant_id is not None:
         db_user.tenant_id = user.tenant_id
-
     db_user.updated_by = updated_by
     db_user.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(db_user)
-    logger.info(f"User updated: {db_user.email}")
     return db_user
 
 

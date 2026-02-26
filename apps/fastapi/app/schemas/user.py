@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel, EmailStr
 from app.models.user import UserRole
@@ -11,6 +11,7 @@ class UserCreate(BaseModel):
     password: str
     tenant_id: Optional[int] = None
     phone_number: Optional[str] = None
+    roles: List[str] = None
 
 
 class UserUpdate(BaseModel):
@@ -27,6 +28,7 @@ class UserPasswordUpdate(BaseModel):
 
 
 class UserResponse(BaseModel):
+
     id: int
     email: EmailStr
     full_name: str
@@ -34,6 +36,7 @@ class UserResponse(BaseModel):
     phone_number: Optional[str] = None
     is_active: bool
     created_at: datetime
+    roles: Optional[List[str]] = None  # roles included for multiple role support
 
     class Config:
         from_attributes = True

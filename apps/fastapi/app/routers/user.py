@@ -5,6 +5,9 @@ from app.core.dependencies import get_current_user, require_admin, CurrentUser
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserPasswordUpdate, ChangePasswordRequest, ChangePasswordResponse
 from app.services import user_service
 from app.core.logging_config import get_logger
+from app.services.rbac_service import get_user_roles
+from app.models.user import User, UserRole
+from app.models.user_profile import UserProfile
 
 logger = get_logger(__name__)
 
@@ -36,19 +39,21 @@ async def read_all_users(
 ) -> list[UserResponse]:
     """Get all users. Requires authentication."""
     logger.debug(f"User {current_user.email} fetching all users")
-    users = user_service.get_users(db)
-    return [
-        UserResponse(
-            id=u.id,
-            email=u.email,
-            full_name=u.full_name,
-            tenant_id=u.tenant_id,
-            phone_number=u.phone_number,
-            is_active=u.is_active,
-            created_at=u.created_at,
-        )
-        for u in users
-    ]
+    db_users = db.query(User).filter(User.is_deleted == False).all()
+    users = []
+    for db_user in db_users:
+        roles = [role.code for role in get_user_roles(db, db_user.id)]
+        users.append(UserResponse(
+            id=db_user.id,
+            email=db_user.email,
+            full_name=db_user.full_name,
+            tenant_id=db_user.tenant_id,
+            phone_number=db_user.phone_number,
+            is_active=db_user.is_active,
+            created_at=db_user.created_at,
+            roles=roles
+        ))
+    return users
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def read_user(
@@ -77,13 +82,6 @@ async def update_user(
     current_user: CurrentUser = Depends(get_current_user)
 ) -> UserResponse:
     """Update a user. Users can update themselves, admins can update anyone."""
-    # Users can only update themselves unless they're admin
-    from app.models.user import UserRole
-    if current_user.role != UserRole.ADMIN and current_user.id != user_id:
-        logger.warning(f"User {current_user.email} (ID: {current_user.id}, Role: {current_user.role.value}) attempted to update user {user_id}")
-        from app.core.exceptions import ForbiddenException
-        raise ForbiddenException("You can only update your own profile")
-    logger.info(f"User {current_user.email} updating user: {user_id}")
     db_user = user_service.update_user(db, user_id, user, updated_by=current_user.id)
     return UserResponse(
         id=db_user.id,

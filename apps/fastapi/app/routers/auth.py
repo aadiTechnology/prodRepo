@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.core.database import get_db
+from app.services.rbac_service import get_user_roles 
 from app.schemas.auth import LoginRequest, TokenResponse, UserWithRole, LoginContextResponse
 from app.schemas.user import UserCreate, UserResponse
 from app.services import user_service, rbac_service
@@ -110,14 +111,14 @@ async def login_with_context(
         data={
             "sub": str(user.id),
             "email": user.email,
-            "role": user_role,
+            "role": roles[0] if roles else user.role.value, 
             "tenant_id": user.tenant_id,
         }
     )
 
-    permissions, menus = rbac_service.resolve_user_permissions_and_menus(db, user)
-    roles = [role_code.upper().replace(" ", "_") for role_code in _get_rbac_role_codes(db, user.id)]
-
+    # Get roles, permissions, menus
+    roles = [role.code for role in get_user_roles(db, user.id)]
+    permissions, menus = rbac_service.resolve_user_permissions_and_menus(db, user) 
     return LoginContextResponse(
         access_token=access_token,
         user=UserWithRole(id=user.id, email=user.email, full_name=user.full_name, role=user.role),
