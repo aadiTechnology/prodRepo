@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   Box,
   Paper,
@@ -12,10 +12,15 @@ import {
   Button,
   Typography,
   Alert,
-  Link,
+  Link as MuiLink,
   InputAdornment,
   IconButton,
   Grid,
+  FormControlLabel,
+  Checkbox,
+  CircularProgress,
+  Zoom,
+  Fade,
 } from "@mui/material";
 import {
   Email as EmailIcon,
@@ -24,21 +29,28 @@ import {
   VisibilityOff,
   Login as LoginIcon,
   AccountCircle,
+  Dashboard as DashboardIcon,
+  Storage as StorageIcon,
+  Security as SecurityIcon,
+  People as PeopleIcon,
+  ArrowForward as ArrowForwardIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 import { LoginRequest } from "../types/auth";
 
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { loginWithContext, isAuthenticated, isLoading } = useAuth();
+  const { loginWithContext, isAuthenticated, isLoading: authLoading } = useAuth();
   const { setRBACData } = useRBAC();
 
   const [formData, setFormData] = useState<LoginRequest>({
     email: "",
     password: "",
   });
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -51,15 +63,41 @@ export default function Login() {
     }
   }, [isAuthenticated, navigate, location]);
 
+  const validate = (): boolean => {
+    const newErrors: { email?: string; password?: string } = {};
+
+    // Email validation
+    if (!formData.email.trim()) {
+      newErrors.email = "Please enter Email Address.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = "Please enter a valid Email Address.";
+    }
+
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = "Please enter Password.";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    // Clear field errors as user types
+    if (errors[name as keyof typeof errors]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
     setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!validate()) return;
+
     setIsSubmitting(true);
 
     try {
@@ -76,7 +114,13 @@ export default function Login() {
       const from = (location.state as { from?: Location })?.from?.pathname || "/";
       navigate(from, { replace: true });
     } catch (err: any) {
-      setError(err?.message || err?.detail || "Invalid email or password. Please try again.");
+      // Generic error handling as per user story
+      const message = err?.message || err?.detail || "";
+      if (message.toLowerCase().includes("inactive")) {
+        setError("Your account is inactive. Please contact system administrator.");
+      } else {
+        setError("Invalid credentials.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -86,142 +130,133 @@ export default function Login() {
     setShowPassword(!showPassword);
   };
 
+  // Button disabled until both fields filled
+  const isButtonDisabled = !formData.email.trim() || !formData.password || isSubmitting;
+
   // Don't render login form if already authenticated (while redirecting)
-  if (isAuthenticated) {
-    return null;
-  }
+  if (isAuthenticated) return null;
+
+  const actionItems = [
+    {
+      icon: <DashboardIcon sx={{ color: "#ffffff" }} />,
+      title: "Platform Dashboard",
+      desc: "Monitor tenant health and system performance."
+    },
+    {
+      icon: <StorageIcon sx={{ color: "#ffffff" }} />,
+      title: "Resource Orchestration",
+      desc: "Manage intelligent cloud resource allocation."
+    },
+    {
+      icon: <SecurityIcon sx={{ color: "#ffffff" }} />,
+      title: "Security & Compliance",
+      desc: "Review logs and manage encryption protocols."
+    },
+    {
+      icon: <PeopleIcon sx={{ color: "#ffffff" }} />,
+      title: "Identity & RBAC",
+      desc: "Configure cross-tenant roles and permissions."
+    }
+  ];
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", overflow: "hidden" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#ffffff" }}>
       <Grid container>
-        {/* Left Panel: Branding and Logo */}
-        <Grid
-          item
-          xs={false}
-          sm={4}
-          md={5}
-          sx={{
-            backgroundColor: "#0f172a", // Dark navy/slate background
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#ffffff",
-            position: "relative",
-            "&::before": {
-              content: '""',
-              position: "absolute",
-              bottom: "-50px",
-              left: "-50px",
-              width: "250px",
-              height: "250px",
-              backgroundColor: "rgba(255, 255, 255, 0.03)",
-              borderRadius: "50%",
-            }
-          }}
-        >
-          <Box sx={{ textAlign: "center", zIndex: 1 }}>
-            <Box
-              component="img"
-              src="/aadi-logo.png"
-              alt="Aadi Technology Logo"
-              sx={{ width: "120px", height: "auto", mb: 2, filter: "brightness(1.1)" }}
-            />
-           
-            <Typography variant="h2" sx={{ fontWeight: 800, letterSpacing: "-0.02em" }}>
-              Aadi Technology
-            </Typography>
-          </Box>
-        </Grid>
-
-        {/* Right Panel: Login Form */}
+        {/* Left Side: Login Form */}
         <Grid
           item
           xs={12}
-          sm={8}
-          md={7}
-          component={Paper}
-          elevation={0}
-          square
+          md={6}
           sx={{
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: "#f8fafc", // Light gray background
-            p: 4,
+            p: { xs: 4, md: 8, lg: 12 },
           }}
         >
-          <Box
-            sx={{
-              maxWidth: 450,
-              width: "100%",
-              p: 5,
-              backgroundColor: "#ffffff",
-              borderRadius: 3,
-              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)",
-            }}
-          >
-            <Box sx={{ mb: 4, textAlign: "left" }}>
-              <Typography variant="h4" sx={{ fontWeight: 800, color: "#1e293b", mb: 1 }}>
-                Platform Admin Login
+          <Box sx={{ maxWidth: 440, width: "100%" }}>
+            {/* Logo/Brand Section */}
+            <Box sx={{ mb: 4 }}>
+              <Box
+                component="img"
+                src="/aadi-logo.png"
+                alt="Aadi Logo"
+                sx={{ width: 120, height: "auto", mb: 2 }}
+              />
+              <Typography variant="subtitle2" sx={{ color: "#64748b", fontWeight: 700, mb: 1, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                Login Platform
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Sign in to manage tenants and system settings.
+              <Typography variant="h3" sx={{ fontWeight: 800, color: "#0f172a", mb: 1.5, letterSpacing: "-0.02em" }}>
+                Welcome back
+              </Typography>
+              <Typography variant="body1" sx={{ color: "#64748b" }}>
+                Please enter your credentials to access the core platform.
               </Typography>
             </Box>
 
             {error && (
-              <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
-                {error}
-              </Alert>
+              <Fade in>
+                <Alert
+                  severity="error"
+                  variant="outlined"
+                  sx={{
+                    mb: 4,
+                    borderRadius: 1,
+                    borderColor: "#ef4444",
+                    backgroundColor: "rgba(239, 68, 68, 0.02)",
+                    color: "#b91c1c"
+                  }}
+                >
+                  {error}
+                </Alert>
+              </Fade>
             )}
 
-            <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <Box component="form" onSubmit={handleSubmit} noValidate sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
               <Box>
-                <Typography variant="caption" sx={{ fontWeight: 700, ml: 1, color: "#64748b", mb: 0.5, display: "block" }}>
-                  Email Address
+                <Typography variant="body2" sx={{ fontWeight: 600, color: "#1e293b", mb: 1 }}>
+                  Email Address *
                 </Typography>
                 <TextField
                   name="email"
-                  placeholder="sysadmin@server.com"
+                  placeholder="Enter Your Email"
                   type="email"
                   value={formData.email}
                   onChange={handleChange}
-                  required
+                  error={!!errors.email}
+                  helperText={errors.email}
                   fullWidth
                   autoComplete="email"
                   autoFocus
                   InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <EmailIcon sx={{ color: "#94a3b8" }} />
-                      </InputAdornment>
-                    ),
-                    sx: { borderRadius: 2, backgroundColor: "#eff6ff" }
+                    sx: {
+                      borderRadius: 1,
+                      backgroundColor: "#fff",
+                      height: "50px",
+                      border: "1px solid #e2e8f0",
+                      "& fieldset": { border: "none" },
+                      "&.Mui-focused": { border: "1px solid #14b8a6", boxShadow: "0 0 0 4px rgba(20, 184, 166, 0.1)" },
+                    }
                   }}
                 />
               </Box>
 
               <Box>
-                <Typography variant="caption" sx={{ fontWeight: 700, ml: 1, color: "#64748b", mb: 0.5, display: "block" }}>
-                  Password
+                <Typography variant="body2" sx={{ fontWeight: 600, color: "#1e293b", mb: 1 }}>
+                  Password *
                 </Typography>
                 <TextField
                   name="password"
-                  placeholder="••••••••"
+                  placeholder="Enter Your Password"
                   type={showPassword ? "text" : "password"}
                   value={formData.password}
                   onChange={handleChange}
-                  required
+                  error={!!errors.password}
+                  helperText={errors.password}
                   fullWidth
                   autoComplete="current-password"
                   InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LockIcon sx={{ color: "#94a3b8" }} />
-                      </InputAdornment>
-                    ),
                     endAdornment: (
                       <InputAdornment position="end">
                         <IconButton
@@ -230,84 +265,164 @@ export default function Login() {
                           edge="end"
                           size="small"
                         >
-                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                          {showPassword ? <VisibilityOff sx={{ fontSize: "1.1rem" }} /> : <Visibility sx={{ fontSize: "1.1rem" }} />}
                         </IconButton>
                       </InputAdornment>
                     ),
-                    sx: { borderRadius: 2, backgroundColor: "#eff6ff" }
+                    sx: {
+                      borderRadius: 1,
+                      backgroundColor: "#fff",
+                      height: "50px",
+                      border: "1px solid #e2e8f0",
+                      "& fieldset": { border: "none" },
+                      "&.Mui-focused": { border: "1px solid #14b8a6", boxShadow: "0 0 0 4px rgba(20, 184, 166, 0.1)" },
+                    }
                   }}
                 />
-                <Box sx={{ display: "flex", alignItems: "center", mt: 1, ml: 0.5 }}>
-                  <Box
-                    sx={{
-                      width: 14,
-                      height: 14,
-                      backgroundColor: "#2196f3",
-                      borderRadius: "2px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      mr: 1
-                    }}
-                  >
-                    <Typography sx={{ color: "#fff", fontSize: 10, fontWeight: 900 }}>i</Typography>
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Password is case-sensitive.
-                  </Typography>
-                </Box>
+              </Box>
+
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <FormControlLabel
+                  control={<Checkbox size="small" sx={{ color: "#cbd5e1", "&.Mui-checked": { color: "#14b8a6" } }} />}
+                  label={<Typography variant="body2" sx={{ color: "#64748b" }}>Remember me</Typography>}
+                />
+                <MuiLink
+                  component={Link}
+                  to="/forgot-password"
+                  sx={{
+                    color: "#1e293b",
+                    textDecoration: "none",
+                    fontWeight: 600,
+                    fontSize: "0.875rem",
+                    "&:hover": { color: "#14b8a6" }
+                  }}
+                >
+                  Forgot password?
+                </MuiLink>
               </Box>
 
               <Button
                 type="submit"
                 variant="contained"
                 fullWidth
-                size="large"
-                disabled={isSubmitting || isLoading}
-                startIcon={!isSubmitting && <LoginIcon />}
+                disabled={isButtonDisabled}
                 sx={{
-                  mt: 1,
-                  py: 1.5,
-                  borderRadius: 2,
-                  backgroundColor: "#14a4b1", // Teal color from reference
-                  boxShadow: "0 4px 6px -1px rgba(20, 164, 177, 0.4)",
+                  mt: 0.5,
+                  height: "56px",
+                  borderRadius: 1.5,
+                  backgroundColor: "#0f172a",
                   textTransform: "none",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   fontSize: "1rem",
                   "&:hover": {
-                    backgroundColor: "#118a95",
+                    backgroundColor: "#1e293b",
                   },
+                  "&.Mui-disabled": {
+                    backgroundColor: "#f1f5f9",
+                    color: "#94a3b8"
+                  }
                 }}
               >
-                {isSubmitting ? "Signing In..." : "Sign In"}
+                {isSubmitting ? <CircularProgress size={24} sx={{ color: "#ffffff" }} /> : "Log In"}
               </Button>
 
-              <Box sx={{ textAlign: "center", mt: 2 }}>
-                <Typography variant="body2" sx={{ color: "#94a3b8", fontSize: "0.75rem", lineHeight: 1.6 }}>
-                  This is a restricted access system. By signing in, you agree to the{" "}
-                  <Link href="#" sx={{ color: "#14a4b1", fontWeight: 600, textDecoration: "none" }}>
-                    Platform Security Policy
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="#" sx={{ color: "#14a4b1", fontWeight: 600, textDecoration: "none" }}>
-                    Terms of Service
-                  </Link>
-                  . All activities are monitored and logged for security auditing purposes.
-                </Typography>
-                {/* 
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
+              <Box sx={{ mt: 1, textAlign: "center" }}>
+                <Typography variant="body2" sx={{ color: "#64748b" }}>
                   Don't have an account?{" "}
-                  <Link
-                    component="button"
-                    variant="body2"
-                    onClick={() => navigate("/register")}
-                    sx={{ fontWeight: 600, color: "#14a4b1", textDecoration: "none" }}
+                  <MuiLink
+                    component={Link}
+                    to="/register"
+                    sx={{
+                      color: "#14b8a6",
+                      textDecoration: "none",
+                      fontWeight: 700,
+                      "&:hover": { textDecoration: "underline" }
+                    }}
                   >
-                    Sign Up
-                  </Link>
+                    Register
+                  </MuiLink>
                 </Typography>
-                */}
               </Box>
+            </Box>
+          </Box>
+        </Grid>
+
+        {/* Right Side: Informational Action Panel */}
+        <Grid
+          item
+          xs={false}
+          md={6}
+          sx={{
+            position: "relative",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundImage: "url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop')", // Futuristic network connection image
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            p: 8,
+            overflow: "hidden",
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(15, 23, 42, 0.4)", // Dark tint overlay
+              backdropFilter: "blur(20px)", // Reference image style blur
+              zIndex: 1,
+            }
+          }}
+        >
+          <Box sx={{ position: "relative", zIndex: 2, maxWidth: 500, mx: "auto" }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {actionItems.map((item, index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    py: 4.5,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    borderBottom: index !== actionItems.length - 1 ? "1px solid rgba(255, 255, 255, 0.1)" : "none",
+                    cursor: "pointer",
+                    transition: "all 0.3s",
+                    "&:hover": {
+                      transform: "translateX(8px)",
+                      "& .arrow-icon": { transform: "translateX(4px)" }
+                    }
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <Box
+                      sx={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 1.5,
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}
+                    >
+                      {item.icon}
+                    </Box>
+                    <Box>
+                      <Typography variant="h6" sx={{ color: "#ffffff", fontWeight: 700, mb: 0.5, letterSpacing: "-0.01em" }}>
+                        {item.title}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: "rgba(255, 255, 255, 0.6)", lineHeight: 1.5 }}>
+                        {item.desc}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <ArrowForwardIcon
+                    className="arrow-icon"
+                    sx={{ color: "rgba(255, 255, 255, 0.3)", transition: "all 0.3s" }}
+                  />
+                </Box>
+              ))}
             </Box>
           </Box>
         </Grid>
@@ -315,4 +430,3 @@ export default function Login() {
     </Box>
   );
 }
-
