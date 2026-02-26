@@ -12,7 +12,18 @@ export default function RoleManagementPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25); // Default to 25 for demonstration
+
+const handlePageChange = (newPage: number) => setPage(newPage);
+const handlePageSizeChange = (newPageSize: number) => {
+  setPageSize(newPageSize);
+  setPage(0); // <-- Reset to first page when page size changes
+};
+
+const handlePaginationModelChange = (model: { page: number; pageSize: number }) => {
+  setPage(model.page);
+  setPageSize(model.pageSize);
+};
 
   // const debouncedSearch = useDebounce(search, 500);
 
@@ -32,7 +43,7 @@ export default function RoleManagementPage() {
     queryKey: ["roles", search, page, pageSize],
     queryFn: () =>
       roleService.getRoles({
-        search: search ,       //debouncedSearch,
+        search: search,
         page: page + 1,
         pageSize,
       }),
@@ -46,8 +57,8 @@ export default function RoleManagementPage() {
   // 🟢 Define mappedRoles FIRST
   const mappedRoles = (rolesData?.items ?? []).map(role => ({
     id: String(role.id),
-    name: role.name,
-    description: role.description,
+    name: role.name ?? "",
+    description: role.description ?? "", // <--- important!
     scope: (role.scope_type || "").toUpperCase() === "PLATFORM" ? "PLATFORM" : "TENANT",
     isSystemRole: !!role.is_system,
     status: role.is_active ? "ACTIVE" : "INACTIVE",
@@ -109,11 +120,9 @@ export default function RoleManagementPage() {
           <RoleTable
             data={mappedRoles}
             loading={rolesLoading}
-            page={page}
-            pageSize={pageSize}
+            paginationModel={{ page, pageSize }}
+            onPaginationModelChange={handlePaginationModelChange}
             rowCount={rolesData?.totalCount ?? 0}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
             search={search}
             onAddRole={handleAddRole}
           />

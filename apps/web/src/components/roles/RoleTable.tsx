@@ -19,6 +19,7 @@ import {
   Visibility as ViewIcon,
   Edit as EditIcon,
   Block as DeactivateIcon,
+  Delete as DeleteIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
@@ -28,6 +29,9 @@ import StatusChip from "./StatusChip";
 import ScopeChip from "./ScopeChip";
 import dayjs from "dayjs";
 import roleService from "../../api/services/roleService";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
 
 interface RoleTableProps {
   data: Role[];
@@ -42,25 +46,30 @@ interface RoleTableProps {
   onAddRole: () => void;
 }
 
-function truncate(text: string, max: number) {
+function truncate(text: string | null | undefined, max: number) {
+  if (!text) return "";
   if (text.length <= max) return text;
   return text.slice(0, max) + "...";
 }
 
-export default function RoleTable({ data, ...props }) {
+export default function RoleTable({
+  data,
+  loading,
+  paginationModel,
+  onPaginationModelChange,
+  rowCount,
+  search,
+  onAddRole,
+}: {
+  data: Role[];
+  loading: boolean;
+  paginationModel: { page: number; pageSize: number };
+  onPaginationModelChange: (model: { page: number; pageSize: number }) => void;
+  rowCount: number;
+  search: string;
+  onAddRole: () => void;
+}) {
   const rows = Array.isArray(data) ? data : [];
-
-  const {
-    loading,
-    page,
-    pageSize,
-    rowCount,
-    onPageChange,
-    onPageSizeChange,
-    pagination,
-    search,
-    onAddRole,
-  } = props;
   const navigate = useNavigate();
 
   // Confirm dialog state
@@ -68,7 +77,40 @@ export default function RoleTable({ data, ...props }) {
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
 
-  const handleDeactivate = async () => {
+  // Actions menu state
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [menuRole, setMenuRole] = useState<Role | null>(null);
+
+  // --- ADD HERE ---
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Delete menu action: open dialog
+  const handleDeleteMenu = () => {
+    if (menuRole) {
+      setSelectedRole(menuRole);
+      setDeleteDialogOpen(true);
+    }
+    handleMenuClose();
+  };
+
+  // Confirm delete action: API call
+  const handleDeleteConfirm = async () => {
+    if (!selectedRole) return;
+    setDeleteLoading(true);
+    try {
+      await roleService.deleteRole(selectedRole.id); // Implement this API if not present
+      setDeleteDialogOpen(false);
+      setSelectedRole(null);
+      // Optionally refetch roles here
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+  // --- END ADD ---
+
+  const handleDeactivateConfirm = async () => {
+    // API call for deactivation
     if (!selectedRole) return;
     setDeactivateLoading(true);
     try {
@@ -78,6 +120,45 @@ export default function RoleTable({ data, ...props }) {
     } finally {
       setDeactivateLoading(false);
     }
+  };
+
+  const handleDeactivateMenu = () => {
+    // Menu action, opens dialog
+    if (menuRole) {
+      setSelectedRole(menuRole);
+      setConfirmOpen(true);
+    }
+    handleMenuClose();
+  };
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, role: Role) => {
+    setMenuAnchorEl(event.currentTarget);
+    setMenuRole(role);
+  };
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+    setMenuRole(null);
+  };
+
+  const handleView = () => {
+    if (menuRole) navigate(`/roles/${menuRole.id}`);
+    handleMenuClose();
+  };
+  const handleEdit = () => {
+    if (menuRole) navigate(`/roles/${menuRole.id}/edit`);
+    handleMenuClose();
+  };
+  const handleDeactivate = () => {
+    handleDeactivateMenu();
+  };
+  const handleDelete = () => {
+    // Implement delete logic here (e.g. open confirm dialog)
+    if (menuRole) {
+      // setSelectedRole(menuRole);
+      // setDeleteDialogOpen(true);
+      alert(`Delete role: ${menuRole.name}`);
+    }
+    handleMenuClose();
   };
 
   const columns: GridColDef[] = [
@@ -146,52 +227,19 @@ export default function RoleTable({ data, ...props }) {
     {
       field: "actions",
       headerName: "Actions",
-      minWidth: 160,
+      minWidth: 80,
       sortable: false,
       filterable: false,
       renderCell: (params: GridRenderCellParams<Role>) => (
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <Tooltip title="View">
-            <IconButton
-              size="small"
-              onClick={() => navigate(`/roles/${params.row.id}`)}
-              aria-label="view"
-            >
-              <ViewIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Edit">
-            <IconButton
-              size="small"
-              onClick={() => navigate(`/roles/${params.row.id}/edit`)}
-              aria-label="edit"
-            >
-              <EditIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip
-            title={
-              params.row.isSystemRole
-                ? "This is a system role and cannot be deactivated."
-                : "Deactivate Role"
-            }
+        <>
+          <IconButton
+            size="small"
+            aria-label="more"
+            onClick={(e) => handleMenuOpen(e, params.row)}
           >
-            <span>
-              <IconButton
-                size="small"
-                color="error"
-                disabled={params.row.isSystemRole}
-                onClick={() => {
-                  setSelectedRole(params.row);
-                  setConfirmOpen(true);
-                }}
-                aria-label="deactivate"
-              >
-                <DeactivateIcon fontSize="small" />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
+            <MoreVertIcon />
+          </IconButton>
+        </>
       ),
     },
   ];
@@ -203,14 +251,11 @@ export default function RoleTable({ data, ...props }) {
       <DataGrid
         rows={rows}
         columns={columns}
-        page={page}
-        pageSize={pageSize}
-        rowCount={rowCount}
-        pagination
         paginationMode="server"
-        onPageChange={onPageChange}
-        onPageSizeChange={onPageSizeChange}
-        rowsPerPageOptions={[10, 25, 50]}
+        paginationModel={paginationModel}
+        onPaginationModelChange={onPaginationModelChange}
+        pageSizeOptions={[10, 25, 50, 100]}
+        rowCount={rowCount}
         loading={loading}
         autoHeight
         disableSelectionOnClick
@@ -221,10 +266,7 @@ export default function RoleTable({ data, ...props }) {
               <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 2 }}>
                 <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
                   {rowCount > 0
-                    ? `Showing ${page * pageSize + 1}–${Math.min(
-                        (page + 1) * pageSize,
-                        rowCount
-                      )} of ${rowCount} roles`
+                    ? `Showing ${page * pageSize + 1}–${page * pageSize + rows.length} of ${rowCount} roles`
                     : "No roles"}
                 </Typography>
                 <Button variant="outlined" onClick={onAddRole} sx={{ ml: "auto" }}>
@@ -255,15 +297,56 @@ export default function RoleTable({ data, ...props }) {
         </Box>
       )}
 
+      {/* Actions Menu */}
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={Boolean(menuAnchorEl)}
+        onClose={handleMenuClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <MenuItem onClick={handleView}>
+          <ViewIcon fontSize="small" sx={{ mr: 1 }} />
+          View
+        </MenuItem>
+        <MenuItem onClick={handleEdit}>
+          <EditIcon fontSize="small" sx={{ mr: 1 }} />
+          Edit
+        </MenuItem>
+        <MenuItem
+          onClick={handleDeactivate}
+          disabled={menuRole?.isSystemRole}
+          sx={{ color: menuRole?.isSystemRole ? "text.disabled" : "error.main" }}
+        >
+          <DeactivateIcon fontSize="small" sx={{ mr: 1 }} />
+          Deactivate
+        </MenuItem>
+        <MenuItem onClick={handleDeleteMenu} sx={{ color: "error.main" }}>
+          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+          Delete
+        </MenuItem>
+      </Menu>
+
       {/* Confirm Dialog */}
       <ConfirmDialog
         open={confirmOpen}
         title="Deactivate Role"
         message="Are you sure you want to deactivate this role? Users assigned may lose access."
         confirmText="Deactivate"
-        onConfirm={handleDeactivate}
+        onConfirm={handleDeactivateConfirm}
         onCancel={() => setConfirmOpen(false)}
         loading={deactivateLoading}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete Role"
+        message="Are you sure you want to delete this role? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteDialogOpen(false)}
+        loading={deleteLoading}
       />
     </Box>
   );
@@ -299,3 +382,4 @@ RoleTable.SearchInput = function SearchInput({
     />
   );
 };
+
