@@ -48,8 +48,13 @@ async def list_roles(
 ) -> RoleListResponse:
     """List roles (optionally filtered by tenant)."""
     logging.warning(f"User: {current_user.email}, Role: {current_user.role}, Tenant: {current_user.tenant_id}")
-    tenant_id = current_user.tenant_id if str(current_user.role) != "SUPER_ADMIN" else None
-    roles, total_count = role_service.get_roles(db, search, page_number, page_size, tenant_id)
+    # Determine if we should show platform roles (Super Admin) or tenant roles
+    from app.models.user import UserRole
+    is_platform = current_user.role == UserRole.SUPER_ADMIN
+    
+    roles, total_count = role_service.get_roles(
+        db, search, page_number, page_size, current_user.tenant_id, is_platform
+    )
     return {
         "success": True,
         "data": {

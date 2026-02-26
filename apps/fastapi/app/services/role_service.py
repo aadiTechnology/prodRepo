@@ -12,13 +12,25 @@ from datetime import datetime
 logger = get_logger(__name__)
 
 
-def get_roles(db: Session, search: str = None, page_number: int = 1, page_size: int = 10, tenant_id: str = None) -> list[Role]:
-    """Get roles, optionally filtered by tenant (including global roles)."""
-    query = db.query(Role).filter(Role.is_deleted == False)
+def get_roles(db: Session, search: str = None, page_number: int = 1, page_size: int = 10, tenant_id: int = None, is_platform: bool = False) -> tuple[list[Role], int]:
+    """
+    Get roles filtered by scope.
+    Super Admin (is_platform=True) -> Platform roles where tenant_id IS NULL.
+    Tenant Admin (is_platform=False) -> Tenant roles where tenant_id = tenant_id.
+    """
+    query = db.query(Role).filter(Role.is_deleted == False)  # noqa: E712
+    
+    if is_platform:
+        query = query.filter(Role.scope_type == "Platform", Role.tenant_id == None)  # noqa: E711
+    elif tenant_id:
+        query = query.filter(Role.scope_type == "Tenant", Role.tenant_id == tenant_id)
+    else:
+        # Fallback: return nothing if no context provided
+        return [], 0
+        
     if search:
         query = query.filter(Role.name.ilike(f"%{search}%"))
-    if tenant_id:
-        query = query.filter(or_(Role.tenant_id == None, Role.tenant_id == tenant_id))
+        
     total_count = query.count()
     roles = (
         query.order_by(Role.created_at.desc())
