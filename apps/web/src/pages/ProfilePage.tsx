@@ -16,6 +16,15 @@ import {
     Menu,
     MenuItem,
     ListItemIcon,
+    Breadcrumbs,
+    Link,
+    Tabs,
+    Tab,
+    Grid,
+    Select,
+    FormControl,
+    InputLabel,
+    MenuItem as MuiMenuItem,
 } from "@mui/material";
 import {
     PhotoCamera as PhotoCameraIcon,
@@ -28,6 +37,7 @@ import {
     Delete as DeleteIcon,
     AddAPhoto as AddAPhotoIcon,
 } from "@mui/icons-material";
+import { Link as RouterLink } from "react-router-dom";
 import profileService, { ProfileResponse } from "../api/services/profileService";
 import { apiBaseUrl } from "../config";
 
@@ -46,46 +56,37 @@ const formatRole = (role: string): string =>
         .replace(/_/g, " ")
         .replace(/\b\w/g, (c) => c.toUpperCase());
 
-// ─── ReadOnlyField ────────────────────────────────────────────────────────────
+const StatusBadge = ({ status }: { status: string }) => {
+    const config: Record<string, { bg: string; color: string; dot: string }> = {
+        active: { bg: "#e8f5e9", color: "#1b5e20", dot: "#4caf50" },
+        pending: { bg: "#fff3e0", color: "#e65100", dot: "#ff9800" },
+        inactive: { bg: "#ffebee", color: "#b71c1c", dot: "#f44336" },
+        blocked: { bg: "#ffebee", color: "#b71c1c", dot: "#f44336" },
+    };
 
-interface ReadOnlyFieldProps {
-    label: string;
-    value: string;
-    icon?: React.ReactNode;
-    helperText?: string;
-}
+    const s = status.toLowerCase();
+    const { bg, color, dot } = config[s] || config.inactive;
 
-const ReadOnlyField = ({ label, value, icon, helperText }: ReadOnlyFieldProps) => (
-    <Box>
-        <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>
-            {label}
-        </Typography>
-        {helperText && (
-            <Typography variant="caption" color="text.disabled" sx={{ ml: 1 }}>
-                — {helperText}
-            </Typography>
-        )}
-        <TextField
-            fullWidth
-            value={value}
-            disabled
-            size="small"
-            sx={{
-                mt: 0.5,
-                "& .MuiInputBase-input.Mui-disabled": {
-                    WebkitTextFillColor: "rgba(0,0,0,0.75)",
-                    cursor: "default",
-                },
-                "& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "rgba(0,0,0,0.1)",
-                },
-                bgcolor: "#f5f5f5",
-                borderRadius: 1,
-            }}
-            InputProps={icon ? { endAdornment: <InputAdornment position="end">{icon}</InputAdornment> } : undefined}
-        />
-    </Box>
-);
+    return (
+        <Box sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 1,
+            px: 1.5,
+            py: 0.5,
+            borderRadius: 1,
+            bgcolor: bg,
+            color: color,
+            fontWeight: 600,
+            fontSize: "0.85rem",
+            width: "fit-content",
+            border: "1px solid rgba(0,0,0,0.03)"
+        }}>
+            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: dot }} />
+            {status}
+        </Box>
+    );
+};
 
 // ─── ProfilePage ──────────────────────────────────────────────────────────────
 
@@ -128,18 +129,19 @@ const ProfilePage = () => {
         const val = e.target.value;
         setFullName(val);
         setIsModified(val !== (profile?.full_name ?? ""));
-        setNameError(val.trim().length < 2 ? "Please enter Full Name (minimum 2 characters)." : "");
+        setNameError(""); // Clear on typing
     };
 
     // ── save ───────────────────────────────────────────────────────────────
     const handleSave = async () => {
-        if (fullName.trim().length < 2) {
-            setNameError("Please enter Full Name.");
+        const trimmedName = fullName.trim();
+        if (trimmedName.length < 2) {
+            setNameError("Full Name must be at least 2 characters.");
             return;
         }
         setSaving(true);
         try {
-            const updated = await profileService.updateProfile({ full_name: fullName.trim() });
+            const updated = await profileService.updateProfile({ full_name: trimmedName });
             setProfile(updated);
             setFullName(updated.full_name);
             setIsModified(false);
@@ -152,20 +154,11 @@ const ProfilePage = () => {
         }
     };
 
-    // ── discard ────────────────────────────────────────────────────────────
-    const handleDiscard = () => {
-        setFullName(profile?.full_name ?? "");
-        setIsModified(false);
-        setNameError("");
-    };
-
     // ── photo menu ─────────────────────────────────────────────────────────
     const handlePhotoButtonClick = (e: React.MouseEvent<HTMLElement>) => {
         if (profile?.profile_image_path) {
-            // Has photo → show menu with Change / Delete options
             setPhotoMenuAnchor(e.currentTarget);
         } else {
-            // No photo → directly open file picker
             fileInputRef.current?.click();
         }
     };
@@ -241,279 +234,276 @@ const ProfilePage = () => {
     const isPhotoLoading = uploading || deleting;
 
     return (
-        <Box sx={{ maxWidth: 780, mx: "auto", py: 3, px: { xs: 2, md: 0 } }}>
-            {/* ── Page header ── */}
-            <Typography variant="h5" fontWeight={700} gutterBottom>
+        <Box sx={{ maxWidth: 850, mx: "auto", py: 4, px: { xs: 2, md: 0 } }}>
+            {/* ── Breadcrumbs ── */}
+            <Typography variant="h5" fontWeight={700} color="#1a237e" sx={{ mb: 1 }}>
                 My Profile
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                View and manage your account information.
-            </Typography>
+            <Breadcrumbs sx={{ mb: 4, fontSize: "0.875rem" }}>
+                <Link underline="hover" color="inherit" component={RouterLink} to="/">
+                    Settings
+                </Link>
+                <Typography color="primary.main" fontWeight={500}>
+                    My Profile
+                </Typography>
+            </Breadcrumbs>
 
-            {/* ── Avatar card ── */}
             <Paper
                 elevation={0}
                 sx={{
-                    p: 3,
-                    mb: 3,
                     borderRadius: 3,
                     border: "1px solid",
-                    borderColor: "divider",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 3,
-                    flexWrap: "wrap",
+                    borderColor: "rgba(0, 0, 0, 0.08)",
+                    overflow: "hidden",
+                    bgcolor: "#fff",
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.03)",
                 }}
             >
-                {/* Avatar + camera button */}
-                <Box sx={{ position: "relative", flexShrink: 0 }}>
-                    <Avatar
-                        src={avatarSrc}
-                        sx={{
-                            width: 100,
-                            height: 100,
-                            fontSize: 36,
-                            fontWeight: 700,
-                            bgcolor: "primary.main",
-                            border: "3px solid",
-                            borderColor: "primary.light",
-                        }}
-                    >
-                        {!avatarSrc && initials}
-                    </Avatar>
-
-                    {/* Camera / loading button */}
-                    <Tooltip title={profile?.profile_image_path ? "Change or remove photo" : "Upload profile photo"}>
+                {/* ── Header Section ── */}
+                <Box sx={{ p: 3, display: "flex", alignItems: "center", gap: 3, borderBottom: "1px solid", borderColor: "rgba(0, 0, 0, 0.05)" }}>
+                    <Box sx={{ position: "relative" }}>
+                        <Avatar
+                            src={avatarSrc}
+                            sx={{
+                                width: 90,
+                                height: 90,
+                                fontSize: 32,
+                                fontWeight: 700,
+                                bgcolor: "#e3f2fd",
+                                color: "#1976d2",
+                                border: "4px solid white",
+                                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                            }}
+                        >
+                            {!avatarSrc && initials}
+                        </Avatar>
+                        {/* Status Badge */}
                         <Box
-                            onClick={isPhotoLoading ? undefined : handlePhotoButtonClick}
                             sx={{
                                 position: "absolute",
-                                bottom: 0,
-                                right: 0,
-                                width: 32,
-                                height: 32,
+                                bottom: 2,
+                                right: 2,
+                                width: 22,
+                                height: 22,
                                 borderRadius: "50%",
-                                bgcolor: isPhotoLoading ? "grey.400" : "primary.main",
+                                bgcolor: "#fff",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                cursor: isPhotoLoading ? "default" : "pointer",
-                                border: "2px solid white",
-                                "&:hover": { bgcolor: isPhotoLoading ? "grey.400" : "primary.dark" },
-                                transition: "background-color 0.2s",
+                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                             }}
                         >
-                            {isPhotoLoading ? (
-                                <CircularProgress size={16} sx={{ color: "white" }} />
-                            ) : (
-                                <PhotoCameraIcon sx={{ fontSize: 16, color: "white" }} />
-                            )}
+                            <CheckCircleIcon sx={{ fontSize: 18, color: "#4caf50" }} />
                         </Box>
-                    </Tooltip>
+                        {/* Camera Button overlay */}
+                        <Tooltip title="Update Photo">
+                            <Box
+                                onClick={isPhotoLoading ? undefined : handlePhotoButtonClick}
+                                sx={{
+                                    position: "absolute",
+                                    top: 0,
+                                    left: 0,
+                                    width: "100%",
+                                    height: "100%",
+                                    borderRadius: "50%",
+                                    bgcolor: "rgba(0,0,0,0.2)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    opacity: 0,
+                                    transition: "opacity 0.2s",
+                                    cursor: "pointer",
+                                    "&:hover": { opacity: 1 },
+                                }}
+                            >
+                                {isPhotoLoading ? (
+                                    <CircularProgress size={24} sx={{ color: "white" }} />
+                                ) : (
+                                    <PhotoCameraIcon sx={{ color: "white" }} />
+                                )}
+                            </Box>
+                        </Tooltip>
+                    </Box>
 
-                    {/* Hidden file input */}
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/gif,image/webp"
-                        style={{ display: "none" }}
-                        onChange={handleImageChange}
-                    />
-
-                    {/* Photo options menu (shown only when photo exists) */}
-                    <Menu
-                        anchorEl={photoMenuAnchor}
-                        open={Boolean(photoMenuAnchor)}
-                        onClose={handlePhotoMenuClose}
-                        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-                        transformOrigin={{ vertical: "top", horizontal: "center" }}
-                        PaperProps={{ sx: { mt: 1, minWidth: 180, borderRadius: 2, boxShadow: 3 } }}
-                    >
-                        <MenuItem onClick={handleChangePhoto}>
-                            <ListItemIcon>
-                                <AddAPhotoIcon fontSize="small" color="primary" />
-                            </ListItemIcon>
-                            <Typography variant="body2" fontWeight={500}>
-                                Change Photo
-                            </Typography>
-                        </MenuItem>
-                        <MenuItem onClick={handleDeletePhoto} sx={{ color: "error.main" }}>
-                            <ListItemIcon>
-                                <DeleteIcon fontSize="small" color="error" />
-                            </ListItemIcon>
-                            <Typography variant="body2" fontWeight={500} color="error.main">
-                                Delete Photo
-                            </Typography>
-                        </MenuItem>
-                    </Menu>
-                </Box>
-
-                {/* Name + badges */}
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="h6" fontWeight={700} noWrap>
-                        {profile?.full_name ?? "—"}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" noWrap sx={{ mb: 1 }}>
-                        {profile?.email ?? "—"}
-                    </Typography>
-                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                    <Box sx={{ flex: 1 }}>
+                        <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5, color: "#2c3e50" }}>
+                            {profile?.full_name ?? "—"}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                            {profile?.email ?? "—"}
+                        </Typography>
                         <Chip
-                            icon={<ShieldIcon sx={{ fontSize: "14px !important" }} />}
                             label={formatRole(profile?.role ?? "")}
                             size="small"
-                            color="primary"
-                            variant="outlined"
-                            sx={{ fontWeight: 600, fontSize: 11 }}
-                        />
-                        <Chip
-                            icon={
-                                profile?.is_active ? (
-                                    <CheckCircleIcon sx={{ fontSize: "14px !important" }} />
-                                ) : (
-                                    <CancelIcon sx={{ fontSize: "14px !important" }} />
-                                )
-                            }
-                            label={profile?.is_active ? "Active" : "Inactive"}
-                            size="small"
-                            color={profile?.is_active ? "success" : "error"}
-                            sx={{ fontWeight: 600, fontSize: 11 }}
-                        />
-                    </Box>
-                </Box>
-            </Paper>
-
-            {/* ── General Information card ── */}
-            <Paper
-                elevation={0}
-                sx={{
-                    borderRadius: 3,
-                    border: "1px solid",
-                    borderColor: "divider",
-                    overflow: "hidden",
-                }}
-            >
-                <Box sx={{ px: 3, py: 2, bgcolor: "grey.50", display: "flex", alignItems: "center", gap: 1 }}>
-                    <PersonIcon color="primary" fontSize="small" />
-                    <Box>
-                        <Typography variant="subtitle1" fontWeight={700}>
-                            General Information
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                            Only Full Name can be edited. Other fields are read-only.
-                        </Typography>
-                    </Box>
-                </Box>
-                <Divider />
-
-                <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 3 }}>
-                    {/* Full Name — EDITABLE */}
-                    <Box>
-                        <Typography
-                            variant="caption"
-                            fontWeight={600}
-                            color="text.secondary"
-                            sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}
-                        >
-                            Full Name
-                            <EditIcon sx={{ fontSize: 12, color: "primary.main" }} />
-                            <Typography component="span" variant="caption" color="error.main">
-                                *
-                            </Typography>
-                        </Typography>
-                        <TextField
-                            fullWidth
-                            value={fullName}
-                            onChange={handleNameChange}
-                            error={Boolean(nameError)}
-                            helperText={nameError || (isModified ? "Unsaved changes" : " ")}
-                            FormHelperTextProps={{
-                                sx: { color: nameError ? "error.main" : isModified ? "warning.main" : "transparent" },
+                            sx={{
+                                bgcolor: "rgba(63, 81, 181, 0.1)",
+                                color: "#3f51b5",
+                                fontWeight: 600,
+                                borderRadius: 1.5,
+                                border: "1px solid rgba(63, 81, 181, 0.2)",
                             }}
-                            size="small"
-                            placeholder="Enter your full name"
-                            sx={{ mt: 0.5 }}
-                            inputProps={{ maxLength: 150 }}
                         />
                     </Box>
 
-                    {/* Email — READ ONLY */}
-                    <ReadOnlyField
-                        label="Email Address"
-                        value={profile?.email ?? ""}
-                        helperText="read-only"
-                        icon={<EmailIcon fontSize="small" color="disabled" />}
-                    />
-
-                    {/* Role — READ ONLY */}
-                    <ReadOnlyField
-                        label="Role"
-                        value={formatRole(profile?.role ?? "")}
-                        helperText="read-only"
-                        icon={<ShieldIcon fontSize="small" color="primary" />}
-                    />
-
-                    {/* Account Status — READ ONLY */}
-                    <Box>
-                        <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>
-                            Account Status
-                            <Typography component="span" variant="caption" color="text.disabled" sx={{ ml: 1 }}>
-                                — read-only
-                            </Typography>
-                        </Typography>
-                        <Box sx={{ mt: 1 }}>
-                            <Chip
-                                icon={
-                                    profile?.is_active ? (
-                                        <CheckCircleIcon sx={{ fontSize: "14px !important" }} />
-                                    ) : (
-                                        <CancelIcon sx={{ fontSize: "14px !important" }} />
-                                    )
-                                }
-                                label={profile?.is_active ? "Active" : "Inactive"}
-                                color={profile?.is_active ? "success" : "error"}
-                                sx={{ fontWeight: 700 }}
-                            />
-                        </Box>
-                    </Box>
                 </Box>
 
-                <Divider />
-
-                {/* Action buttons */}
-                <Box sx={{ px: 3, py: 2, display: "flex", justifyContent: "flex-end", gap: 2, bgcolor: "grey.50" }}>
-                    <Button
-                        variant="outlined"
-                        color="inherit"
-                        onClick={handleDiscard}
-                        disabled={!isModified || saving}
-                        sx={{ borderColor: "divider" }}
+                {/* ── Tabs (Static) ── */}
+                <Box sx={{ px: 2, borderBottom: "1px solid", borderColor: "rgba(0, 0, 0, 0.05)" }}>
+                    <Tabs
+                        value={0}
+                        sx={{
+                            minHeight: 48,
+                            "& .MuiTab-root": {
+                                textTransform: "none",
+                                fontWeight: 600,
+                                minWidth: 100,
+                                fontSize: "0.95rem",
+                                color: "text.secondary",
+                            },
+                            "& .Mui-selected": {
+                                color: "primary.main",
+                            },
+                        }}
                     >
-                        Discard
-                    </Button>
+                        <Tab label="General" />
+                    </Tabs>
+                </Box>
+
+                {/* ── Content ── */}
+                <Box sx={{ p: 4 }}>
+                    <Grid container spacing={4}>
+                        <Grid item xs={12} md={6}>
+                            <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
+                                Full Name <Typography component="span" color="error" sx={{ ml: 0.5 }}>*</Typography>
+                            </Typography>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                value={fullName}
+                                onChange={handleNameChange}
+                                error={Boolean(nameError)}
+                                helperText={nameError}
+                                placeholder="John Doe"
+                                sx={{
+                                    "& .MuiOutlinedInput-root": {
+                                        borderRadius: 2.5,
+                                        bgcolor: "#fafafa",
+                                    },
+                                }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
+                                Email Address
+                            </Typography>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                value={profile?.email ?? ""}
+                                disabled
+                                sx={{
+                                    "& .MuiOutlinedInput-root": {
+                                        borderRadius: 2.5,
+                                        bgcolor: "#fafafa",
+                                        "& .MuiInputBase-input.Mui-disabled": {
+                                            WebkitTextFillColor: "rgba(0,0,0,0.5)",
+                                        },
+                                    },
+                                }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
+                                Role
+                            </Typography>
+                            <FormControl fullWidth size="small" disabled>
+                                <Select
+                                    value={profile?.role ?? ""}
+                                    sx={{
+                                        borderRadius: 2.5,
+                                        bgcolor: "#fafafa",
+                                        "& .MuiSelect-select.Mui-disabled": {
+                                            WebkitTextFillColor: "rgba(0,0,0,0.5)",
+                                        },
+                                    }}
+                                >
+                                    <MuiMenuItem value={profile?.role ?? ""}>{formatRole(profile?.role ?? "")}</MuiMenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
+                                Status
+                            </Typography>
+                            <Box sx={{ mt: 0.5 }}>
+                                <StatusBadge status={profile?.is_active ? "Active" : "Inactive"} />
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </Box>
+
+                {/* ── Footer / Actions ── */}
+                <Divider sx={{ opacity: 0.5 }} />
+                <Box sx={{ p: 3, display: "flex", justifyContent: "flex-end", bgcolor: "#fafafa" }}>
                     <Button
                         variant="contained"
                         onClick={handleSave}
-                        disabled={!isModified || saving || Boolean(nameError)}
-                        startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ px: 4, borderRadius: 2, minWidth: 140 }}
+                        disabled={!isModified || saving}
+                        sx={{
+                            bgcolor: "#3f51b5",
+                            borderRadius: 2,
+                            textTransform: "none",
+                            fontWeight: 600,
+                            px: 4,
+                            py: 1.2,
+                            boxShadow: "0 4px 12px rgba(63, 81, 181, 0.2)",
+                            "&:hover": { bgcolor: "#303f9f", boxShadow: "0 6px 16px rgba(63, 81, 181, 0.3)" },
+                            "&.Mui-disabled": { bgcolor: "rgba(63, 81, 181, 0.5)", color: "#fff" },
+                        }}
                     >
-                        {saving ? "Saving…" : "Save Changes"}
+                        {saving ? <CircularProgress size={20} color="inherit" /> : "Save Changes"}
                     </Button>
                 </Box>
             </Paper>
 
-            {/* ── Snackbar ── */}
+            {/* Hidden components */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={handleImageChange}
+            />
+
+            <Menu
+                anchorEl={photoMenuAnchor}
+                open={Boolean(photoMenuAnchor)}
+                onClose={handlePhotoMenuClose}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+                transformOrigin={{ vertical: "top", horizontal: "center" }}
+                PaperProps={{ sx: { mt: 1, borderRadius: 2, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" } }}
+            >
+                <MenuItem onClick={handleChangePhoto}>
+                    <ListItemIcon><AddAPhotoIcon fontSize="small" /></ListItemIcon>
+                    Change Photo
+                </MenuItem>
+                <MenuItem onClick={handleDeletePhoto} sx={{ color: "error.main" }}>
+                    <ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>
+                    Remove Photo
+                </MenuItem>
+            </Menu>
+
             <Snackbar
                 open={Boolean(snack)}
                 autoHideDuration={5000}
                 onClose={() => setSnack(null)}
-                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                anchorOrigin={{ vertical: "top", horizontal: "right" }}
             >
                 <Alert
                     onClose={() => setSnack(null)}
                     severity={snack?.severity ?? "info"}
                     variant="filled"
-                    sx={{ width: "100%" }}
+                    sx={{ width: "100%", borderRadius: 2, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
                 >
                     {snack?.msg}
                 </Alert>
@@ -523,3 +513,4 @@ const ProfilePage = () => {
 };
 
 export default ProfilePage;
+
