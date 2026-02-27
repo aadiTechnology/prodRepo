@@ -91,7 +91,7 @@ async def startup_event():
     try:
         logger.info(f"Connecting to database...")
         Base.metadata.create_all(bind=engine)
-        logger.info("✓ Database tables initialized successfully")
+        logger.info("[OK] Database tables initialized successfully")
     except Exception as e:
         logger.error(f"✗ Failed to initialize database tables")
         logger.error(f"  Error: {str(e)}")

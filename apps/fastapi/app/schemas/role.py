@@ -24,6 +24,8 @@ class RoleCreate(BaseModel):
     is_active: bool = True
     is_system: bool = False
     tenant_id: Optional[int] = None
+    feature_ids: List[int] = []
+    menu_ids: List[int] = []
 
     @validator('name')
     def name_required(cls, v):
@@ -52,6 +54,8 @@ class RoleUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     is_active: Optional[bool] = None
+    feature_ids: Optional[List[int]] = None
+    menu_ids: Optional[List[int]] = None
 
 
 class RoleResponse(BaseModel):
