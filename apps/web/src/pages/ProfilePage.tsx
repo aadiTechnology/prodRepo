@@ -45,7 +45,19 @@ import { apiBaseUrl } from "../config";
 
 const toFullUrl = (path: string | null | undefined): string | undefined => {
     if (!path) return undefined;
-    if (path.startsWith("http")) return path;
+    // Security: Prevent malicious URLs - only allow relative paths to our API
+    if (path.startsWith("http")) {
+        try {
+            const url = new URL(path);
+            const apiUrl = new URL(apiBaseUrl);
+            if (url.hostname !== apiUrl.hostname) return undefined; // Reject external URLs
+            return path;
+        } catch {
+            return undefined; // Invalid URL format
+        }
+    }
+    // Prevent path traversal attacks
+    if (path.includes("..") || path.includes("//")) return undefined;
     const root = apiBaseUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
     return `${root}${path}`;
 };
@@ -113,7 +125,7 @@ const ProfilePage = () => {
             setProfile(data);
             setFullName(data.full_name);
         } catch (err) {
-            console.error("Profile fetch error:", err);
+            console.error("Profile fetch error:", err instanceof Error ? err.message : "Unknown error");
             setSnack({ msg: "Unable to load profile data. Please refresh.", severity: "error" });
         } finally {
             setLoading(false);
@@ -123,6 +135,16 @@ const ProfilePage = () => {
     useEffect(() => {
         fetchProfile();
     }, [fetchProfile]);
+
+    // Clear sensitive data on unmount for security
+    useEffect(() => {
+        return () => {
+            setProfile(null);
+            setFullName("");
+            setNameError("");
+            setSnack(null);
+        };
+    }, []);
 
     // ── name change ────────────────────────────────────────────────────────
     const handleNameChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -175,10 +197,22 @@ const ProfilePage = () => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        if (!file.type.startsWith("image/")) {
-            setSnack({ msg: "Please select a valid image file.", severity: "error" });
+        // Validate MIME type (client-side check - server should also validate)
+        const allowedMimeTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+        if (!allowedMimeTypes.includes(file.type)) {
+            setSnack({ msg: "Please select a valid image file (JPEG, PNG, GIF, or WebP).", severity: "error" });
             return;
         }
+
+        // Validate file extension to prevent MIME type spoofing
+        const fileName = file.name.toLowerCase();
+        const allowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+        const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+        if (!hasValidExtension) {
+            setSnack({ msg: "Invalid file extension. Use JPEG, PNG, GIF, or WebP.", severity: "error" });
+            return;
+        }
+
         if (file.size > 5 * 1024 * 1024) {
             setSnack({ msg: "Image must be smaller than 5 MB.", severity: "error" });
             return;
@@ -194,7 +228,10 @@ const ProfilePage = () => {
             setSnack({ msg: "Unable to upload image. Please try again.", severity: "error" });
         } finally {
             setUploading(false);
-            if (fileInputRef.current) fileInputRef.current.value = "";
+            // Reset file input for security - prevents re-uploading same file
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
         }
     };
 
@@ -293,7 +330,11 @@ const ProfilePage = () => {
                                 boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                             }}
                         >
-                            <CheckCircleIcon sx={{ fontSize: 18, color: "#4caf50" }} />
+                            {profile?.is_active ? (
+                                <CheckCircleIcon sx={{ fontSize: 18, color: "#4caf50" }} />
+                            ) : (
+                                <CancelIcon sx={{ fontSize: 18, color: "#f44336" }} />
+                            )}
                         </Box>
                         {/* Camera Button overlay */}
                         <Tooltip title="Update Photo">
@@ -384,6 +425,7 @@ const ProfilePage = () => {
                                 error={Boolean(nameError)}
                                 helperText={nameError}
                                 placeholder="John Doe"
+                                inputProps={{ maxLength: 255 }}
                                 sx={{
                                     "& .MuiOutlinedInput-root": {
                                         borderRadius: 2.5,
