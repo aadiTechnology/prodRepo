@@ -57,18 +57,31 @@ export default function Login() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      const from = (location.state as { from?: Location })?.from?.pathname || "/";
+      let from = "/";
+      const statePath = (location.state as { from?: Location })?.from?.pathname;
+      if (statePath && statePath.startsWith("/") && !statePath.includes("http")) {
+        from = statePath;
+      }
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, location]);
 
+  // Clear sensitive data on unmount for security
+  useEffect(() => {
+    return () => {
+      setFormData({ email: "", password: "" });
+      setErrors({});
+      setError(null);
+    };
+  }, []);
+
   const validate = (): boolean => {
     const newErrors: { email?: string; password?: string } = {};
 
-    // Email validation
+    // Email validation - stricter pattern and length check
     if (!formData.email.trim()) {
       newErrors.email = "Please enter Email Address.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) || formData.email.length > 254) {
       newErrors.email = "Please enter a valid Email Address.";
     }
 
@@ -110,16 +123,16 @@ export default function Login() {
       });
 
       // 3. Navigation happens via useEffect or explicitly here
-      const from = (location.state as { from?: Location })?.from?.pathname || "/";
+      // Validate redirect pathname to prevent open redirect attacks
+      let from = "/";
+      const statePath = (location.state as { from?: Location })?.from?.pathname;
+      if (statePath && statePath.startsWith("/") && !statePath.includes("http")) {
+        from = statePath;
+      }
       navigate(from, { replace: true });
     } catch (err: any) {
-      // Generic error handling as per user story
-      const message = err?.message || err?.detail || "";
-      if (message.toLowerCase().includes("inactive")) {
-        setError("Your account is inactive. Please contact system administrator.");
-      } else {
-        setError("Invalid credentials.");
-      }
+      // Generic error handling - do NOT leak account status information (prevents account enumeration attacks)
+      setError("Invalid credentials.");
     } finally {
       setIsSubmitting(false);
     }
@@ -622,4 +635,4 @@ export default function Login() {
     </Box>
   );
 }
-
+//
