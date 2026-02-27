@@ -214,8 +214,8 @@ export default function Login() {
 
             <Box component="form" onSubmit={handleSubmit} noValidate sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
               <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: "#1e293b", mb: 1 }}>
-                  Email Address *
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
+                  Email Address <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
                 </Typography>
                 <TextField
                   name="email"
@@ -228,22 +228,44 @@ export default function Login() {
                   fullWidth
                   autoComplete="email"
                   autoFocus
+                  inputProps={{
+                    style: { 
+                      padding: "12px 16px",
+                    }
+                  }}
                   InputProps={{
                     sx: {
-                      borderRadius: 1,
-                      backgroundColor: "#fff",
+                      borderRadius: "8px",
+                      backgroundColor: "#ffffff",
                       height: "50px",
-                      border: "1px solid #e2e8f0",
+                      transition: "all 0.2s",
+                      border: "1px solid #cbd5e1",
+                      boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
                       "& fieldset": { border: "none" },
-                      "&.Mui-focused": { border: "1px solid #14b8a6", boxShadow: "0 0 0 4px rgba(20, 184, 166, 0.1)" },
+                      "&:hover": {
+                        borderColor: "#94a3b8",
+                      },
+                      "&.Mui-focused": { 
+                        borderColor: "#14b8a6", 
+                        boxShadow: "0 0 0 4px rgba(20, 184, 166, 0.1)",
+                      },
+                      "& input": { 
+                        color: "#0f172a",
+                        fontSize: "0.95rem",
+                      },
+                      "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus": {
+                        WebkitBoxShadow: "0 0 0 1000px #ffffff inset !important",
+                        WebkitTextFillColor: "#0f172a !important",
+                        transition: "background-color 5000s ease-in-out 0s",
+                      },
                     }
                   }}
                 />
               </Box>
 
               <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: "#1e293b", mb: 1 }}>
-                  Password *
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
+                  Password <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
                 </Typography>
                 <TextField
                   name="password"
@@ -255,9 +277,14 @@ export default function Login() {
                   helperText={errors.password}
                   fullWidth
                   autoComplete="current-password"
+                  inputProps={{
+                    style: { 
+                      padding: "12px 16px",
+                    }
+                  }}
                   InputProps={{
                     endAdornment: (
-                      <InputAdornment position="end">
+                      <InputAdornment position="end" sx={{ pr: 1 }}>
                         <IconButton
                           aria-label="toggle password visibility"
                           onClick={togglePasswordVisibility}
@@ -269,12 +296,29 @@ export default function Login() {
                       </InputAdornment>
                     ),
                     sx: {
-                      borderRadius: 1,
-                      backgroundColor: "#fff",
+                      borderRadius: "8px",
+                      backgroundColor: "#ffffff",
                       height: "50px",
-                      border: "1px solid #e2e8f0",
+                      transition: "all 0.2s",
+                      border: "1px solid #cbd5e1",
+                      boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
                       "& fieldset": { border: "none" },
-                      "&.Mui-focused": { border: "1px solid #14b8a6", boxShadow: "0 0 0 4px rgba(20, 184, 166, 0.1)" },
+                      "&:hover": {
+                        borderColor: "#94a3b8",
+                      },
+                      "&.Mui-focused": { 
+                        borderColor: "#14b8a6", 
+                        boxShadow: "0 0 0 4px rgba(20, 184, 166, 0.1)",
+                      },
+                      "& input": { 
+                        color: "#0f172a",
+                        fontSize: "0.95rem",
+                      },
+                      "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus": {
+                        WebkitBoxShadow: "0 0 0 1000px #ffffff inset !important",
+                        WebkitTextFillColor: "#0f172a !important",
+                        transition: "background-color 5000s ease-in-out 0s",
+                      },
                     }
                   }}
                 />
@@ -348,7 +392,7 @@ export default function Login() {
           </Box>
         </Grid>
 
-        {/* Right Side: Informational Action Panel */}
+        {/* Right Side: Product Logo Showcase */}
         <Grid
           item
           xs={false}
@@ -357,77 +401,225 @@ export default function Login() {
             position: "relative",
             backgroundSize: "cover",
             backgroundPosition: "center",
-            backgroundImage: "url('/login-bg.jpg')", // Local asset — place login-bg.jpg in public/
-            display: "flex",
+            backgroundImage: "url('/login-bg.jpg')",
+            display: { xs: "none", md: "flex" },
             flexDirection: "column",
             justifyContent: "center",
-            p: 8,
+            alignItems: "center",
+            p: { md: 6, lg: 8 },
             overflow: "hidden",
             "&::before": {
               content: '""',
               position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "rgba(15, 23, 42, 0.4)", // Dark tint overlay
-              backdropFilter: "blur(20px)", // Reference image style blur
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: "rgba(10, 18, 40, 0.72)",
+              backdropFilter: "blur(18px)",
               zIndex: 1,
             }
           }}
         >
-          <Box sx={{ position: "relative", zIndex: 2, maxWidth: 500, mx: "auto" }}>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0 }}>
-              {actionItems.map((item, index) => (
-                <Box
-                  key={index}
-                  sx={{
-                    py: 4.5,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    borderBottom: index !== actionItems.length - 1 ? "1px solid rgba(255, 255, 255, 0.1)" : "none",
-                    cursor: "pointer",
-                    transition: "all 0.3s",
-                    "&:hover": {
-                      transform: "translateX(8px)",
-                      "& .arrow-icon": { transform: "translateX(4px)" }
-                    }
-                  }}
-                >
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <Box
-                      sx={{
-                        width: 52,
-                        height: 52,
-                        borderRadius: 1.5,
-                        backgroundColor: "rgba(255, 255, 255, 0.1)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center"
-                      }}
-                    >
-                      {item.icon}
-                    </Box>
-                    <Box>
-                      <Typography variant="h6" sx={{ color: "#ffffff", fontWeight: 700, mb: 0.5, letterSpacing: "-0.01em" }}>
-                        {item.title}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: "rgba(255, 255, 255, 0.6)", lineHeight: 1.5 }}>
-                        {item.desc}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <ArrowForwardIcon
-                    className="arrow-icon"
-                    sx={{ color: "rgba(255, 255, 255, 0.3)", transition: "all 0.3s" }}
-                  />
+          <Box sx={{ position: "relative", zIndex: 2, width: "100%", maxWidth: 460, mx: "auto" }}>
+
+            {/* Header label */}
+            <Typography sx={{
+              color: "rgba(255,255,255,0.4)",
+              fontSize: "0.65rem",
+              fontWeight: 700,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              textAlign: "center",
+              mb: 2,
+            }}>
+              Our Product Suite
+            </Typography>
+
+            {/* ── ERP Management ── */}
+            <Box sx={{
+              display: "flex", alignItems: "center", gap: 2,
+              px: 2.5, py: 1.8, mb: 1.5, borderRadius: 2,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              backdropFilter: "blur(10px)",
+              transition: "all 0.25s ease", cursor: "pointer",
+              "&:hover": { background: "rgba(255,255,255,0.11)", borderColor: "rgba(30,90,200,0.5)", transform: "translateY(-2px)", boxShadow: "0 8px 28px rgba(0,0,0,0.25)" }
+            }}>
+              <Box sx={{ flexShrink: 0, width: 48, height: 48 }}>
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="24" cy="24" r="22" fill="rgba(21,101,192,0.15)" stroke="#1565c0" strokeWidth="1.5" />
+                  {/* Gear teeth */}
+                  <path d="M24 6 L26 2 L28 2 L30 6 L34 7 L37 4 L39 6 L37 10 L38 14 L42 15 L42 17 L42 19 L38 20 L37 24 L39 28 L37 30 L34 27 L30 28 L28 32 L26 32 L24 32 L22 28 L18 27 L15 30 L13 28 L15 24 L14 20 L10 19 L10 17 L10 15 L14 14 L15 10 L13 6 L15 4 L18 7 L22 6 Z" fill="rgba(21,101,192,0.25)" stroke="#1e88e5" strokeWidth="1" strokeLinejoin="round" />
+                  <circle cx="24" cy="17" r="5.5" fill="rgba(21,101,192,0.3)" stroke="#42a5f5" strokeWidth="1.5" />
+                  <path d="M27 14 A4 4 0 1 0 27 20" stroke="#90caf9" strokeWidth="2" strokeLinecap="round" fill="none" />
+                  <rect x="8" y="32" width="32" height="11" rx="3" fill="rgba(21,101,192,0.25)" stroke="#1565c0" strokeWidth="1" />
+                  <text x="24" y="41" textAnchor="middle" fill="#90caf9" fontSize="7.5" fontWeight="bold" fontFamily="Arial, sans-serif">ERP</text>
+                </svg>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
+                  <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: "1.05rem", lineHeight: 1 }}>ERP</Typography>
+                  <Typography sx={{ color: "#90caf9", fontWeight: 700, fontSize: "0.95rem", lineHeight: 1 }}>Management</Typography>
                 </Box>
-              ))}
+                <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", mt: 0.4 }}>Enterprise Resource Planning</Typography>
+              </Box>
+              <ArrowForwardIcon sx={{ color: "rgba(255,255,255,0.2)", fontSize: "0.9rem", flexShrink: 0 }} />
             </Box>
+
+            {/* ── Learning Platform ── */}
+            <Box sx={{
+              display: "flex", alignItems: "center", gap: 2,
+              px: 2.5, py: 1.8, mb: 1.5, borderRadius: 2,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              backdropFilter: "blur(10px)",
+              transition: "all 0.25s ease", cursor: "pointer",
+              "&:hover": { background: "rgba(255,255,255,0.11)", borderColor: "rgba(33,150,243,0.5)", transform: "translateY(-2px)", boxShadow: "0 8px 28px rgba(0,0,0,0.25)" }
+            }}>
+              <Box sx={{ flexShrink: 0, width: 48, height: 48 }}>
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="24" cy="24" r="22" fill="rgba(25,118,210,0.12)" stroke="#1976d2" strokeWidth="1.5" />
+                  {/* Graduation cap */}
+                  <polygon points="24,8 36,14 24,20 12,14" fill="#1976d2" />
+                  <rect x="22" y="14" width="4" height="5" rx="0.8" fill="#42a5f5" fillOpacity="0.9" />
+                  <circle cx="36" cy="14" r="1.5" fill="#42a5f5" />
+                  <line x1="36" y1="14" x2="36" y2="20" stroke="#42a5f5" strokeWidth="1.5" strokeLinecap="round" />
+                  <line x1="34" y1="20" x2="38" y2="20" stroke="#42a5f5" strokeWidth="1.5" strokeLinecap="round" />
+                  {/* Open book */}
+                  <path d="M9 26 Q9 40 24 42 Q39 40 39 26 L39 24 Q39 24 24 26 Q9 24 9 24 Z" fill="#1976d2" fillOpacity="0.2" stroke="#1976d2" strokeWidth="1.3" />
+                  <line x1="24" y1="26" x2="24" y2="42" stroke="#1976d2" strokeWidth="1.2" strokeDasharray="2 2" />
+                  <line x1="12" y1="30" x2="21" y2="29" stroke="#90caf9" strokeWidth="1" strokeLinecap="round" />
+                  <line x1="12" y1="33" x2="21" y2="32" stroke="#90caf9" strokeWidth="1" strokeLinecap="round" />
+                  <line x1="27" y1="29" x2="36" y2="30" stroke="#90caf9" strokeWidth="1" strokeLinecap="round" />
+                  <line x1="27" y1="32" x2="36" y2="33" stroke="#90caf9" strokeWidth="1" strokeLinecap="round" />
+                </svg>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
+                  <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: "1.05rem", lineHeight: 1 }}>Learning</Typography>
+                  <Typography sx={{ color: "#42a5f5", fontWeight: 700, fontSize: "0.95rem", lineHeight: 1 }}>Platform</Typography>
+                </Box>
+                <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", mt: 0.4 }}>Smart Education Management</Typography>
+              </Box>
+              <ArrowForwardIcon sx={{ color: "rgba(255,255,255,0.2)", fontSize: "0.9rem", flexShrink: 0 }} />
+            </Box>
+
+            {/* ── CCTV Security ── */}
+            <Box sx={{
+              display: "flex", alignItems: "center", gap: 2,
+              px: 2.5, py: 1.8, mb: 1.5, borderRadius: 2,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              backdropFilter: "blur(10px)",
+              transition: "all 0.25s ease", cursor: "pointer",
+              "&:hover": { background: "rgba(255,255,255,0.11)", borderColor: "rgba(13,71,161,0.6)", transform: "translateY(-2px)", boxShadow: "0 8px 28px rgba(0,0,0,0.25)" }
+            }}>
+              <Box sx={{ flexShrink: 0, width: 48, height: 48 }}>
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* Shield */}
+                  <path d="M24 4 L40 10 L40 26 C40 35 24 44 24 44 C24 44 8 35 8 26 L8 10 Z" fill="rgba(13,71,161,0.25)" stroke="#1565c0" strokeWidth="2" strokeLinejoin="round" />
+                  <path d="M24 8 L36 13 L36 26 C36 33 24 40 24 40 C24 40 12 33 12 26 L12 13 Z" fill="rgba(21,101,192,0.15)" stroke="#42a5f5" strokeWidth="1" strokeLinejoin="round" />
+                  {/* Camera body */}
+                  <rect x="14" y="19" width="16" height="10" rx="3" fill="#1565c0" fillOpacity="0.8" stroke="#64b5f6" strokeWidth="1" />
+                  {/* Camera lens */}
+                  <circle cx="22" cy="24" r="4" fill="rgba(100,181,246,0.3)" stroke="#90caf9" strokeWidth="1.5" />
+                  <circle cx="22" cy="24" r="2" fill="#42a5f5" fillOpacity="0.7" />
+                  {/* Camera tail */}
+                  <path d="M30 21 L36 18 L36 30 L30 27 Z" fill="#1565c0" fillOpacity="0.7" stroke="#64b5f6" strokeWidth="0.8" />
+                </svg>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
+                  <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: "1.05rem", lineHeight: 1 }}>CCTV</Typography>
+                  <Typography sx={{ color: "#64b5f6", fontWeight: 700, fontSize: "0.95rem", lineHeight: 1 }}>Security</Typography>
+                </Box>
+                <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", mt: 0.4 }}>Surveillance & Access Control</Typography>
+              </Box>
+              <ArrowForwardIcon sx={{ color: "rgba(255,255,255,0.2)", fontSize: "0.9rem", flexShrink: 0 }} />
+            </Box>
+
+            {/* ── Mobile App ── */}
+            <Box sx={{
+              display: "flex", alignItems: "center", gap: 2,
+              px: 2.5, py: 1.8, mb: 1.5, borderRadius: 2,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              backdropFilter: "blur(10px)",
+              transition: "all 0.25s ease", cursor: "pointer",
+              "&:hover": { background: "rgba(255,255,255,0.11)", borderColor: "rgba(56,142,60,0.5)", transform: "translateY(-2px)", boxShadow: "0 8px 28px rgba(0,0,0,0.25)" }
+            }}>
+              <Box sx={{ flexShrink: 0, width: 48, height: 48 }}>
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* Phone body */}
+                  <rect x="13" y="4" width="22" height="36" rx="4" fill="rgba(56,142,60,0.15)" stroke="#388e3c" strokeWidth="1.8" />
+                  <rect x="16" y="8" width="16" height="22" rx="2" fill="rgba(76,175,80,0.2)" stroke="#66bb6a" strokeWidth="1" />
+                  {/* Screen content lines */}
+                  <rect x="18" y="11" width="12" height="2" rx="1" fill="#81c784" fillOpacity="0.8" />
+                  <rect x="18" y="15" width="12" height="2" rx="1" fill="#81c784" fillOpacity="0.6" />
+                  <rect x="18" y="19" width="7" height="5" rx="1" fill="#66bb6a" fillOpacity="0.5" />
+                  <rect x="27" y="19" width="3" height="5" rx="1" fill="#66bb6a" fillOpacity="0.4" />
+                  {/* Home button */}
+                  <circle cx="24" cy="36" r="2" fill="#388e3c" fillOpacity="0.6" stroke="#66bb6a" strokeWidth="1" />
+                  {/* Swirl arrow */}
+                  <path d="M8 36 Q4 28 10 22 Q16 16 20 20" stroke="#43a047" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+                  <polygon points="19,17 22,22 16,21" fill="#43a047" />
+                  {/* Green dot accent */}
+                  <rect x="22" y="6" width="4" height="1.5" rx="0.75" fill="#66bb6a" />
+                </svg>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
+                  <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: "1.05rem", lineHeight: 1 }}>Mobile</Typography>
+                  <Typography sx={{ color: "#81c784", fontWeight: 700, fontSize: "0.95rem", lineHeight: 1 }}>Apps</Typography>
+                </Box>
+                <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", mt: 0.4 }}>Cross-Platform App Development</Typography>
+              </Box>
+              <ArrowForwardIcon sx={{ color: "rgba(255,255,255,0.2)", fontSize: "0.9rem", flexShrink: 0 }} />
+            </Box>
+
+            {/* ── Digital Marketing ── */}
+            <Box sx={{
+              display: "flex", alignItems: "center", gap: 2,
+              px: 2.5, py: 1.8, borderRadius: 2,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              backdropFilter: "blur(10px)",
+              transition: "all 0.25s ease", cursor: "pointer",
+              "&:hover": { background: "rgba(255,255,255,0.11)", borderColor: "rgba(46,125,50,0.5)", transform: "translateY(-2px)", boxShadow: "0 8px 28px rgba(0,0,0,0.25)" }
+            }}>
+              <Box sx={{ flexShrink: 0, width: 48, height: 48 }}>
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* Megaphone body */}
+                  <path d="M8 18 L8 30 L14 30 L30 38 L30 10 L14 18 Z" fill="rgba(46,125,50,0.25)" stroke="#388e3c" strokeWidth="1.8" strokeLinejoin="round" />
+                  <rect x="8" y="18" width="6" height="12" rx="1" fill="rgba(76,175,80,0.3)" stroke="#66bb6a" strokeWidth="1" />
+                  {/* Sound waves */}
+                  <path d="M34 16 Q38 20 38 24 Q38 28 34 32" stroke="#43a047" strokeWidth="2" strokeLinecap="round" fill="none" />
+                  <path d="M36 13 Q42 18 42 24 Q42 30 36 35" stroke="#66bb6a" strokeWidth="1.5" strokeLinecap="round" fill="none" strokeOpacity="0.6" />
+                  {/* Swirl arrow at bottom */}
+                  <path d="M10 36 Q14 44 22 42 Q28 40 28 36" stroke="#43a047" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+                  <polygon points="28,32 30,37 24,36" fill="#43a047" />
+                  {/* Light rays */}
+                  <line x1="33" y1="10" x2="36" y2="7" stroke="#81c784" strokeWidth="1.5" strokeLinecap="round" />
+                  <line x1="37" y1="14" x2="41" y2="12" stroke="#81c784" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
+                  <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: "1.05rem", lineHeight: 1 }}>Digital</Typography>
+                  <Typography sx={{ color: "#81c784", fontWeight: 700, fontSize: "0.95rem", lineHeight: 1 }}>Marketing</Typography>
+                </Box>
+                <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", mt: 0.4 }}>SEO · Social · Growth Strategy</Typography>
+              </Box>
+              <ArrowForwardIcon sx={{ color: "rgba(255,255,255,0.2)", fontSize: "0.9rem", flexShrink: 0 }} />
+            </Box>
+
+            {/* Footer */}
+            <Typography sx={{ mt: 2, textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: "0.62rem", letterSpacing: "0.08em" }}>
+              One platform · Five powerful solutions
+            </Typography>
+
           </Box>
         </Grid>
       </Grid>
     </Box>
   );
 }
+
