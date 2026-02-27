@@ -255,31 +255,11 @@ export default function RoleTable({
         paginationModel={paginationModel}
         onPaginationModelChange={onPaginationModelChange}
         pageSizeOptions={[10, 25, 50, 100]}
+        pageSize={paginationModel.pageSize}
         rowCount={rowCount}
         loading={loading}
         autoHeight
         disableSelectionOnClick
-        components={{
-          LoadingOverlay: LinearProgress,
-          Toolbar: () => (
-            <GridToolbarContainer>
-              <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 2 }}>
-                <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
-                  {rowCount > 0
-                    ? `Showing ${page * pageSize + 1}–${page * pageSize + rows.length} of ${rowCount} roles`
-                    : "No roles"}
-                </Typography>
-                <Button variant="outlined" onClick={onAddRole} sx={{ ml: "auto" }}>
-                  + Add Role
-                </Button>
-              </Box>
-            </GridToolbarContainer>
-          ),
-        }}
-        sx={{
-          bgcolor: "background.paper",
-          "& .MuiDataGrid-columnHeaders": { bgcolor: "background.default" },
-        }}
       />
 
       {/* Empty state */}

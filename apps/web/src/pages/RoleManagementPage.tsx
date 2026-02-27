@@ -70,6 +70,7 @@ const handlePaginationModelChange = (model: { page: number; pageSize: number }) 
   console.log("Current roles:", roles);
   console.log("rolesData", rolesData);
   console.log("mappedRoles", mappedRoles);
+  console.log("pageSize sent to backend:", pageSize);
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -125,6 +126,7 @@ const handlePaginationModelChange = (model: { page: number; pageSize: number }) 
             rowCount={rolesData?.totalCount ?? 0}
             search={search}
             onAddRole={handleAddRole}
+            pageSize={pageSize} // <-- Add this prop if RoleTable expects it
           />
         )}
       </Paper>

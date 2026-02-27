@@ -8,7 +8,7 @@ interface GetRolesParams {
 }
 
 const roleService = {
-  async getRoles(params: GetRolesParams): Promise<PaginatedResponse<Role>> {
+  async getRoles(params: GetRolesParams): Promise<{ items: Role[]; totalCount: number; pageNumber: number; pageSize: number }> {
     const { data } = await axiosInstance.get("/roles", {
       params: {
         search: params.search,
