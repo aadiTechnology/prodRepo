@@ -16,8 +16,6 @@ import {
   InputAdornment,
   IconButton,
   Grid,
-  FormControlLabel,
-  Checkbox,
   CircularProgress,
   Zoom,
   Fade,
@@ -34,6 +32,7 @@ import {
   Security as SecurityIcon,
   People as PeopleIcon,
   ArrowForward as ArrowForwardIcon,
+  Info as InfoIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
@@ -282,10 +281,12 @@ export default function Login() {
               </Box>
 
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <FormControlLabel
-                  control={<Checkbox size="small" sx={{ color: "#cbd5e1", "&.Mui-checked": { color: "#14b8a6" } }} />}
-                  label={<Typography variant="body2" sx={{ color: "#64748b" }}>Remember me</Typography>}
-                />
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <InfoIcon sx={{ fontSize: "1.2rem", color: "#3b82f6" }} />
+                  <Typography variant="body2" sx={{ color: "#1e293b", fontWeight: 600, fontSize: "0.875rem" }}>
+                    Password is case-sensitive
+                  </Typography>
+                </Box>
                 <MuiLink
                   component={Link}
                   to="/forgot-password"
@@ -356,7 +357,7 @@ export default function Login() {
             position: "relative",
             backgroundSize: "cover",
             backgroundPosition: "center",
-            backgroundImage: "url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop')", // Futuristic network connection image
+            backgroundImage: "url('/login-bg.jpg')", // Local asset — place login-bg.jpg in public/
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
