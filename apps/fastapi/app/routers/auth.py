@@ -97,7 +97,7 @@ async def login_with_context(
     # Strict Tenant/User Activation Check
     if not user.is_active:
         raise UnauthorizedException("Your account is deactivated. Contact system administrator.")
-    
+
     if user.tenant_id:
         from app.models.tenant import Tenant
         tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
@@ -105,24 +105,25 @@ async def login_with_context(
             logger.warning(f"Login blocked (Context): Tenant {user.tenant_id} is inactive or deleted (User: {user.email})")
             raise ForbiddenException("Tenant is deactivated. Contact system administrator.")
 
-    # Resolve roles BEFORE creating the token so they can be embedded
+    # Always assign roles before using it!
     roles = [role.code for role in get_user_roles(db, user.id)]
-    user_role = roles[0] if roles else user.role.value
+    permissions, menus = rbac_service.resolve_user_permissions_and_menus(db, user)
+
+    # Handle empty roles gracefully
+    resolved_role = roles[0] if roles and len(roles) > 0 else (user.role.value if hasattr(user, 'role') else "USER")
 
     access_token = create_access_token(
         data={
             "sub": str(user.id),
             "email": user.email,
-            "role": user_role,
+            "role": resolved_role,
             "tenant_id": user.tenant_id,
         }
     )
 
-    # Get permissions and menus
-    permissions, menus = rbac_service.resolve_user_permissions_and_menus(db, user)
-    logger.info(f"[RBAC] User logged in successfully: {user.email}. Role: {user_role}")
     return LoginContextResponse(
         access_token=access_token,
+        token_type="bearer",
         user=UserWithRole(id=user.id, email=user.email, full_name=user.full_name, role=user.role),
         roles=roles,
         permissions=permissions,
