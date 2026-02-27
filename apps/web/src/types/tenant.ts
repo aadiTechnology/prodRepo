@@ -20,6 +20,17 @@ export interface TenantCreate {
     is_active?: boolean;
 }
 
+/** Use this for the provision endpoint — admin_password is required by the backend API */
+export interface TenantProvisionRequest {
+    name: string;
+    owner_name: string;
+    email: string;
+    admin_password: string;
+    phone?: string;
+    description?: string;
+    is_active?: boolean;
+}
+
 export interface TenantUpdate {
     name?: string;
     owner_name?: string;

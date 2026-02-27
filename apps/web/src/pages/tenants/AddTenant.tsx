@@ -46,9 +46,10 @@ const AddTenant = () => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value, checked, type } = e.target;
+        // MUI Switch fires type="checkbox" events; explicitly branch on name for is_active
         setFormData((prev) => ({
             ...prev,
-            [name]: type === "checkbox" ? checked : value,
+            [name]: type === "checkbox" || name === "is_active" ? checked : value,
         }));
     };
 
@@ -115,7 +116,7 @@ const AddTenant = () => {
             {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>{error}</Alert>}
             {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
                 <Grid container spacing={3}>
                     {/* Tenant Information */}
                     <Grid item xs={12} md={6}>

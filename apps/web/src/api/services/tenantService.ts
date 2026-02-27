@@ -1,5 +1,5 @@
 import { apiClient } from "../client";
-import { Tenant, TenantCreate, TenantUpdate, TenantProvisionResponse } from "../../types/tenant";
+import { Tenant, TenantCreate, TenantProvisionRequest, TenantUpdate, TenantProvisionResponse } from "../../types/tenant";
 
 export const tenantService = {
     /**
@@ -19,9 +19,9 @@ export const tenantService = {
     },
 
     /**
-     * Enterprise-grade tenant provisioning
+     * Enterprise-grade tenant provisioning (admin_password is required)
      */
-    provision: async (data: TenantCreate): Promise<TenantProvisionResponse> => {
+    provision: async (data: TenantProvisionRequest): Promise<TenantProvisionResponse> => {
         const response = await apiClient.post("/tenants/provision", data);
         return response.data;
     },

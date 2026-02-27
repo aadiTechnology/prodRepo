@@ -82,6 +82,11 @@ const TenantDetail = () => {
         }));
     };
 
+    /** Dedicated toggle for the status card click — avoids synthetic event casts */
+    const handleStatusToggle = () => {
+        setEditData((prev) => ({ ...prev, is_active: !prev.is_active }));
+    };
+
     const isDirty = tenant ? (
         editData.name !== tenant.name ||
         editData.owner_name !== tenant.owner_name ||
@@ -265,7 +270,7 @@ const TenantDetail = () => {
                                 <Typography variant="h6" fontWeight="600" gutterBottom>Account Status</Typography>
                                 <Divider sx={{ mb: 3 }} />
                                 <Box
-                                    onClick={() => isEditing && handleInputChange({ target: { name: 'is_active', type: 'checkbox', checked: !editData.is_active } } as any)}
+                                    onClick={isEditing ? handleStatusToggle : undefined}
                                     sx={{
                                         p: 3,
                                         bgcolor: (isEditing ? editData.is_active : tenant.is_active) ? "success.main" : "error.main",

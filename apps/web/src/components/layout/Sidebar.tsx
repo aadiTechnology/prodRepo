@@ -35,7 +35,9 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const { menus } = useRBAC();
   const { user } = useAuth();
 
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  /** Role constant — update to an enum import if the auth context ever changes */
+  const SUPER_ADMIN_ROLE = "SUPER_ADMIN" as const;
+  const isSuperAdmin = user?.role === SUPER_ADMIN_ROLE;
 
   const drawerContent = (
     <Box>
