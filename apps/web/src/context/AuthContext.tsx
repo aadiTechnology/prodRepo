@@ -212,7 +212,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         timeoutId = setTimeout(() => {
           console.log("Session timed out due to inactivity");
           logout(true);
-        }, 60000); // 1 minute inactivity
+        }, 300000); // 5 minute inactivity
       }
     };
 
