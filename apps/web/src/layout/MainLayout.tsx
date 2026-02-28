@@ -5,7 +5,7 @@
 
 import { AppBar, Toolbar, Typography, Box, Container, IconButton, useMediaQuery, useTheme, Menu, MenuItem, Avatar, Chip } from "@mui/material";
 import { Menu as MenuIcon, Logout as LogoutIcon, Person as PersonIcon, Lock as LockIcon } from "@mui/icons-material";
-import { Outlet, Link, useNavigate } from "react-router-dom";
+import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { useState, useCallback, memo, useEffect } from "react";
 import { appName } from "../config";
 import { Container as PageContainer } from "../components/common";
@@ -18,17 +18,40 @@ import { apiBaseUrl } from "../config";
 function MainLayout() {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout, isAuthenticated } = useAuth();
   const { clearRBACData } = useRBAC();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [avatarSrc, setAvatarSrc] = useState<string | undefined>(undefined);
 
-  /** Convert stored path like "/profile-images/7.jpg" → full URL */
+  /** SECURITY: Convert stored path like "/profile-images/7.jpg" → full URL with validation */
   const toFullUrl = (path: string | null | undefined): string | undefined => {
-    if (!path) return undefined;
-    if (path.startsWith("http")) return path;
+    if (!path || typeof path !== 'string') return undefined;
+    
+    // SECURITY: Reject absolute URLs that don't match our domain
+    if (path.startsWith("http")) {
+      try {
+        const url = new URL(path);
+        const baseUrl = new URL(apiBaseUrl);
+        // Only allow URLs from the same origin
+        if (url.origin !== baseUrl.origin) {
+          return undefined;
+        }
+        return path;
+      } catch {
+        return undefined; // Invalid URL
+      }
+    }
+    
+    // SECURITY: Only allow paths starting with /
+    if (!path.startsWith("/")) return undefined;
+    
+    // SECURITY: Block path traversal attempts
+    if (path.includes("..") || path.includes("//")) return undefined;
+    
     const root = apiBaseUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
     return `${root}${path}`;
   };
@@ -37,9 +60,15 @@ function MainLayout() {
   const refreshAvatar = useCallback(async () => {
     try {
       const data = await profileService.getProfile();
-      setAvatarSrc(toFullUrl(data.profile_image_path));
-    } catch {
-      // silently ignore — avatar will fall back to initials
+      // SECURITY: Validate image path before setting
+      if (data && typeof data.profile_image_path === 'string') {
+        const validatedUrl = toFullUrl(data.profile_image_path);
+        setAvatarSrc(validatedUrl);
+      }
+    } catch (error) {
+      // SECURITY: Log error for debugging but don't expose to UI
+      console.error('Failed to fetch profile image');
+      // avatar will fall back to initials
     }
   }, []);
 
@@ -63,6 +92,11 @@ function MainLayout() {
     setUserMenuAnchor(null);
   }, []);
 
+  // Close menu on navigation to prevent drifting dropdowns
+  useEffect(() => {
+    handleUserMenuClose();
+  }, [location.pathname, handleUserMenuClose]);
+
   const handleProfileClick = useCallback(() => {
     handleUserMenuClose();
     navigate("/profile");
@@ -84,18 +118,54 @@ function MainLayout() {
     setMobileMenuOpen(!mobileMenuOpen);
   }, [mobileMenuOpen]);
 
+  const handleSidebarCollapseToggle = useCallback(() => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  }, [sidebarCollapsed]);
+
   const handleMobileMenuClose = useCallback(() => {
     setMobileMenuOpen(false);
   }, []);
 
+  const DRAWER_WIDTH = 280;
+  const COLLAPSED_DRAWER_WIDTH = 80;
+
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
       {/* Sidebar */}
-      <Sidebar mobileOpen={mobileMenuOpen} onMobileClose={handleMobileMenuClose} />
+      <Sidebar
+        mobileOpen={mobileMenuOpen}
+        onMobileClose={handleMobileMenuClose}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={handleSidebarCollapseToggle}
+      />
 
       {/* Main content area */}
-      <Box sx={{ display: "flex", flexDirection: "column", flexGrow: 1 }}>
-        <AppBar position="sticky" elevation={1} sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          flexGrow: 1,
+          width: {
+            md: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)`
+          },
+          transition: theme.transitions.create(['width', 'margin'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
+        }}
+      >
+        <AppBar
+          position="sticky"
+          elevation={0}
+          sx={{
+            zIndex: (theme) => theme.zIndex.drawer + 1,
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(8px)',
+            color: 'text.primary',
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
           <Toolbar>
             {isMobile && (
               <IconButton
@@ -152,10 +222,10 @@ function MainLayout() {
                   aria-label="account menu"
                 >
                   <Avatar
-                    src={avatarSrc}
+                    src={avatarSrc || ''}
                     sx={{ width: 32, height: 32, bgcolor: "secondary.main" }}
                   >
-                    {!avatarSrc && user.full_name.charAt(0).toUpperCase()}
+                    {!avatarSrc && (user.full_name || 'U').charAt(0).toUpperCase()}
                   </Avatar>
                 </IconButton>
                 <Menu
@@ -174,17 +244,21 @@ function MainLayout() {
                   <MenuItem disabled>
                     <Box>
                       <Typography variant="body2" fontWeight="bold">
-                        {user.full_name}
+                        {/* SECURITY: Sanitize user display name to prevent XSS */}
+                        {(user.full_name || '').substring(0, 100).replace(/[<>'\"]/g, '')}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {user.email}
+                        {/* SECURITY: Sanitize email to prevent XSS */}
+                        {(user.email || '').substring(0, 150).replace(/[<>'\"]/g, '')}
                       </Typography>
                     </Box>
                   </MenuItem>
-                  <MenuItem onClick={handleProfileClick}>
-                    <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
-                    My Profile
-                  </MenuItem>
+                  {location.pathname !== "/profile" && (
+                    <MenuItem onClick={handleProfileClick}>
+                      <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
+                      My Profile
+                    </MenuItem>
+                  )}
                   <MenuItem onClick={handleChangePasswordClick}>
                     <LockIcon sx={{ mr: 1, fontSize: 20 }} />
                     Change Password
