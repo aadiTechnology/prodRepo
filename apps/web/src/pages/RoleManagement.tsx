@@ -34,12 +34,11 @@ import { MenuItem } from "../types/menu";
 import roleService from "../api/services/roleService";
 import menuService from "../api/services/menuService";
 import rbacService from "../api/services/rbacService";
-import { DataTable, Column } from "../components/common";
+import { DataTable, Column, CommonPageHeader, type NavLink } from "../components/common";
 
-const PAGE_PADDING = 32;
 const SECTION_GAP = 24;
-const PAGE_TITLE_STYLE = { fontSize: 20, fontWeight: 600, color: "#1E293B" };
 const SECTION_TITLE_STYLE = { fontSize: 16, fontWeight: 600 };
+const ROLE_HEADER_LINKS: NavLink[] = [{ title: "Role Management", path: "#" }];
 const FIELD_LABEL_STYLE = { fontSize: 14, fontWeight: 500 };
 const HELPER_TEXT_STYLE = { fontSize: 12 };
 const ERROR_TEXT_STYLE = { fontSize: 12, color: "#DC2626" };
@@ -325,15 +324,27 @@ function RoleManagement() {
   );
 
   return (
-    <Grid sx={{ px: { xs: 1, sm: 2 }, overflow: 'auto' }}>
-      <Box>
-        <Typography component="h1" sx={PAGE_TITLE_STYLE}>
-          Role Management
-        </Typography>
-        <Typography sx={{ ...HELPER_TEXT_STYLE, color: "text.secondary", mt: 0.5 }}>
-          Manage roles and assign menus to control access.
-        </Typography>
-      </Box>
+    <Grid sx={{ px: { xs: 1, sm: 2 }, overflow: "auto" }}>
+      <CommonPageHeader
+        navLinks={ROLE_HEADER_LINKS}
+        rightActions={
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setSelectedRole(null);
+              resetForm();
+              setFormOpen(true);
+            }}
+            sx={{ minHeight: 40, borderRadius: 6 }}
+          >
+            Add Role
+          </Button>
+        }
+      />
+      <Typography sx={{ ...HELPER_TEXT_STYLE, color: "text.secondary", mb: 2 }}>
+        Manage roles and assign menus to control access.
+      </Typography>
 
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
@@ -341,22 +352,7 @@ function RoleManagement() {
         </Alert>
       )}
 
-          <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", mb: 2 }}>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setSelectedRole(null);
-                resetForm();
-                setFormOpen(true);
-              }}
-              sx={{ minHeight: 40, borderRadius: 6 }}
-            >
-              Add Role
-            </Button>
-          </Box>
-
-          <DataTable<Role>
+      <DataTable<Role>
             columns={roleColumns}
             data={roles}
             isLoading={loading}
