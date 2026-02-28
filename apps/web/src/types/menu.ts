@@ -9,6 +9,20 @@ export interface Feature {
   category: string | null;
 }
 
+/** Flat menu item from API (GET /menus, GET /rbac/roles/:id/menus) */
+export interface MenuItem {
+  id: number;
+  name: string;
+  path: string | null;
+  icon: string | null;
+  sort_order: number;
+  level: number;
+  parent_id: number | null;
+  tenant_id: number | null;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface MenuNode {
   id: number;
   name: string;

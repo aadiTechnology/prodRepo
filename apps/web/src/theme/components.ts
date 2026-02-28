@@ -1,6 +1,7 @@
 /**
  * MUI Theme Component Overrides
- * Customizes default component styles
+ * Aadi Technology SaaS Design System (V1)
+ * Button: height 40px, radius 6px. Input: height 40px, radius 6px, focus #2563EB.
  */
 
 import { Components, Theme } from "@mui/material/styles";
@@ -9,15 +10,24 @@ export const components = (theme: Theme): Components => ({
   MuiButton: {
     styleOverrides: {
       root: {
-        borderRadius: 8,
+        borderRadius: 6,
+        minHeight: 40,
         padding: "8px 16px",
         textTransform: "none",
         fontWeight: 500,
       },
       contained: {
-        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+        backgroundColor: "#2563EB",
         "&:hover": {
-          boxShadow: "0 4px 8px rgba(0,0,0,0.15)",
+          backgroundColor: "#1d4ed8",
+        },
+      },
+      outlined: {
+        borderColor: "#CBD5E1",
+        color: theme.palette.text.primary,
+        "&:hover": {
+          borderColor: "#94a3b8",
+          backgroundColor: "rgba(203, 213, 225, 0.08)",
         },
       },
     },
@@ -25,8 +35,8 @@ export const components = (theme: Theme): Components => ({
   MuiCard: {
     styleOverrides: {
       root: {
-        borderRadius: 12,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+        borderRadius: 6,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
       },
     },
   },
@@ -34,7 +44,12 @@ export const components = (theme: Theme): Components => ({
     styleOverrides: {
       root: {
         "& .MuiOutlinedInput-root": {
-          borderRadius: 8,
+          borderRadius: 6,
+          minHeight: 40,
+          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+            borderColor: "#2563EB",
+            borderWidth: 1,
+          },
         },
       },
     },

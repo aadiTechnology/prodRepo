@@ -9,6 +9,7 @@ import ChangePassword from "../pages/ChangePassword";
 const Home = lazy(() => import("../pages/Home"));
 const About = lazy(() => import("../pages/About"));
 const Users = lazy(() => import("../pages/Users"));
+const RoleManagement = lazy(() => import("../pages/RoleManagement"));
 const Login = lazy(() => import("../pages/Login"));
 const Register = lazy(() => import("../pages/Register"));
 const Profile = lazy(() => import("../pages/ProfilePage"));
@@ -84,6 +85,14 @@ export default function AppRoutes() {
             element={
               <ProtectedRoute>
                 <Users />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/role-management"
+            element={
+              <ProtectedRoute>
+                <RoleManagement />
               </ProtectedRoute>
             }
           />
