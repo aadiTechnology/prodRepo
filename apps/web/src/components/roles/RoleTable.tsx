@@ -14,6 +14,7 @@ import {
   Button,
   TextField,
 } from "@mui/material";
+import RoleInfoBox from "./RoleInfoBox";
 import {
   Lock as LockIcon,
   Visibility as ViewIcon,
@@ -35,19 +36,16 @@ import MenuItem from "@mui/material/MenuItem";
 
 interface RoleTableProps {
   data: Role[];
-  pagination?: PaginatedResponse<Role>["pagination"];
   loading: boolean;
-  page: number;
-  pageSize: number;
   rowCount: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (size: number) => void;
   search: string;
-  onAddRole: () => void;
+  refetchRoles: () => void;
+  paginationModel: { page: number; pageSize: number };
+  onPaginationModelChange: (model: { page: number; pageSize: number }) => void;
 }
 
 function truncate(text: string | null | undefined, max: number) {
-  if (!text) return "";
+  if (!text) return '';
   if (text.length <= max) return text;
   return text.slice(0, max) + "...";
 }
@@ -59,16 +57,8 @@ export default function RoleTable({
   onPaginationModelChange,
   rowCount,
   search,
-  onAddRole,
-}: {
-  data: Role[];
-  loading: boolean;
-  paginationModel: { page: number; pageSize: number };
-  onPaginationModelChange: (model: { page: number; pageSize: number }) => void;
-  rowCount: number;
-  search: string;
-  onAddRole: () => void;
-}) {
+  refetchRoles,
+}: RoleTableProps) {
   const rows = Array.isArray(data) ? data : [];
   const navigate = useNavigate();
 
@@ -79,30 +69,25 @@ export default function RoleTable({
 
   // Actions menu state
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [menuRole, setMenuRole] = useState<Role | null>(null);
+  // menuRole and setMenuRole removed
 
   // --- ADD HERE ---
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [infoBoxOpen, setInfoBoxOpen] = useState(false);
+  const [roleDetails, setRoleDetails] = useState<Role | null>(null);
 
-  // Delete menu action: open dialog
-  const handleDeleteMenu = () => {
-    if (menuRole) {
-      setSelectedRole(menuRole);
-      setDeleteDialogOpen(true);
-    }
-    handleMenuClose();
-  };
+  // Delete menu action: open dialog (no longer needed, handled inline)
 
   // Confirm delete action: API call
   const handleDeleteConfirm = async () => {
     if (!selectedRole) return;
     setDeleteLoading(true);
     try {
-      await roleService.deleteRole(selectedRole.id); // Implement this API if not present
+      await roleService.deleteRole(selectedRole.id);
       setDeleteDialogOpen(false);
       setSelectedRole(null);
-      // Optionally refetch roles here
+      refetchRoles();
     } finally {
       setDeleteLoading(false);
     }
@@ -122,44 +107,8 @@ export default function RoleTable({
     }
   };
 
-  const handleDeactivateMenu = () => {
-    // Menu action, opens dialog
-    if (menuRole) {
-      setSelectedRole(menuRole);
-      setConfirmOpen(true);
-    }
-    handleMenuClose();
-  };
-
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, role: Role) => {
-    setMenuAnchorEl(event.currentTarget);
-    setMenuRole(role);
-  };
-  const handleMenuClose = () => {
-    setMenuAnchorEl(null);
-    setMenuRole(null);
-  };
-
-  const handleView = () => {
-    if (menuRole) navigate(`/roles/${menuRole.id}`);
-    handleMenuClose();
-  };
-  const handleEdit = () => {
-    if (menuRole) navigate(`/roles/${menuRole.id}/edit`);
-    handleMenuClose();
-  };
-  const handleDeactivate = () => {
-    handleDeactivateMenu();
-  };
-  const handleDelete = () => {
-    // Implement delete logic here (e.g. open confirm dialog)
-    if (menuRole) {
-      // setSelectedRole(menuRole);
-      // setDeleteDialogOpen(true);
-      alert(`Delete role: ${menuRole.name}`);
-    }
-    handleMenuClose();
-  };
+  // menuRole, setMenuRole, handleMenuOpen, handleMenuClose, handleView, handleEdit removed
+  // Remove unused handleDelete (all delete logic handled by handleDeleteMenu)
 
   const columns: GridColDef[] = [
     {
@@ -225,21 +174,57 @@ export default function RoleTable({
       ),
     },
     {
-      field: "actions",
-      headerName: "Actions",
-      minWidth: 80,
+      field: "view",
+      headerName: "View",
+      minWidth: 60,
       sortable: false,
       filterable: false,
+      align: "center",
       renderCell: (params: GridRenderCellParams<Role>) => (
-        <>
-          <IconButton
-            size="small"
-            aria-label="more"
-            onClick={(e) => handleMenuOpen(e, params.row)}
-          >
-            <MoreVertIcon />
-          </IconButton>
-        </>
+        <IconButton size="small" aria-label="view" onClick={async () => {
+          try {
+            const details = await roleService.getRoleById(params.row.id);
+            setRoleDetails({
+              ...details,
+              status: details.is_active ? "ACTIVE" : "INACTIVE",
+            });
+          } catch (e) {
+            setRoleDetails(params.row);
+          }
+          setSelectedRole(params.row);
+          setInfoBoxOpen(true);
+        }}>
+          <ViewIcon fontSize="small" />
+        </IconButton>
+      ),
+    },
+    {
+      field: "edit",
+      headerName: "Edit",
+      minWidth: 60,
+      sortable: false,
+      filterable: false,
+      align: "center",
+      renderCell: (params: GridRenderCellParams<Role>) => (
+        <IconButton size="small" aria-label="edit" onClick={() => navigate(`/roles/${params.row.id}/edit`)}>
+          <EditIcon fontSize="small" />
+        </IconButton>
+      ),
+    },
+    {
+      field: "delete",
+      headerName: "Delete",
+      minWidth: 60,
+      sortable: false,
+      filterable: false,
+      align: "center",
+      renderCell: (params: GridRenderCellParams<Role>) => (
+        <IconButton size="small" aria-label="delete" onClick={() => {
+          setSelectedRole(params.row);
+          setDeleteDialogOpen(true);
+        }}>
+          <DeleteIcon fontSize="small" />
+        </IconButton>
       ),
     },
   ];
@@ -248,19 +233,30 @@ export default function RoleTable({
 
   return (
     <Box sx={{ width: "100%" }}>
-      <DataGrid
-        rows={rows}
-        columns={columns}
-        paginationMode="server"
-        paginationModel={paginationModel}
-        onPaginationModelChange={onPaginationModelChange}
-        pageSizeOptions={[10, 25, 50, 100]}
-        pageSize={paginationModel.pageSize}
-        rowCount={rowCount}
-        loading={loading}
-        autoHeight
-        disableSelectionOnClick
-      />
+      {infoBoxOpen && roleDetails && (
+        <RoleInfoBox role={roleDetails} onClose={() => setInfoBoxOpen(false)} />
+      )}
+      <Box sx={{ height: 400, width: '100%', maxWidth: 1200, mx: 'auto', mt: 2 }}>
+        <DataGrid
+          rows={rows}
+          columns={columns}
+          pageSizeOptions={[paginationModel.pageSize]}
+          rowCount={rowCount}
+          pagination
+          paginationMode="server"
+          paginationModel={paginationModel}
+          onPaginationModelChange={onPaginationModelChange}
+          getRowId={row => row.id}
+          getRowHeight={() => 40}
+          disableColumnMenu
+          sx={{
+            '& .MuiDataGrid-row': { minHeight: 40, maxHeight: 40 },
+            '& .MuiDataGrid-cell': { py: 0.5, px: 1 },
+            '& .MuiDataGrid-columnHeaders': { minHeight: 40, maxHeight: 40 },
+            fontSize: 14,
+          }}
+        />
+      </Box>
 
       {/* Empty state */}
       {!loading && data.length === 0 && (
@@ -271,41 +267,8 @@ export default function RoleTable({
               ? "No roles found matching your search"
               : "No roles available"}
           </Typography>
-          <Button variant="contained" sx={{ mt: 2 }} onClick={onAddRole}>
-            Add Role
-          </Button>
         </Box>
       )}
-
-      {/* Actions Menu */}
-      <Menu
-        anchorEl={menuAnchorEl}
-        open={Boolean(menuAnchorEl)}
-        onClose={handleMenuClose}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <MenuItem onClick={handleView}>
-          <ViewIcon fontSize="small" sx={{ mr: 1 }} />
-          View
-        </MenuItem>
-        <MenuItem onClick={handleEdit}>
-          <EditIcon fontSize="small" sx={{ mr: 1 }} />
-          Edit
-        </MenuItem>
-        <MenuItem
-          onClick={handleDeactivate}
-          disabled={menuRole?.isSystemRole}
-          sx={{ color: menuRole?.isSystemRole ? "text.disabled" : "error.main" }}
-        >
-          <DeactivateIcon fontSize="small" sx={{ mr: 1 }} />
-          Deactivate
-        </MenuItem>
-        <MenuItem onClick={handleDeleteMenu} sx={{ color: "error.main" }}>
-          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-          Delete
-        </MenuItem>
-      </Menu>
 
       {/* Confirm Dialog */}
       <ConfirmDialog

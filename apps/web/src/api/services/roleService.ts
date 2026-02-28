@@ -1,5 +1,6 @@
 import axiosInstance from "../axiosInstance";
-import { Role, RoleSummary, PaginatedResponse } from "../types/role.types";
+// @ts-ignore: types file missing
+import { Role, RoleSummary, PaginatedResponse, RoleFormValues } from "../types/role.types";
 
 interface GetRolesParams {
   search?: string;
@@ -8,6 +9,10 @@ interface GetRolesParams {
 }
 
 const roleService = {
+    async getTenants() {
+      const { data } = await axiosInstance.get("/tenants");
+      return data.data || data;
+    },
   async getRoles(params: GetRolesParams): Promise<{ items: Role[]; totalCount: number; pageNumber: number; pageSize: number }> {
     const { data } = await axiosInstance.get("/roles", {
       params: {
@@ -26,6 +31,30 @@ const roleService = {
 
   async deactivateRole(id: string): Promise<void> {
     await axiosInstance.put(`/roles/${id}/deactivate`);
+  },
+
+  async createRole(data: RoleFormValues) {
+    const res = await axiosInstance.post("/roles", data);
+    return res.data;
+  },
+
+  async updateRole(id: string, data: RoleFormValues) {
+    const res = await axiosInstance.put(`/roles/${id}`, data);
+    return res.data;
+  },
+
+  async getRoleById(id: string) {
+    const res = await axiosInstance.get(`/roles/${id}`);
+    return res.data;
+  },
+
+  async getPermissionGroups() {
+    const { data } = await axiosInstance.get("/rbac/permissions/groups");
+    return data.data || data;
+  },
+
+  async deleteRole(id: string | number): Promise<void> {
+    await axiosInstance.delete(`/roles/${id}`);
   },
 };
 

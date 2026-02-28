@@ -1,5 +1,8 @@
+
+
 import { useState, useCallback } from "react";
 import { Box, Container, Paper, Typography, Button, LinearProgress, Alert } from "@mui/material";
+import { Role } from "../types/role.types";
 import { useNavigate } from "react-router-dom";
 import RoleSummaryCards from "../components/roles/RoleSummaryCards";
 import RoleTable from "../components/roles/RoleTable";
@@ -12,7 +15,7 @@ export default function RoleManagementPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(25); // Default to 25 for demonstration
+  const [pageSize, setPageSize] = useState(10); // Ensure default is 25
 
 const handlePageChange = (newPage: number) => setPage(newPage);
 const handlePageSizeChange = (newPageSize: number) => {
@@ -39,31 +42,36 @@ const handlePaginationModelChange = (model: { page: number; pageSize: number }) 
   });
 
   // Role table
-  const { data: rolesData, isLoading: rolesLoading, isError: rolesError, refetch: refetchRoles } = useQuery({
-    queryKey: ["roles", search, page, pageSize],
-    queryFn: () =>
-      roleService.getRoles({
-        search: search,
-        page: page + 1,
-        pageSize,
-      }),
-    keepPreviousData: true,
-  });
+  const { data: rolesData, isLoading: rolesLoading, isError: rolesError, refetch: refetchRoles } = useQuery<{ items: Role[]; totalCount: number; pageNumber: number; pageSize: number }>(
+    {
+      queryKey: ["roles", search, page, pageSize],
+      queryFn: () =>
+        roleService.getRoles({
+          search: search,
+          page: page + 1,
+          pageSize,
+        }),
+    }
+  );
 
   const handleAddRole = useCallback(() => {
     navigate("/roles/create");
   }, [navigate]);
 
   // 🟢 Define mappedRoles FIRST
-  const mappedRoles = (rolesData?.items ?? []).map(role => ({
-    id: String(role.id),
-    name: role.name ?? "",
-    description: role.description ?? "", // <--- important!
-    scope: (role.scope_type || "").toUpperCase() === "PLATFORM" ? "PLATFORM" : "TENANT",
-    isSystemRole: !!role.is_system,
-    status: role.is_active ? "ACTIVE" : "INACTIVE",
-    createdAt: role.created_at,
-  }));
+  const mappedRoles: Role[] = (rolesData?.items ?? []).map((role: any) => {
+    // Use the original value from backend for scope
+    return {
+      id: String(role.id),
+      name: role.name ?? "",
+      description: role.description ?? "",
+      scope: role.scope_type ?? "PLATFORM",
+      isSystemRole: !!role.is_system,
+      status: role.is_active ? "ACTIVE" : "INACTIVE",
+      createdAt: role.created_at,
+      permissions: role.permissions ?? [],
+    };
+  });
 
   // 🟢 Now you can use mappedRoles
   const { roles } = useRBAC();
@@ -115,7 +123,7 @@ const handlePaginationModelChange = (model: { page: number; pageSize: number }) 
       <Paper elevation={0} sx={{ p: 2, bgcolor: "background.paper", borderRadius: 2 }}>
         {rolesError ? (
           <Alert severity="error" sx={{ mb: 2 }}>
-            Failed to load roles. <Button onClick={refetchRoles}>Retry</Button>
+            Failed to load roles. <Button onClick={() => refetchRoles()}>Retry</Button>
           </Alert>
         ) : (
           <RoleTable
@@ -125,8 +133,7 @@ const handlePaginationModelChange = (model: { page: number; pageSize: number }) 
             onPaginationModelChange={handlePaginationModelChange}
             rowCount={rolesData?.totalCount ?? 0}
             search={search}
-            onAddRole={handleAddRole}
-            pageSize={pageSize} // <-- Add this prop if RoleTable expects it
+            refetchRoles={refetchRoles}
           />
         )}
       </Paper>

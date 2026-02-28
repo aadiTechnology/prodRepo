@@ -5,6 +5,8 @@ import MainLayout from "../layout/MainLayout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import ChangePassword from "../pages/ChangePassword";
 import RoleManagementPage from "../pages/RoleManagementPage"; // <-- Add this import
+import AddRole from "../pages/AddRole"; // <-- Add this import
+import EditRole from "../pages/EditRole";
 
 // Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
@@ -45,18 +47,26 @@ export default function AppRoutes() {
         <Route element={<MainLayout />}>
           {/* Basic authentication - no permissions required */}
           <Route
-            path="/"
+            path="/roles"
             element={
               <ProtectedRoute>
-                <Home />
+                <RoleManagementPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/about"
+            path="/roles/create"
             element={
               <ProtectedRoute>
-                <About />
+                <AddRole />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/roles/:id/edit"
+            element={
+              <ProtectedRoute>
+                <EditRole />
               </ProtectedRoute>
             }
           />
@@ -94,8 +104,32 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/roles/create"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}>
+                <AddRole />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/roles/edit/:id"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}>
+                <AddRole />
+              </ProtectedRoute>
+            }
+          />
 
-          {/* Tenant Management - Super Admin Only */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/tenants"
             element={

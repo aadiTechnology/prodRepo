@@ -1,3 +1,10 @@
+export interface Permission {
+  id: string;
+  name: string;
+  code: string;
+  module_name: string;
+}
+
 export interface Role {
   id: string;
   name: string;
@@ -6,6 +13,7 @@ export interface Role {
   isSystemRole: boolean;
   status: "ACTIVE" | "INACTIVE";
   createdAt: string;
+  permissions: Permission[];
 }
 
 export interface RoleSummary {
