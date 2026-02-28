@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.core.dependencies import require_system_admin, CurrentUser
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantProvision
 from app.services import tenant_service
-
+from app.models.tenant import Tenant
 
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
 
@@ -87,3 +87,8 @@ async def deactivate_tenant(
 ) -> TenantResponse:
     """Deactivate a tenant."""
     return tenant_service.deactivate_tenant(db, tenant_id, updated_by=current_user.id)
+
+@router.get("", response_model=list)
+def list_tenants(db: Session = Depends(get_db)):
+    tenants = db.query(Tenant).filter(Tenant.is_deleted == False).all()
+    return [{"id": t.id, "name": t.name} for t in tenants]

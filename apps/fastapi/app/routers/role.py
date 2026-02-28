@@ -7,13 +7,10 @@ from app.models.role import Role
 
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
-from typing import List
-
 from app.core.database import get_db
 from app.core.dependencies import require_admin, require_system_admin, CurrentUser
-from app.schemas.role import RoleCreate, RoleUpdate, RoleResponse, RoleListResponse
+from app.schemas.role import RoleCreate, RoleUpdate, RoleResponse, RoleListResponse, RoleListData
 from app.services import role_service
-
 
 router = APIRouter(prefix="/roles", tags=["Roles"])
 
@@ -42,28 +39,30 @@ async def role_summary(db: Session = Depends(get_db), current_user: CurrentUser 
 async def list_roles(
     search: str = Query(None),
     page_number: int = Query(1, alias="pageNumber"),
-    page_size: int = Query(10, alias="pageSize"),
+    page_size: int = Query(50, alias="pageSize"),  # Default is 25
+    scope_type: str = Query(None),
+    tenant_id: int = Query(None),
+    status: bool = Query(None),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_system_admin),
+    current_user: CurrentUser = Depends(require_admin),
 ) -> RoleListResponse:
-    """List roles (optionally filtered by tenant)."""
     logging.warning(f"User: {current_user.email}, Role: {current_user.role}, Tenant: {current_user.tenant_id}")
-    # Determine if we should show platform roles (Super Admin) or tenant roles
+    print(f"page_size={page_size}, page_number={page_number}")
     from app.models.user import UserRole
     is_platform = current_user.role == UserRole.SUPER_ADMIN
-    
-    roles, total_count = role_service.get_roles(
-        db, search, page_number, page_size, current_user.tenant_id, is_platform
+
+    roles, total = role_service.get_roles(
+        db, search, page_number, page_size, tenant_id=tenant_id, is_platform=is_platform
     )
-    return {
-        "success": True,
-        "data": {
-            "items": [RoleResponse.from_orm(r) for r in roles],
-            "totalCount": total_count,
-            "pageNumber": page_number,
-            "pageSize": page_size,
-        }
-    }
+    return RoleListResponse(
+        success=True,
+        data=RoleListData(
+            items=[RoleResponse.from_orm(r) for r in roles],
+            totalCount=total,
+            pageNumber=page_number,
+            pageSize=page_size,
+        ),
+    )
 
 
 @router.get("/{role_id}", response_model=RoleResponse)
@@ -73,17 +72,19 @@ async def get_role(
     current_user: CurrentUser = Depends(require_admin),
 ) -> RoleResponse:
     """Get a single role by ID."""
-    return role_service.get_role(db, role_id)
+    role = role_service.get_role(db, role_id)
+    return RoleResponse.from_orm(role)
 
 
-@router.post("/", response_model=RoleResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=RoleResponse)
 async def create_role(
     data: RoleCreate,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ) -> RoleResponse:
     """Create a new role."""
-    return role_service.create_role(db, data, created_by=current_user.id)
+    role = role_service.create_role(db, data, created_by=current_user.id)
+    return RoleResponse.from_orm(role)
 
 
 @router.put("/{role_id}", response_model=RoleResponse)
@@ -93,8 +94,9 @@ async def update_role(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ) -> RoleResponse:
-    """Update an existing role."""
-    return role_service.update_role(db, role_id, data, updated_by=current_user.id)
+        """Update an existing role."""
+        role = role_service.update_role(db, role_id, data, updated_by=current_user.id)
+        return RoleResponse.from_orm(role)
 
 
 @router.put("/{role_id}/activate")

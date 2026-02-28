@@ -174,6 +174,23 @@ def upgrade() -> None:
     op.create_index("ix_users_is_active", "users", ["is_active"], unique=False)
 
 
+    # --- Permissions ---
+    op.create_table(
+        "permissions",
+        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
+        sa.Column("code", sa.String(length=100), nullable=False, unique=True),
+        sa.Column("name", sa.String(length=200), nullable=False),
+        sa.Column("module_name", sa.String(length=100), nullable=False),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        sa.Column("updated_at", sa.DateTime(), nullable=True),
+    )
+    op.create_index("ix_permissions_id", "permissions", ["id"], unique=False)
+    op.create_index("ix_permissions_code", "permissions", ["code"], unique=True)
+    op.create_index("ix_permissions_is_active", "permissions", ["is_active"], unique=False)
+
+
+   
 def downgrade() -> None:
     """Drop RBAC and multi-tenant schema changes."""
 

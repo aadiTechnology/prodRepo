@@ -15,6 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.models.permission import role_permissions  # Add this import
 
 
 # Association table: user <-> role (many-to-many)
@@ -61,31 +62,27 @@ class Role(Base):
     __tablename__ = "roles"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    code = Column(String(50), unique=True, nullable=False)
+    name = Column(String(100), nullable=False)
+    scope_type = Column(String(20), nullable=False, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
-
-    code = Column(String(50), nullable=False)  # e.g. SUPER_ADMIN, ADMIN, USER
-    name = Column(String(150), nullable=False)
-    scope_type = Column(String(20), nullable=False, index=True)  # Use RoleScope
     description = Column(String(500), nullable=True)
     is_system = Column(Boolean, nullable=False, default=False)
     is_active = Column(Boolean, nullable=False, default=True)
-
-    # Audit fields
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_by = Column(Integer, nullable=True)
     updated_at = Column(DateTime, nullable=True)
     updated_by = Column(Integer, nullable=True)
-
-    # Soft delete
     is_deleted = Column(Boolean, nullable=False, default=False)
     deleted_at = Column(DateTime, nullable=True)
     deleted_by = Column(Integer, nullable=True)
 
-    # Relationships
+    # relationships...
     tenant = relationship("Tenant", back_populates="roles")
     users = relationship("User", secondary=user_roles, back_populates="roles")
     features = relationship("Feature", secondary=role_features, back_populates="roles")
     menus = relationship("Menu", secondary=role_menus, back_populates="roles")
+    permissions = relationship("Permission", secondary=role_permissions, back_populates="roles")
 
     __table_args__ = (
         # Ensure role code is unique within a tenant; allow global roles (tenant_id NULL)

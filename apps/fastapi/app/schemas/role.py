@@ -1,7 +1,8 @@
 """Pydantic schemas for Role (RBAC)."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional, List
+from app.schemas.permission import PermissionResponse
 
 from pydantic import BaseModel, validator
 
@@ -20,32 +21,16 @@ class RoleCreate(BaseModel):
     code: str
     name: str
     scope_type: str
+    tenant_id: Optional[int] = None
     description: Optional[str] = None
     is_active: bool = True
+    permission_ids: List[int]
     is_system: bool = False
     tenant_id: Optional[int] = None
     feature_ids: List[int] = []
     menu_ids: List[int] = []
 
-    @validator('name')
-    def name_required(cls, v):
-        if not v or not v.strip():
-            raise ValueError('Role name is required')
-        return v
 
-    @validator('scope_type')
-    def scope_type_required(cls, v):
-        if v not in ['Platform', 'Tenant']:
-            raise ValueError('Scope must be Platform or Tenant')
-        return v
-
-    @validator('tenant_id')
-    def tenant_id_rule(cls, v, values):
-        if values.get('scope_type') == 'Tenant' and not v:
-            raise ValueError('TenantId required for Tenant scope')
-        if values.get('scope_type') == 'Platform' and v:
-            raise ValueError('TenantId must be null for Platform scope')
-        return v
 
 
 class RoleUpdate(BaseModel):
@@ -56,23 +41,35 @@ class RoleUpdate(BaseModel):
     is_active: Optional[bool] = None
     feature_ids: Optional[List[int]] = None
     menu_ids: Optional[List[int]] = None
-
+permission_ids: Optional[List[int]] = None
 
 class RoleResponse(BaseModel):
     """Role data returned to clients."""
 
     id: int
+    code: str
     name: str
     scope_type: str
-    description: Optional[str]
-    is_active: bool
-    is_system: bool
-    created_at: datetime
-    created_by: Optional[int]  # <-- Change from str to Optional[int]
-    updated_at: Optional[datetime]
-    updated_by: Optional[int]  # <-- Change from str to Optional[int]
     tenant_id: Optional[int]
-    # row_version: Optional[bytes]  # <-- Make Optional if it can be None
+    description: Optional[str]
+    is_system: bool
+    is_active: bool
+    created_at: datetime
+    created_by: Optional[int]
+    updated_at: Optional[datetime]
+    updated_by: Optional[int]
+    is_deleted: bool
+    deleted_at: Optional[datetime]
+    deleted_by: Optional[int]
+    permissions: List[PermissionResponse]
+
+    @classmethod
+    def from_orm(cls, obj):
+        # Convert permissions to PermissionResponse
+        permissions = [PermissionResponse.from_orm(p) for p in getattr(obj, 'permissions', [])]
+        data = obj.__dict__.copy()
+        data['permissions'] = permissions
+        return cls(**data)
 
     class Config:
         from_attributes = True

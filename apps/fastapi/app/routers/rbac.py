@@ -1,8 +1,9 @@
 """RBAC assignment endpoints (user roles, role menus, role features)."""
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict
 
 from app.core.database import get_db
 from app.core.dependencies import require_admin, CurrentUser
@@ -16,9 +17,27 @@ from app.schemas.menu import MenuResponse
 from app.schemas.feature import FeatureResponse
 from app.schemas.auth import UserWithRole
 from app.services import rbac_service, role_service, menu_service, feature_service, user_service
+from app.models.permission import Permission
 
+from app.schemas.permission import PermissionResponse
 
 router = APIRouter(prefix="/rbac", tags=["RBAC"])
+
+@router.get("/permissions/groups")
+def get_permission_groups(db: Session = Depends(get_db), current_user: CurrentUser = Depends(require_admin)):
+    """Return permissions grouped by module_name."""
+    permissions = db.query(Permission).filter(Permission.is_active == True).all()
+    groups: Dict[str, list] = {}
+    for perm in permissions:
+        group = perm.module_name or "Other"
+        if group not in groups:
+            groups[group] = []
+        groups[group].append(PermissionResponse.model_validate(perm).dict())
+    result = [
+        {"group": group, "permissions": perms}
+        for group, perms in groups.items()
+    ]
+    return {"items": result}
 
 
 @router.get("/users/{user_id}/roles", response_model=List[RoleResponse])

@@ -27,7 +27,8 @@ def get_roles(
     Super Admin (is_platform=True) -> Platform roles where tenant_id IS NULL.
     Tenant Admin (is_platform=False) -> Tenant roles where tenant_id = tenant_id.
     """
-    query = db.query(Role)
+
+    query = db.query(Role).filter(Role.is_deleted == False)
 
     # RBAC filtering logic
     # if is_platform:
@@ -41,11 +42,12 @@ def get_roles(
 
     total_count = query.count()
     roles = (
-        query.order_by(Role.created_at.desc())
+        query.order_by(Role.id.desc())
         .offset((page_number - 1) * page_size)
         .limit(page_size)
         .all()
     )
+    logger.info(f"Returning roles for page {page_number}, page_size {page_size}: {[r.id for r in roles]}")
     return roles, total_count
 
 
@@ -66,6 +68,8 @@ def create_role(db: Session, data: RoleCreate, created_by: int | None = None) ->
         raise ConflictException("Role code must be unique")
     if data.scope_type == "Tenant" and not data.tenant_id:
         raise ConflictException("Tenant ID required for tenant scope")
+    if data.scope_type == "Platform" and data.tenant_id is not None:
+        raise ConflictException("Platform role cannot have tenant_id")
 
     role = Role(
         code=data.code,
