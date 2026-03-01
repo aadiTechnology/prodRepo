@@ -7,6 +7,7 @@ import ChangePassword from "../pages/ChangePassword";
 import RoleManagementPage from "../pages/RoleManagementPage"; // <-- Add this import
 import AddRole from "../pages/AddRole"; // <-- Add this import
 import EditRole from "../pages/EditRole";
+import AIAssistant from "../components/AIAssistant";
 
 // Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
@@ -121,6 +122,16 @@ export default function AppRoutes() {
             }
           />
 
+          <Route
+            path="/ai-assistant"
+            element={
+              <ProtectedRoute>
+                <Box sx={{ p: 2, display: "flex", justifyContent: "center" }}>
+                  <AIAssistant />
+                </Box>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/"
             element={
