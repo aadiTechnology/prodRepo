@@ -30,7 +30,7 @@ function MainLayout() {
   /** SECURITY: Convert stored path like "/profile-images/7.jpg" → full URL with validation */
   const toFullUrl = (path: string | null | undefined): string | undefined => {
     if (!path || typeof path !== 'string') return undefined;
-    
+
     // SECURITY: Reject absolute URLs that don't match our domain
     if (path.startsWith("http")) {
       try {
@@ -45,13 +45,13 @@ function MainLayout() {
         return undefined; // Invalid URL
       }
     }
-    
+
     // SECURITY: Only allow paths starting with /
     if (!path.startsWith("/")) return undefined;
-    
+
     // SECURITY: Block path traversal attempts
     if (path.includes("..") || path.includes("//")) return undefined;
-    
+
     const root = apiBaseUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
     return `${root}${path}`;
   };
@@ -166,7 +166,7 @@ function MainLayout() {
             borderColor: 'divider',
           }}
         >
-          <Toolbar>
+          <Toolbar variant="dense" sx={{ minHeight: 44 }}>
             {isMobile && (
               <IconButton
                 color="inherit"
@@ -273,8 +273,8 @@ function MainLayout() {
           </Toolbar>
         </AppBar>
 
-        <Box component="main" sx={{ flexGrow: 1, py: { xs: 2, md: 4 } }}>
-          <PageContainer>
+        <Box component="main" sx={{ flexGrow: 1, py: 0, mb: "50px", overflow: "auto" }}>
+          <PageContainer maxWidth={false} sx={{ px: { xs: 1, md: 1.5 } }}>
             <Outlet />
           </PageContainer>
         </Box>
@@ -282,19 +282,32 @@ function MainLayout() {
         <Box
           component="footer"
           sx={{
-            py: 3,
+            py: 1, // Reduced padding for a more compact footer
             px: 2,
             mt: "auto",
-            backgroundColor: (theme) =>
-              theme.palette.mode === "light" ? theme.palette.grey[100] : theme.palette.grey[900],
-            borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+            backgroundColor: "white",
+            borderTop: "1px solid",
+            borderColor: "divider",
+            position: "sticky",
+            bottom: 0,
+            zIndex: (theme) => theme.zIndex.drawer + 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            height: "50px"
           }}
         >
-          <Container maxWidth="lg">
-            <Typography variant="body2" color="text.secondary" align="center">
-              © {new Date().getFullYear()} {appName}. All rights reserved.
-            </Typography>
-          </Container>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <img
+              src="/campus-axis-logo.png"
+              alt="CampusAxis Logo"
+              style={{ height: "45px", objectFit: "contain" }}
+            />
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+            © {new Date().getFullYear()} Campus Axis App. All rights reserved to Aadi Technology
+          </Typography>
+          <Box sx={{ width: "100px", display: { xs: "none", sm: "block" } }} /> {/* Spacer to balance the layout */}
         </Box>
       </Box>
     </Box>
