@@ -23,17 +23,21 @@ def get_tenants(
     search: str | None = None,
     page: int = 1,
     page_size: int = 100,
-) -> list[Tenant]:
+) -> tuple[list[Tenant], int]:
     """Get non-deleted tenants with optional search and pagination."""
     query = db.query(Tenant).filter(Tenant.is_deleted == False)  # noqa: E712
     if search:
         query = query.filter(Tenant.name.ilike(f"%{search}%"))
-    return (
+    
+    total_count = query.count()
+    
+    tenants = (
         query.order_by(Tenant.created_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
     )
+    return tenants, total_count
 
 
 def get_tenant(db: Session, tenant_id: int) -> Tenant:

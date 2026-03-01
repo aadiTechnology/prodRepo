@@ -51,3 +51,8 @@ class TenantResponse(TenantBase):
 
     class Config:
         from_attributes = True
+
+
+class TenantListResponse(BaseModel):
+    items: list[TenantResponse]
+    total: int

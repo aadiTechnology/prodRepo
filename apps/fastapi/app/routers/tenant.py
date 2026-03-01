@@ -4,24 +4,24 @@ from typing import List, Optional
 
 from app.core.database import get_db
 from app.core.dependencies import require_system_admin, CurrentUser
-from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantProvision
+from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantProvision, TenantListResponse
 from app.services import tenant_service
 from app.models.tenant import Tenant
 
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
 
 
-@router.get("/", response_model=List[TenantResponse])
+@router.get("/", response_model=TenantListResponse)
 async def list_tenants(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_system_admin),
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(100, ge=1, le=500, description="Items per page"),
+    page_size: int = Query(10, ge=1, le=500, description="Items per page"),
     search: Optional[str] = Query(None, description="Filter tenants by name"),
-) -> List[TenantResponse]:
+) -> TenantListResponse:
     """List tenants with optional search and pagination. Only Super Admin can access."""
-    tenants = tenant_service.get_tenants(db, search=search, page=page, page_size=page_size)
-    return tenants
+    tenants, total = tenant_service.get_tenants(db, search=search, page=page, page_size=page_size)
+    return {"items": tenants, "total": total}
 
 
 @router.get("/{tenant_id}", response_model=TenantResponse)
@@ -88,7 +88,3 @@ async def deactivate_tenant(
     """Deactivate a tenant."""
     return tenant_service.deactivate_tenant(db, tenant_id, updated_by=current_user.id)
 
-@router.get("", response_model=list)
-def list_tenants(db: Session = Depends(get_db)):
-    tenants = db.query(Tenant).filter(Tenant.is_deleted == False).all()
-    return [{"id": t.id, "name": t.name} for t in tenants]
