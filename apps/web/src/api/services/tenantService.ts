@@ -5,7 +5,7 @@ export const tenantService = {
     /**
      * List all tenants (Super Admin only)
      */
-    list: async (params?: { page?: number; pageSize?: number; search?: string }): Promise<Tenant[]> => {
+    list: async (params?: { page?: number; page_size?: number; search?: string }): Promise<{ items: Tenant[]; total: number }> => {
         const response = await apiClient.get("/tenants/", { params });
         return response.data;
     },
