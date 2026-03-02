@@ -1,4 +1,4 @@
-import { Card, CardContent, Typography, Box, Skeleton, Grid } from "@mui/material";
+import { Card, CardContent, Typography, Box, Skeleton, Grid, Button } from "@mui/material";
 import { Group as GroupIcon, Business as BusinessIcon, AccountTree as AccountTreeIcon } from "@mui/icons-material";
 import { RoleSummary } from "../../types/role.types";
 
@@ -30,7 +30,19 @@ const cards = [
   },
 ];
 
-export default function RoleSummaryCards({ summary, loading }: RoleSummaryCardsProps) {
+export default function RoleSummaryCards({ summary, loading, error, onRetry }: RoleSummaryCardsProps) {
+  if (error) {
+    return (
+      <Box sx={{ width: '100%', textAlign: 'center', py: 4 }}>
+        <Typography color="error" variant="h6" gutterBottom>
+          Failed to load role summary.
+        </Typography>
+        <Button variant="outlined" color="primary" onClick={onRetry}>
+          Retry
+        </Button>
+      </Box>
+    );
+  }
   return (
     <Grid container spacing={2}>
       {cards.map((card) => (

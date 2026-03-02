@@ -10,7 +10,6 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Table,
-    BINARY,
 )
 from sqlalchemy.orm import relationship
 

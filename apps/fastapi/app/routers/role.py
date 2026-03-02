@@ -1,8 +1,5 @@
 import logging
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, func
-from sqlalchemy.orm import relationship
-from app.core.database import Base
 from app.models.role import Role
 
 from fastapi import APIRouter, Depends, status, Query
@@ -12,17 +9,21 @@ from app.core.dependencies import require_admin, require_system_admin, CurrentUs
 from app.schemas.role import RoleCreate, RoleUpdate, RoleResponse, RoleListResponse, RoleListData
 from app.services import role_service
 
+
 router = APIRouter(prefix="/roles", tags=["Roles"])
+
+# IMPORTANT: Keep all path literals (e.g. /summary) above path-parameter routes (e.g. /{role_id})
+# to avoid accidental matching of /summary as a role_id. See FastAPI routing order.
 
 
 @router.get("/summary")
 async def role_summary(db: Session = Depends(get_db), current_user: CurrentUser = Depends(require_system_admin)):
     """Get a summary of roles."""
-    total_roles = db.query(Role).count()
-    platform_roles = db.query(Role).filter(Role.scope_type == "Platform").count()
-    tenant_roles = db.query(Role).filter(Role.scope_type == "Tenant").count()
-    active_roles = db.query(Role).filter(Role.is_active == True).count()
-    inactive_roles = db.query(Role).filter(Role.is_active == False).count()
+    total_roles = db.query(Role).filter(Role.is_deleted == False).count()
+    platform_roles = db.query(Role).filter(Role.scope_type == "Platform", Role.is_deleted == False).count()
+    tenant_roles = db.query(Role).filter(Role.scope_type == "Tenant", Role.is_deleted == False).count()
+    active_roles = db.query(Role).filter(Role.is_active == True, Role.is_deleted == False).count()
+    inactive_roles = db.query(Role).filter(Role.is_active == False, Role.is_deleted == False).count()
     return {
         "success": True,
         "data": {
@@ -46,7 +47,7 @@ async def list_roles(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ) -> RoleListResponse:
-    logging.warning(f"User: {current_user.email}, Role: {current_user.role}, Tenant: {current_user.tenant_id}")
+    logging.debug(f"User: {current_user.email}, Role: {current_user.role}, Tenant: {current_user.tenant_id}")
     print(f"page_size={page_size}, page_number={page_number}")
     from app.models.user import UserRole
     is_platform = current_user.role == UserRole.SUPER_ADMIN
@@ -57,7 +58,7 @@ async def list_roles(
     return RoleListResponse(
         success=True,
         data=RoleListData(
-            items=[RoleResponse.from_orm(r) for r in roles],
+            items=[RoleResponse.model_validate(r) for r in roles],
             totalCount=total,
             pageNumber=page_number,
             pageSize=page_size,
@@ -73,7 +74,7 @@ async def get_role(
 ) -> RoleResponse:
     """Get a single role by ID."""
     role = role_service.get_role(db, role_id)
-    return RoleResponse.from_orm(role)
+    return RoleResponse.model_validate(role)
 
 
 @router.post("", response_model=RoleResponse)
@@ -84,7 +85,7 @@ async def create_role(
 ) -> RoleResponse:
     """Create a new role."""
     role = role_service.create_role(db, data, created_by=current_user.id)
-    return RoleResponse.from_orm(role)
+    return RoleResponse.model_validate(role)
 
 
 @router.put("/{role_id}", response_model=RoleResponse)
@@ -96,12 +97,13 @@ async def update_role(
 ) -> RoleResponse:
         """Update an existing role."""
         role = role_service.update_role(db, role_id, data, updated_by=current_user.id)
-        return RoleResponse.from_orm(role)
+        return RoleResponse.model_validate(role)
+
 
 
 @router.put("/{role_id}/activate")
 async def activate_role(
-    role_id: str,
+    role_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_system_admin),
 ):
@@ -109,9 +111,10 @@ async def activate_role(
     return {"success": True}
 
 
+
 @router.put("/{role_id}/deactivate")
 async def deactivate_role(
-    role_id: str,
+    role_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_system_admin),
 ):

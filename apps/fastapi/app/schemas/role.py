@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional, List
 from app.schemas.permission import PermissionResponse
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 
 class RoleBase(BaseModel):
@@ -63,10 +63,11 @@ class RoleResponse(BaseModel):
     deleted_by: Optional[int]
     permissions: List[PermissionResponse]
 
+
     @classmethod
-    def from_orm(cls, obj):
+    def model_validate(cls, obj):
         # Convert permissions to PermissionResponse
-        permissions = [PermissionResponse.from_orm(p) for p in getattr(obj, 'permissions', [])]
+        permissions = [PermissionResponse.model_validate(p) for p in getattr(obj, 'permissions', [])]
         data = obj.__dict__.copy()
         data['permissions'] = permissions
         return cls(**data)

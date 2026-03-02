@@ -75,10 +75,6 @@ const handlePaginationModelChange = (model: { page: number; pageSize: number }) 
 
   // 🟢 Now you can use mappedRoles
   const { roles } = useRBAC();
-  console.log("Current roles:", roles);
-  console.log("rolesData", rolesData);
-  console.log("mappedRoles", mappedRoles);
-  console.log("pageSize sent to backend:", pageSize);
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>

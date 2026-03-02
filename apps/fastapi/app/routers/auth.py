@@ -11,7 +11,7 @@ from app.models.user import UserRole
 from app.utils.security import verify_password, create_access_token
 from app.core.exceptions import UnauthorizedException, ForbiddenException
 from app.core.logging_config import get_logger
-from app.core.dependencies import get_current_user, CurrentUser, _get_rbac_role_codes
+from app.core.dependencies import get_current_user, CurrentUser, get_rbac_role_codes
 from app.services.auth_service import revoke_token
 
 logger = get_logger(__name__)

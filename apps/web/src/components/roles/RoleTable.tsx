@@ -101,7 +101,7 @@ export default function RoleTable({
     try {
       await roleService.deactivateRole(selectedRole.id);
       setConfirmOpen(false);
-      // Optionally refetch roles here
+      refetchRoles();
     } finally {
       setDeactivateLoading(false);
     }
@@ -150,7 +150,7 @@ export default function RoleTable({
       renderCell: (params: GridRenderCellParams<Role>) => (
         <Tooltip title={params.row.description}>
           <Typography noWrap>
-            {truncate(params.row.description, 40)}
+            {truncate(params.row.description ?? '', 40)}
           </Typography>
         </Tooltip>
       ),

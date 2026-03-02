@@ -19,7 +19,7 @@ def get_roles(
     search: str = None,
     page_number: int = 1,
     page_size: int = 50,
-    tenant_id: int = None,
+    tenant_id: int | None = None,
     is_platform: bool = False
 ) -> tuple[list[Role], int]:
     """
@@ -142,11 +142,12 @@ def soft_delete_role(db: Session, role_id: int, deleted_by: int | None = None) -
     logger.info(f"Role soft-deleted: {role.code} (id={role.id})")
 
 
-def activate_role(db: Session, role_id: str, updated_by: str) -> Role:
+
+def activate_role(db: Session, role_id: int, updated_by: int | None) -> Role:
     """Activate a role."""
     role = get_role(db, role_id)
     if role.is_system:
-        raise ConflictException("System roles cannot be deactivated.")
+        raise ConflictException("System roles cannot be activated or deactivated.")
     role.is_active = True
     role.updated_at = datetime.utcnow()
     role.updated_by = updated_by
@@ -154,7 +155,8 @@ def activate_role(db: Session, role_id: str, updated_by: str) -> Role:
     return role
 
 
-def deactivate_role(db: Session, role_id: str, updated_by: str) -> Role:
+
+def deactivate_role(db: Session, role_id: int, updated_by: int | None) -> Role:
     """Deactivate a role."""
     role = get_role(db, role_id)
     if role.is_system:

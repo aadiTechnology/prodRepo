@@ -109,7 +109,8 @@ def get_current_user(
 SYSTEM_ADMIN_ROLE_CODE = "SYSTEM_ADMIN"  # Changed from SUPER_ADMIN to match database
 
 
-def _get_rbac_role_codes(db: Session, user_id: int) -> list[str]:
+
+def get_rbac_role_codes(db: Session, user_id: int) -> list[str]:
     """Load role codes from DB (user_roles + roles) for the user. Used for permission checks."""
     from app.models.role import user_roles, Role
 
@@ -143,7 +144,7 @@ def require_role(allowed_roles: list[UserRole]):
         if current_user.role in allowed_roles:
             return current_user
 
-        rbac_role_codes = _get_rbac_role_codes(db, current_user.id)
+        rbac_role_codes = get_rbac_role_codes(db, current_user.id)
         
         # Check if user has SYSTEM_ADMIN role code from database
         if SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_role_codes:
@@ -183,7 +184,7 @@ def require_system_admin(
     if current_user.role in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
         return current_user
 
-    rbac_role_codes = _get_rbac_role_codes(db, current_user.id)
+    rbac_role_codes = get_rbac_role_codes(db, current_user.id)
     if SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_role_codes:
         return current_user
 

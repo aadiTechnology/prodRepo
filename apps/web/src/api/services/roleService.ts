@@ -1,6 +1,6 @@
 import axiosInstance from "../axiosInstance";
 // @ts-ignore: types file missing
-import { Role, RoleSummary, PaginatedResponse, RoleFormValues } from "../types/role.types";
+import { Role, RoleSummary, RoleListResponse, RoleFormValues } from "../../types/role.types";
 
 interface GetRolesParams {
   search?: string;
@@ -13,7 +13,7 @@ const roleService = {
       const { data } = await axiosInstance.get("/tenants");
       return data.data || data;
     },
-  async getRoles(params: GetRolesParams): Promise<{ items: Role[]; totalCount: number; pageNumber: number; pageSize: number }> {
+  async getRoles(params: GetRolesParams): Promise<RoleListResponse> {
     const { data } = await axiosInstance.get("/roles", {
       params: {
         search: params.search,
