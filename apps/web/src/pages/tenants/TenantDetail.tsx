@@ -2,53 +2,75 @@ import { useState, useEffect, useCallback } from "react";
 import {
     Box,
     Button,
-    Paper,
     Typography,
-    Grid,
-    TextField,
-    FormControlLabel,
-    Switch,
     Alert,
     CircularProgress,
-    Divider,
     Breadcrumbs,
     Link,
-    Card,
-    CardContent,
     Dialog,
     DialogTitle,
     DialogContent,
     DialogContentText,
     DialogActions,
+    Paper,
+    Divider,
 } from "@mui/material";
 import {
-    Save as SaveIcon,
-    ArrowBack as BackIcon,
     Edit as EditIcon,
-    Cancel as CancelIcon,
     Business as BusinessIcon,
     Delete as DeleteIcon,
+    ArrowBack as BackIcon,
+    InfoOutlined as InfoIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams, Link as RouterLink } from "react-router-dom";
-import { Tenant, TenantUpdate } from "../../types/tenant";
+import { Tenant } from "../../types/tenant";
 import tenantService from "../../api/services/tenantService";
 
+// ─── Design tokens matching TenantList ───────────────────────
+const NAV = "#1a1a2e";
+const NAV2 = "#2d2d44";
+const LABEL = "#64748b";
+const BG = "#f5f6fa";
+const BORDER = "#e2e8f0";
+
+// ─── Field Row ───────────────────────────────────────────────
+interface RowProps { label: string; children: React.ReactNode; last?: boolean; }
+const FieldRow = ({ label, children, last }: RowProps) => (
+    <Box>
+        <Box
+            sx={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 2,
+                py: 2.5,
+                px: 3,
+                flexWrap: { xs: "wrap", sm: "nowrap" },
+            }}
+        >
+            <Typography
+                variant="body2"
+                sx={{ minWidth: 180, flexShrink: 0, color: LABEL, pt: 0.3 }}
+            >
+                {label}
+            </Typography>
+            <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
+        </Box>
+        {!last && <Divider sx={{ mx: 0 }} />}
+    </Box>
+);
+
+// ─── Main Component ──────────────────────────────────────────
 const TenantDetail = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+
     const [loading, setLoading] = useState(true);
-    const [saveLoading, setSaveLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
-    const [isEditing, setIsEditing] = useState(false);
 
-    // Original and Current State for dirty checking
     const [tenant, setTenant] = useState<Tenant | null>(null);
-    const [editData, setEditData] = useState<TenantUpdate>({});
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleteLoading, setDeleteLoading] = useState(false);
-
-
 
     const fetchTenant = useCallback(async () => {
         if (!id) return;
@@ -56,13 +78,6 @@ const TenantDetail = () => {
             setLoading(true);
             const data = await tenantService.get(Number(id));
             setTenant(data);
-            setEditData({
-                name: data.name,
-                owner_name: data.owner_name,
-                phone: data.phone,
-                description: data.description,
-                is_active: data.is_active,
-            });
         } catch (err: any) {
             setError(err?.message || "Failed to load tenant details.");
         } finally {
@@ -70,48 +85,7 @@ const TenantDetail = () => {
         }
     }, [id]);
 
-    useEffect(() => {
-        fetchTenant();
-    }, [fetchTenant]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value, checked, type } = e.target;
-        setEditData((prev) => ({
-            ...prev,
-            [name]: type === "checkbox" ? checked : value,
-        }));
-    };
-
-    /** Dedicated toggle for the status card click — avoids synthetic event casts */
-    const handleStatusToggle = () => {
-        setEditData((prev) => ({ ...prev, is_active: !prev.is_active }));
-    };
-
-    const isDirty = tenant ? (
-        editData.name !== tenant.name ||
-        editData.owner_name !== tenant.owner_name ||
-        editData.phone !== tenant.phone ||
-        editData.description !== (tenant.description || "") ||
-        editData.is_active !== tenant.is_active
-    ) : false;
-
-    const handleSave = async () => {
-        if (!id || !tenant) return;
-
-        try {
-            setSaveLoading(true);
-            setError(null);
-            await tenantService.update(Number(id), editData);
-            setSuccess("Tenant updated successfully.");
-            setIsEditing(false);
-            fetchTenant();
-            setTimeout(() => setSuccess(null), 3000);
-        } catch (err: any) {
-            setError(err?.message || "Unable to update tenant. Please try again.");
-        } finally {
-            setSaveLoading(false);
-        }
-    };
+    useEffect(() => { fetchTenant(); }, [fetchTenant]);
 
     const handleDeleteTenant = async () => {
         if (!id) return;
@@ -128,228 +102,297 @@ const TenantDetail = () => {
         }
     };
 
-    if (loading) {
-        return (
-            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "80vh" }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
+    // ── Loading ──
+    if (loading) return (
+        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh", bgcolor: BG }}>
+            <CircularProgress sx={{ color: NAV }} />
+        </Box>
+    );
 
-    if (!tenant) {
-        return <Alert severity="error">Tenant not found.</Alert>;
-    }
+    if (!tenant) return <Alert severity="error">Tenant not found.</Alert>;
+
+    const isActive = tenant.is_active;
 
     return (
         <>
-            <Box sx={{ p: 4 }}>
-                <Breadcrumbs sx={{ mb: 2 }}>
-                    <Link component={RouterLink} to="/tenants" underline="hover" color="inherit">
+            <Box sx={{ minHeight: "100vh", bgcolor: BG, p: { xs: 2, sm: 2 }, pt: { xs: 2, sm: 2 } }}>
+
+                {/* ── Breadcrumb ── */}
+                <Breadcrumbs sx={{ mb: 2.5 }}>
+                    <Link
+                        component={RouterLink}
+                        to="/tenants"
+                        underline="hover"
+                        sx={{ fontSize: 13, color: LABEL }}
+                    >
                         Tenants
                     </Link>
-                    <Typography color="text.primary">{tenant.name}</Typography>
+                    <Typography sx={{ fontSize: 13, color: "#1a1a2e", fontWeight: 600 }}>
+                        {tenant.name}
+                    </Typography>
                 </Breadcrumbs>
 
-                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 }}>
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <BusinessIcon sx={{ mr: 2, fontSize: 40, color: "primary.main" }} />
+                {/* ── Page Header ── */}
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: 2,
+                        mb: 2.5,
+                    }}
+                >
+                    {/* Left: icon + name + meta */}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <Box
+                            sx={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: "8px",
+                                border: `1.5px solid ${BORDER}`,
+                                bgcolor: "white",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                            }}
+                        >
+                            <BusinessIcon sx={{ fontSize: 24, color: LABEL }} />
+                        </Box>
                         <Box>
-                            <Typography variant="h4" fontWeight="600">
+                            <Typography
+                                variant="h6"
+                                fontWeight={700}
+                                sx={{ color: NAV, lineHeight: 1.2, fontSize: { xs: 16, sm: 20 } }}
+                            >
                                 {tenant.name}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                ID: {tenant.id} | Created: {new Date(tenant.created_at).toLocaleDateString()}
+                            <Typography variant="caption" sx={{ color: LABEL }}>
+                                ID: {tenant.id}&nbsp;&nbsp;•&nbsp;&nbsp;Created:{" "}
+                                {new Date(tenant.created_at).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                })}
                             </Typography>
                         </Box>
                     </Box>
-                    <Box sx={{ display: "flex", gap: 2 }}>
-                        <Button variant="outlined" startIcon={<BackIcon />} onClick={() => navigate("/tenants")}>
+
+                    {/* Right: action buttons */}
+                    <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
+                        {/* Back */}
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<BackIcon sx={{ fontSize: 16 }} />}
+                            onClick={() => navigate("/tenants")}
+                            sx={{
+                                borderRadius: "8px",
+                                textTransform: "none",
+                                borderColor: BORDER,
+                                color: "#374151",
+                                fontWeight: 500,
+                                fontSize: 13,
+                                "&:hover": { borderColor: "#94a3b8", bgcolor: "rgba(0,0,0,0.02)" },
+                            }}
+                        >
                             Back to List
                         </Button>
-                        {!isEditing ? (
-                            <>
-                                <Button
-                                    variant="outlined"
-                                    color="error"
-                                    startIcon={<DeleteIcon />}
-                                    onClick={() => setDeleteDialogOpen(true)}
-                                >
-                                    Delete Tenant
-                                </Button>
-                                <Button variant="contained" startIcon={<EditIcon />} onClick={() => setIsEditing(true)}>
-                                    Edit Tenant
-                                </Button>
-                            </>
-                        ) : (
-                            <Button
-                                variant="contained"
-                                color="success"
-                                startIcon={saveLoading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-                                onClick={handleSave}
-                                disabled={!isDirty || saveLoading}
-                            >
-                                Save Changes
-                            </Button>
-                        )}
+
+                        {/* Delete */}
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            size="small"
+                            startIcon={<DeleteIcon sx={{ fontSize: 16 }} />}
+                            onClick={() => setDeleteDialogOpen(true)}
+                            sx={{
+                                borderRadius: "8px",
+                                textTransform: "none",
+                                fontWeight: 500,
+                                fontSize: 13,
+                            }}
+                        >
+                            Delete Tenant
+                        </Button>
+
+                        {/* Edit — navigates to edit page */}
+                        <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<EditIcon sx={{ fontSize: 16 }} />}
+                            onClick={() => navigate(`/tenants/${id}/edit`)}
+                            sx={{
+                                borderRadius: "8px",
+                                textTransform: "none",
+                                fontWeight: 600,
+                                fontSize: 13,
+                                bgcolor: NAV,
+                                "&:hover": { bgcolor: NAV2 },
+                                boxShadow: "none",
+                            }}
+                        >
+                            Edit Tenant
+                        </Button>
                     </Box>
                 </Box>
 
-                {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>{error}</Alert>}
-                {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
-
-                <Grid container spacing={3}>
-                    <Grid item xs={12} md={8}>
-                        <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                            <CardContent>
-                                <Typography variant="h6" fontWeight="600" gutterBottom>Profile Details</Typography>
-                                <Divider sx={{ mb: 3 }} />
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12} md={6}>
-                                        <TextField
-                                            fullWidth
-                                            label="Tenant Name"
-                                            name="name"
-                                            value={isEditing ? editData.name : tenant.name}
-                                            onChange={handleInputChange}
-                                            InputProps={{ readOnly: !isEditing }}
-                                            variant={isEditing ? "outlined" : "filled"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12} md={6}>
-                                        <TextField
-                                            fullWidth
-                                            label="Owner Name"
-                                            name="owner_name"
-                                            value={isEditing ? editData.owner_name : tenant.owner_name}
-                                            onChange={handleInputChange}
-                                            InputProps={{ readOnly: !isEditing }}
-                                            variant={isEditing ? "outlined" : "filled"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12} md={6}>
-                                        <TextField
-                                            fullWidth
-                                            label="Email Address"
-                                            value={tenant.email}
-                                            InputProps={{ readOnly: true }}
-                                            variant="filled"
-                                            helperText="Email is a unique identifier and cannot be changed."
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12} md={6}>
-                                        <TextField
-                                            fullWidth
-                                            label="Phone Number"
-                                            name="phone"
-                                            value={isEditing ? editData.phone : tenant.phone || ""}
-                                            onChange={handleInputChange}
-                                            InputProps={{ readOnly: !isEditing }}
-                                            variant={isEditing ? "outlined" : "filled"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Description"
-                                            name="description"
-                                            value={isEditing ? editData.description : tenant.description || ""}
-                                            onChange={handleInputChange}
-                                            multiline
-                                            rows={3}
-                                            InputProps={{ readOnly: !isEditing }}
-                                            variant={isEditing ? "outlined" : "filled"}
-                                        />
-                                    </Grid>
-                                </Grid>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                        <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: "rgba(0,0,0,0.02)" }}>
-                            <CardContent>
-                                <Typography variant="h6" fontWeight="600" gutterBottom>Account Status</Typography>
-                                <Divider sx={{ mb: 3 }} />
-                                <Box
-                                    onClick={isEditing ? handleStatusToggle : undefined}
-                                    sx={{
-                                        p: 3,
-                                        bgcolor: (isEditing ? editData.is_active : tenant.is_active) ? "success.main" : "error.main",
-                                        borderRadius: 2,
-                                        color: "white",
-                                        mb: 2,
-                                        cursor: isEditing ? "pointer" : "default",
-                                        transition: "all 0.2s",
-                                        "&:hover": isEditing ? { transform: "scale(1.02)", boxShadow: 3 } : {},
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
-                                        justifyContent: "center"
-                                    }}
-                                >
-                                    <Typography variant="h4" align="center" fontWeight="800">
-                                        {(isEditing ? editData.is_active : tenant.is_active) ? "ACTIVE" : "INACTIVE"}
-                                    </Typography>
-                                    {isEditing && (
-                                        <Typography variant="caption" sx={{ mt: 1, opacity: 0.8 }}>
-                                            Click to Toggle
-                                        </Typography>
-                                    )}
-                                </Box>
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={isEditing ? !!editData.is_active : tenant.is_active}
-                                            onChange={handleInputChange}
-                                            name="is_active"
-                                            disabled={!isEditing}
-                                            color="primary"
-                                        />
-                                    }
-                                    label={isEditing ? "Change Status" : "Current Status"}
-                                />
-                                <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 2 }}>
-                                    If deactivated, all users associated with this tenant will be blocked from logging in immediately.
-                                </Typography>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                </Grid>
-
-                {isEditing && (
-                    <Box sx={{ mt: 4, display: "flex", justifyContent: "flex-end", gap: 2 }}>
-                        <Button startIcon={<CancelIcon />} onClick={() => setIsEditing(false)}>
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="contained"
-                            color="success"
-                            startIcon={saveLoading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-                            onClick={handleSave}
-                            disabled={!isDirty || saveLoading}
-                        >
-                            Save Changes
-                        </Button>
-                    </Box>
+                {/* ── Alerts ── */}
+                {error && (
+                    <Alert
+                        severity="error"
+                        onClose={() => setError(null)}
+                        sx={{ mb: 2, borderRadius: "8px", border: `1px solid #fecaca` }}
+                    >
+                        {error}
+                    </Alert>
                 )}
+                {success && (
+                    <Alert
+                        severity="success"
+                        sx={{ mb: 2, borderRadius: "8px", border: `1px solid #bbf7d0` }}
+                    >
+                        {success}
+                    </Alert>
+                )}
+
+                {/* ── Profile Details Card ── */}
+                <Paper
+                    elevation={0}
+                    sx={{
+                        borderRadius: "12px",
+                        border: `1px solid ${BORDER}`,
+                        bgcolor: "white",
+                        overflow: "hidden",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                    }}
+                >
+                    {/* Card Header */}
+                    <Box
+                        sx={{
+                            px: 3,
+                            py: 2,
+                            borderBottom: `1px solid ${BORDER}`,
+                        }}
+                    >
+                        <Typography
+                            variant="body1"
+                            fontWeight={700}
+                            sx={{ color: NAV, fontSize: 15 }}
+                        >
+                            Profile Details
+                        </Typography>
+                    </Box>
+
+                    {/* ── Tenant Name ── */}
+                    <FieldRow label="Tenant Name">
+                        <Typography variant="body2" sx={{ color: NAV, fontWeight: 600 }}>
+                            {tenant.name}
+                        </Typography>
+                    </FieldRow>
+
+                    {/* ── Tenant Status ── */}
+                    <FieldRow label="Tenant Status">
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.6,
+                                    px: 1.2,
+                                    py: 0.4,
+                                    borderRadius: "20px",
+                                    bgcolor: isActive ? "#f0fdf4" : "#fff1f2",
+                                    border: `1px solid ${isActive ? "#bbf7d0" : "#fecdd3"}`,
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        width: 7,
+                                        height: 7,
+                                        borderRadius: "50%",
+                                        bgcolor: isActive ? "#10b981" : "#ef4444",
+                                    }}
+                                />
+                                <Typography
+                                    variant="caption"
+                                    fontWeight={700}
+                                    sx={{ color: isActive ? "#10b981" : "#ef4444", fontSize: 12 }}
+                                >
+                                    {isActive ? "Active" : "Inactive"}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </FieldRow>
+
+                    {/* ── Account Owner ── */}
+                    <FieldRow label="Account Owner">
+                        <Typography variant="body2" sx={{ color: NAV, fontWeight: 600 }}>
+                            {tenant.owner_name}
+                        </Typography>
+                    </FieldRow>
+
+                    {/* ── Email Address (read-only) ── */}
+                    <FieldRow label="Email Address">
+                        <Typography variant="body2" sx={{ color: NAV, fontWeight: 600 }}>
+                            {tenant.email}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#3b82f6", display: "block", mt: 0.3 }}>
+                            Primary contact for system notifications and billing
+                        </Typography>
+                    </FieldRow>
+
+                    {/* ── Phone Number ── */}
+                    <FieldRow label="Phone Number">
+                        <Typography variant="body2" sx={{ color: NAV, fontWeight: 600 }}>
+                            {tenant.phone || "—"}
+                        </Typography>
+                    </FieldRow>
+
+                    {/* ── Business Description ── */}
+                    <FieldRow label="Business Description" last>
+                        <Typography variant="body2" sx={{ color: NAV, fontWeight: 500, lineHeight: 1.7 }}>
+                            {tenant.description || "—"}
+                        </Typography>
+                    </FieldRow>
+
+                    {/* ── Footer notice ── */}
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 1,
+                            px: 3,
+                            py: 1.5,
+                            bgcolor: "#f8fafc",
+                            borderTop: `1px solid ${BORDER}`,
+                        }}
+                    >
+                        <InfoIcon sx={{ fontSize: 15, color: LABEL, mt: 0.1, flexShrink: 0 }} />
+                        <Typography variant="caption" sx={{ color: LABEL, lineHeight: 1.6 }}>
+                            All fields are read-only on this screen. Click &quot;Edit Tenant&quot; to modify details.
+                        </Typography>
+                    </Box>
+                </Paper>
             </Box>
 
-            {/* Delete Confirmation Dialog */}
+            {/* ── Delete Confirmation Dialog ── */}
             <Dialog
                 open={deleteDialogOpen}
                 onClose={() => !deleteLoading && setDeleteDialogOpen(false)}
-                PaperProps={{
-                    sx: { borderRadius: 3, width: "100%", maxWidth: 450 }
-                }}
+                PaperProps={{ sx: { borderRadius: "12px", width: "100%", maxWidth: 450 } }}
             >
-                <DialogTitle sx={{ fontWeight: "700", color: "error.main" }}>
+                <DialogTitle sx={{ fontWeight: 700, color: "error.main" }}>
                     Confirm Tenant Deletion
                 </DialogTitle>
                 <DialogContent>
                     <DialogContentText sx={{ mb: 2 }}>
                         Are you sure you want to delete <strong>{tenant?.name}</strong>?
                     </DialogContentText>
-                    <Alert severity="warning" sx={{ borderRadius: 2 }}>
-                        This will perform a <strong>Soft Delete</strong>. The tenant will be hidden,
+                    <Alert severity="warning" sx={{ borderRadius: "8px" }}>
+                        This is a <strong>Soft Delete</strong>. The tenant will be removed from the list,
                         and <strong>all associated user accounts</strong> will be deactivated immediately.
                     </Alert>
                 </DialogContent>
@@ -357,7 +400,7 @@ const TenantDetail = () => {
                     <Button
                         onClick={() => setDeleteDialogOpen(false)}
                         disabled={deleteLoading}
-                        sx={{ borderRadius: 2 }}
+                        sx={{ borderRadius: "8px", textTransform: "none" }}
                     >
                         Cancel
                     </Button>
@@ -366,10 +409,10 @@ const TenantDetail = () => {
                         color="error"
                         variant="contained"
                         disabled={deleteLoading}
-                        startIcon={deleteLoading ? <CircularProgress size={20} color="inherit" /> : <DeleteIcon />}
-                        sx={{ borderRadius: 2, px: 3 }}
+                        startIcon={deleteLoading ? <CircularProgress size={16} color="inherit" /> : <DeleteIcon />}
+                        sx={{ borderRadius: "8px", px: 3, textTransform: "none", boxShadow: "none" }}
                     >
-                        {deleteLoading ? "Deleting..." : "Delete Permanently"}
+                        {deleteLoading ? "Deleting…" : "Delete Permanently"}
                     </Button>
                 </DialogActions>
             </Dialog>
