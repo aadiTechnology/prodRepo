@@ -155,7 +155,7 @@ const TenantList = () => {
                         >
                             <HomeIcon sx={{ color: "white", fontSize: 24 }} />
                         </IconButton>
-                        <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#64748b" }}>
+                        <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#1A1A2E" }}>
                             Tenant Management
                         </Typography>
                     </Box>
@@ -229,13 +229,13 @@ const TenantList = () => {
                         <Table size="small" stickyHeader>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell sx={{ fontWeight: 700, color: "#64748b", fontSize: "0.80rem", px: 2, bgcolor: "white" }}>Tenant Name</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#64748b", fontSize: "0.80rem", px: 2, bgcolor: "white" }}>Owner</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#64748b", fontSize: "0.80rem", px: 2, bgcolor: "white" }}>Email</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#64748b", fontSize: "0.80rem", px: 2, bgcolor: "white" }}>Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#64748b", fontSize: "0.80rem", px: 2, bgcolor: "white" }}>Created Date</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#64748b", fontSize: "0.80rem", px: 2, bgcolor: "white" }}>Edit</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#64748b", fontSize: "0.80rem", px: 2, bgcolor: "white" }}>Delete</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Tenant Name</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Owner</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Email</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Status</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Created Date</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Edit</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Delete</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>

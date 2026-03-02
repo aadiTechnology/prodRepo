@@ -154,6 +154,14 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/tenants/:id/edit"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
+                <AddTenant />
+              </ProtectedRoute>
+            }
+          />
         </Route>
       </Routes>
     </Suspense>
