@@ -12,6 +12,7 @@ import { Container as PageContainer } from "../components/common";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 import Sidebar from "../components/layout/Sidebar";
+import AIAssistant from "../components/AIAssistant";
 import profileService from "../api/services/profileService";
 import { apiBaseUrl } from "../config";
 
@@ -307,9 +308,10 @@ function MainLayout() {
           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
             © {new Date().getFullYear()} Campus Axis App. All rights reserved to Aadi Technology
           </Typography>
-          <Box sx={{ width: "100px", display: { xs: "none", sm: "block" } }} /> {/* Spacer to balance the layout */}
+          <Box sx={{ width: "100px", display: { xs: "none", sm: "block" } }} />
         </Box>
       </Box>
+      {isAuthenticated && <AIAssistant />}
     </Box>
   );
 }

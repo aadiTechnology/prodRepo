@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -10,15 +10,17 @@ import {
   ListItemText,
   Typography,
   CircularProgress,
+  Collapse,
 } from "@mui/material";
 import MicIcon from "@mui/icons-material/Mic";
 import SendIcon from "@mui/icons-material/Send";
-import StopIcon from "@mui/icons-material/Stop";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import PersonIcon from "@mui/icons-material/Person";
+import ChatIcon from "@mui/icons-material/Chat";
 import apiClient from "../api/client";
 
 type MessageRole = "user" | "assistant";
+type ChatState = "idle" | "listening" | "processing";
 
 interface ChatMessage {
   id: string;
@@ -35,13 +37,24 @@ interface InterpretResponse {
   payload: Record<string, unknown>;
 }
 
+interface PendingAction {
+  data: InterpretResponse;
+}
+
+const SILENCE_MS = 1800;
+
 export default function AIAssistant() {
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [listening, setListening] = useState(false);
+  const [chatState, setChatState] = useState<ChatState>("idle");
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const listEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const transcriptRef = useRef("");
+  const submittedRef = useRef(false);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const append = useCallback((role: MessageRole, text: string) => {
     setMessages((prev) => [
@@ -50,118 +63,284 @@ export default function AIAssistant() {
     ]);
   }, []);
 
-  const handleSend = useCallback(async () => {
-    const text = input.trim();
-    if (!text || loading) return;
-    setInput("");
-    append("user", text);
-    setLoading(true);
-    try {
-      const { data } = await apiClient.post<InterpretResponse>("/api/ai/interpret", {
-        user_text: text,
-      });
+  useEffect(() => {
+    listEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, chatState]);
+
+  const executeAction = useCallback(
+    async (data: InterpretResponse) => {
       if (data.action === "NAVIGATE") {
         append("assistant", `Opening ${data.endpoint}.`);
         navigate(data.endpoint);
-        setLoading(false);
         return;
       }
       if (data.payload?.error === "role_not_found") {
         append("assistant", `Error: ${(data.payload.message as string) || "Role not found."}`);
-        setLoading(false);
         return;
       }
       if (data.action === "CALL_API" && data.method && data.endpoint) {
         const method = data.method.toLowerCase() as "get" | "post" | "put" | "delete";
-        const hasBody = (data.method === "POST" || data.method === "PUT") && data.payload && Object.keys(data.payload).length > 0 && !data.payload.error;
-        hasBody
-          ? await apiClient.request({ method, url: data.endpoint, data: data.payload })
-          : await apiClient.request({ method, url: data.endpoint });
-        append("assistant", `Done: ${data.intent}.`);
+        const hasBody =
+          (data.method === "POST" || data.method === "PUT") &&
+          data.payload &&
+          Object.keys(data.payload).length > 0 &&
+          !data.payload.error;
+        try {
+          hasBody
+            ? await apiClient.request({ method, url: data.endpoint, data: data.payload })
+            : await apiClient.request({ method, url: data.endpoint });
+          append("assistant", `Done: ${data.intent}.`);
+        } catch (err: unknown) {
+          const msg =
+            err && typeof err === "object" && "message" in err
+              ? String((err as { message: string }).message)
+              : "Request failed.";
+          append("assistant", `Error: ${msg}`);
+        }
       } else {
         append("assistant", `Done: ${data.intent}.`);
       }
-    } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Request failed.";
-      append("assistant", `Error: ${msg}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [input, loading, append, navigate]);
+    },
+    [append, navigate]
+  );
+
+  const submitText = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || chatState === "processing") return;
+
+      if (pendingAction && pendingAction.data.intent === "DELETE_ROLE") {
+        if (/^\s*yes\s*$/i.test(trimmed)) {
+          setPendingAction(null);
+          setChatState("processing");
+          append("user", "Yes");
+          await executeAction(pendingAction.data);
+          setChatState("idle");
+        } else {
+          append("assistant", "Delete cancelled. Say or type Yes to confirm delete.");
+        }
+        setInput("");
+        return;
+      }
+
+      setInput("");
+      append("user", trimmed);
+      setChatState("processing");
+
+      try {
+        const { data } = await apiClient.post<InterpretResponse>("/api/ai/interpret", {
+          user_text: trimmed,
+        });
+
+        if (data.intent === "DELETE_ROLE" && data.action === "CALL_API") {
+          setPendingAction({ data });
+          append("assistant", "Delete role? Say or type Yes to confirm.");
+          setChatState("idle");
+          return;
+        }
+
+        await executeAction(data);
+      } catch (err: unknown) {
+        const msg =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: string }).message)
+            : "Request failed.";
+        append("assistant", `Error: ${msg}`);
+      } finally {
+        setChatState("idle");
+      }
+    },
+    [chatState, pendingAction, append, executeAction]
+  );
+
+  const handleSend = useCallback(() => {
+    submitText(input);
+  }, [input, submitText]);
 
   const startListening = useCallback(() => {
-    const SpeechRecognitionAPI = (window as Window & { SpeechRecognition?: typeof SpeechRecognition; webkitSpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition ?? (window as Window & { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
-    if (!SpeechRecognitionAPI) {
-      append("assistant", "Speech recognition is not supported in this browser.");
-      return;
+    const Win = window as Window & {
+      SpeechRecognition?: typeof SpeechRecognition;
+      webkitSpeechRecognition?: typeof SpeechRecognition;
+    };
+    const API = Win.SpeechRecognition ?? Win.webkitSpeechRecognition;
+    if (!API || chatState === "processing") return;
+
+    transcriptRef.current = "";
+    submittedRef.current = false;
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
     }
-    const recognition = new SpeechRecognitionAPI();
+
+    const recognition = new API();
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = "en-US";
+
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[event.results.length - 1][0].transcript;
-      setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+      const t = event.results[event.results.length - 1][0].transcript;
+      transcriptRef.current = (transcriptRef.current ? transcriptRef.current + " " + t : t).trim();
     };
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
+
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      setChatState((s) => (s === "listening" ? "idle" : s));
+      if (submittedRef.current) return;
+      const transcript = transcriptRef.current;
+      if (transcript.trim() === "") return;
+      submittedRef.current = true;
+      submitText(transcript);
+    };
+
+    recognition.onerror = () => {
+      recognitionRef.current = null;
+      setChatState((s) => (s === "listening" ? "idle" : s));
+    };
+
     recognitionRef.current = recognition;
     recognition.start();
-    setListening(true);
-  }, [append]);
+    setChatState("listening");
 
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    setListening(false);
+    silenceTimerRef.current = setTimeout(() => {
+      silenceTimerRef.current = null;
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    }, SILENCE_MS);
+  }, [chatState, submitText]);
+
+  useEffect(() => {
+    return () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (recognitionRef.current) recognitionRef.current.stop();
+    };
   }, []);
 
+  const processing = chatState === "processing";
+  const listening = chatState === "listening";
+
   return (
-    <Paper elevation={2} sx={{ display: "flex", flexDirection: "column", height: 420, maxWidth: 480, overflow: "hidden" }}>
-      <Box sx={{ p: 1.5, borderBottom: 1, borderColor: "divider", display: "flex", alignItems: "center", gap: 1 }}>
-        <SmartToyIcon color="primary" />
-        <Typography variant="subtitle1" fontWeight={600}>Role assistant</Typography>
-      </Box>
-      <List sx={{ flex: 1, overflow: "auto", py: 1 }}>
-        {messages.length === 0 && (
-          <ListItem>
-            <ListItemText secondary="Try: Add role Admin, Delete role Teacher, Update role Parent to Guardian, Show roles." />
-          </ListItem>
-        )}
-        {messages.map((m) => (
-          <ListItem key={m.id} sx={{ alignItems: "flex-start", gap: 1 }}>
-            {m.role === "user" ? <PersonIcon fontSize="small" sx={{ color: "text.secondary", mt: 0.5 }} /> : <SmartToyIcon fontSize="small" color="primary" sx={{ mt: 0.5 }} />}
-            <ListItemText primary={m.text} primaryTypographyProps={{ variant: "body2" }} />
-          </ListItem>
-        ))}
-        {loading && (
-          <ListItem>
-            <CircularProgress size={20} sx={{ mr: 1 }} />
-            <ListItemText primary="Interpreting…" primaryTypographyProps={{ variant: "body2" }} />
-          </ListItem>
-        )}
-      </List>
-      <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider", display: "flex", gap: 0.5, alignItems: "flex-end" }}>
-        <TextField
-          size="small"
-          fullWidth
-          placeholder="Add role Admin, Show roles…"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-          disabled={loading}
-          multiline
-          maxRows={2}
-        />
-        <IconButton color="primary" onClick={listening ? stopListening : startListening} disabled={loading} title={listening ? "Stop" : "Mic"}>
-          {listening ? <StopIcon /> : <MicIcon />}
-        </IconButton>
-        <IconButton color="primary" onClick={handleSend} disabled={loading || !input.trim()} title="Send">
-          <SendIcon />
-        </IconButton>
-      </Box>
-    </Paper>
+    <>
+      <IconButton
+        onClick={() => setOpen((o) => !o)}
+        sx={{
+          position: "fixed",
+          bottom: 24,
+          right: 24,
+          zIndex: 1300,
+          width: 56,
+          height: 56,
+          bgcolor: "primary.main",
+          color: "primary.contrastText",
+          "&:hover": { bgcolor: "primary.dark" },
+          boxShadow: 3,
+        }}
+        aria-label={open ? "Close chat" : "Open chat"}
+      >
+        {open ? <ChatIcon /> : <SmartToyIcon />}
+      </IconButton>
+
+      <Collapse in={open} sx={{ position: "fixed", bottom: 0, right: 0, zIndex: 1299, transformOrigin: "bottom right" }}>
+        <Paper
+          elevation={8}
+          sx={{
+            position: "fixed",
+            bottom: 88,
+            right: 24,
+            width: 380,
+            maxWidth: "calc(100vw - 48px)",
+            height: 420,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            borderRadius: 2,
+          }}
+        >
+          <Box sx={{ p: 1.5, borderBottom: 1, borderColor: "divider", display: "flex", alignItems: "center", gap: 1 }}>
+            <SmartToyIcon color="primary" />
+            <Typography variant="subtitle1" fontWeight={600}>
+              Role assistant
+            </Typography>
+          </Box>
+          <List sx={{ flex: 1, overflow: "auto", py: 1 }}>
+            {messages.length === 0 && (
+              <ListItem>
+                <ListItemText secondary="Try: Add role Admin, Delete role Teacher, Show roles. Use mic for voice." />
+              </ListItem>
+            )}
+            {messages.map((m) => (
+              <ListItem key={m.id} sx={{ alignItems: "flex-start", gap: 1 }}>
+                {m.role === "user" ? (
+                  <PersonIcon fontSize="small" sx={{ color: "text.secondary", mt: 0.5 }} />
+                ) : (
+                  <SmartToyIcon fontSize="small" color="primary" sx={{ mt: 0.5 }} />
+                )}
+                <ListItemText primary={m.text} primaryTypographyProps={{ variant: "body2" }} />
+              </ListItem>
+            ))}
+            {listening && (
+              <ListItem>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    bgcolor: "primary.main",
+                    animation: "pulse 1s ease-in-out infinite",
+                    "@keyframes pulse": { "0%, 100%": { opacity: 1 }, "50%": { opacity: 0.4 } },
+                    mr: 1,
+                  }}
+                />
+                <ListItemText primary="Listening…" primaryTypographyProps={{ variant: "body2" }} />
+              </ListItem>
+            )}
+            {processing && (
+              <ListItem>
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+                <ListItemText primary="Processing…" primaryTypographyProps={{ variant: "body2" }} />
+              </ListItem>
+            )}
+            <div ref={listEndRef} />
+          </List>
+          <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider", display: "flex", gap: 0.5, alignItems: "flex-end" }}>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder={pendingAction ? "Type Yes to confirm" : "Add role Admin, Show roles…"}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+              disabled={processing}
+              multiline
+              maxRows={2}
+            />
+            <IconButton
+              color="primary"
+              onClick={startListening}
+              disabled={processing}
+              title="Voice"
+              sx={
+                listening
+                  ? {
+                      "&": {
+                        animation: "micPulse 1.2s ease-in-out infinite",
+                      },
+                      "@keyframes micPulse": {
+                        "0%, 100%": { transform: "scale(1)", opacity: 1 },
+                        "50%": { transform: "scale(1.1)", opacity: 0.8 },
+                      },
+                    }
+                  : undefined
+              }
+            >
+              <MicIcon />
+            </IconButton>
+            <IconButton color="primary" onClick={handleSend} disabled={processing || !input.trim()} title="Send">
+              <SendIcon />
+            </IconButton>
+          </Box>
+        </Paper>
+      </Collapse>
+    </>
   );
 }
