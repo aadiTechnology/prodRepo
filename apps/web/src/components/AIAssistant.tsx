@@ -30,11 +30,18 @@ interface ChatMessage {
 }
 
 interface InterpretResponse {
-  intent: "ADD_ROLE" | "UPDATE_ROLE" | "DELETE_ROLE" | "VIEW_ROLES";
-  action: "CALL_API" | "NAVIGATE";
+  menu_id: number | null;
+  menu_name: string;
+  parent_menu_id: number | null;
+  parent_menu_name: string;
+  route: string;
+  action: "NAVIGATE" | "CALL_API";
   method: "POST" | "PUT" | "DELETE" | "GET" | null;
-  endpoint: string;
+  endpoint: string | null;
   payload: Record<string, unknown>;
+  requires_confirmation: boolean;
+  error_type?: "SAFE_ERROR" | "NEED_CLARIFICATION" | null;
+  error_message?: string | null;
 }
 
 interface PendingAction {
@@ -42,6 +49,21 @@ interface PendingAction {
 }
 
 const SILENCE_MS = 1800;
+
+const ROUTE_TO_SIDEBAR_PARENT: Record<string, string> = {
+  "/roles": "config",
+  "/menus": "config",
+  "/permissions": "config",
+  "/users": "users",
+  "/tenants": "tenants",
+};
+
+function dispatchSidebarExpand(parentId: string): void {
+  if (parentId === "") return;
+  window.dispatchEvent(
+    new CustomEvent("sidebar-expand", { detail: { parentId } })
+  );
+}
 
 export default function AIAssistant() {
   const navigate = useNavigate();
@@ -51,7 +73,7 @@ export default function AIAssistant() {
   const [chatState, setChatState] = useState<ChatState>("idle");
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const listEndRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const transcriptRef = useRef("");
   const submittedRef = useRef(false);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,27 +91,42 @@ export default function AIAssistant() {
 
   const executeAction = useCallback(
     async (data: InterpretResponse) => {
-      if (data.action === "NAVIGATE") {
-        append("assistant", `Opening ${data.endpoint}.`);
-        navigate(data.endpoint);
+      if (data.error_type && data.error_message) {
+        append("assistant", data.error_message);
         return;
       }
-      if (data.payload?.error === "role_not_found") {
-        append("assistant", `Error: ${(data.payload.message as string) || "Role not found."}`);
+      if (data.action === "NAVIGATE" && data.route) {
+        const parentId =
+          data.parent_menu_id != null
+            ? String(data.parent_menu_id)
+            : (ROUTE_TO_SIDEBAR_PARENT[data.route] ?? "");
+        dispatchSidebarExpand(parentId);
+        append("assistant", `Opening ${data.menu_name || data.route}.`);
+        navigate(data.route);
         return;
       }
-      if (data.action === "CALL_API" && data.method && data.endpoint) {
+      if (data.payload && (data.payload as Record<string, unknown>).error) {
+        append(
+          "assistant",
+          String((data.payload as Record<string, unknown>).message || "Request failed.")
+        );
+        return;
+      }
+      if (
+        data.action === "CALL_API" &&
+        data.method &&
+        data.endpoint
+      ) {
         const method = data.method.toLowerCase() as "get" | "post" | "put" | "delete";
         const hasBody =
           (data.method === "POST" || data.method === "PUT") &&
           data.payload &&
-          Object.keys(data.payload).length > 0 &&
-          !data.payload.error;
+          Object.keys(data.payload).length > 0;
         try {
           hasBody
             ? await apiClient.request({ method, url: data.endpoint, data: data.payload })
             : await apiClient.request({ method, url: data.endpoint });
-          append("assistant", `Done: ${data.intent}.`);
+          append("assistant", `Done: ${data.menu_name || data.action}.`);
         } catch (err: unknown) {
           const msg =
             err && typeof err === "object" && "message" in err
@@ -98,7 +135,7 @@ export default function AIAssistant() {
           append("assistant", `Error: ${msg}`);
         }
       } else {
-        append("assistant", `Done: ${data.intent}.`);
+        append("assistant", data.menu_name ? `Opening ${data.menu_name}.` : "Done.");
       }
     },
     [append, navigate]
@@ -109,7 +146,7 @@ export default function AIAssistant() {
       const trimmed = text.trim();
       if (!trimmed || chatState === "processing") return;
 
-      if (pendingAction && pendingAction.data.intent === "DELETE_ROLE") {
+      if (pendingAction) {
         if (/^\s*yes\s*$/i.test(trimmed)) {
           setPendingAction(null);
           setChatState("processing");
@@ -117,7 +154,7 @@ export default function AIAssistant() {
           await executeAction(pendingAction.data);
           setChatState("idle");
         } else {
-          append("assistant", "Delete cancelled. Say or type Yes to confirm delete.");
+          append("assistant", "Cancelled. Say or type Yes to confirm.");
         }
         setInput("");
         return;
@@ -132,9 +169,9 @@ export default function AIAssistant() {
           user_text: trimmed,
         });
 
-        if (data.intent === "DELETE_ROLE" && data.action === "CALL_API") {
+        if (data.requires_confirmation && data.action === "CALL_API" && data.method && data.endpoint) {
           setPendingAction({ data });
-          append("assistant", "Delete role? Say or type Yes to confirm.");
+          append("assistant", `${data.menu_name || "This action"}? Say or type Yes to confirm.`);
           setChatState("idle");
           return;
         }
@@ -159,8 +196,26 @@ export default function AIAssistant() {
 
   const startListening = useCallback(() => {
     const Win = window as Window & {
-      SpeechRecognition?: typeof SpeechRecognition;
-      webkitSpeechRecognition?: typeof SpeechRecognition;
+      SpeechRecognition?: new () => {
+        start: () => void;
+        stop: () => void;
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        onresult: ((e: { results: Array<Array<{ transcript: string }>> }) => void) | null;
+        onend: (() => void) | null;
+        onerror: (() => void) | null;
+      };
+      webkitSpeechRecognition?: new () => {
+        start: () => void;
+        stop: () => void;
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        onresult: ((e: { results: Array<Array<{ transcript: string }>> }) => void) | null;
+        onend: (() => void) | null;
+        onerror: (() => void) | null;
+      };
     };
     const API = Win.SpeechRecognition ?? Win.webkitSpeechRecognition;
     if (!API || chatState === "processing") return;
@@ -177,7 +232,7 @@ export default function AIAssistant() {
     recognition.interimResults = false;
     recognition.lang = "en-US";
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: { results: Array<Array<{ transcript: string }>> }) => {
       const t = event.results[event.results.length - 1][0].transcript;
       transcriptRef.current = (transcriptRef.current ? transcriptRef.current + " " + t : t).trim();
     };
@@ -259,13 +314,13 @@ export default function AIAssistant() {
           <Box sx={{ p: 1.5, borderBottom: 1, borderColor: "divider", display: "flex", alignItems: "center", gap: 1 }}>
             <SmartToyIcon color="primary" />
             <Typography variant="subtitle1" fontWeight={600}>
-              Role assistant
+              Assistant
             </Typography>
           </Box>
           <List sx={{ flex: 1, overflow: "auto", py: 1 }}>
             {messages.length === 0 && (
               <ListItem>
-                <ListItemText secondary="Try: Add role Admin, Delete role Teacher, Show roles. Use mic for voice." />
+                <ListItemText secondary="Try: Open roles, Go to users, Navigate to menus. Use mic for voice." />
               </ListItem>
             )}
             {messages.map((m) => (
@@ -306,7 +361,7 @@ export default function AIAssistant() {
             <TextField
               size="small"
               fullWidth
-              placeholder={pendingAction ? "Type Yes to confirm" : "Add role Admin, Show roles…"}
+              placeholder={pendingAction ? "Type Yes to confirm" : "Open roles, Go to users…"}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
@@ -322,9 +377,7 @@ export default function AIAssistant() {
               sx={
                 listening
                   ? {
-                      "&": {
-                        animation: "micPulse 1.2s ease-in-out infinite",
-                      },
+                      "&": { animation: "micPulse 1.2s ease-in-out infinite" },
                       "@keyframes micPulse": {
                         "0%, 100%": { transform: "scale(1)", opacity: 1 },
                         "50%": { transform: "scale(1.1)", opacity: 0.8 },

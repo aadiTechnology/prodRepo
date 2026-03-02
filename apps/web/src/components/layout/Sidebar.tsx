@@ -209,6 +209,17 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ parentId: string }>) => {
+      const id = e.detail?.parentId;
+      if (id != null && String(id).trim() !== "") {
+        setExpandedSections((prev) => ({ ...prev, [String(id)]: true }));
+      }
+    };
+    window.addEventListener("sidebar-expand" as any, handler as any);
+    return () => window.removeEventListener("sidebar-expand" as any, handler as any);
+  }, []);
+
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
 
   // Consolidate Menu Items based on role

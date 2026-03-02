@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     def CORS_ORIGINS(self) -> List[str]:
         return [x.strip() for x in self.CORS_ORIGINS_STR.split(",") if x.strip()]
     
-    OPENAI_API_KEY: str = ""
+    OPENAI_API_KEY: str = Field(default="", description="OpenAI API key for AI interpret; set in .env")
     # JWT Authentication
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"

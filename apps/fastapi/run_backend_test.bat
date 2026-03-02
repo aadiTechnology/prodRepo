@@ -1,5 +1,6 @@
 @echo off
 cd /d "%~dp0"
+git pull
 set ENV_FILE=.env.test
 if exist "venv\Scripts\activate.bat" (
   echo Activating virtual environment...

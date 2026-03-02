@@ -1,6 +1,6 @@
 """Service helpers for RBAC assignments and login context."""
 
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 
 from sqlalchemy.orm import Session
 
@@ -156,5 +156,42 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
     menu_tree = menu_service.build_menu_tree(menu_rows) if menu_rows else []
 
     return feature_codes, menu_tree
+
+
+def _path_from_name(name: str) -> str:
+    if not name or not name.strip():
+        return ""
+    return "/" + name.strip().lower().replace(" ", "-").replace("_", "-")
+
+
+def _flatten_menu_tree_for_ai(nodes: List[MenuNode], parent_id: int | None, parent_name: str, out: List[Dict[str, Any]]) -> None:
+    for n in nodes:
+        route = (n.path or "").strip() or _path_from_name(n.name)
+        out.append({
+            "menu_id": n.id,
+            "menu_name": n.name,
+            "parent_menu_id": parent_id,
+            "parent_menu_name": parent_name,
+            "route": route,
+        })
+        if n.children:
+            _flatten_menu_tree_for_ai(n.children, n.id, n.name, out)
+
+
+def get_allowed_menus_tree_for_ai(db: Session, user: User) -> List[Dict[str, Any]]:
+    _, menu_tree = resolve_user_permissions_and_menus(db, user)
+    flat: List[Dict[str, Any]] = []
+    for root in menu_tree:
+        route = (root.path or "").strip() or _path_from_name(root.name)
+        flat.append({
+            "menu_id": root.id,
+            "menu_name": root.name,
+            "parent_menu_id": None,
+            "parent_menu_name": "",
+            "route": route,
+        })
+        if root.children:
+            _flatten_menu_tree_for_ai(root.children, root.id, root.name, flat)
+    return flat
 
 
