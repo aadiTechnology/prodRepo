@@ -1,3 +1,4 @@
+import fastapi
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -7,6 +8,9 @@ from app.services import user_service
 from app.core.logging_config import get_logger
 from app.services.rbac_service import get_user_roles
 from app.models.user import User, UserRole
+from app.core.exceptions import ConflictException
+from fastapi.responses import JSONResponse
+from app.core.exceptions import ConflictException
 from app.models.user_profile import UserProfile
 
 logger = get_logger(__name__)
@@ -21,16 +25,20 @@ async def create_user(
 ) -> UserResponse:
     """Create a new user. Requires admin role."""
     logger.info(f"Admin {current_user.email} creating user: {user.email}")
-    db_user = user_service.create_user(db, user, created_by=current_user.id)
-    return UserResponse(
-        id=db_user.id,
-        email=db_user.email,
-        full_name=db_user.full_name,
-        tenant_id=db_user.tenant_id,
-        phone_number=db_user.phone_number,
-        is_active=db_user.is_active,
-        created_at=db_user.created_at,
-    )
+    try:
+        db_user = user_service.create_user(db, user, created_by=current_user.id)
+        return UserResponse(
+            id=db_user.id,
+            email=db_user.email,
+            full_name=db_user.full_name,
+            is_active=db_user.is_active,
+            created_at=db_user.created_at,
+            roles=[role.code for role in get_user_roles(db, db_user.id)]
+        )
+    except ConflictException as e:
+        return JSONResponse(status_code=409, content={"message": str(e)})
+    except Exception:
+        return fastapi.responses.JSONResponse(status_code=500, content={"message": "Unable to save user. Please try again."})
 
 @router.get("/", response_model=list[UserResponse])
 async def read_all_users(
@@ -82,16 +90,13 @@ async def update_user(
     current_user: CurrentUser = Depends(get_current_user)
 ) -> UserResponse:
     """Update a user. Users can update themselves, admins can update anyone."""
-    db_user = user_service.update_user(db, user_id, user, updated_by=current_user.id)
-    return UserResponse(
-        id=db_user.id,
-        email=db_user.email,
-        full_name=db_user.full_name,
-        tenant_id=db_user.tenant_id,
-        phone_number=db_user.phone_number,
-        is_active=db_user.is_active,
-        created_at=db_user.created_at,
-    )
+    try:
+        db_user = user_service.update_user(db, user_id, user, updated_by=current_user.id)
+        return {"message": "User saved successfully."}
+    except ConflictException as e:
+        return fastapi.responses.JSONResponse(status_code=403, content={"message": str(e)})
+    except Exception:
+        return fastapi.responses.JSONResponse(status_code=500, content={"message": "Unable to save user. Please try again."})
 
 @router.delete("/{user_id}", status_code=204)
 async def delete_user(

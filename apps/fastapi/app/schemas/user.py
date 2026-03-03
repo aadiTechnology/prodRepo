@@ -9,9 +9,25 @@ class UserCreate(BaseModel):
     email: EmailStr
     full_name: str
     password: str
-    tenant_id: Optional[int] = None
-    phone_number: Optional[str] = None
-    roles: List[str] = None
+    role: str
+
+    @classmethod
+    def validate_full_name(cls, value):
+        if not value or len(value) < 2:
+            raise ValueError("Full name must be at least 2 characters.")
+        return value
+
+    @classmethod
+    def validate_password(cls, value):
+        if not value or len(value) < 8:
+            raise ValueError("Password must be at least 8 characters.")
+        return value
+
+    @classmethod
+    def validate_email(cls, value):
+        if not value or "@" not in value:
+            raise ValueError("Invalid email format.")
+        return value
 
 
 class UserUpdate(BaseModel):
@@ -19,6 +35,8 @@ class UserUpdate(BaseModel):
     phone_number: Optional[str] = None
     is_active: Optional[bool] = None
     tenant_id: Optional[int] = None
+    role: Optional[str] = None
+    # Email and password are not editable
 
 
 class UserPasswordUpdate(BaseModel):

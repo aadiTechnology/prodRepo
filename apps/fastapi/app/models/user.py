@@ -80,6 +80,7 @@ class User(Base):
     role = Column(UserRoleType(), default=UserRole.USER, nullable=False)
 
     is_active = Column(Boolean, nullable=False, default=True)
+    is_protected = Column(Boolean, nullable=False, default=False)
 
     # Audit fields
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

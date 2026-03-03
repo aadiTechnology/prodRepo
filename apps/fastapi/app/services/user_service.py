@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.models.user import User, UserRole
-from app.schemas.user import UserCreate, UserUpdate
+from app.models.role import Role
+from app.schemas.user import UserCreate, UserUpdate, ChangePasswordRequest
 from app.utils.security import hash_password, verify_password, validate_new_password
 from app.core.exceptions import NotFoundException, ConflictException
 from app.core.logging_config import get_logger
@@ -20,20 +21,36 @@ def create_user(
 ) -> User:
     """Create a new user."""
     try:
+        # Check email uniqueness
+        if get_user_by_email(db, user.email):
+            logger.warning(f"Attempt to create user with existing email: {user.email}")
+            raise ConflictException(f"User with email {user.email} already exists")
+
+        # Validate role
+        role_obj = db.query(Role).filter(Role.code == user.role).first()
+        if not role_obj:
+            raise ConflictException("Role does not exist.")
+
         db_user = User(
             email=user.email,
             full_name=user.full_name,
             hashed_password=hash_password(user.password),
-            role=role,
-            tenant_id=user.tenant_id,
-            phone_number=user.phone_number,
+            role=user.role,
             is_active=True,
             created_by=created_by,
         )
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
-        logger.info(f"User created successfully: {db_user.email} with role {db_user.role.value}")
+        # Assign role to user_roles relationship
+        if not role_obj:
+            logger.error(f"Role object not found for code: {user.role}")
+        else:
+            db_user.roles.append(role_obj)
+            db.commit()
+            db.refresh(db_user)
+            logger.info(f"Assigned roles to user {db_user.id}: {[role.code for role in db_user.roles]}")
+        logger.info(f"User created successfully: {db_user.email} with role {db_user.role}")
         return db_user
     except IntegrityError:
         db.rollback()
@@ -48,6 +65,7 @@ def get_users(db: Session) -> list[User]:
     return users
 
 
+
 def get_user(db: Session, user_id: int) -> User:
     """Get a user by ID (excluding soft-deleted)."""
     user = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()  # noqa: E712
@@ -55,7 +73,6 @@ def get_user(db: Session, user_id: int) -> User:
         logger.warning(f"User not found: {user_id}")
         raise NotFoundException("User", user_id)
     return user
-
 
 def get_user_by_email(db: Session, email: str) -> User | None:
     """Get a user by email (excluding soft-deleted)."""
@@ -70,6 +87,13 @@ def update_user(
 ) -> User:
     """Update a user."""
     db_user = get_user(db, user_id)
+    # Block changes if protected
+    if db_user.is_protected:
+        if user.role is not None and user.role != db_user.role:
+            raise ConflictException("Cannot change role of protected user.")
+        if user.is_active is not None and not user.is_active:
+            raise ConflictException("Cannot deactivate protected user.")
+
     if user.full_name is not None:
         db_user.full_name = user.full_name
     if user.phone_number is not None:
@@ -78,6 +102,17 @@ def update_user(
         db_user.is_active = user.is_active
     if user.tenant_id is not None:
         db_user.tenant_id = user.tenant_id
+    if user.role is not None:
+        # Validate role
+        role_obj = db.query(UserRole).filter(UserRole.value == user.role).first()
+        if not role_obj:
+            raise ConflictException("Role does not exist.")
+        # Validate tenant_id for role scope
+        if user.role == "TENANT_ADMIN" and not db_user.tenant_id:
+            raise ConflictException("Tenant ID required for tenant role.")
+        if user.role == "SUPER_ADMIN" and db_user.tenant_id:
+            raise ConflictException("Tenant ID must be null for platform role.")
+        db_user.role = user.role
     db_user.updated_by = updated_by
     db_user.updated_at = datetime.utcnow()
     db.commit()
@@ -155,7 +190,7 @@ def handle_change_password(
     db: Session,
     user_id: int,
     tenant_id: int,
-    req: "ChangePasswordRequest",
+    req: ChangePasswordRequest,
 ) -> dict:
     """
     Handles password change with all validation and business rules.
