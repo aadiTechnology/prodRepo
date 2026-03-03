@@ -23,7 +23,8 @@ import {
   Stack,
 } from "@mui/material";
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Search as SearchIcon, Visibility as VisibilityIcon, MoreVert as MoreVertIcon } from "@mui/icons-material";
-import { User, UserCreate, UserUpdate } from "../types/user";
+import { UserCreate, UserUpdate } from "../types/user";
+import { User } from "../types/auth";
 import userService from "../api/services/userService";
 import PermissionGate from "../components/auth/PermissionGate";
 import { Chip, Tooltip } from "@mui/material";
@@ -31,34 +32,49 @@ import UserForm from "../components/UserForm";
 import { Block as BlockIcon } from "@mui/icons-material";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase();
-}
+import { useNavigate } from "react-router-dom";
 
 function Users() {
+  function getInitials(name: string) {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
+  }
+
   // All state hooks at the top!
   // Removed duplicate selectedUser declaration
   // Removed duplicate users declaration
-const [loading, setLoading] = useState(true);
-const [error, setError] = useState<string | null>(null);
-const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-const [deleteLoading, setDeleteLoading] = useState(false);
-const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
-const [deactivateLoading, setDeactivateLoading] = useState(false);
-const [search, setSearch] = useState("");
-const [selectedUser, setSelectedUser] = useState<User | null>(null);
-const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
+  const [deactivateLoading, setDeactivateLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  // Add User dialog state
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const navigate = useNavigate();
+
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await userService.getAllUsers();
-      setUsers(data);
+      // Map backend response to ensure all required fields exist
+      const mappedUsers: User[] = data.map((u: any) => ({
+        id: u.id,
+        email: u.email,
+        full_name: u.full_name,
+        role: Array.isArray(u.roles) && u.roles.length > 0 ? u.roles[0] : "Unknown",
+        tenant_id: u.tenant_id ?? null,
+        phone_number: u.phone_number ?? null,
+        is_active: u.is_active ?? true,
+      }));
+      setUsers(mappedUsers);
     } catch (err: any) {
       setError(err?.detail || "Failed to fetch users. Please try again.");
     } finally {
@@ -70,10 +86,9 @@ const [users, setUsers] = useState<User[]>([]);
     fetchUsers();
   }, [fetchUsers]);
 
-
   const handleEditClick = useCallback((user: User) => {
-    // Edit is disabled
-  }, []);
+    navigate(`/create-user`, { state: { user, isEdit: true } });
+  }, [navigate]);
 
   const handleDeleteClick = useCallback((user: User) => {
     setSelectedUser(user);
@@ -107,8 +122,8 @@ const [users, setUsers] = useState<User[]>([]);
         setDeactivateLoading(true);
         await userService.updateUser(selectedUser.id, {
           full_name: selectedUser.full_name,
-          phone_number: selectedUser.phone_number,
-          tenant_id: selectedUser.tenant_id,
+          phone_number: selectedUser.phone_number ?? null,
+          tenant_id: selectedUser.tenant_id ?? null,
           is_active: false,
         });
         setDeactivateDialogOpen(false);
@@ -166,13 +181,7 @@ const [users, setUsers] = useState<User[]>([]);
         <TableCell>{user.email}</TableCell>
         <TableCell>
           <Chip
-            label={
-              Array.isArray(user.roles) && user.roles.length > 0
-                ? user.roles.map(r =>
-                    r.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())
-                  ).join(", ")
-                : "Unknown"
-            }
+            label={user.role ? user.role.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()) : "Unknown"}
             color="primary"
             variant="outlined"
           />
@@ -229,10 +238,7 @@ const [users, setUsers] = useState<User[]>([]);
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={() => {
-              // User creation is disabled
-              // alert("User creation is disabled.");
-            }}
+            onClick={() => navigate("/user/create")}
             sx={{ borderRadius: 2, fontWeight: 600 }}
           >
             Add User
@@ -271,6 +277,23 @@ const [users, setUsers] = useState<User[]>([]);
       )}
 
       
+
+      {/* Add User modal */}
+      <UserForm
+        open={addDialogOpen}
+        onClose={() => setAddDialogOpen(false)}
+        onSubmit={async (data) => {
+          try {
+            // Only pass UserCreate type
+            await userService.createUser(data as UserCreate);
+            setAddDialogOpen(false);
+            fetchUsers();
+          } catch (err: any) {
+            setError(err?.detail || "Failed to create user. Please try again.");
+          }
+        }}
+        isEdit={false}
+      />
 
       <Dialog
         open={deleteDialogOpen}
@@ -327,9 +350,6 @@ const [users, setUsers] = useState<User[]>([]);
         open={Boolean(menuAnchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={() => { handleViewClick(menuUser!); handleMenuClose(); }}>
-          <VisibilityIcon sx={{ mr: 1 }} /> View
-        </MenuItem>
         <MenuItem onClick={() => { handleEditClick(menuUser!); handleMenuClose(); }}>
           <EditIcon sx={{ mr: 1 }} /> Edit
         </MenuItem>

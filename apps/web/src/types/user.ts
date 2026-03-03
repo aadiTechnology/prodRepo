@@ -8,6 +8,7 @@ export interface UserCreate {
   email: string;
   full_name: string;
   password: string;
+  role: string;
   phone_number?: string | null;
   tenant_id?: number | null;
 }
@@ -17,6 +18,7 @@ export interface UserUpdate {
   phone_number?: string | null;
   is_active?: boolean;
   tenant_id?: number | null;
+  role?: string;
 }
 
 export interface ApiError {

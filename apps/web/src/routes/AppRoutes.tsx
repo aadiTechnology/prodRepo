@@ -8,6 +8,7 @@ import RoleManagementPage from "../pages/RoleManagementPage"; // <-- Add this im
 import AddRole from "../pages/AddRole"; // <-- Add this import
 import EditRole from "../pages/EditRole";
 
+
 // Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
 const About = lazy(() => import("../pages/About"));
@@ -19,6 +20,7 @@ const SessionExpired = lazy(() => import("../pages/SessionExpired"));
 const TenantList = lazy(() => import("../pages/tenants/TenantList"));
 const AddTenant = lazy(() => import("../pages/tenants/AddTenant"));
 const TenantDetail = lazy(() => import("../pages/tenants/TenantDetail"));
+const CreateUser = lazy(() => import("../pages/CreateUser"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -45,6 +47,14 @@ export default function AppRoutes() {
 
         {/* Protected routes with layout */}
         <Route element={<MainLayout />}>
+                    <Route
+                      path="/user/create"
+                      element={
+                        <ProtectedRoute>
+                          <CreateUser />
+                        </ProtectedRoute>
+                      }
+                    />
           {/* Basic authentication - no permissions required */}
           <Route
             path="/roles"
@@ -162,6 +172,7 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          <Route path="/user/create" element={<CreateUser />} />
         </Route>
       </Routes>
     </Suspense>

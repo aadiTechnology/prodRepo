@@ -22,7 +22,7 @@ export const userService = {
    * Create a new user
    */
   createUser: async (userData: UserCreate): Promise<User> => {
-    const response = await apiClient.post<User>("/users", userData);
+    const response = await apiClient.post<User>("/api/account/", userData);
     return response.data;
   },
 
