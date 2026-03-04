@@ -1,7 +1,6 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
     Box,
-    Button,
     Paper,
     Typography,
     Grid,
@@ -10,17 +9,14 @@ import {
     Switch,
     Alert,
     CircularProgress,
-    Divider,
-    Breadcrumbs,
-    Link,
     IconButton,
     InputAdornment,
     Stack,
-    LinearProgress,
+    Tooltip,
+    Button,
 } from "@mui/material";
 import {
     Home as HomeIcon,
-    ArrowBack as BackIcon,
     Business as BusinessIcon,
     Person as PersonIcon,
     Security as SecurityIcon,
@@ -29,8 +25,9 @@ import {
     ErrorOutline as ErrorIcon,
     Lock as LockIcon,
     Save as SaveIcon,
+    Cancel as CancelIcon,
 } from "@mui/icons-material";
-import { useNavigate, useParams, Link as RouterLink } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import tenantService from "../../api/services/tenantService";
 
 const AddTenant = () => {
@@ -42,6 +39,7 @@ const AddTenant = () => {
     const [fetchLoading, setFetchLoading] = useState(isEditMode);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -84,55 +82,66 @@ const AddTenant = () => {
         if (isEditMode) fetchTenant();
     }, [fetchTenant, isEditMode]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value, checked, type } = e.target;
-        setFormData((prev) => ({
-            ...prev,
-            [name]: type === "checkbox" || name === "is_active" ? checked : value,
-        }));
-    };
-
-    const getPasswordStrength = (password: string) => {
-        if (!password) return 0;
-        let strength = 0;
-        if (password.length >= 8) strength += 25;
-        if (/[A-Z]/.test(password)) strength += 25;
-        if (/[0-9]/.test(password)) strength += 25;
-        if (/[^A-Za-z0-9]/.test(password)) strength += 25;
-        return strength;
-    };
-
-    const passwordStrength = useMemo(() => getPasswordStrength(formData.admin_password), [formData.admin_password]);
-
-    const getStrengthColor = (strength: number) => {
-        if (strength <= 25) return "#ef4444";
-        if (strength <= 50) return "#f59e0b";
-        if (strength <= 75) return "#3b82f6";
-        return "#10b981";
-    };
-
-    const validate = () => {
-        if (!isEditMode) {
-            if (formData.admin_password !== formData.confirm_password) {
-                setError("Passwords do not match.");
-                return false;
-            }
-            if (formData.admin_password.length < 8) {
-                setError("Password must be at least 8 characters.");
-                return false;
+    const validateField = (name: string, value: any) => {
+        let error = "";
+        if (name === "name") {
+            if (!value) error = "Please enter Tenant Name.";
+            else if (value.length < 3) error = "Minimum 3 characters required.";
+        } else if (name === "owner_name") {
+            if (!value) error = "Please enter Owner Name.";
+        } else if (name === "email") {
+            if (!value) error = "Please enter Email Address.";
+            else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) error = "Please enter valid Email Address.";
+        } else if (name === "phone" && value) {
+            if (!/^\d+$/.test(value)) error = "Numeric only.";
+            else if (value.length < 10 || value.length > 15) error = "10–15 digits required.";
+        } else if (!isEditMode) {
+            if (name === "admin_password") {
+                if (!value) error = "Please enter Password.";
+                else if (value.length < 8) error = "Password must be at least 8 characters.";
+            } else if (name === "confirm_password") {
+                if (!value) error = "Please confirm Password.";
+                else if (value !== formData.admin_password) error = "Passwords do not match.";
             }
         }
-        return true;
+        return error;
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!validate()) return;
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value, checked, type } = e.target;
+        const fieldValue = type === "checkbox" || name === "is_active" ? checked : value;
 
+        setFormData((prev) => ({
+            ...prev,
+            [name]: fieldValue,
+        }));
+
+        // Real-time validation
+        const fieldError = validateField(name, fieldValue);
+        setErrors(prev => ({ ...prev, [name]: fieldError }));
+    };
+
+    const validateForm = () => {
+        const newErrors: Record<string, string> = {};
+        const fieldsToValidate = ["name", "owner_name", "email", "phone"];
+        if (!isEditMode) {
+            fieldsToValidate.push("admin_password", "confirm_password");
+        }
+
+        fieldsToValidate.forEach(field => {
+            const error = validateField(field, formData[field as keyof typeof formData]);
+            if (error) newErrors[field] = error;
+        });
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const handleSubmitAction = async () => {
+        if (!validateForm()) return;
         try {
             setLoading(true);
             setError(null);
-
             if (isEditMode && id) {
                 await tenantService.update(Number(id), {
                     name: formData.name,
@@ -142,7 +151,7 @@ const AddTenant = () => {
                     is_active: formData.is_active,
                 });
                 setSuccess("Tenant updated successfully!");
-                setTimeout(() => navigate(`/tenants/${id}`), 1500);
+                setTimeout(() => navigate("/tenants"), 1000);
             } else {
                 const result = await tenantService.provision({
                     name: formData.name,
@@ -154,400 +163,241 @@ const AddTenant = () => {
                     is_active: formData.is_active,
                 });
                 setSuccess(result.message || "Tenant created successfully!");
-                setTimeout(() => navigate("/tenants"), 2000);
+                setTimeout(() => navigate("/tenants"), 1000);
             }
         } catch (err: any) {
-            setError(err?.message || (isEditMode ? "Failed to update tenant." : "Failed to provision tenant."));
+            const msg = err?.message || "";
+            if (msg.toLowerCase().includes("email already exists")) {
+                setErrors(prev => ({ ...prev, email: "Email already exists." }));
+            }
+            setError(msg || (isEditMode ? "Failed to update tenant." : "Failed to provision tenant."));
         } finally {
             setLoading(false);
         }
     };
 
-    // ── Shared Styles ──────────────────────────────────────────
-    const inputLabelSx = {
-        fontSize: "0.875rem",
-        fontWeight: 600,
-        color: "#64748b",
-        mb: 0.5,
-        display: "block"
-    };
-
-    const textFieldSx = {
+    // Standardized Premium Styling (Reduced Scale to match TenantList)
+    const textFieldSx = (name: string) => ({
         "& .MuiOutlinedInput-root": {
-            borderRadius: "8px",
-            height: "44px",
-            backgroundColor: "white",
-            "& fieldset": { borderColor: "#e2e8f0" },
-            "&:hover fieldset": { borderColor: "#cbd5e1" },
-            "&.Mui-focused fieldset": { borderColor: "#1a1a2e", borderWidth: "1.5px" },
+            borderRadius: "12px",
+            backgroundColor: formData[name as keyof typeof formData] ? "white" : "#fcfdfe",
+            fontSize: "0.95rem",
+            fontWeight: 500,
+            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            "& fieldset": {
+                borderColor: errors[name] ? "#ef4444" : "#e2e8f0",
+                borderWidth: errors[name] ? "1.5px" : "1.2px"
+            },
+            "&:hover fieldset": { borderColor: errors[name] ? "#ef4444" : "#cbd5e1" },
+            "&.Mui-focused": {
+                backgroundColor: "white",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.03)",
+                "& fieldset": {
+                    borderColor: errors[name] ? "#ef4444" : "#1A1A2E",
+                    borderWidth: "2px"
+                },
+            },
         },
-        "& .MuiInputBase-input::placeholder": {
-            color: "#94a3b8",
-            opacity: 1
+        "& .MuiInputLabel-root": {
+            fontSize: "0.9rem",
+            color: errors[name] ? "#ef4444" : "#94a3b8",
+            fontWeight: 500,
+            transform: "translate(14px, 14px) scale(1)",
+            transition: "all 0.2s ease-out",
+            pointerEvents: "none",
+            "&.MuiInputLabel-shrink": {
+                transform: "translate(12px, -9px) scale(0.75)",
+                fontWeight: 700,
+                color: errors[name] ? "#ef4444" : "#1A1A2E",
+                backgroundColor: "white",
+                padding: "0 6px",
+            }
         },
-        mb: 2
-    };
+        "& .MuiFormHelperText-root": {
+            marginLeft: "4px",
+            marginTop: "4px",
+            fontWeight: 500
+        }
+    });
 
-    const sectionLabelSx = {
-        display: "flex",
-        alignItems: "center",
-        gap: 1.5,
-        mb: 1.5,
-        color: "#3a3a46",
-        "& .MuiSvgIcon-root": { fontSize: 20 }
-    };
+    const requiredLabel = (text: string) => (
+        <Box component="span">
+            {text} <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
+        </Box>
+    );
 
-    if (fetchLoading) {
-        return (
-            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh", bgcolor: "#f5f6fa" }}>
-                <CircularProgress sx={{ color: "#1a1a2e" }} />
-            </Box>
-        );
-    }
+    const isFormValid =
+        formData.name.length >= 3 &&
+        Boolean(formData.owner_name) &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
+        Object.values(errors).every(error => !error) &&
+        (!isEditMode ? (formData.admin_password.length >= 8 && formData.confirm_password === formData.admin_password) : true);
+
+    if (fetchLoading) return <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}><CircularProgress /></Box>;
 
     return (
-        <Box sx={{
-            p: 2,
-            pt: 0,
-            backgroundColor: "#f5f6fa",
-            minHeight: "100vh",
-            color: "#1a1a2e"
-        }}>
-            {/* ── Page Header ── */}
-            <Box sx={{ pt: 2, pb: 1.5, px: 0, mb: 1.5 }}>
-                <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#1A1A2E" }}>
-                    <Box
-                        component="span"
-                        onClick={() => navigate("/tenants")}
-                        sx={{
-                            color: "#64748b",
-                            fontWeight: 500,
-                            cursor: "pointer",
-                            "&:hover": { color: "#1a1a2e" },
-                            transition: "color 0.2s"
-                        }}
-                    >
-                        Tenants
-                    </Box>
-                    <Box component="span" sx={{ color: "#94a3b8", mx: 1, fontWeight: 400 }}>/</Box>
-                    {isEditMode ? "Edit Tenant" : "Add Tenant"}
-                </Typography>
-            </Box>
+        <Box sx={{ px: { xs: 2, md: 4 }, pb: 2, backgroundColor: "#f8fafc", height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
 
-            {/* ── Form ── */}
-            <form onSubmit={handleSubmit} noValidate>
-                <Paper sx={{
-                    p: { xs: 2.5, md: 3 },
-                    borderRadius: "16px",
-                    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
-                    border: "1px solid #e2e8f0",
-                    bgcolor: "white",
-                    mb: 4
-                }}>
-                    {/* Status Messages */}
-                    {error && (
-                        <Alert
-                            severity="error"
-                            icon={<ErrorIcon />}
-                            sx={{ mb: 2.5, borderRadius: "10px", border: "1px solid #fee2e2" }}
-                            onClose={() => setError(null)}
-                        >
-                            {error}
-                        </Alert>
-                    )}
-                    {success && (
-                        <Alert
-                            severity="success"
-                            sx={{ mb: 2.5, borderRadius: "10px", bgcolor: "#ecfdf5", color: "#065f46", border: "1px solid #d1fae5" }}
-                        >
-                            {success}
-                        </Alert>
-                    )}
-
-                    {/* ── Company Information ── */}
-                    <Box sx={sectionLabelSx}>
-                        <BusinessIcon />
-                        <Typography variant="overline" sx={{ fontWeight: 800, letterSpacing: "1px", color: "#3a3a46", fontSize: "0.75rem" }}>
-                            Company Information
-                        </Typography>
-                    </Box>
-
-                    <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
-                            <Typography sx={inputLabelSx}>
-                                Company Name <Box component="span" sx={{ color: "red" }}>*</Box>
-                            </Typography>
-                            <TextField
-                                fullWidth
-                                name="name"
-                                value={formData.name}
-                                onChange={handleChange}
-                                required
-                                placeholder="e.g. Acme Corporation"
-                                sx={textFieldSx}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <Typography sx={inputLabelSx}>Phone Number</Typography>
-                            <TextField
-                                fullWidth
-                                name="phone"
-                                value={formData.phone}
-                                onChange={handleChange}
-                                placeholder="e.g. +1 (555) 000-0000"
-                                sx={textFieldSx}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={8}>
-                            <Typography sx={inputLabelSx}>Description</Typography>
-                            <TextField
-                                fullWidth
-                                name="description"
-                                value={formData.description}
-                                onChange={handleChange}
-                                multiline
-                                rows={2}
-                                placeholder="Briefly describe the tenant's purpose"
-                                sx={{ ...textFieldSx, "& .MuiOutlinedInput-root": { ...textFieldSx["& .MuiOutlinedInput-root"], height: "auto" } }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                            <Box sx={{ p: 1.5, bgcolor: "#f8fafc", borderRadius: "12px", border: "1px solid #f1f5f9", mt: 3.2 }}>
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={formData.is_active}
-                                            onChange={handleChange}
-                                            name="is_active"
-                                            sx={{
-                                                "& .MuiSwitch-switchBase.Mui-checked": { color: "#10b981" },
-                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#10b981" }
-                                            }}
-                                        />
-                                    }
-                                    label={
-                                        <Box sx={{ ml: 1.5 }}>
-                                            <Typography sx={{ fontSize: "0.875rem", fontWeight: 600, color: "#1e293b" }}>Active Status</Typography>
-                                            <Typography variant="caption" sx={{ color: "#64748b", display: "block", fontSize: "0.7rem" }}>
-                                                Enable or disable account
-                                            </Typography>
-                                        </Box>
-                                    }
-                                />
-                            </Box>
-                        </Grid>
-                    </Grid>
-
-                    <Divider sx={{ my: 2, borderColor: "#f1f5f9" }} />
-
-                    {/* ── Admin Account ── */}
-                    <Box sx={sectionLabelSx}>
-                        <PersonIcon />
-                        <Typography variant="overline" sx={{ fontWeight: 800, letterSpacing: "1px", color: "#3a3a46", fontSize: "0.75rem" }}>
-                            Admin Account
-                        </Typography>
-                    </Box>
-
-                    <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
-                            <Typography sx={inputLabelSx}>
-                                Owner Full Name <Box component="span" sx={{ color: "red" }}>*</Box>
-                            </Typography>
-                            <TextField
-                                fullWidth
-                                name="owner_name"
-                                value={formData.owner_name}
-                                onChange={handleChange}
-                                required
-                                placeholder="John Doe"
-                                sx={textFieldSx}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <Typography sx={inputLabelSx}>
-                                Admin Email Address <Box component="span" sx={{ color: "red" }}>*</Box>
-                            </Typography>
-                            <TextField
-                                fullWidth
-                                name="email"
-                                type="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                required={!isEditMode}
-                                disabled={isEditMode}
-                                placeholder="admin@company.com"
-                                sx={{
-                                    ...textFieldSx,
-                                    ...(isEditMode && {
-                                        "& .MuiOutlinedInput-root": {
-                                            ...textFieldSx["& .MuiOutlinedInput-root"],
-                                            backgroundColor: "#f8fafc",
-                                            color: "#94a3b8",
-                                        }
-                                    })
-                                }}
-                                InputProps={isEditMode ? {
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <LockIcon sx={{ fontSize: 16, color: "#cbd5e1" }} />
-                                        </InputAdornment>
-                                    )
-                                } : undefined}
-                                helperText={isEditMode ? "Email cannot be changed after creation" : undefined}
-                                FormHelperTextProps={{ sx: { fontSize: "0.72rem", color: "#94a3b8", mt: 0.5, ml: 0 } }}
-                            />
-                        </Grid>
-                    </Grid>
-
-                    {/* ── Security Credentials (hidden in edit mode) ── */}
-                    {!isEditMode && (
-                        <>
-                            <Divider sx={{ my: 2, borderColor: "#f1f5f9" }} />
-
-                            <Box sx={sectionLabelSx}>
-                                <SecurityIcon />
-                                <Typography variant="overline" sx={{ fontWeight: 800, letterSpacing: "1px", color: "#3a3a46", fontSize: "0.75rem" }}>
-                                    Security Credentials
-                                </Typography>
-                            </Box>
-
-                            <Grid container spacing={2}>
-                                <Grid item xs={12} md={6}>
-                                    <Typography sx={inputLabelSx}>
-                                        Admin Password <Box component="span" sx={{ color: "red" }}>*</Box>
-                                    </Typography>
-                                    <TextField
-                                        fullWidth
-                                        name="admin_password"
-                                        type={showPassword ? "text" : "password"}
-                                        value={formData.admin_password}
-                                        onChange={handleChange}
-                                        required
-                                        placeholder="••••••••"
-                                        InputProps={{
-                                            endAdornment: (
-                                                <InputAdornment position="end">
-                                                    <IconButton size="small" onClick={() => setShowPassword(!showPassword)} sx={{ color: "#94a3b8" }}>
-                                                        {showPassword ? <VisibilityOff sx={{ fontSize: 20 }} /> : <Visibility sx={{ fontSize: 20 }} />}
-                                                    </IconButton>
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                        sx={{ ...textFieldSx, mb: 1.5 }}
-                                    />
-                                    {/* Password strength bar */}
-                                    <Box sx={{ mt: 0.5, px: 0.5 }}>
-                                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                                            <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
-                                                Strength
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ color: getStrengthColor(passwordStrength), fontWeight: 700 }}>
-                                                {passwordStrength <= 25 ? "Weak" : passwordStrength <= 50 ? "Fair" : passwordStrength <= 75 ? "Good" : "Strong"}
-                                            </Typography>
-                                        </Stack>
-                                        <LinearProgress
-                                            variant="determinate"
-                                            value={passwordStrength}
-                                            sx={{
-                                                height: 6,
-                                                borderRadius: 3,
-                                                bgcolor: "#f1f5f9",
-                                                "& .MuiLinearProgress-bar": {
-                                                    bgcolor: getStrengthColor(passwordStrength),
-                                                    borderRadius: 3
-                                                }
-                                            }}
-                                        />
-                                        <Typography variant="caption" sx={{ color: "#94a3b8", mt: 0.5, display: "block", fontSize: "0.7rem" }}>
-                                            Minimum 8 characters
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-                                <Grid item xs={12} md={6}>
-                                    <Typography sx={inputLabelSx}>
-                                        Confirm Password <Box component="span" sx={{ color: "red" }}>*</Box>
-                                    </Typography>
-                                    <TextField
-                                        fullWidth
-                                        name="confirm_password"
-                                        type={showConfirmPassword ? "text" : "password"}
-                                        value={formData.confirm_password}
-                                        onChange={handleChange}
-                                        required
-                                        placeholder="••••••••"
-                                        InputProps={{
-                                            endAdornment: (
-                                                <InputAdornment position="end">
-                                                    <IconButton size="small" onClick={() => setShowConfirmPassword(!showConfirmPassword)} sx={{ color: "#94a3b8" }}>
-                                                        {showConfirmPassword ? <VisibilityOff sx={{ fontSize: 20 }} /> : <Visibility sx={{ fontSize: 20 }} />}
-                                                    </IconButton>
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                        sx={textFieldSx}
-                                    />
-                                </Grid>
-                            </Grid>
-                        </>
-                    )}
-
-                    {/* ── Locked password notice in edit mode ── */}
-                    {isEditMode && (
-                        <>
-                            <Divider sx={{ my: 6, borderColor: "#f1f5f9" }} />
-                            <Box sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1.5,
-                                p: 2.5,
-                                bgcolor: "#f8fafc",
-                                borderRadius: "12px",
-                                border: "1px solid #e2e8f0"
-                            }}>
-                                <LockIcon sx={{ fontSize: 20, color: "#94a3b8", flexShrink: 0 }} />
-                                <Box>
-                                    <Typography sx={{ fontSize: "0.875rem", fontWeight: 600, color: "#1e293b" }}>
-                                        Password is locked
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: "#64748b", display: "block" }}>
-                                        Passwords cannot be changed from this screen. Use the Change Password feature instead.
-                                    </Typography>
-                                </Box>
-                            </Box>
-                        </>
-                    )}
-
-                    {/* ── Submit Button ── */}
-                    <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 4 }}>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={loading}
-                            startIcon={loading ? <CircularProgress size={18} sx={{ color: "white" }} /> : (isEditMode ? <SaveIcon /> : undefined)}
+            {/* Header - Aligned with TenantList */}
+            <Box sx={{ pt: 1.5, pb: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <IconButton onClick={() => navigate("/")} sx={{ backgroundColor: "#1a1a2e", borderRadius: 1.2, width: 44, height: 44, "&:hover": { backgroundColor: "#2d2d44" } }}>
+                        <HomeIcon sx={{ color: "white", fontSize: 24 }} />
+                    </IconButton>
+                    <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#1A1A2E", letterSpacing: "-1px" }}>
+                        <Box component="span" onClick={() => navigate("/tenants")} sx={{ color: "#94a3b8", cursor: "pointer", "&:hover": { color: "#1a1a2e" } }}>Tenants</Box>
+                        <Box component="span" sx={{ color: "#cbd5e1", mx: 1.5 }}>/</Box>
+                        {isEditMode ? "Edit Tenant" : "Add Tenant"}
+                    </Typography>
+                </Box>
+                <Stack direction="row" spacing={1.5}>
+                    <Tooltip title="Cancel and Go Back">
+                        <IconButton
+                            onClick={() => navigate("/tenants")}
                             sx={{
-                                height: "52px",
-                                px: 4,
-                                borderRadius: "10px",
-                                backgroundColor: "#1a1a2e",
-                                fontSize: "1rem",
-                                fontWeight: 700,
-                                textTransform: "none",
-                                boxShadow: "0 4px 6px -1px rgba(26,26,46,0.2)",
+                                color: "#64748b",
+                                backgroundColor: "#f1f5f9",
+                                borderRadius: 1.2,
+                                width: 44,
+                                height: 44,
                                 "&:hover": {
-                                    backgroundColor: "#2d2d44",
-                                    boxShadow: "0 10px 15px -3px rgba(26,26,46,0.3)"
-                                },
-                                "&.Mui-disabled": { backgroundColor: "#cbd5e1" }
+                                    backgroundColor: "#fee2e2",
+                                    color: "#ef4444",
+                                    transform: "translateY(-1px)"
+                                }
                             }}
                         >
-                            {loading
-                                ? (isEditMode ? "Saving..." : "Creating...")
-                                : (isEditMode ? "Save Changes" : "Create Tenant Account")
-                            }
-                        </Button>
-                    </Box>
-                </Paper>
-            </form>
+                            <CancelIcon sx={{ fontSize: 24 }} />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title={isEditMode ? "Update Tenant" : "Save Tenant"}>
+                        <IconButton
+                            onClick={handleSubmitAction}
+                            disabled={loading || !isFormValid}
+                            sx={{
+                                backgroundColor: "#1a1a2e",
+                                color: "white",
+                                borderRadius: 1.2,
+                                width: 44, height: 44,
+                                boxShadow: "0 4px 10px rgba(26,26,46,0.2)",
+                                "&:hover": { backgroundColor: "#2d2d44", transform: "translateY(-1px)" },
+                                "&.Mui-disabled": { backgroundColor: "#cbd5e1", color: "white" }
+                            }}
+                        >
+                            {loading ? <CircularProgress size={24} color="inherit" /> : <SaveIcon sx={{ fontSize: 24 }} />}
+                        </IconButton>
+                    </Tooltip>
+                </Stack>
+            </Box>
+
+            <Box sx={{ flexGrow: 1, overflowY: "auto", pr: 0.5, pb: 4 }}>
+                {error && <Alert severity="error" icon={<ErrorIcon />} sx={{ mb: 2, borderRadius: "12px", border: "1px solid #fee2e2" }} onClose={() => setError(null)}>{error}</Alert>}
+                {success && <Alert severity="success" sx={{ mb: 2, borderRadius: "12px", border: "1px solid #d1fae5" }}>{success}</Alert>}
+
+                <Grid container spacing={4}>
+                    {/* Left Column: Company Info */}
+                    <Grid item xs={12} md={7.5}>
+                        <Paper sx={{ p: 0, borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.01)", overflow: "hidden" }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 2, bgcolor: "#1a1a2e" }}>
+                                <BusinessIcon sx={{ color: "white", fontSize: 22 }} />
+                                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "white", textTransform: "uppercase", letterSpacing: "1px" }}>Company Information</Typography>
+                            </Box>
+                            <Box sx={{ p: 3 }}>
+                                <Grid container spacing={3}>
+                                    <Grid item xs={12} sm={6}>
+                                        <TextField
+                                            fullWidth name="name" label={requiredLabel("Tenant Name")}
+                                            value={formData.name} onChange={handleChange} sx={textFieldSx("name")}
+                                            InputLabelProps={{ shrink: formData.name ? true : undefined }}
+                                            error={Boolean(errors.name)} helperText={errors.name}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <TextField
+                                            fullWidth name="phone" label="Phone Number"
+                                            value={formData.phone} onChange={handleChange} sx={textFieldSx("phone")}
+                                            InputLabelProps={{ shrink: formData.phone ? true : undefined }}
+                                            error={Boolean(errors.phone)} helperText={errors.phone}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            fullWidth name="description" label="Business Description"
+                                            value={formData.description} onChange={handleChange} multiline rows={3}
+                                            sx={{ ...textFieldSx("description"), "& .MuiOutlinedInput-root": { py: 1.5 } }}
+                                            InputLabelProps={{ shrink: formData.description ? true : undefined }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <Box sx={{ p: 2, bgcolor: "#f1f5f9", borderRadius: "16px", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                            <Box>
+                                                <Typography sx={{ fontSize: "0.9rem", fontWeight: 700, color: "#1e293b" }}>Account Active</Typography>
+                                                <Typography variant="caption" sx={{ color: "#64748b", fontSize: "0.75rem" }}>Control system access for this tenant</Typography>
+                                            </Box>
+                                            <Switch checked={formData.is_active} onChange={handleChange} name="is_active" size="small" color="primary" />
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+                            </Box>
+                        </Paper>
+                    </Grid>
+
+                    {/* Right Column: Admin & Security */}
+                    <Grid item xs={12} md={4.5}>
+                        <Stack spacing={4}>
+                            <Paper sx={{ p: 0, borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.01)", overflow: "hidden" }}>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 2, bgcolor: "#1a1a2e" }}>
+                                    <PersonIcon sx={{ color: "white", fontSize: 22 }} />
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "white", textTransform: "uppercase", letterSpacing: "1px" }}>Administrator</Typography>
+                                </Box>
+                                <Box sx={{ p: 3 }}>
+                                    <Stack spacing={3}>
+                                        <TextField
+                                            fullWidth name="owner_name" label={requiredLabel("Full Name")}
+                                            value={formData.owner_name} onChange={handleChange} sx={textFieldSx("owner_name")}
+                                            InputLabelProps={{ shrink: formData.owner_name ? true : undefined }}
+                                            error={Boolean(errors.owner_name)} helperText={errors.owner_name}
+                                        />
+                                        <TextField
+                                            fullWidth name="email" label={requiredLabel("Email Address")}
+                                            value={formData.email} onChange={handleChange} disabled={isEditMode} sx={textFieldSx("email")}
+                                            InputLabelProps={{ shrink: formData.email ? true : undefined }}
+                                            error={Boolean(errors.email)} helperText={errors.email}
+                                        />
+                                    </Stack>
+                                </Box>
+                            </Paper>
+
+                            {!isEditMode && (
+                                <Paper sx={{ p: 0, borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.01)", overflow: "hidden" }}>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 2, bgcolor: "#1a1a2e" }}>
+                                        <SecurityIcon sx={{ color: "white", fontSize: 22 }} />
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "white", textTransform: "uppercase", letterSpacing: "1px" }}>Security</Typography>
+                                    </Box>
+                                    <Box sx={{ p: 3 }}>
+                                        <Stack spacing={3}>
+                                            <TextField
+                                                fullWidth name="admin_password" label={requiredLabel("Password")}
+                                                type={showPassword ? "text" : "password"} value={formData.admin_password} onChange={handleChange} sx={textFieldSx("admin_password")}
+                                                InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => setShowPassword(!showPassword)} size="small">{showPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> }}
+                                                InputLabelProps={{ shrink: formData.admin_password ? true : undefined }}
+                                                error={Boolean(errors.admin_password)} helperText={errors.admin_password}
+                                            />
+                                            <TextField
+                                                fullWidth name="confirm_password" label={requiredLabel("Confirm Password")}
+                                                type={showConfirmPassword ? "text" : "password"} value={formData.confirm_password} onChange={handleChange} sx={textFieldSx("confirm_password")}
+                                                InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} size="small">{showConfirmPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> }}
+                                                InputLabelProps={{ shrink: formData.confirm_password ? true : undefined }}
+                                                error={Boolean(errors.confirm_password)} helperText={errors.confirm_password}
+                                            />
+                                        </Stack>
+                                    </Box>
+                                </Paper>
+                            )}
+                        </Stack>
+                    </Grid>
+                </Grid>
+            </Box>
         </Box>
     );
 };

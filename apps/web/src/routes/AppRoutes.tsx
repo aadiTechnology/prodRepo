@@ -19,7 +19,7 @@ const Profile = lazy(() => import("../pages/ProfilePage"));
 const SessionExpired = lazy(() => import("../pages/SessionExpired"));
 const TenantList = lazy(() => import("../pages/tenants/TenantList"));
 const AddTenant = lazy(() => import("../pages/tenants/AddTenant"));
-const TenantDetail = lazy(() => import("../pages/tenants/TenantDetail"));
+
 const CreateUser = lazy(() => import("../pages/CreateUser"));
 
 // Loading fallback component
@@ -156,14 +156,7 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/tenants/:id"
-            element={
-              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
-                <TenantDetail />
-              </ProtectedRoute>
-            }
-          />
+         
           <Route
             path="/tenants/:id/edit"
             element={

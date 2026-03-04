@@ -19,6 +19,7 @@ import {
   Collapse,
   Badge,
   Chip,
+  Avatar,
   styled,
   alpha,
   Slide,
@@ -54,7 +55,7 @@ const SidebarContainer = styled(Box)(({ theme }) => ({
   height: "100%",
   display: "flex",
   flexDirection: "column",
-  backgroundColor: "#0d1624",
+  backgroundColor: "#1a1a2e",
   color: "#F8FAFC",
   overflow: "hidden",
   borderRight: "1px solid rgba(255, 255, 255, 0.05)",
@@ -68,15 +69,19 @@ const SearchWrapper = styled(Box)(({ theme }) => ({
 const SearchInput = styled(Box)(({ theme }) => ({
   display: "flex",
   alignItems: "center",
-  backgroundColor: "rgba(255, 255, 255, 0.05)",
-  borderRadius: "8px",
+  backgroundColor: "rgba(255, 255, 255, 0.03)",
+  borderRadius: "12px",
   padding: "8px 12px",
-  border: "1px solid transparent",
-  transition: "all 0.3s ease",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
+  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+  "&:hover": {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderColor: "rgba(255, 255, 255, 0.15)",
+  },
   "&:focus-within": {
     borderColor: "#38bdf8",
     backgroundColor: "rgba(56, 189, 248, 0.05)",
-    boxShadow: `0 0 0 2px ${alpha("#38bdf8", 0.2)}`,
+    boxShadow: `0 0 0 2px ${alpha("#38bdf8", 0.15)}`,
   },
 }));
 
@@ -415,36 +420,118 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         </List>
       </Box>
 
-      <Box sx={{ p: 2, bgcolor: "rgba(0, 0, 0, 0.2)", borderTop: "1px solid rgba(255, 255, 255, 0.05)" }}>
+      <Box sx={{
+        p: 2,
+        bgcolor: "rgba(0, 0, 0, 0.4)",
+        borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+        mx: 1.5,
+        mb: 2.5,
+        borderRadius: "20px",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        "&:hover": {
+          bgcolor: "rgba(255, 255, 255, 0.05)",
+          transform: "translateY(-2px)",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.2)"
+        }
+      }}>
         {!collapsed ? (
-          <Box>
-            <Typography variant="caption" sx={{ color: "#64748B", display: "block", mb: 0.5, fontWeight: 700, letterSpacing: "1px" }}>
-              LOGGED IN AS
-            </Typography>
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: "#F8FAFC", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "140px" }}>
-                {/* SECURITY: Sanitize user display name */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Avatar
+              sx={{
+                width: 44,
+                height: 44,
+                bgcolor: "#38bdf8",
+                fontSize: "1.1rem",
+                fontWeight: 800,
+                border: "2px solid rgba(56, 189, 248, 0.3)",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.3)"
+              }}
+            >
+              {(user?.full_name || 'U').charAt(0).toUpperCase()}
+            </Avatar>
+            <Box sx={{ flex: 1, overflow: "hidden" }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 800,
+                  color: "#F8FAFC",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  lineHeight: 1.2
+                }}
+              >
                 {sanitizeInput(user?.full_name || "User")}
               </Typography>
-              <Chip
-                label={sanitizeInput(user?.role || "USER")}
-                size="small"
+              <Typography
+                variant="caption"
                 sx={{
-                  height: "20px",
-                  fontSize: "10px",
-                  fontWeight: 800,
-                  bgcolor: alpha("#38bdf8", 0.1),
-                  color: "#38bdf8",
-                  border: `1px solid ${alpha("#38bdf8", 0.2)}`,
+                  color: "#94A3B8",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                  mt: 0.25
                 }}
-              />
+              >
+                <Box
+                  component="span"
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    bgcolor: "#10b981",
+                    boxShadow: "0 0 8px #10b981"
+                  }}
+                />
+                {sanitizeInput(user?.role || "USER")}
+              </Typography>
             </Box>
           </Box>
         ) : (
           <Tooltip title={`${user?.full_name} (${user?.role})`} placement="right">
             <Box sx={{ display: "flex", justifyContent: "center" }}>
-              <Badge variant="dot" color="primary" overlap="circular">
-                <UsersIcon sx={{ color: "#38bdf8" }} />
+              <Badge
+                overlap="circular"
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                variant="dot"
+                sx={{
+                  '& .MuiBadge-badge': {
+                    backgroundColor: '#10b981',
+                    color: '#10b981',
+                    boxShadow: `0 0 0 2px #1a1a2e`,
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
+                    '&::after': {
+                      position: 'absolute',
+                      top: -1,
+                      left: -1,
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '50%',
+                      animation: 'ripple 1.5s infinite ease-in-out',
+                      border: '1px solid currentColor',
+                      content: '""',
+                    },
+                  },
+                  '@keyframes ripple': {
+                    '0%': { transform: 'scale(.8)', opacity: 1 },
+                    '100%': { transform: 'scale(2.4)', opacity: 0 },
+                  },
+                }}
+              >
+                <Avatar
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    bgcolor: "#38bdf8",
+                    fontSize: "0.9rem",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.3)"
+                  }}
+                >
+                  {(user?.full_name || 'U').charAt(0).toUpperCase()}
+                </Avatar>
               </Badge>
             </Box>
           </Tooltip>
@@ -480,7 +567,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
               boxSizing: "border-box",
               width: DRAWER_WIDTH,
               borderRight: "none",
-              bgcolor: "#0d1624",
+              bgcolor: "#1a1a2e",
             },
           }}
         >
@@ -501,7 +588,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                 duration: theme.transitions.duration.enteringScreen,
               }),
               overflowX: "hidden",
-              bgcolor: "#0d1624",
+              bgcolor: "#1a1a2e",
             },
           }}
           open

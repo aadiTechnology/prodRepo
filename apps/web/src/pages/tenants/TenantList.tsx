@@ -18,6 +18,10 @@ import {
     TablePagination,
     InputAdornment,
     Tooltip,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
 } from "@mui/material";
 import {
     Add as AddIcon,
@@ -28,6 +32,10 @@ import {
     Cancel as InactiveIcon,
     Delete as DeleteIcon,
     Home as HomeIcon,
+    FirstPage as FirstPageIcon,
+    LastPage as LastPageIcon,
+    KeyboardArrowLeft as PrevIcon,
+    KeyboardArrowRight as NextIcon,
 } from "@mui/icons-material";
 import {
     Dialog,
@@ -119,105 +127,115 @@ const TenantList = () => {
 
     return (
         <Box sx={{
-            p: 2,
-            pt: 0,
+            px: { xs: 2, md: 4 },
+            pb: 4,
             minHeight: "100vh",
-            backgroundColor: "#f5f6fa",
-            color: "#1a1a2e"
+            backgroundColor: "#f8fafc",
+            display: "flex",
+            flexDirection: "column"
         }}>
-            {/* Simplified Page Header */}
-            <Box sx={{
-                pt: 2,
-                pb: 1.5,
-                px: 0,
-                mb: 1.5,
-                mt: 0,
-            }}>
+            {/* Header - Aligned with AddTenant */}
+            <Box sx={{ pt: 1.5, pb: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <IconButton
+                        onClick={() => navigate("/")}
+                        sx={{
+                            backgroundColor: "#1a1a2e",
+                            borderRadius: 1.2,
+                            width: 44,
+                            height: 44,
+                            "&:hover": { backgroundColor: "#2d2d44" }
+                        }}
+                    >
+                        <HomeIcon sx={{ color: "white", fontSize: 24 }} />
+                    </IconButton>
+                    <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#1A1A2E", letterSpacing: "-1px" }}>
+                        Tenant Management
+                    </Typography>
+                </Box>
+
+                {/* Actions Row */}
                 <Box sx={{
                     display: "flex",
-                    flexDirection: { xs: "column", sm: "row" },
-                    justifyContent: "space-between",
-                    alignItems: { xs: "flex-start", sm: "center" },
-                    gap: 2
+                    alignItems: "center",
+                    gap: 2,
+                    width: { xs: "100%", sm: "auto" }
                 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <TextField
+                        placeholder="Search tenants..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        variant="outlined"
+                        size="small"
+                        fullWidth={isMobile}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon sx={{ color: "#94a3b8", fontSize: 20 }} />
+                                </InputAdornment>
+                            ),
+                        }}
+                        sx={{
+                            width: { xs: "100%", sm: "280px" },
+                            "& .MuiOutlinedInput-root": {
+                                bgcolor: "white",
+                                borderRadius: "12px",
+                                fontSize: "0.9rem",
+                                fontWeight: 500,
+                                "& fieldset": { borderColor: "#e2e8f0", borderWidth: "1.2px" },
+                                "&:hover fieldset": { borderColor: "#cbd5e1" },
+                                "&.Mui-focused": {
+                                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.03)",
+                                    "& fieldset": { borderColor: "#1A1A2E", borderWidth: "1.8px" },
+                                }
+                            }
+                        }}
+                    />
+                    <Tooltip title="Add Tenant">
                         <IconButton
-                            onClick={() => navigate("/")}
+                            onClick={() => navigate("/tenants/add")}
                             sx={{
                                 backgroundColor: "#1a1a2e",
-                                p: 1,
-                                borderRadius: 1,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                "&:hover": { backgroundColor: "#2d2d44" }
+                                color: "white",
+                                borderRadius: 1.2,
+                                width: 44,
+                                height: 44,
+                                boxShadow: "0 4px 10px rgba(26,26,46,0.2)",
+                                "&:hover": { backgroundColor: "#2d2d44", transform: "translateY(-1px)" }
                             }}
                         >
-                            <HomeIcon sx={{ color: "white", fontSize: 24 }} />
+                            <AddIcon sx={{ fontSize: 24 }} />
                         </IconButton>
-                        <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#1A1A2E" }}>
-                            Tenant Management
-                        </Typography>
-                    </Box>
-
-                    {/* Search and Add Action in Header Row */}
-                    <Box sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 2,
-                        width: { xs: "100%", sm: "auto" }
-                    }}>
-                        <TextField
-                            placeholder="Search by Tenant Name..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            variant="outlined"
-                            size="small"
-                            fullWidth={isMobile}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon sx={{ color: "#94a3b8" }} />
-                                    </InputAdornment>
-                                ),
-                            }}
-                            sx={{
-                                width: { xs: "100%", sm: "300px" },
-                                "& .MuiOutlinedInput-root": {
-                                    bgcolor: "white",
-                                    borderRadius: "8px",
-                                    "& fieldset": { borderColor: "#cbd5e1" },
-                                    "&:hover fieldset": { borderColor: "#94a3b8" },
-                                }
-                            }}
-                        />
-                        <Tooltip title="Add Tenant">
-                            <IconButton
-                                onClick={() => navigate("/tenants/add")}
-                                sx={{
-                                    color: "#1a1a2e",
-                                    flexShrink: 0,
-                                    "&:hover": { bgcolor: "rgba(26, 26, 46, 0.04)" }
-                                }}
-                            >
-                                <AddIcon sx={{ fontSize: 32, border: "2px solid #1a1a2e", borderRadius: "50%", p: 0.2 }} />
-                            </IconButton>
-                        </Tooltip>
-                    </Box>
+                    </Tooltip>
                 </Box>
             </Box>
 
             <Paper sx={{
                 borderRadius: "12px",
                 overflow: "hidden",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.01)",
                 border: "1px solid #e2e8f0",
-                bgcolor: "white"
+                bgcolor: "white",
+                flexGrow: 1,
+                display: "flex",
+                flexDirection: "column"
             }}>
                 {error && (
                     <Alert severity="error" sx={{ m: 2 }} onClose={() => setError(null)}>
                         {error}
                     </Alert>
+                )}
+
+                {/* Info Bar */}
+                {!loading && totalTenants > 0 && (
+                    <Box sx={{ py: 1.2, px: 3, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f1f5f9", bgcolor: "#fcfdfe" }}>
+                        <Typography sx={{ fontSize: "0.80rem", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            Tenant Directory
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.85rem", color: "#94a3b8", fontWeight: 500 }}>
+                            Showing <Box component="span" sx={{ color: "#1a1a2e", fontWeight: 700 }}>{Math.min(page * rowsPerPage + 1, totalTenants)}-{Math.min((page + 1) * rowsPerPage, totalTenants)}</Box> of <Box component="span" sx={{ color: "#1a1a2e", fontWeight: 700 }}>{totalTenants}</Box> tenants
+                        </Typography>
+                    </Box>
                 )}
 
                 <TableContainer sx={{ maxHeight: "calc(100vh - 200px)" }}>
@@ -229,13 +247,13 @@ const TenantList = () => {
                         <Table size="small" stickyHeader>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Tenant Name</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Owner</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Email</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Created Date</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Edit</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f8f9fb", fontSize: "0.80rem", px: 2, bgcolor: "#3a3a46" }}>Delete</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Tenant Name</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Owner</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Email</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Status</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Created Date</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Edit</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Delete</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -249,50 +267,68 @@ const TenantList = () => {
                                     </TableRow>
                                 ) : (
                                     tenants.map((tenant) => (
-                                        <TableRow key={tenant.id} hover sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
-                                            <TableCell sx={{ fontWeight: 600, color: "#1a1a2e", py: 0.6, px: 2 }}>
+                                        <TableRow
+                                            key={tenant.id}
+                                            hover
+                                            sx={{
+                                                "&.MuiTableRow-hover:hover": { bgcolor: "#f1f5f9" },
+                                                "& td": { borderBottom: "1px solid #f1f5f9" }
+                                            }}
+                                        >
+                                            <TableCell sx={{ fontWeight: 700, color: "#1a1a2e", py: 0.8, px: 2, fontSize: "0.85rem" }}>
                                                 {tenant.name}
                                             </TableCell>
-                                            <TableCell sx={{ color: "#64748b", py: 0.6, px: 2 }}>{tenant.owner_name}</TableCell>
-                                            <TableCell sx={{ color: "#64748b", py: 0.6, px: 2 }}>{tenant.email}</TableCell>
-                                            <TableCell sx={{ py: 0.6, px: 2 }}>
-                                                <Typography sx={{
-                                                    fontWeight: 600,
-                                                    fontSize: "0.80rem", // Slightly smaller font
-                                                    color: tenant.is_active ? "#10b981" : "#ef4444"
+                                            <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem", fontWeight: 500 }}>{tenant.owner_name}</TableCell>
+                                            <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem" }}>{tenant.email}</TableCell>
+                                            <TableCell sx={{ py: 0.8, px: 2 }}>
+                                                <Box sx={{
+                                                    display: "inline-flex",
+                                                    alignItems: "center",
+                                                    gap: 1,
+                                                    px: 1.2,
+                                                    py: 0.35,
+                                                    borderRadius: "20px",
+                                                    bgcolor: tenant.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                                                    color: tenant.is_active ? "#059669" : "#dc2626",
+                                                    border: `1px solid ${tenant.is_active ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)"}`
                                                 }}>
-                                                    {tenant.is_active ? "Active" : "Inactive"}
-                                                </Typography>
+                                                    <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "currentColor" }} />
+                                                    <Typography sx={{ fontWeight: 700, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                                        {tenant.is_active ? "Active" : "Inactive"}
+                                                    </Typography>
+                                                </Box>
                                             </TableCell>
-                                            <TableCell sx={{ color: "#64748b", py: 0.6, px: 2 }}>
+                                            <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem", fontWeight: 500 }}>
                                                 {new Date(tenant.created_at).toLocaleDateString('en-US', {
                                                     month: 'short',
                                                     day: '2-digit',
                                                     year: 'numeric'
                                                 })}
                                             </TableCell>
-                                            <TableCell sx={{ py: 0.6, px: 2 }}>
+                                            <TableCell sx={{ py: 0.8, px: 2 }}>
                                                 <Tooltip title="Edit">
                                                     <IconButton
                                                         size="small"
-                                                        onClick={() => navigate(`/tenants/${tenant.id}`)}
+                                                        onClick={() => navigate(`/tenants/${tenant.id}/edit`)}
                                                         sx={{
-                                                            color: "#94a3b8",
-                                                            "&:hover": { color: "#1713eaff" }
+                                                            color: "#64748b",
+                                                            p: 0.5,
+                                                            "&:hover": { color: "#2626e4", bgcolor: "#f1f5f9" }
                                                         }}
                                                     >
                                                         <EditIcon fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
                                             </TableCell>
-                                            <TableCell sx={{ py: 0.9, px: 2 }}>
+                                            <TableCell sx={{ py: 0.8, px: 2 }}>
                                                 <Tooltip title="Delete">
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => handleDeleteClick(tenant)}
                                                         sx={{
-                                                            color: "#94a3b8",
-                                                            "&:hover": { color: "#ef4444" }
+                                                            color: "#64748b",
+                                                            p: 0.5,
+                                                            "&:hover": { color: "#ef4444", bgcolor: "#fee2e2" }
                                                         }}
                                                     >
                                                         <DeleteIcon fontSize="small" />
@@ -307,21 +343,73 @@ const TenantList = () => {
                     )}
                 </TableContainer>
 
-                <TablePagination
-                    component="div"
-                    count={totalTenants}
-                    page={page}
-                    onPageChange={(_, newPage) => setPage(newPage)}
-                    rowsPerPage={rowsPerPage}
-                    onRowsPerPageChange={(e) => {
-                        const newRowsPerPage = parseInt(e.target.value, 10);
-                        setRowsPerPage(newRowsPerPage);
-                        setPage(0);
-                    }}
-                    rowsPerPageOptions={[10, 25, 50]}
-                    labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count}`}
-                    sx={{ px: 2, borderTop: "1px solid #e2e8f0" }}
-                />
+                {/* Custom Pagination Footer */}
+                {!loading && tenants.length > 0 && (
+                    <Box sx={{
+                        px: 2,
+                        py: 1,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        borderTop: "1px solid #f1f5f9",
+                        bgcolor: "#fcfdfe"
+                    }}>
+                        {/* Left: Rows Per Page */}
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b" }}>
+                                Rows per page
+                            </Typography>
+                            <Select
+                                value={rowsPerPage}
+                                onChange={(e) => {
+                                    setRowsPerPage(Number(e.target.value));
+                                    setPage(0);
+                                }}
+                                size="small"
+                                sx={{
+                                    height: "28px",
+                                    width: "65px",
+                                    fontSize: "0.8rem",
+                                    fontWeight: 600,
+                                    bgcolor: "white",
+                                    borderRadius: "6px",
+                                    "& .MuiOutlinedInput-notchedOutline": { borderColor: "#e2e8f0" },
+                                }}
+                            >
+                                <MenuItem value={10}>10</MenuItem>
+                                <MenuItem value={20}>20</MenuItem>
+                                <MenuItem value={25}>25</MenuItem>
+                                <MenuItem value={50}>50</MenuItem>
+                            </Select>
+                        </Box>
+
+                        {/* Right: Page Navigation */}
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                            <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b" }}>
+                                <Box component="span" sx={{ color: "#1a1a2e" }}>{page * rowsPerPage + 1}-{Math.min((page + 1) * rowsPerPage, totalTenants)}</Box> of <Box component="span" sx={{ color: "#1a1a2e" }}>{totalTenants}</Box>
+                            </Typography>
+                            <Box sx={{ display: "flex", gap: 0.5 }}>
+                                <IconButton
+                                    size="small"
+                                    disabled={page === 0}
+                                    onClick={() => setPage(page - 1)}
+                                    sx={{ border: "1px solid #e2e8f0", borderRadius: "6px", p: 0.4, "&:hover": { bgcolor: "#f1f5f9" } }}
+                                >
+                                    <PrevIcon sx={{ fontSize: "1.1rem" }} />
+                                </IconButton>
+
+                                <IconButton
+                                    size="small"
+                                    disabled={page >= Math.ceil(totalTenants / rowsPerPage) - 1}
+                                    onClick={() => setPage(page + 1)}
+                                    sx={{ border: "1px solid #e2e8f0", borderRadius: "6px", p: 0.4, "&:hover": { bgcolor: "#f1f5f9" } }}
+                                >
+                                    <NextIcon sx={{ fontSize: "1.1rem" }} />
+                                </IconButton>
+                            </Box>
+                        </Box>
+                    </Box>
+                )}
             </Paper>
 
             <Dialog
