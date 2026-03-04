@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, get_current_user
@@ -6,6 +6,7 @@ from app.models.user import User, UserRole
 from app.schemas.ai import InterpretRequest, InterpretResponse, GenerateStoryAndTestsRequest
 from app.services.intent_service import interpret
 from app.services.ai_service import generate_story_and_tests
+from app.services.cache_service import get_cached_response, cache_response
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
 
@@ -38,6 +39,7 @@ async def ai_interpret(
 @router.post("/generate-story-and-tests")
 async def ai_generate_story_and_tests(
     body: GenerateStoryAndTestsRequest,
+    response: Response,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict:
     """Generate user stories and test cases from a requirement. Super Admin only."""
@@ -46,4 +48,12 @@ async def ai_generate_story_and_tests(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only Super Admin can use this endpoint.",
         )
-    return generate_story_and_tests(body.requirement)
+    requirement = body.requirement
+    cached = get_cached_response(requirement)
+    if cached is not None:
+        response.headers["X-Cache"] = "HIT"
+        return cached
+    response.headers["X-Cache"] = "MISS"
+    result = generate_story_and_tests(body.requirement)
+    cache_response(requirement, result)
+    return result
