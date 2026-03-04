@@ -5,15 +5,13 @@ import {
     Typography,
     Grid,
     TextField,
-    FormControlLabel,
-    Switch,
     Alert,
     CircularProgress,
     IconButton,
     InputAdornment,
     Stack,
     Tooltip,
-    Button,
+    Switch,
 } from "@mui/material";
 import {
     Home as HomeIcon,
@@ -28,6 +26,7 @@ import {
     Cancel as CancelIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
+import { PageHeader } from "../../components/common";
 import tenantService from "../../api/services/tenantService";
 
 const AddTenant = () => {
@@ -54,6 +53,7 @@ const AddTenant = () => {
         description: "",
         is_active: true,
     });
+    const [initialFormData, setInitialFormData] = useState<typeof formData | null>(null);
 
     // Load existing tenant when in edit mode
     const fetchTenant = useCallback(async () => {
@@ -61,7 +61,7 @@ const AddTenant = () => {
         try {
             setFetchLoading(true);
             const data = await tenantService.get(Number(id));
-            setFormData({
+            const tenantData = {
                 name: data.name || "",
                 owner_name: data.owner_name || "",
                 email: data.email || "",
@@ -70,7 +70,9 @@ const AddTenant = () => {
                 phone: data.phone || "",
                 description: data.description || "",
                 is_active: data.is_active,
-            });
+            };
+            setFormData(tenantData);
+            setInitialFormData(tenantData);
         } catch (err: any) {
             setError(err?.message || "Failed to load tenant.");
         } finally {
@@ -226,69 +228,72 @@ const AddTenant = () => {
         </Box>
     );
 
+    const isDirty = initialFormData ? JSON.stringify(formData) !== JSON.stringify(initialFormData) : true;
+
     const isFormValid =
         formData.name.length >= 3 &&
         Boolean(formData.owner_name) &&
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
         Object.values(errors).every(error => !error) &&
-        (!isEditMode ? (formData.admin_password.length >= 8 && formData.confirm_password === formData.admin_password) : true);
+        (!isEditMode ? (formData.admin_password.length >= 8 && formData.confirm_password === formData.admin_password) : isDirty);
 
     if (fetchLoading) return <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}><CircularProgress /></Box>;
 
     return (
         <Box sx={{ px: { xs: 2, md: 4 }, pb: 2, backgroundColor: "#f8fafc", height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
 
-            {/* Header - Aligned with TenantList */}
-            <Box sx={{ pt: 1.5, pb: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <IconButton onClick={() => navigate("/")} sx={{ backgroundColor: "#1a1a2e", borderRadius: 1.2, width: 44, height: 44, "&:hover": { backgroundColor: "#2d2d44" } }}>
-                        <HomeIcon sx={{ color: "white", fontSize: 24 }} />
-                    </IconButton>
-                    <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#1A1A2E", letterSpacing: "-1px" }}>
+            {/* Header - Standardized using PageHeader */}
+            <PageHeader
+                onBack={() => navigate("/")}
+                backIcon={<HomeIcon sx={{ color: "white", fontSize: 24 }} />}
+                title={
+                    <>
                         <Box component="span" onClick={() => navigate("/tenants")} sx={{ color: "#94a3b8", cursor: "pointer", "&:hover": { color: "#1a1a2e" } }}>Tenants</Box>
                         <Box component="span" sx={{ color: "#cbd5e1", mx: 1.5 }}>/</Box>
                         {isEditMode ? "Edit Tenant" : "Add Tenant"}
-                    </Typography>
-                </Box>
-                <Stack direction="row" spacing={1.5}>
-                    <Tooltip title="Cancel and Go Back">
-                        <IconButton
-                            onClick={() => navigate("/tenants")}
-                            sx={{
-                                color: "#64748b",
-                                backgroundColor: "#f1f5f9",
-                                borderRadius: 1.2,
-                                width: 44,
-                                height: 44,
-                                "&:hover": {
-                                    backgroundColor: "#fee2e2",
-                                    color: "#ef4444",
-                                    transform: "translateY(-1px)"
-                                }
-                            }}
-                        >
-                            <CancelIcon sx={{ fontSize: 24 }} />
-                        </IconButton>
-                    </Tooltip>
-                    <Tooltip title={isEditMode ? "Update Tenant" : "Save Tenant"}>
-                        <IconButton
-                            onClick={handleSubmitAction}
-                            disabled={loading || !isFormValid}
-                            sx={{
-                                backgroundColor: "#1a1a2e",
-                                color: "white",
-                                borderRadius: 1.2,
-                                width: 44, height: 44,
-                                boxShadow: "0 4px 10px rgba(26,26,46,0.2)",
-                                "&:hover": { backgroundColor: "#2d2d44", transform: "translateY(-1px)" },
-                                "&.Mui-disabled": { backgroundColor: "#cbd5e1", color: "white" }
-                            }}
-                        >
-                            {loading ? <CircularProgress size={24} color="inherit" /> : <SaveIcon sx={{ fontSize: 24 }} />}
-                        </IconButton>
-                    </Tooltip>
-                </Stack>
-            </Box>
+                    </>
+                }
+                actions={
+                    <>
+                        <Tooltip title="Cancel and Go Back">
+                            <IconButton
+                                onClick={() => navigate("/tenants")}
+                                sx={{
+                                    color: "#64748b",
+                                    backgroundColor: "#f1f5f9",
+                                    borderRadius: 1.2,
+                                    width: 44,
+                                    height: 44,
+                                    "&:hover": {
+                                        backgroundColor: "#fee2e2",
+                                        color: "#ef4444",
+                                        transform: "translateY(-1px)"
+                                    }
+                                }}
+                            >
+                                <CancelIcon sx={{ fontSize: 24 }} />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title={isEditMode ? "Update Tenant" : "Save Tenant"}>
+                            <IconButton
+                                onClick={handleSubmitAction}
+                                disabled={loading || !isFormValid}
+                                sx={{
+                                    backgroundColor: "#1a1a2e",
+                                    color: "white",
+                                    borderRadius: 1.2,
+                                    width: 44, height: 44,
+                                    boxShadow: "0 4px 10px rgba(26,26,46,0.2)",
+                                    "&:hover": { backgroundColor: "#2d2d44", transform: "translateY(-1px)" },
+                                    "&.Mui-disabled": { backgroundColor: "#cbd5e1", color: "white" }
+                                }}
+                            >
+                                {loading ? <CircularProgress size={24} color="inherit" /> : <SaveIcon sx={{ fontSize: 24 }} />}
+                            </IconButton>
+                        </Tooltip>
+                    </>
+                }
+            />
 
             <Box sx={{ flexGrow: 1, overflowY: "auto", pr: 0.5, pb: 4 }}>
                 {error && <Alert severity="error" icon={<ErrorIcon />} sx={{ mb: 2, borderRadius: "12px", border: "1px solid #fee2e2" }} onClose={() => setError(null)}>{error}</Alert>}

@@ -14,26 +14,17 @@ import {
     Alert,
     CircularProgress,
     TextField,
-    Chip,
-    TablePagination,
     InputAdornment,
     Tooltip,
     Select,
     MenuItem,
-    FormControl,
-    InputLabel,
 } from "@mui/material";
 import {
     Add as AddIcon,
-    Visibility as ViewIcon,
     Edit as EditIcon,
     Search as SearchIcon,
-    CheckCircle as ActiveIcon,
-    Cancel as InactiveIcon,
     Delete as DeleteIcon,
     Home as HomeIcon,
-    FirstPage as FirstPageIcon,
-    LastPage as LastPageIcon,
     KeyboardArrowLeft as PrevIcon,
     KeyboardArrowRight as NextIcon,
 } from "@mui/icons-material";
@@ -46,6 +37,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useTheme, useMediaQuery } from "@mui/material";
+import { PageHeader } from "../../components/common";
 import { Tenant } from "../../types/tenant";
 import tenantService from "../../api/services/tenantService";
 
@@ -135,80 +127,62 @@ const TenantList = () => {
             flexDirection: "column"
         }}>
             {/* Header - Aligned with AddTenant */}
-            <Box sx={{ pt: 1.5, pb: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <IconButton
-                        onClick={() => navigate("/")}
-                        sx={{
-                            backgroundColor: "#1a1a2e",
-                            borderRadius: 1.2,
-                            width: 44,
-                            height: 44,
-                            "&:hover": { backgroundColor: "#2d2d44" }
-                        }}
-                    >
-                        <HomeIcon sx={{ color: "white", fontSize: 24 }} />
-                    </IconButton>
-                    <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#1A1A2E", letterSpacing: "-1px" }}>
-                        Tenant Management
-                    </Typography>
-                </Box>
-
-                {/* Actions Row */}
-                <Box sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    width: { xs: "100%", sm: "auto" }
-                }}>
-                    <TextField
-                        placeholder="Search tenants..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        variant="outlined"
-                        size="small"
-                        fullWidth={isMobile}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon sx={{ color: "#94a3b8", fontSize: 20 }} />
-                                </InputAdornment>
-                            ),
-                        }}
-                        sx={{
-                            width: { xs: "100%", sm: "280px" },
-                            "& .MuiOutlinedInput-root": {
-                                bgcolor: "white",
-                                borderRadius: "12px",
-                                fontSize: "0.9rem",
-                                fontWeight: 500,
-                                "& fieldset": { borderColor: "#e2e8f0", borderWidth: "1.2px" },
-                                "&:hover fieldset": { borderColor: "#cbd5e1" },
-                                "&.Mui-focused": {
-                                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.03)",
-                                    "& fieldset": { borderColor: "#1A1A2E", borderWidth: "1.8px" },
-                                }
-                            }
-                        }}
-                    />
-                    <Tooltip title="Add Tenant">
-                        <IconButton
-                            onClick={() => navigate("/tenants/add")}
-                            sx={{
-                                backgroundColor: "#1a1a2e",
-                                color: "white",
-                                borderRadius: 1.2,
-                                width: 44,
-                                height: 44,
-                                boxShadow: "0 4px 10px rgba(26,26,46,0.2)",
-                                "&:hover": { backgroundColor: "#2d2d44", transform: "translateY(-1px)" }
+            {/* Header - Standardized using PageHeader */}
+            <PageHeader
+                title="Tenant Management"
+                onBack={() => navigate("/")}
+                backIcon={<HomeIcon sx={{ color: "white", fontSize: 24 }} />}
+                actions={
+                    <>
+                        <TextField
+                            placeholder="Search tenants..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            variant="outlined"
+                            size="small"
+                            fullWidth={isMobile}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon sx={{ color: "#94a3b8", fontSize: 20 }} />
+                                    </InputAdornment>
+                                ),
                             }}
-                        >
-                            <AddIcon sx={{ fontSize: 24 }} />
-                        </IconButton>
-                    </Tooltip>
-                </Box>
-            </Box>
+                            sx={{
+                                width: { xs: "100%", sm: "280px" },
+                                "& .MuiOutlinedInput-root": {
+                                    bgcolor: "white",
+                                    borderRadius: "12px",
+                                    fontSize: "0.9rem",
+                                    fontWeight: 500,
+                                    "& fieldset": { borderColor: "#e2e8f0", borderWidth: "1.2px" },
+                                    "&:hover fieldset": { borderColor: "#cbd5e1" },
+                                    "&.Mui-focused": {
+                                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.03)",
+                                        "& fieldset": { borderColor: "#1A1A2E", borderWidth: "1.8px" },
+                                    }
+                                }
+                            }}
+                        />
+                        <Tooltip title="Add Tenant">
+                            <IconButton
+                                onClick={() => navigate("/tenants/add")}
+                                sx={{
+                                    backgroundColor: "#1a1a2e",
+                                    color: "white",
+                                    borderRadius: 1.2,
+                                    width: 44,
+                                    height: 44,
+                                    boxShadow: "0 4px 10px rgba(26,26,46,0.2)",
+                                    "&:hover": { backgroundColor: "#2d2d44", transform: "translateY(-1px)" }
+                                }}
+                            >
+                                <AddIcon sx={{ fontSize: 24 }} />
+                            </IconButton>
+                        </Tooltip>
+                    </>
+                }
+            />
 
             <Paper sx={{
                 borderRadius: "12px",
