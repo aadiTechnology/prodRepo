@@ -193,7 +193,7 @@ function MainLayout() {
                 alignItems: "center",
                 textDecoration: "none",
                 gap: 1.5,
-                mr: { md: 4 }
+                zIndex: 2,
               }}
             >
               <img
@@ -201,49 +201,40 @@ function MainLayout() {
                 alt="Logo"
                 style={{ height: "45px", objectFit: "contain", borderRadius: "8px" }}
               />
-              {!isMobile && (
+            </Box>
+
+            {!isMobile && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  display: "flex",
+                  justifyContent: "center",
+                  width: "auto",
+                  pointerEvents: "none"
+                }}
+              >
                 <Typography
                   variant="h6"
                   sx={{
                     color: "text.primary",
                     fontWeight: 800,
                     fontSize: "1.25rem",
-                    letterSpacing: "-0.5px"
+                    letterSpacing: "-0.5px",
+                    pointerEvents: "auto"
                   }}
                 >
                   {appName}
                 </Typography>
-              )}
-            </Box>
+              </Box>
+            )}
 
             <Box sx={{ flexGrow: 1 }} />
 
             {/* User menu */}
             {isAuthenticated && user && (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <Chip
-                  label={
-                    user.role === "SUPER_ADMIN"
-                      ? "System Admin"
-                      : user.role === "admin"
-                        ? "Admin"
-                        : "User"
-                  }
-                  size="small"
-                  sx={{
-                    display: { xs: "none", sm: "flex" },
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    px: 0.5,
-                    borderRadius: "6px",
-                    backgroundColor: user.role === "SUPER_ADMIN" ? "rgba(99, 102, 241, 0.1)" : "rgba(0, 0, 0, 0.05)",
-                    color: user.role === "SUPER_ADMIN" ? "#6366f1" : "text.secondary",
-                    border: "none"
-                  }}
-                />
-
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2, zIndex: 2 }}>
                 <Box
                   onClick={handleUserMenuOpen}
                   sx={{
@@ -262,13 +253,27 @@ function MainLayout() {
                     }
                   }}
                 >
-                  <Box sx={{ display: { xs: "none", md: "block" }, textAlign: "right" }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: "text.primary", lineHeight: 1.2 }}>
+                  <Box sx={{ display: { xs: "none", md: "flex" }, flexDirection: "column", alignItems: "flex-end" }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: "text.primary", lineHeight: 1.1 }}>
                       {user.full_name || 'User'}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 500 }}>
-                      {user.role === "SUPER_ADMIN" ? "System Admin" : user.role}
-                    </Typography>
+                    <Box
+                      sx={{
+                        fontSize: "0.65rem",
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                        color: user.role === "SUPER_ADMIN" ? "#6366f1" : "text.secondary",
+                        backgroundColor: user.role === "SUPER_ADMIN" ? "rgba(99, 102, 241, 0.08)" : "rgba(0, 0, 0, 0.04)",
+                        px: 0.8,
+                        py: 0.2,
+                        borderRadius: "4px",
+                        mt: 0.3,
+                        display: "inline-block"
+                      }}
+                    >
+                      {user.role === "SUPER_ADMIN" ? "System Admin" : user.role || "User"}
+                    </Box>
                   </Box>
                   <Avatar
                     src={avatarSrc || ''}
