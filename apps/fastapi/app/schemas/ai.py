@@ -2,6 +2,10 @@ from typing import Literal, Any
 from pydantic import BaseModel, Field
 
 
+class GenerateStoryAndTestsRequest(BaseModel):
+    requirement: str = Field(..., min_length=1, max_length=50000)
+
+
 class InterpretRequest(BaseModel):
     user_text: str = Field(..., min_length=1, max_length=2000)
 
