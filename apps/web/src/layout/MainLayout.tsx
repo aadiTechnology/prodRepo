@@ -3,7 +3,7 @@
  * Main application layout with navigation and responsive design
  */
 
-import { AppBar, Toolbar, Typography, Box, Container, IconButton, useMediaQuery, useTheme, Menu, MenuItem, Avatar, Chip } from "@mui/material";
+import { AppBar, Toolbar, Typography, Box, Container, IconButton, useMediaQuery, useTheme, Menu, MenuItem, Avatar, Chip, ListItemIcon, Divider } from "@mui/material";
 import { Menu as MenuIcon, Logout as LogoutIcon, Person as PersonIcon, Lock as LockIcon } from "@mui/icons-material";
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { useState, useCallback, memo, useEffect } from "react";
@@ -160,46 +160,67 @@ function MainLayout() {
           elevation={0}
           sx={{
             zIndex: (theme) => theme.zIndex.drawer + 1,
-            backgroundColor: 'rgba(255, 255, 255, 0.8)',
-            backdropFilter: 'blur(8px)',
+            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+            backdropFilter: 'blur(16px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(16px) saturate(180%)',
             color: 'text.primary',
             borderBottom: '1px solid',
-            borderColor: 'divider',
+            borderColor: 'rgba(0, 0, 0, 0.06)',
+            transition: theme.transitions.create(['width', 'margin', 'background-color'], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.enteringScreen,
+            }),
           }}
         >
-          <Toolbar variant="dense" sx={{ minHeight: 44 }}>
+          <Toolbar sx={{ minHeight: 68, px: { xs: 2, md: 3 } }}>
             {isMobile && (
               <IconButton
                 color="inherit"
                 edge="start"
                 onClick={handleMobileMenuToggle}
                 aria-label="menu"
-                sx={{ mr: 2 }}
+                sx={{ mr: 2, "&:hover": { backgroundColor: "rgba(0,0,0,0.04)" } }}
               >
                 <MenuIcon />
               </IconButton>
             )}
 
-            <Typography
-              variant="h6"
+            <Box
               component={Link}
               to="/"
               sx={{
-                flexGrow: { xs: 1, md: 0 },
+                display: "flex",
+                alignItems: "center",
                 textDecoration: "none",
-                color: "inherit",
-                fontWeight: 600,
-                mr: { md: 4 },
+                gap: 1.5,
+                mr: { md: 4 }
               }}
             >
-              {appName}
-            </Typography>
+              <img
+                src="/aaadi.webp"
+                alt="Logo"
+                style={{ height: "45px", objectFit: "contain", borderRadius: "8px" }}
+              />
+              {!isMobile && (
+                <Typography
+                  variant="h6"
+                  sx={{
+                    color: "text.primary",
+                    fontWeight: 800,
+                    fontSize: "1.25rem",
+                    letterSpacing: "-0.5px"
+                  }}
+                >
+                  {appName}
+                </Typography>
+              )}
+            </Box>
 
             <Box sx={{ flexGrow: 1 }} />
 
             {/* User menu */}
             {isAuthenticated && user && (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                 <Chip
                   label={
                     user.role === "SUPER_ADMIN"
@@ -209,26 +230,62 @@ function MainLayout() {
                         : "User"
                   }
                   size="small"
-                  color={
-                    user.role === "SUPER_ADMIN" || user.role === "admin"
-                      ? "secondary"
-                      : "default"
-                  }
-                  sx={{ display: { xs: "none", sm: "flex" } }}
+                  sx={{
+                    display: { xs: "none", sm: "flex" },
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    px: 0.5,
+                    borderRadius: "6px",
+                    backgroundColor: user.role === "SUPER_ADMIN" ? "rgba(99, 102, 241, 0.1)" : "rgba(0, 0, 0, 0.05)",
+                    color: user.role === "SUPER_ADMIN" ? "#6366f1" : "text.secondary",
+                    border: "none"
+                  }}
                 />
-                <IconButton
+
+                <Box
                   onClick={handleUserMenuOpen}
-                  size="small"
-                  sx={{ ml: 1 }}
-                  aria-label="account menu"
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.5,
+                    cursor: "pointer",
+                    padding: "6px 12px",
+                    borderRadius: "14px",
+                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                    border: "1px solid transparent",
+                    "&:hover": {
+                      backgroundColor: "rgba(255, 255, 255, 0.8)",
+                      borderColor: "rgba(0, 0, 0, 0.04)",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.04)"
+                    }
+                  }}
                 >
+                  <Box sx={{ display: { xs: "none", md: "block" }, textAlign: "right" }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: "text.primary", lineHeight: 1.2 }}>
+                      {user.full_name || 'User'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 500 }}>
+                      {user.role === "SUPER_ADMIN" ? "System Admin" : user.role}
+                    </Typography>
+                  </Box>
                   <Avatar
                     src={avatarSrc || ''}
-                    sx={{ width: 32, height: 32, bgcolor: "secondary.main" }}
+                    sx={{
+                      width: 42,
+                      height: 42,
+                      bgcolor: "primary.main",
+                      boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)",
+                      border: "2px solid white",
+                      transition: "transform 0.2s",
+                      "&:hover": { transform: "scale(1.05)" }
+                    }}
                   >
                     {!avatarSrc && (user.full_name || 'U').charAt(0).toUpperCase()}
                   </Avatar>
-                </IconButton>
+                </Box>
+
                 <Menu
                   anchorEl={userMenuAnchor}
                   open={Boolean(userMenuAnchor)}
@@ -241,32 +298,61 @@ function MainLayout() {
                     vertical: "top",
                     horizontal: "right",
                   }}
+                  PaperProps={{
+                    elevation: 0,
+                    sx: {
+                      mt: 2,
+                      width: 260,
+                      overflow: 'visible',
+                      filter: 'drop-shadow(0px 12px 32px rgba(0,0,0,0.1))',
+                      borderRadius: "20px",
+                      border: '1px solid rgba(0,0,0,0.06)',
+                      padding: "8px",
+                      '&:before': {
+                        content: '""',
+                        display: 'block',
+                        position: 'absolute',
+                        top: 0,
+                        right: 20,
+                        width: 12,
+                        height: 12,
+                        bgcolor: 'background.paper',
+                        transform: 'translateY(-50%) rotate(45deg)',
+                        zIndex: 0,
+                      },
+                    },
+                  }}
                 >
-                  <MenuItem disabled>
-                    <Box>
-                      <Typography variant="body2" fontWeight="bold">
-                        {/* SECURITY: Sanitize user display name to prevent XSS */}
-                        {(user.full_name || '').substring(0, 100).replace(/[<>'\"]/g, '')}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {/* SECURITY: Sanitize email to prevent XSS */}
-                        {(user.email || '').substring(0, 150).replace(/[<>'\"]/g, '')}
-                      </Typography>
-                    </Box>
+                  <Box sx={{ px: 2, py: 2, mb: 1, borderRadius: "14px", background: "rgba(0,0,0,0.02)" }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "text.primary" }}>
+                      {(user.full_name || '').substring(0, 100).replace(/[<>'\"]/g, '')}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
+                      {(user.email || '').substring(0, 150).replace(/[<>'\"]/g, '')}
+                    </Typography>
+                  </Box>
+
+                  <MenuItem onClick={handleProfileClick} sx={{ py: 1.5, borderRadius: "12px", gap: 1.5 }}>
+                    <ListItemIcon sx={{ minWidth: "auto !important" }}>
+                      <PersonIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                    </ListItemIcon>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Account Profile</Typography>
                   </MenuItem>
-                  {location.pathname !== "/profile" && (
-                    <MenuItem onClick={handleProfileClick}>
-                      <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
-                      My Profile
-                    </MenuItem>
-                  )}
-                  <MenuItem onClick={handleChangePasswordClick}>
-                    <LockIcon sx={{ mr: 1, fontSize: 20 }} />
-                    Change Password
+
+                  <MenuItem onClick={handleChangePasswordClick} sx={{ py: 1.5, borderRadius: "12px", gap: 1.5 }}>
+                    <ListItemIcon sx={{ minWidth: "auto !important" }}>
+                      <LockIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                    </ListItemIcon>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Security Settings</Typography>
                   </MenuItem>
-                  <MenuItem onClick={handleLogout}>
-                    <LogoutIcon sx={{ mr: 1, fontSize: 20 }} />
-                    Logout
+
+                  <Divider sx={{ my: 1, opacity: 0.5 }} />
+
+                  <MenuItem onClick={handleLogout} sx={{ py: 1.5, borderRadius: "12px", gap: 1.5, color: "error.main", "&:hover": { bgcolor: "error.lighter" } }}>
+                    <ListItemIcon sx={{ minWidth: "auto !important" }}>
+                      <LogoutIcon fontSize="small" sx={{ color: "error.main" }} />
+                    </ListItemIcon>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>Logout Session</Typography>
                   </MenuItem>
                 </Menu>
               </Box>
