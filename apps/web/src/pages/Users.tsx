@@ -87,7 +87,7 @@ function Users() {
   }, [fetchUsers]);
 
   const handleEditClick = useCallback((user: User) => {
-    navigate(`/create-user`, { state: { user, isEdit: true } });
+    navigate(`/user/create`, { state: { user, isEdit: true } });
   }, [navigate]);
 
   const handleDeleteClick = useCallback((user: User) => {
@@ -276,7 +276,7 @@ function Users() {
         </TableContainer>
       )}
 
-      
+
 
       {/* Add User modal */}
       <UserForm

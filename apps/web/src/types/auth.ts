@@ -6,7 +6,7 @@ export interface User {
   id: number;
   email: string;
   full_name: string;
-  role: "user" | "admin" | "SUPER_ADMIN";
+  role: string;
   tenant_id?: number | null;
   phone_number?: string | null;
   is_active?: boolean;
