@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 
 from app.models.role import Role
@@ -37,13 +38,19 @@ async def role_summary(db: Session = Depends(get_db), current_user: CurrentUser 
 
 
 @router.get("", response_model=RoleListResponse)
+
+@router.get("", response_model=RoleListResponse)
 async def list_roles(
     search: str = Query(None),
     page_number: int = Query(1, alias="pageNumber"),
-    page_size: int = Query(50, alias="pageSize"),  # Default is 25
+    page_size: int = Query(50, alias="pageSize"),
     scope_type: str = Query(None),
     tenant_id: int = Query(None),
     status: bool = Query(None),
+    created_from: datetime = Query(None, alias="createdFrom"),
+    created_to: datetime = Query(None, alias="createdTo"),
+    sort_by: str = Query("id", alias="sortBy"),
+    sort_order: str = Query("desc", alias="sortOrder"),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ) -> RoleListResponse:
@@ -53,7 +60,9 @@ async def list_roles(
     is_platform = current_user.role == UserRole.SUPER_ADMIN
 
     roles, total = role_service.get_roles(
-        db, search, page_number, page_size, tenant_id=tenant_id, is_platform=is_platform
+        db, search, page_number, page_size, tenant_id=tenant_id, is_platform=is_platform,
+        created_from=created_from, created_to=created_to,
+        sort_by=sort_by, sort_order=sort_order
     )
     return RoleListResponse(
         success=True,

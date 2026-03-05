@@ -6,6 +6,8 @@ interface GetRolesParams {
   search?: string;
   page?: number;
   pageSize?: number;
+  sortBy?: string;
+  sortOrder?: string;
 }
 
 const roleService = {
@@ -19,6 +21,8 @@ const roleService = {
         search: params.search,
         pageNumber: params.page,
         pageSize: params.pageSize,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
       },
     });
     return data.data;

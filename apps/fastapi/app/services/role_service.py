@@ -20,8 +20,13 @@ def get_roles(
     page_number: int = 1,
     page_size: int = 50,
     tenant_id: int | None = None,
-    is_platform: bool = False
+    is_platform: bool = False,
+    created_from: datetime = None,
+    created_to: datetime = None,
+    sort_by: str = "id",
+    sort_order: str = "desc"
 ) -> tuple[list[Role], int]:
+
     """
     Get roles filtered by scope.
     Super Admin (is_platform=True) -> Platform roles where tenant_id IS NULL.
@@ -41,12 +46,33 @@ def get_roles(
     if search:
         query = query.filter(Role.name.ilike(f"%{search}%"))
 
-    # Use eager loading to fetch permissions in a single query
-    query = query.options(joinedload(Role.permissions))
+    if created_from:
+        query = query.filter(Role.created_at >= created_from)
+    if created_to:
+        query = query.filter(Role.created_at <= created_to)
 
     total_count = query.count()
+
+
+    # Robust sort_by mapping (support camelCase and snake_case)
+    sort_map = {
+        'name': 'name',
+        'created_at': 'created_at',
+        'createdAt': 'created_at',
+        'id': 'id',
+    }
+    sort_attr = sort_map.get(sort_by, 'id')
+    sort_column = getattr(Role, sort_attr, None)
+    if sort_column is not None:
+        if sort_order == "asc":
+            query = query.order_by(sort_column.asc())
+        else:
+            query = query.order_by(sort_column.desc())
+    else:
+        query = query.order_by(Role.id.desc())
+
     roles = (
-        query.order_by(Role.id.desc())
+        query
         .offset((page_number - 1) * page_size)
         .limit(page_size)
         .all()

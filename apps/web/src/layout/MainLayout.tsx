@@ -207,10 +207,11 @@ function MainLayout() {
                 // Tenant User: show their logo or tenant name
                 user.tenant.logo_url && !logoError ? (
                   // Has Logo URL
-                  <img
+                  <Box
+                    component="img"
                     src={user.tenant.logo_url}
                     alt={user.tenant.name}
-                    style={{ height: 45, maxWidth: 180, objectFit: "contain", borderRadius: "8px" }}
+                    sx={{ height: 45, maxWidth: 180, objectFit: "contain", borderRadius: "8px" }}
                     onError={() => setLogoError(true)}
                   />
                 ) : (
@@ -229,10 +230,11 @@ function MainLayout() {
               ) : (
                 // System Admin: show Aadi Technology branding
                 <>
-                  <img
+                  <Box
+                    component="img"
                     src="/aaadi.webp"
                     alt="Aadi Technology Logo"
-                    style={{ height: "45px", objectFit: "contain", borderRadius: "8px" }}
+                    sx={{ height: "45px", objectFit: "contain", borderRadius: "8px" }}
                   />
                   <Typography
                     variant="h6"
@@ -411,10 +413,11 @@ function MainLayout() {
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <img
+            <Box
+              component="img"
               src="/campus-axis-logo.png"
               alt="CampusAxis Logo"
-              style={{ height: "45px", objectFit: "contain" }}
+              sx={{ height: "45px", objectFit: "contain" }}
             />
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>

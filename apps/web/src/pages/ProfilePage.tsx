@@ -513,8 +513,8 @@ const ProfilePage = () => {
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                style={{ display: "none" }}
                 onChange={handleImageChange}
+                hidden
             />
 
             <Menu

@@ -1,9 +1,45 @@
+// Style object for confirmation popup divider
+const confirmDividerStyle = {
+  border: 'none',
+  borderTop: '1px solid #e5e7eb',
+  margin: 0,
+  height: 0,
+};
 
+// Custom snackbar style for success toast
+const successSnackbarBoxSx = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 1.5,
+  px: 2.5,
+  py: 1.2,
+  borderRadius: 3,
+  bgcolor: '#2B2B2B',
+  boxShadow: '0 4px 24px 0 rgba(0,0,0,0.18)',
+  minWidth: 320,
+  maxWidth: 425,
+  mx: 'auto',
+  '& .success-snackbar-icon': {
+    width: 32,
+    height: 32,
+    borderRadius: '50%',
+    bgcolor: '#4CAF50',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  '& .success-snackbar-text': {
+    color: 'white',
+    fontWeight: 600,
+    fontSize: '1.08rem',
+    letterSpacing: 0.1,
+  },
+};
 
 import { useState, useEffect, useCallback } from "react";
 import {
   Box,
-  Button,
   Paper,
   Table,
   TableBody,
@@ -22,20 +58,24 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
+  Snackbar,
   DialogContentText,
-  DialogActions
 } from "@mui/material";
+import CheckIcon from '@mui/icons-material/Check';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Search as SearchIcon,
   Delete as DeleteIcon,
   Home as HomeIcon,
+  Cancel as CancelIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useTheme, useMediaQuery } from "@mui/material";
 import { Role } from "../types/role.types";
 import roleService from "../api/services/roleService";
+import { Button, Select, MenuItem } from "@mui/material";
 
 const RoleManagementPage = () => {
   const navigate = useNavigate();
@@ -48,9 +88,17 @@ const RoleManagementPage = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalRoles, setTotalRoles] = useState(0);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmDialogType, setConfirmDialogType] = useState<'delete' | 'edit' | null>(null);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<string | null>(null);
+  // --- Success Toast Handler ---
+  const showSuccessToast = (message: string) => setSnackbar(message);
+
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'name' | 'createdAt'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const fetchRoles = useCallback(async () => {
     try {
@@ -60,6 +108,8 @@ const RoleManagementPage = () => {
         search: search || undefined,
         page: page + 1,
         pageSize: rowsPerPage,
+        sortBy: sortBy === 'createdAt' ? 'created_at' : sortBy,
+        sortOrder,
       });
       // Map backend fields to Role type
       const mappedRoles = (data.items ?? []).map((role: any) => ({
@@ -74,7 +124,7 @@ const RoleManagementPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [search, page, rowsPerPage]);
+  }, [search, page, rowsPerPage, sortBy, sortOrder]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -83,19 +133,23 @@ const RoleManagementPage = () => {
     return () => clearTimeout(timer);
   }, [fetchRoles]);
 
+  // No local sorting; roles are sorted by backend
+  const sortedRoles = roles;
+
   const handleDeleteClick = (role: Role) => {
     setRoleToDelete(role);
-    setDeleteDialogOpen(true);
+    setConfirmDialogType('delete');
+    setConfirmDialogOpen(true);
   };
 
   const handleConfirmDelete = async () => {
     if (!roleToDelete) return;
     try {
       setDeleteLoading(true);
-      // Assuming deleteRole exists in roleService
       await roleService.deactivateRole(roleToDelete.id);
-      setDeleteDialogOpen(false);
+      setConfirmDialogOpen(false);
       setRoleToDelete(null);
+      showSuccessToast("Role deleted successfully");
       fetchRoles();
     } catch (err: any) {
       setError(err?.message || "Failed to delete role.");
@@ -106,102 +160,116 @@ const RoleManagementPage = () => {
 
   return (
     <Box sx={{
-      p: 2,
-      pt: 0,
+      px: { xs: 2, md: 4 },
+      pb: 4,
       minHeight: "100vh",
-      backgroundColor: "#f5f6fa",
-      color: "#1a1a2e"
+      backgroundColor: "#f8fafc",
+      display: "flex",
+      flexDirection: "column"
     }}>
-      <Box sx={{
-        pt: 2,
-        pb: 1.5,
-        px: 0,
-        mb: 1.5,
-        mt: 0,
-      }}>
+      {/* Header - Aligned with TenantList */}
+      <Box sx={{ pt: 1.5, pb: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <IconButton
+            onClick={() => navigate("/")}
+            sx={{
+              backgroundColor: "#1a1a2e",
+              borderRadius: 1.2,
+              width: 44,
+              height: 44,
+              "&:hover": { backgroundColor: "#2d2d44" }
+            }}
+          >
+            <HomeIcon sx={{ color: "white", fontSize: 24 }} />
+          </IconButton>
+          <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#1A1A2E", letterSpacing: "-1px" }}>
+            Role Management
+          </Typography>
+        </Box>
+        {/* Actions Row */}
         <Box sx={{
           display: "flex",
-          flexDirection: { xs: "column", sm: "row" },
-          justifyContent: "space-between",
-          alignItems: { xs: "flex-start", sm: "center" },
-          gap: 2
+          alignItems: "center",
+          gap: 2,
+          width: { xs: "100%", sm: "auto" }
         }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <TextField
+            placeholder="Search roles..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            variant="outlined"
+            size="small"
+            fullWidth={isMobile}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: "#94a3b8", fontSize: 20 }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              width: { xs: "100%", sm: "280px" },
+              "& .MuiOutlinedInput-root": {
+                bgcolor: "white",
+                borderRadius: "12px",
+                fontSize: "0.9rem",
+                fontWeight: 500,
+                "& fieldset": { borderColor: "#e2e8f0", borderWidth: "1.2px" },
+                "&:hover fieldset": { borderColor: "#cbd5e1" },
+                "&.Mui-focused": {
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.03)",
+                  "& fieldset": { borderColor: "#1A1A2E", borderWidth: "1.8px" },
+                }
+              }
+            }}
+          />
+          <Tooltip title="Add Role">
             <IconButton
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/roles/create")}
               sx={{
                 backgroundColor: "#1a1a2e",
-                p: 1,
-                borderRadius: 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                "&:hover": { backgroundColor: "#2d2d44" }
+                color: "white",
+                borderRadius: 1.2,
+                width: 44,
+                height: 44,
+                boxShadow: "0 4px 10px rgba(26,26,46,0.2)",
+                "&:hover": { backgroundColor: "#2d2d44", transform: "translateY(-1px)" }
               }}
             >
-              <HomeIcon sx={{ color: "white", fontSize: 24 }} />
+              <AddIcon sx={{ fontSize: 24 }} />
             </IconButton>
-            <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#64748b" }}>
-              Role Management
-            </Typography>
-          </Box>
-          <Box sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            width: { xs: "100%", sm: "auto" }
-          }}>
-            <TextField
-              placeholder="Search by Role Name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              variant="outlined"
-              size="small"
-              fullWidth={isMobile}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon sx={{ color: "#94a3b8" }} />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                width: { xs: "100%", sm: "300px" },
-                "& .MuiOutlinedInput-root": {
-                  bgcolor: "white",
-                  borderRadius: "8px",
-                  "& fieldset": { borderColor: "#cbd5e1" },
-                  "&:hover fieldset": { borderColor: "#94a3b8" },
-                }
-              }}
-            />
-            <Tooltip title="Add Role">
-              <IconButton
-                onClick={() => navigate("/roles/create")}
-                sx={{
-                  color: "#1a1a2e",
-                  flexShrink: 0,
-                  "&:hover": { bgcolor: "rgba(26, 26, 46, 0.04)" }
-                }}
-              >
-                <AddIcon sx={{ fontSize: 32, border: "2px solid #1a1a2e", borderRadius: "50%", p: 0.2 }} />
-              </IconButton>
-            </Tooltip>
-          </Box>
+          </Tooltip>
         </Box>
       </Box>
+
       <Paper sx={{
         borderRadius: "12px",
         overflow: "hidden",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.01)",
         border: "1px solid #e2e8f0",
-        bgcolor: "white"
+        bgcolor: "white",
+        flexGrow: 1,
+        display: "flex",
+        flexDirection: "column"
       }}>
         {error && (
           <Alert severity="error" sx={{ m: 2 }} onClose={() => setError(null)}>
             {error}
           </Alert>
         )}
+
+        {/* Info Bar */}
+        {!loading && totalRoles > 0 && (
+          <Box sx={{ py: 1.2, px: 3, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f1f5f9", bgcolor: "#fcfdfe" }}>
+            <Typography sx={{ fontSize: "0.80rem", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              Role Directory
+            </Typography>
+            <Typography sx={{ fontSize: "0.85rem", color: "#94a3b8", fontWeight: 500 }}>
+              Showing <Box component="span" sx={{ color: "#1a1a2e", fontWeight: 700 }}>{Math.min(page * rowsPerPage + 1, totalRoles)}-{Math.min((page + 1) * rowsPerPage, totalRoles)}</Box> of <Box component="span" sx={{ color: "#1a1a2e", fontWeight: 700 }}>{totalRoles}</Box> roles
+            </Typography>
+          </Box>
+        )}
+
         <TableContainer sx={{ maxHeight: "calc(100vh - 200px)" }}>
           {loading ? (
             <Box sx={{ display: "flex", justifyContent: "center", p: 8 }}>
@@ -211,12 +279,28 @@ const RoleManagementPage = () => {
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f0f3f8", fontSize: "0.80rem", px: 2, bgcolor: "#1a1a2e" }}>Role Name</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f0f3f8", fontSize: "0.80rem", px: 2, bgcolor: "#1a1a2e" }}>Description</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f0f3f8", fontSize: "0.80rem", px: 2, bgcolor: "#1a1a2e" }}>Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f0f3f8", fontSize: "0.80rem", px: 2, bgcolor: "#1a1a2e" }}>Created Date</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f0f3f8", fontSize: "0.80rem", px: 2, bgcolor: "#1a1a2e" }}>Edit</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#f0f3f8", fontSize: "0.80rem", px: 2, bgcolor: "#1a1a2e" }}>Delete</TableCell>
+                  <TableCell
+                    sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e", cursor: 'pointer' }}
+                    onClick={() => {
+                      if (sortBy === 'name') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      else { setSortBy('name'); setSortOrder('asc'); }
+                    }}
+                  >
+                    Role Name {sortBy === 'name' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Description</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Status</TableCell>
+                  <TableCell
+                    sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e", cursor: 'pointer' }}
+                    onClick={() => {
+                      if (sortBy === 'createdAt') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      else { setSortBy('createdAt'); setSortOrder('asc'); }
+                    }}
+                  >
+                    Created Date {sortBy === 'createdAt' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Edit</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Delete</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -229,22 +313,38 @@ const RoleManagementPage = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  roles.map((role) => (
-                    <TableRow key={role.id} hover sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
-                      <TableCell sx={{ fontWeight: 600, color: "#1a1a2e", py: 0.6, px: 2 }}>
+                  sortedRoles.map((role) => (
+                    <TableRow
+                      key={role.id}
+                      hover
+                      sx={{
+                        "&.MuiTableRow-hover:hover": { bgcolor: "#f1f5f9" },
+                        "& td": { borderBottom: "1px solid #f1f5f9" }
+                      }}
+                    >
+                      <TableCell sx={{ fontWeight: 700, color: "#1a1a2e", py: 0.8, px: 2, fontSize: "0.85rem" }}>
                         {role.name}
                       </TableCell>
-                      <TableCell sx={{ color: "#64748b", py: 0.6, px: 2 }}>{role.description}</TableCell>
-                      <TableCell sx={{ py: 0.6, px: 2 }}>
-                        <Typography sx={{
-                          fontWeight: 600,
-                          fontSize: "0.80rem",
-                          color: role.status === "ACTIVE" ? "#10b981" : "#ef4444"
+                      <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem" }}>{role.description}</TableCell>
+                      <TableCell sx={{ py: 0.8, px: 2 }}>
+                        <Box sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 1,
+                          px: 1.2,
+                          py: 0.35,
+                          borderRadius: "20px",
+                          bgcolor: role.status === "ACTIVE" ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                          color: role.status === "ACTIVE" ? "#059669" : "#dc2626",
+                          border: `1px solid ${role.status === "ACTIVE" ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)"}`
                         }}>
-                          {role.status === "ACTIVE" ? "Active" : "Inactive"}
-                        </Typography>
+                          <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "currentColor" }} />
+                          <Typography sx={{ fontWeight: 700, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            {role.status === "ACTIVE" ? "Active" : "Inactive"}
+                          </Typography>
+                        </Box>
                       </TableCell>
-                      <TableCell sx={{ color: "#64748b", py: 0.6, px: 2 }}>
+                      <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem" }}>
                         {role.createdAt && !isNaN(new Date(role.createdAt).getTime())
                           ? new Date(role.createdAt).toLocaleDateString('en-US', {
                               month: 'short',
@@ -253,11 +353,11 @@ const RoleManagementPage = () => {
                             })
                           : "-"}
                       </TableCell>
-                      <TableCell sx={{ py: 0.6, px: 2 }}>
+                      <TableCell sx={{ py: 0.8, px: 2 }}>
                         <Tooltip title="Edit">
                           <IconButton
                             size="small"
-                            onClick={() => navigate(`/roles/${role.id}`)}
+                            onClick={() => navigate(`/roles/create?id=${role.id}`)}
                             sx={{
                               color: "#94a3b8",
                               "&:hover": { color: "#1713eaff" }
@@ -288,61 +388,183 @@ const RoleManagementPage = () => {
             </Table>
           )}
         </TableContainer>
-        <TablePagination
-          component="div"
-          count={totalRoles}
-          page={page}
-          onPageChange={(_, newPage) => setPage(newPage)}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => {
-            const newRowsPerPage = parseInt(e.target.value, 10);
-            setRowsPerPage(newRowsPerPage);
-            setPage(0);
-          }}
-          rowsPerPageOptions={[10, 25, 50]}
-          labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count}`}
-          sx={{ px: 2, borderTop: "1px solid #e2e8f0" }}
-        />
+        {/* Custom Pagination Footer */}
+        {!loading && roles.length > 0 && (
+          <Box sx={{
+            px: 2,
+            py: 1,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            borderTop: "1px solid #f1f5f9",
+            bgcolor: "#fcfdfe"
+          }}>
+            {/* Left: Rows Per Page */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b" }}>
+                Rows per page
+              </Typography>
+              <Select
+                value={rowsPerPage}
+                onChange={(e) => {
+                  setRowsPerPage(Number(e.target.value));
+                  setPage(0);
+                }}
+                size="small"
+                sx={{
+                  height: "28px",
+                  width: "65px",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  bgcolor: "white",
+                  borderRadius: "6px",
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: "#e2e8f0" },
+                }}
+              >
+                <MenuItem value={10}>10</MenuItem>
+                <MenuItem value={20}>20</MenuItem>
+                <MenuItem value={25}>25</MenuItem>
+                <MenuItem value={50}>50</MenuItem>
+              </Select>
+            </Box>
+            {/* Right: Page Navigation */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b" }}>
+                <Box component="span" sx={{ color: "#1a1a2e" }}>{page * rowsPerPage + 1}-{Math.min((page + 1) * rowsPerPage, totalRoles)}</Box> of <Box component="span" sx={{ color: "#1a1a2e" }}>{totalRoles}</Box>
+              </Typography>
+              <Box sx={{ display: "flex", gap: 0.5 }}>
+                <IconButton
+                  size="small"
+                  disabled={page === 0}
+                  onClick={() => setPage(page - 1)}
+                  sx={{ border: "1px solid #e2e8f0", borderRadius: "6px", p: 0.4, "&:hover": { bgcolor: "#f1f5f9" } }}
+                >
+                  <Box component="span" sx={{ fontSize: '1.1rem' }}>{'<'}</Box>
+                </IconButton>
+                <IconButton
+                  size="small"
+                  disabled={page >= Math.ceil(totalRoles / rowsPerPage) - 1}
+                  onClick={() => setPage(page + 1)}
+                  sx={{ border: "1px solid #e2e8f0", borderRadius: "6px", p: 0.4, "&:hover": { bgcolor: "#f1f5f9" } }}
+                >
+                  <Box component="span" sx={{ fontSize: '1.1rem' }}>{'>'}</Box>
+                </IconButton>
+              </Box>
+            </Box>
+          </Box>
+        )}
       </Paper>
       <Dialog
-        open={deleteDialogOpen}
-        onClose={() => !deleteLoading && setDeleteDialogOpen(false)}
+        open={confirmDialogOpen}
+        onClose={() => !deleteLoading && setConfirmDialogOpen(false)}
         PaperProps={{
-          sx: { borderRadius: 3, width: "100%", maxWidth: 450 }
+          sx: {
+            borderRadius: 3,
+            maxWidth: 600,
+            width: '100%',
+            p: 0,
+            position: 'absolute',
+            top: '5%',
+            left: '50%',
+            transform: 'translate(-50%, 0)',
+            height: '30%', // Reduced height by 50%
+            minHeight: '20px', // Optional: ensure minimum usability
+            overflowY: 'auto',
+          }
         }}
       >
-        <DialogTitle sx={{ fontWeight: "700", color: "error.main" }}>
-          Confirm Role Deletion
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
-            Are you sure you want to delete <strong>{roleToDelete?.name}</strong>?
-          </DialogContentText>
-          <Alert severity="warning" sx={{ borderRadius: 2 }}>
-            This is a <strong>Soft Delete</strong>. The role will be removed from the list,
-            and <strong>all associated permissions</strong> will be deactivated immediately.
-          </Alert>
-        </DialogContent>
-        <DialogActions sx={{ p: 3, pt: 0 }}>
-          <Button
-            onClick={() => setDeleteDialogOpen(false)}
+        {/* Header bar with title and close icon */}
+        <Box sx={{
+          bgcolor: '#18183a',
+          borderTopLeftRadius: 12,
+          borderTopRightRadius: 12,
+          px: 2,
+          py: 0.10,
+          minHeight: 4,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.10)',
+        }}>
+          <Box />
+          <IconButton
+            aria-label="close"
+            onClick={() => setConfirmDialogOpen(false)}
             disabled={deleteLoading}
-            sx={{ borderRadius: 2 }}
+            sx={{ color: 'white', bgcolor: 'transparent', borderRadius: 2 }}
           >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmDelete}
-            color="error"
-            variant="contained"
-            disabled={deleteLoading}
-            startIcon={deleteLoading ? <CircularProgress size={20} /> : <DeleteIcon />}
-            sx={{ borderRadius: 2, px: 3 }}
-          >
-            {deleteLoading ? "Deleting..." : "Delete Permanently"}
-          </Button>
-        </DialogActions>
+            <CancelIcon sx={{ fontSize: 28 }} />
+          </IconButton>
+        </Box>
+        {/* Message, check icon, and buttons area */}
+        <Box sx={{ px: 4, pt: 4, pb: 2.5, bgcolor: 'white', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, textAlign: 'left' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+            <CheckIcon sx={{ fontSize: 50, color: '#43a047', mr: 2, p: 0 }} />
+            <Typography sx={{ fontWeight: 175, fontSize: '1.9rem', color: '#18183a', letterSpacing: '-1px', lineHeight: 1.1 }}>
+              Please Confirm
+            </Typography>
+          </Box>
+          <Typography sx={{ fontSize: '1.05rem', color: '#18183a', fontWeight: 125, mb: 1.2, ml: 3 }}>
+            {confirmDialogType === 'delete'
+              ? 'Are you sure you want to delete role?'
+              : confirmDialogType === 'edit'
+                ? 'Are you sure you want to update this role?'
+                : ''}
+          </Typography>
+          <Box sx={{ width: '100%', mb: 0.5 }}>
+            <hr style={confirmDividerStyle} />
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, width: '100%', mt: 0.5 }}>
+            <Button
+              onClick={() => setConfirmDialogOpen(false)}
+              disabled={deleteLoading}
+              sx={{
+                color: '#ef4444',
+                backgroundColor: 'transparent',
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                px: 4,
+                borderRadius: 0,
+                minWidth: 120,
+                boxShadow: 'none',
+                border: 'none',
+                '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' }
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDialogType === 'delete' ? handleConfirmDelete : undefined}
+              disabled={deleteLoading}
+              sx={{
+                color: '#43a047',
+                backgroundColor: 'transparent',
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                px: 4,
+                borderRadius: 0,
+                minWidth: 120,
+                boxShadow: 'none',
+                border: 'none',
+                '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' }
+              }}
+            >
+              {deleteLoading ? "Deleting..." : "Confirm"}
+            </Button>
+          </Box>
+        </Box>
       </Dialog>
+      <Snackbar
+        open={!!snackbar}
+        autoHideDuration={3000}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        onClose={() => setSnackbar(null)}
+      >
+        <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: '100%' }}>
+          {snackbar}
+        </Alert>
+      </Snackbar>
     </Box >
   );
 };
