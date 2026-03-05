@@ -3,44 +3,56 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, EmailStr
 
 
 class TenantBase(BaseModel):
     code: str
     name: str
     owner_name: Optional[str] = None
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None
     phone: Optional[str] = None
     description: Optional[str] = None
     is_active: bool = True
+    # Branding
+    logo_url: Optional[str] = None
+    # Address
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pin_code: Optional[str] = None
 
 
 class TenantCreate(TenantBase):
     """Schema for creating a new tenant."""
-
     pass
 
 
-class TenantProvision(BaseModel):
+class TenantProvision(TenantBase):
     """Schema for the full tenant provisioning workflow."""
-    name: str
-    owner_name: str
-    email: str
-    admin_password: str
-    phone: Optional[str] = None
-    description: Optional[str] = None
-    is_active: bool = True
+    owner_name: str # Required for provisioning
+    email: EmailStr # Required for provisioning
+    admin_password: str = Field(..., min_length=8)
+    
+    # logo_url and address fields are inherited from TenantBase
 
 
 class TenantUpdate(BaseModel):
     """Schema for updating an existing tenant."""
-
     name: Optional[str] = None
     owner_name: Optional[str] = None
     phone: Optional[str] = None
     description: Optional[str] = None
     is_active: Optional[bool] = None
+    # Branding
+    logo_url: Optional[str] = None
+    # Address
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pin_code: Optional[str] = None
 
 
 class TenantResponse(TenantBase):

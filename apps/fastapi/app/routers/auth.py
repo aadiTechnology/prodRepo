@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.core.database import get_db
 from app.services.rbac_service import get_user_roles 
-from app.schemas.auth import LoginRequest, TokenResponse, UserWithRole, LoginContextResponse
+from app.schemas.auth import LoginRequest, TokenResponse, UserWithRole, LoginContextResponse, TenantInfo
 from app.schemas.user import UserCreate, UserResponse
 from app.services import user_service, rbac_service
 from app.models.user import UserRole
@@ -104,6 +104,19 @@ async def login_with_context(
         if not tenant or not tenant.is_active or tenant.is_deleted:
             logger.warning(f"Login blocked (Context): Tenant {user.tenant_id} is inactive or deleted (User: {user.email})")
             raise ForbiddenException("Tenant is deactivated. Contact system administrator.")
+        tenant_info = TenantInfo(
+            id=tenant.id,
+            name=tenant.name,
+            code=tenant.code,
+            logo_url=tenant.logo_url,
+            address_line1=tenant.address_line1,
+            address_line2=tenant.address_line2,
+            city=tenant.city,
+            state=tenant.state,
+            pin_code=tenant.pin_code,
+        )
+    else:
+        tenant_info = None
 
     # Always assign roles before using it!
     roles = [role.code for role in get_user_roles(db, user.id)]
@@ -124,23 +137,43 @@ async def login_with_context(
     return LoginContextResponse(
         access_token=access_token,
         token_type="bearer",
-        user=UserWithRole(id=user.id, email=user.email, full_name=user.full_name, role=user.role),
+        user=UserWithRole(id=user.id, email=user.email, full_name=user.full_name, role=user.role, tenant_id=user.tenant_id, tenant=tenant_info),
         roles=roles,
         permissions=permissions,
         menus=menus,
+        tenant=tenant_info,
     )
 
 @router.get("/me", response_model=UserWithRole)
 async def get_current_user_info(
     request: Request,
+    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ) -> UserWithRole:
     """Get current authenticated user information."""
+    tenant_info = None
+    if current_user.tenant_id:
+        from app.models.tenant import Tenant
+        tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
+        if tenant and tenant.is_active and not tenant.is_deleted:
+            tenant_info = TenantInfo(
+                id=tenant.id,
+                name=tenant.name,
+                code=tenant.code,
+                logo_url=tenant.logo_url,
+                address_line1=tenant.address_line1,
+                address_line2=tenant.address_line2,
+                city=tenant.city,
+                state=tenant.state,
+                pin_code=tenant.pin_code,
+            )
+
     return UserWithRole(
         id=current_user.id,
         email=current_user.email,
         full_name=current_user.full_name,
-        role=current_user.role
+        role=current_user.role,
+        tenant=tenant_info
     )
 
 @router.post("/logout")

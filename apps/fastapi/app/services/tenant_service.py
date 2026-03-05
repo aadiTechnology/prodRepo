@@ -63,7 +63,10 @@ def provision_tenant(db: Session, data: TenantProvision, created_by: int | None 
     Executes 6 steps inside ONE SQL TRANSACTION with rollback on failure.
     """
     # 1. Generate unique tenant code from name
-    base_code = re.sub(r'[^a-zA-Z0-9]', '_', data.name).upper()[:50]
+    base_code = re.sub(r'[^a-zA-Z0-9]', '_', data.name).strip('_').upper()[:50]
+    if not base_code:
+        base_code = "TENANT"
+    
     code = base_code
     counter = 1
     while db.query(Tenant).filter(Tenant.code == code).first():
@@ -85,6 +88,12 @@ def provision_tenant(db: Session, data: TenantProvision, created_by: int | None 
             phone=data.phone,
             description=data.description,
             is_active=data.is_active,
+            logo_url=data.logo_url,
+            address_line1=data.address_line1,
+            address_line2=data.address_line2,
+            city=data.city,
+            state=data.state,
+            pin_code=data.pin_code,
             created_by=created_by,
         )
         db.add(new_tenant)
@@ -164,6 +173,18 @@ def update_tenant(db: Session, tenant_id: int, data: TenantUpdate, updated_by: i
         tenant.phone = data.phone
     if data.description is not None:
         tenant.description = data.description
+    if "logo_url" in data.model_fields_set:
+        tenant.logo_url = data.logo_url
+    if data.address_line1 is not None:
+        tenant.address_line1 = data.address_line1
+    if data.address_line2 is not None:
+        tenant.address_line2 = data.address_line2
+    if data.city is not None:
+        tenant.city = data.city
+    if data.state is not None:
+        tenant.state = data.state
+    if data.pin_code is not None:
+        tenant.pin_code = data.pin_code
     if data.is_active is not None:
         if tenant.is_active != data.is_active:
             status_changed = True

@@ -4,15 +4,34 @@ from typing import Optional, List
 from app.models.user import UserRole
 from app.schemas.menu import MenuNode
 
+
 class LoginRequest(BaseModel):
     """Login request schema."""
     email: EmailStr
     password: str
 
+
 class TokenResponse(BaseModel):
     """Token response schema."""
     access_token: str
     token_type: str = "bearer"
+
+
+class TenantInfo(BaseModel):
+    """Tenant information returned at login."""
+    id: int
+    name: str
+    code: str
+    logo_url: Optional[str] = None
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pin_code: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 
 class UserWithRole(BaseModel):
     """User response with role."""
@@ -20,9 +39,12 @@ class UserWithRole(BaseModel):
     email: EmailStr
     full_name: str
     role: UserRole
+    tenant_id: Optional[int] = None
+    tenant: Optional[TenantInfo] = None
 
     class Config:
         from_attributes = True
+
 
 class CurrentUser(BaseModel):
     """Current authenticated user."""
@@ -45,6 +67,8 @@ class LoginContextResponse(BaseModel):
     roles: List[str]
     permissions: List[str]
     menus: List[MenuNode]
+    tenant: Optional[TenantInfo] = None
+
 
 def create_user_with_role(user):
     """Create a user with role."""

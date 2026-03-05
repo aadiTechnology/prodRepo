@@ -97,6 +97,10 @@ def update_user(
     try:
         if user.full_name is not None:
             db_user.full_name = user.full_name
+
+        if user.phone_number is not None:
+            db_user.phone_number = user.phone_number 
+
         if user.is_active is not None:
             db_user.is_active = user.is_active
         if user.tenant_id is not None:
