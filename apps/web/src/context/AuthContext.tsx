@@ -156,9 +156,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(response.access_token);
       saveToken(response.access_token);
 
+      // Merge tenant info into user so user.tenant is accessible everywhere
+      const userWithTenant = response.tenant
+        ? { ...response.user, tenant: response.tenant }
+        : response.user;
+
       // Save user information
-      setUser(response.user);
-      saveUser(response.user);
+      setUser(userWithTenant);
+      saveUser(userWithTenant);
 
       return response;
     } catch (error) {

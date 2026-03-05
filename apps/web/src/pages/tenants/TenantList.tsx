@@ -221,6 +221,7 @@ const TenantList = () => {
                         <Table size="small" stickyHeader>
                             <TableHead>
                                 <TableRow>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Logo</TableCell>
                                     <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Tenant Name</TableCell>
                                     <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Owner</TableCell>
                                     <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Email</TableCell>
@@ -233,7 +234,7 @@ const TenantList = () => {
                             <TableBody>
                                 {tenants.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                                        <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
                                             <Typography variant="body1" color="text.secondary">
                                                 No tenants available.
                                             </Typography>
@@ -249,6 +250,18 @@ const TenantList = () => {
                                                 "& td": { borderBottom: "1px solid #f1f5f9" }
                                             }}
                                         >
+                                            <TableCell sx={{ py: 0.8, px: 2 }}>
+                                                {tenant.logo_url ? (
+                                                    <img
+                                                        src={tenant.logo_url}
+                                                        alt={tenant.name}
+                                                        style={{ height: 28, width: "auto", maxWidth: 80, objectFit: "contain" }}
+                                                        onError={(e) => { e.currentTarget.style.display = "none"; }}
+                                                    />
+                                                ) : (
+                                                    <Typography variant="caption" color="text.secondary">—</Typography>
+                                                )}
+                                            </TableCell>
                                             <TableCell sx={{ fontWeight: 700, color: "#1a1a2e", py: 0.8, px: 2, fontSize: "0.85rem" }}>
                                                 {tenant.name}
                                             </TableCell>

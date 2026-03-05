@@ -3,7 +3,7 @@
  */
 
 import { MenuNode } from "./menu";
-import { User } from "./auth";
+import { User, TenantInfo } from "./auth";
 
 export interface RBACState {
   roles: string[];
@@ -19,4 +19,5 @@ export interface LoginContextResponse {
   user: User;
   roles: string[];
   menus: MenuNode[];
+  tenant?: TenantInfo | null;
 }

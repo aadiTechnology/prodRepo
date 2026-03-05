@@ -27,6 +27,12 @@ function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [avatarSrc, setAvatarSrc] = useState<string | undefined>(undefined);
+  const [logoError, setLogoError] = useState(false);
+
+  // Reset logo error when tenant changes
+  useEffect(() => {
+    setLogoError(false);
+  }, [user?.tenant?.id, user?.tenant?.logo_url]);
 
   /** SECURITY: Convert stored path like "/profile-images/7.jpg" → full URL with validation */
   const toFullUrl = (path: string | null | undefined): string | undefined => {
@@ -185,6 +191,7 @@ function MainLayout() {
               </IconButton>
             )}
 
+            {/* Dynamic Logo / Title Logic */}
             <Box
               component={Link}
               to="/"
@@ -196,39 +203,53 @@ function MainLayout() {
                 zIndex: 2,
               }}
             >
-              <img
-                src="/aaadi.webp"
-                alt="Logo"
-                style={{ height: "45px", objectFit: "contain", borderRadius: "8px" }}
-              />
+              {user?.tenant ? (
+                // Tenant User: show their logo or tenant name
+                user.tenant.logo_url && !logoError ? (
+                  // Has Logo URL
+                  <img
+                    src={user.tenant.logo_url}
+                    alt={user.tenant.name}
+                    style={{ height: 45, maxWidth: 180, objectFit: "contain", borderRadius: "8px" }}
+                    onError={() => setLogoError(true)}
+                  />
+                ) : (
+                  // No logo or broken logo — show tenant name
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 700,
+                      color: "text.primary",
+                      fontSize: isMobile ? "1rem" : "1.25rem"
+                    }}
+                  >
+                    {user.tenant.name}
+                  </Typography>
+                )
+              ) : (
+                // System Admin: show Aadi Technology branding
+                <>
+                  <img
+                    src="/aaadi.webp"
+                    alt="Aadi Technology Logo"
+                    style={{ height: "45px", objectFit: "contain", borderRadius: "8px" }}
+                  />
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 700,
+                      color: "text.primary",
+                      fontSize: isMobile ? "1rem" : "1.25rem",
+                      display: { xs: "none", sm: "block" }
+                    }}
+                  >
+                    Aadi Technology
+                  </Typography>
+                </>
+              )}
             </Box>
 
-            {!isMobile && (
-              <Box
-                sx={{
-                  position: "absolute",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  display: "flex",
-                  justifyContent: "center",
-                  width: "auto",
-                  pointerEvents: "none"
-                }}
-              >
-                <Typography
-                  variant="h6"
-                  sx={{
-                    color: "text.primary",
-                    fontWeight: 800,
-                    fontSize: "1.25rem",
-                    letterSpacing: "-0.5px",
-                    pointerEvents: "auto"
-                  }}
-                >
-                  {appName}
-                </Typography>
-              </Box>
-            )}
+            {/* Spacer for centered layout - can be removed if strictly following user placement */}
 
             <Box sx={{ flexGrow: 1 }} />
 

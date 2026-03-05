@@ -2,6 +2,18 @@
  * Authentication Types
  */
 
+export interface TenantInfo {
+  id: number;
+  name: string;
+  code: string;
+  logo_url?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pin_code?: string | null;
+}
+
 export interface User {
   id: number;
   email: string;
@@ -10,6 +22,7 @@ export interface User {
   tenant_id?: number | null;
   phone_number?: string | null;
   is_active?: boolean;
+  tenant?: TenantInfo | null;
 }
 
 export interface LoginRequest {

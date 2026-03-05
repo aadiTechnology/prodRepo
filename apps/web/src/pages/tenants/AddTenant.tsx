@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
     Box,
+    Button,
     Paper,
     Typography,
     Grid,
@@ -12,6 +13,9 @@ import {
     Stack,
     Tooltip,
     Switch,
+    Tabs,
+    Tab,
+    Divider,
 } from "@mui/material";
 import {
     Home as HomeIcon,
@@ -24,10 +28,13 @@ import {
     Lock as LockIcon,
     Save as SaveIcon,
     Cancel as CancelIcon,
+    CloudUpload as UploadIcon,
+    Delete as DeleteIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../../components/common";
 import tenantService from "../../api/services/tenantService";
+import { Link as LinkIcon } from "@mui/icons-material";
 
 const AddTenant = () => {
     const navigate = useNavigate();
@@ -52,7 +59,16 @@ const AddTenant = () => {
         phone: "",
         description: "",
         is_active: true,
+        // Branding
+        logo_url: "",
+        // Address
+        address_line1: "",
+        address_line2: "",
+        city: "",
+        state: "",
+        pin_code: "",
     });
+    const [logoTab, setLogoTab] = useState(0); // 0 for Upload, 1 for URL
     const [initialFormData, setInitialFormData] = useState<typeof formData | null>(null);
 
     // Load existing tenant when in edit mode
@@ -70,9 +86,25 @@ const AddTenant = () => {
                 phone: data.phone || "",
                 description: data.description || "",
                 is_active: data.is_active,
+                // Branding & Address
+                logo_url: data.logo_url || "",
+                address_line1: data.address_line1 || "",
+                address_line2: data.address_line2 || "",
+                city: data.city || "",
+                state: data.state || "",
+                pin_code: data.pin_code || "",
             };
             setFormData(tenantData);
             setInitialFormData(tenantData);
+
+            // If logo exists, detect if it's base64 or a standard URL to set the tab
+            if (tenantData.logo_url) {
+                if (tenantData.logo_url.startsWith('data:')) {
+                    setLogoTab(0);
+                } else {
+                    setLogoTab(1);
+                }
+            }
         } catch (err: any) {
             setError(err?.message || "Failed to load tenant.");
         } finally {
@@ -139,6 +171,27 @@ const AddTenant = () => {
         return Object.keys(newErrors).length === 0;
     };
 
+    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validation: Size < 2MB
+        if (file.size > 2 * 1024 * 1024) {
+            setError("Image size should be less than 2MB");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setFormData(prev => ({ ...prev, logo_url: reader.result as string }));
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleClearLogo = () => {
+        setFormData(prev => ({ ...prev, logo_url: "" }));
+    };
+
     const handleSubmitAction = async () => {
         if (!validateForm()) return;
         try {
@@ -151,6 +204,12 @@ const AddTenant = () => {
                     phone: formData.phone,
                     description: formData.description,
                     is_active: formData.is_active,
+                    logo_url: formData.logo_url || null,
+                    address_line1: formData.address_line1 || null,
+                    address_line2: formData.address_line2 || null,
+                    city: formData.city || null,
+                    state: formData.state || null,
+                    pin_code: formData.pin_code || null,
                 });
                 setSuccess("Tenant updated successfully!");
                 setTimeout(() => navigate("/tenants"), 1000);
@@ -163,6 +222,12 @@ const AddTenant = () => {
                     phone: formData.phone,
                     description: formData.description,
                     is_active: formData.is_active,
+                    logo_url: formData.logo_url || null,
+                    address_line1: formData.address_line1 || null,
+                    address_line2: formData.address_line2 || null,
+                    city: formData.city || null,
+                    state: formData.state || null,
+                    pin_code: formData.pin_code || null,
                 });
                 setSuccess(result.message || "Tenant created successfully!");
                 setTimeout(() => navigate("/tenants"), 1000);
@@ -259,14 +324,13 @@ const AddTenant = () => {
                             <IconButton
                                 onClick={() => navigate("/tenants")}
                                 sx={{
-                                    color: "#64748b",
-                                    backgroundColor: "#f1f5f9",
+                                    color: "#ef4444",
+                                    backgroundColor: "#fee2e2",
                                     borderRadius: 1.2,
                                     width: 44,
                                     height: 44,
                                     "&:hover": {
-                                        backgroundColor: "#fee2e2",
-                                        color: "#ef4444",
+                                        backgroundColor: "#fecaca",
                                         transform: "translateY(-1px)"
                                     }
                                 }}
@@ -277,14 +341,14 @@ const AddTenant = () => {
                         <Tooltip title={isEditMode ? "Update Tenant" : "Save Tenant"}>
                             <IconButton
                                 onClick={handleSubmitAction}
-                                disabled={loading || !isFormValid}
+                                disabled={loading}
                                 sx={{
-                                    backgroundColor: "#1a1a2e",
+                                    backgroundColor: "#10b981",
                                     color: "white",
                                     borderRadius: 1.2,
                                     width: 44, height: 44,
-                                    boxShadow: "0 4px 10px rgba(26,26,46,0.2)",
-                                    "&:hover": { backgroundColor: "#2d2d44", transform: "translateY(-1px)" },
+                                    boxShadow: "0 4px 10px rgba(16, 185, 129, 0.2)",
+                                    "&:hover": { backgroundColor: "#059669", transform: "translateY(-1px)" },
                                     "&.Mui-disabled": { backgroundColor: "#cbd5e1", color: "white" }
                                 }}
                             >
@@ -342,6 +406,198 @@ const AddTenant = () => {
                                             <Switch checked={formData.is_active} onChange={handleChange} name="is_active" size="small" color="primary" />
                                         </Box>
                                     </Grid>
+
+                                    {/* Branding Section */}
+                                    <Grid item xs={12}>
+                                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1.5, bgcolor: "#1a1a2e", borderRadius: "12px", mb: 0 }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "white", textTransform: "uppercase", letterSpacing: "1px", fontSize: "0.75rem" }}>Branding</Typography>
+                                        </Box>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <Box sx={{
+                                            p: 2,
+                                            border: "2px dashed #e2e8f0",
+                                            borderRadius: "16px",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            alignItems: "center",
+                                            gap: 2,
+                                            bgcolor: "#f8fafc",
+                                            transition: "all 0.2s ease-in-out",
+                                            "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f1f5f9" }
+                                        }}>
+                                            <Box sx={{ width: "100%", mb: 1 }}>
+                                                <Tabs
+                                                    value={logoTab}
+                                                    onChange={(_, val) => {
+                                                        setLogoTab(val);
+                                                        // Clear logo when switching to avoid mismatched state
+                                                        setFormData(prev => ({ ...prev, logo_url: "" }));
+                                                    }}
+                                                    variant="fullWidth"
+                                                    sx={{
+                                                        minHeight: 36,
+                                                        "& .MuiTab-root": { py: 1, minHeight: 36, fontSize: "0.75rem", fontWeight: 700 },
+                                                        "& .MuiTabs-indicator": { height: 3, borderRadius: "3px 3px 0 0", bgcolor: "#1a1a2e" },
+                                                        borderBottom: "1px solid #e2e8f0"
+                                                    }}
+                                                >
+                                                    <Tab icon={<UploadIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="UPLOAD FILE" />
+                                                    <Tab icon={<LinkIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="LOGO URL" />
+                                                </Tabs>
+                                            </Box>
+
+                                            {logoTab === 0 ? (
+                                                <>
+                                                    {formData.logo_url && formData.logo_url.startsWith('data:') ? (
+                                                        <Box sx={{ position: "relative", display: "inline-block" }}>
+                                                            <img
+                                                                src={formData.logo_url}
+                                                                alt="Logo Preview"
+                                                                style={{ height: "80px", maxWidth: "200px", objectFit: "contain", borderRadius: "8px", border: "1px solid #e2e8f0" }}
+                                                            />
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={handleClearLogo}
+                                                                sx={{
+                                                                    position: "absolute",
+                                                                    top: -8,
+                                                                    right: -8,
+                                                                    bgcolor: "#ef4444",
+                                                                    color: "white",
+                                                                    "&:hover": { bgcolor: "#dc2626" }
+                                                                }}
+                                                            >
+                                                                <DeleteIcon sx={{ fontSize: 16 }} />
+                                                            </IconButton>
+                                                        </Box>
+                                                    ) : (
+                                                        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 1 }}>
+                                                            <UploadIcon sx={{ fontSize: 40, color: "#94a3b8", mb: 1 }} />
+                                                            <Typography variant="body2" sx={{ fontWeight: 600, color: "#64748b" }}>
+                                                                No Local File
+                                                            </Typography>
+                                                            <Typography variant="caption" sx={{ color: "#94a3b8" }}>
+                                                                PNG, JPG or WebP (Max 2MB)
+                                                            </Typography>
+                                                        </Box>
+                                                    )}
+
+                                                    <input
+                                                        accept="image/*"
+                                                        id="logo-upload-input"
+                                                        type="file"
+                                                        hidden
+                                                        onChange={handleLogoUpload}
+                                                    />
+                                                    <label htmlFor="logo-upload-input">
+                                                        <Box
+                                                            component="span"
+                                                            sx={{
+                                                                px: 3, py: 1,
+                                                                bgcolor: "#1a1a2e", borderRadius: "8px",
+                                                                color: "white", fontSize: "0.875rem", fontWeight: 700,
+                                                                cursor: "pointer", display: "inline-block",
+                                                                transition: "all 0.2s",
+                                                                "&:hover": { bgcolor: "#2d2d44", transform: "translateY(-1px)" }
+                                                            }}
+                                                        >
+                                                            {(formData.logo_url && formData.logo_url.startsWith('data:')) ? "Change File" : "Choose File"}
+                                                        </Box>
+                                                    </label>
+                                                </>
+                                            ) : (
+                                                <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
+                                                    <TextField
+                                                        fullWidth
+                                                        name="logo_url"
+                                                        label="Logo Image URL"
+                                                        placeholder="https://example.com/logo.png"
+                                                        value={formData.logo_url.startsWith('data:') ? "" : formData.logo_url}
+                                                        onChange={handleChange}
+                                                        sx={textFieldSx("logo_url")}
+                                                        InputProps={{
+                                                            startAdornment: (
+                                                                <InputAdornment position="start">
+                                                                    <LinkIcon sx={{ color: "#94a3b8" }} />
+                                                                </InputAdornment>
+                                                            ),
+                                                            endAdornment: formData.logo_url && !formData.logo_url.startsWith('data:') && (
+                                                                <InputAdornment position="end">
+                                                                    <IconButton onClick={handleClearLogo} size="small" sx={{ color: "#ef4444" }}>
+                                                                        <DeleteIcon sx={{ fontSize: 18 }} />
+                                                                    </IconButton>
+                                                                </InputAdornment>
+                                                            )
+                                                        }}
+                                                    />
+                                                    {formData.logo_url && !formData.logo_url.startsWith('data:') && (
+                                                        <Box sx={{ position: "relative", display: "inline-block", mt: 1 }}>
+                                                            <Box sx={{ p: 1, bgcolor: "white", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                                                                <img
+                                                                    src={formData.logo_url}
+                                                                    alt="URL Preview"
+                                                                    style={{ height: "60px", maxWidth: "150px", objectFit: "contain" }}
+                                                                    onError={(e) => {
+                                                                        (e.target as HTMLImageElement).style.display = 'none';
+                                                                        setErrors(prev => ({ ...prev, logo_url: "Invalid or inaccessible image URL" }));
+                                                                    }}
+                                                                />
+                                                            </Box>
+                                                        </Box>
+                                                    )}
+                                                </Box>
+                                            )}
+                                        </Box>
+                                    </Grid>
+
+                                    {/* Address Section */}
+                                    <Grid item xs={12}>
+                                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1.5, bgcolor: "#1a1a2e", borderRadius: "12px" }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "white", textTransform: "uppercase", letterSpacing: "1px", fontSize: "0.75rem" }}>Address Information</Typography>
+                                        </Box>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            fullWidth name="address_line1" label="Address Line 1"
+                                            placeholder="123 Main Street"
+                                            value={formData.address_line1} onChange={handleChange} sx={textFieldSx("address_line1")}
+                                            InputLabelProps={{ shrink: formData.address_line1 ? true : undefined }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            fullWidth name="address_line2" label="Address Line 2"
+                                            placeholder="Suite 100, Building A"
+                                            value={formData.address_line2} onChange={handleChange} sx={textFieldSx("address_line2")}
+                                            InputLabelProps={{ shrink: formData.address_line2 ? true : undefined }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={5}>
+                                        <TextField
+                                            fullWidth name="city" label="City"
+                                            placeholder="New York"
+                                            value={formData.city} onChange={handleChange} sx={textFieldSx("city")}
+                                            InputLabelProps={{ shrink: formData.city ? true : undefined }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField
+                                            fullWidth name="state" label="State"
+                                            placeholder="NY"
+                                            value={formData.state} onChange={handleChange} sx={textFieldSx("state")}
+                                            InputLabelProps={{ shrink: formData.state ? true : undefined }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={3}>
+                                        <TextField
+                                            fullWidth name="pin_code" label="Pin Code"
+                                            placeholder="10001"
+                                            value={formData.pin_code} onChange={handleChange} sx={textFieldSx("pin_code")}
+                                            InputLabelProps={{ shrink: formData.pin_code ? true : undefined }}
+                                            inputProps={{ maxLength: 20 }}
+                                        />
+                                    </Grid>
                                 </Grid>
                             </Box>
                         </Paper>
@@ -396,6 +652,42 @@ const AddTenant = () => {
                                                 error={Boolean(errors.confirm_password)} helperText={errors.confirm_password}
                                             />
                                         </Stack>
+                                    </Box>
+                                    <Box sx={{ mt: 4, pt: 3, borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: 2 }}>
+                                        <Button
+                                            onClick={() => navigate("/tenants")}
+                                            variant="text"
+                                            sx={{
+                                                borderRadius: "12px",
+                                                px: 2,
+                                                py: 1,
+                                                color: "#ef4444",
+                                                fontWeight: 800,
+                                                fontSize: "1rem",
+                                                textTransform: "none",
+                                                "&:hover": { bgcolor: "rgba(239, 68, 68, 0.08)" }
+                                            }}
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            onClick={handleSubmitAction}
+                                            variant="text"
+                                            disabled={loading}
+                                            sx={{
+                                                borderRadius: "12px",
+                                                px: 2,
+                                                py: 1,
+                                                color: "#10b981",
+                                                fontWeight: 800,
+                                                fontSize: "1rem",
+                                                textTransform: "none",
+                                                "&:hover": { bgcolor: "rgba(16, 185, 129, 0.08)" },
+                                                "&.Mui-disabled": { color: "#cbd5e1" }
+                                            }}
+                                        >
+                                            {loading ? <CircularProgress size={20} color="inherit" /> : (isEditMode ? "Update" : "Save")}
+                                        </Button>
                                     </Box>
                                 </Paper>
                             )}
