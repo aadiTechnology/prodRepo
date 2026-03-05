@@ -27,6 +27,7 @@ def get_roles(
     Super Admin (is_platform=True) -> Platform roles where tenant_id IS NULL.
     Tenant Admin (is_platform=False) -> Tenant roles where tenant_id = tenant_id.
     """
+    from sqlalchemy.orm import joinedload
 
     query = db.query(Role).filter(Role.is_deleted == False)
 
@@ -40,6 +41,9 @@ def get_roles(
     if search:
         query = query.filter(Role.name.ilike(f"%{search}%"))
 
+    # Use eager loading to fetch permissions in a single query
+    query = query.options(joinedload(Role.permissions))
+
     total_count = query.count()
     roles = (
         query.order_by(Role.id.desc())
@@ -52,8 +56,14 @@ def get_roles(
 
 
 def get_role(db: Session, role_id: int) -> Role:
-    """Get a single role by ID."""
-    role = db.query(Role).filter(Role.id == role_id, Role.is_deleted == False).first()  # noqa: E712
+    """Get a single role by ID with eager loading of permissions."""
+    from sqlalchemy.orm import joinedload
+    role = (
+        db.query(Role)
+        .filter(Role.id == role_id, Role.is_deleted == False)  # noqa: E712
+        .options(joinedload(Role.permissions))
+        .first()
+    )
     if not role:
         raise NotFoundException("Role", role_id)
     return role

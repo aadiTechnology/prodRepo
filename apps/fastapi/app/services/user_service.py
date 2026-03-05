@@ -94,30 +94,48 @@ def update_user(
         if user.is_active is not None and not user.is_active:
             raise ConflictException("Cannot deactivate protected user.")
 
-    if user.full_name is not None:
-        db_user.full_name = user.full_name
-    if user.phone_number is not None:
-        db_user.phone_number = user.phone_number
-    if user.is_active is not None:
-        db_user.is_active = user.is_active
-    if user.tenant_id is not None:
-        db_user.tenant_id = user.tenant_id
-    if user.role is not None:
-        # Validate role
-        role_obj = db.query(UserRole).filter(UserRole.value == user.role).first()
-        if not role_obj:
-            raise ConflictException("Role does not exist.")
-        # Validate tenant_id for role scope
-        if user.role == "TENANT_ADMIN" and not db_user.tenant_id:
-            raise ConflictException("Tenant ID required for tenant role.")
-        if user.role == "SUPER_ADMIN" and db_user.tenant_id:
-            raise ConflictException("Tenant ID must be null for platform role.")
-        db_user.role = user.role
-    db_user.updated_by = updated_by
-    db_user.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+    try:
+        if user.full_name is not None:
+            db_user.full_name = user.full_name
+        if user.is_active is not None:
+            db_user.is_active = user.is_active
+        if user.tenant_id is not None:
+            db_user.tenant_id = user.tenant_id
+        if user.role is not None:
+            # Normalize role code to uppercase
+            target_role_code = user.role.upper()
+            
+            # Validate role existence
+            role_obj = db.query(Role).filter(Role.code == target_role_code).first()
+            if not role_obj:
+                logger.warning(f"Update failed: Role code {target_role_code} not found")
+                raise ConflictException(f"Role '{target_role_code}' does not exist.")
+            
+            # Additional validation for tenant-specific roles
+            if target_role_code == "TENANT_ADMIN" and not db_user.tenant_id:
+                raise ConflictException("Tenant ID is required for TENANT_ADMIN role.")
+            if target_role_code == "SUPER_ADMIN" and db_user.tenant_id:
+                raise ConflictException("Tenant ID must be null for SUPER_ADMIN role.")
+            
+            # Update legacy role column
+            db_user.role = target_role_code
+            
+            # Sync many-to-many roles relationship
+            db_user.roles = [role_obj]
+            
+        db_user.updated_by = updated_by
+        db_user.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(db_user)
+        return db_user
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"Database integrity error during user update: {str(e)}")
+        raise ConflictException("Updating user would violate a database constraint (e.g., duplicate email).")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Unexpected error during user update: {str(e)}")
+        raise e
 
 
 def soft_delete_user(db: Session, user_id: int, deleted_by: int | None = None) -> None:

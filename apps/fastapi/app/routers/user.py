@@ -8,7 +8,7 @@ from app.services import user_service
 from app.core.logging_config import get_logger
 from app.services.rbac_service import get_user_roles
 from app.models.user import User, UserRole
-from app.core.exceptions import ConflictException
+from app.core.exceptions import ConflictException, AppException
 from fastapi.responses import JSONResponse
 from app.core.exceptions import ConflictException
 from app.models.user_profile import UserProfile
@@ -27,13 +27,15 @@ async def create_user(
     logger.info(f"Admin {current_user.email} creating user: {user.email}")
     try:
         db_user = user_service.create_user(db, user, created_by=current_user.id)
+        # Refresh user object to load relationships after creation
+        db.refresh(db_user)
         return UserResponse(
             id=db_user.id,
             email=db_user.email,
             full_name=db_user.full_name,
             is_active=db_user.is_active,
             created_at=db_user.created_at,
-            roles=[role.code for role in get_user_roles(db, db_user.id)]
+            roles=[role.code for role in db_user.roles]
         )
     except ConflictException as e:
         return JSONResponse(status_code=409, content={"message": str(e)})
@@ -47,10 +49,18 @@ async def read_all_users(
 ) -> list[UserResponse]:
     """Get all users. Requires authentication."""
     logger.debug(f"User {current_user.email} fetching all users")
-    db_users = db.query(User).filter(User.is_deleted == False).all()
+    # Use eager loading to fetch users with their roles in a single query
+    from sqlalchemy.orm import joinedload
+    db_users = (
+        db.query(User)
+        .filter(User.is_deleted == False)
+        .options(joinedload(User.roles))
+        .all()
+    )
     users = []
     for db_user in db_users:
-        roles = [role.code for role in get_user_roles(db, db_user.id)]
+        # Roles are already loaded via joinedload, no additional query needed
+        roles = [role.code for role in db_user.roles]
         users.append(UserResponse(
             id=db_user.id,
             email=db_user.email,
@@ -92,11 +102,25 @@ async def update_user(
     """Update a user. Users can update themselves, admins can update anyone."""
     try:
         db_user = user_service.update_user(db, user_id, user, updated_by=current_user.id)
-        return {"message": "User saved successfully."}
+        return UserResponse(
+            id=db_user.id,
+            email=db_user.email,
+            full_name=db_user.full_name,
+            tenant_id=db_user.tenant_id,
+            phone_number=db_user.phone_number,
+            is_active=db_user.is_active,
+            created_at=db_user.created_at,
+            roles=[role.code for role in get_user_roles(db, db_user.id)]
+        )
+    except AppException as e:
+        logger.warning(f"Update user failed: {e.message}")
+        return JSONResponse(status_code=e.status_code, content={"message": e.message})
     except ConflictException as e:
-        return fastapi.responses.JSONResponse(status_code=403, content={"message": str(e)})
-    except Exception:
-        return fastapi.responses.JSONResponse(status_code=500, content={"message": "Unable to save user. Please try again."})
+        # Fallback for direct ConflictException if not inheriting from AppException in some versions
+        return JSONResponse(status_code=409, content={"message": str(e)})
+    except Exception as e:
+        logger.error(f"Unexpected error updating user {user_id}: {str(e)}")
+        return JSONResponse(status_code=500, content={"message": "Unable to save user. Please try again."})
 
 @router.delete("/{user_id}", status_code=204)
 async def delete_user(
@@ -150,5 +174,3 @@ async def change_password(
     else:
         result = user_service.handle_change_password(db, user_id, tenant_id, req)
         return ChangePasswordResponse(**result)
-
-
