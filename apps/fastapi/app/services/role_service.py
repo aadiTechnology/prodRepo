@@ -32,53 +32,57 @@ def get_roles(
     Super Admin (is_platform=True) -> Platform roles where tenant_id IS NULL.
     Tenant Admin (is_platform=False) -> Tenant roles where tenant_id = tenant_id.
     """
-    from sqlalchemy.orm import joinedload
+    try:
+        query = db.query(Role).filter(Role.is_deleted == False)
 
-    query = db.query(Role).filter(Role.is_deleted == False)
+        # RBAC filtering logic
+        # if is_platform:
+        #     query = query.filter(Role.scope_type == "Platform", Role.tenant_id == None)
+        # elif tenant_id:
+        #     query = query.filter(Role.scope_type == "Tenant", Role.tenant_id == tenant_id)
+        # # else: fallback, show all roles (for legacy or debugging)
 
-    # RBAC filtering logic
-    # if is_platform:
-    #     query = query.filter(Role.scope_type == "Platform", Role.tenant_id == None)
-    # elif tenant_id:
-    #     query = query.filter(Role.scope_type == "Tenant", Role.tenant_id == tenant_id)
-    # # else: fallback, show all roles (for legacy or debugging)
+        if search:
+            query = query.filter(Role.name.ilike(f"%{search}%"))
 
-    if search:
-        query = query.filter(Role.name.ilike(f"%{search}%"))
+        if created_from:
+            query = query.filter(Role.created_at >= created_from)
+        if created_to:
+            query = query.filter(Role.created_at <= created_to)
 
-    if created_from:
-        query = query.filter(Role.created_at >= created_from)
-    if created_to:
-        query = query.filter(Role.created_at <= created_to)
-
-    total_count = query.count()
-
-
-    # Robust sort_by mapping (support camelCase and snake_case)
-    sort_map = {
-        'name': 'name',
-        'created_at': 'created_at',
-        'createdAt': 'created_at',
-        'id': 'id',
-    }
-    sort_attr = sort_map.get(sort_by, 'id')
-    sort_column = getattr(Role, sort_attr, None)
-    if sort_column is not None:
-        if sort_order == "asc":
-            query = query.order_by(sort_column.asc())
+        # Robust sort_by mapping (support camelCase and snake_case)
+        sort_map = {
+            'name': 'name',
+            'created_at': 'created_at',
+            'createdAt': 'created_at',
+            'id': 'id',
+        }
+        sort_attr = sort_map.get(sort_by, 'id')
+        sort_column = getattr(Role, sort_attr, None)
+        if sort_column is not None:
+            if sort_order == "asc":
+                query = query.order_by(sort_column.asc())
+            else:
+                query = query.order_by(sort_column.desc())
         else:
-            query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(Role.id.desc())
+            query = query.order_by(Role.id.desc())
 
-    roles = (
-        query
-        .offset((page_number - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
-    logger.info(f"Returning roles for page {page_number}, page_size {page_size}: {[r.id for r in roles]}")
-    return roles, total_count
+        # Get count before pagination
+        total_count = query.count()
+
+        # Get paginated results
+        roles = (
+            query
+            .offset((page_number - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+        logger.info(f"Returning roles for page {page_number}, page_size {page_size}: {[r.id for r in roles]}")
+        return roles, total_count
+    except Exception as e:
+        logger.error(f"Error fetching roles: {str(e)}")
+        # Return empty list instead of crashing
+        return [], 0
 
 
 def get_role(db: Session, role_id: int) -> Role:

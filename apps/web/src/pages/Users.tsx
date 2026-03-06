@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Box,
-  Button,
   Paper,
   Table,
   TableBody,
@@ -13,51 +12,58 @@ import {
   IconButton,
   Alert,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
   TextField,
-  InputBase,
-  Stack,
+  InputAdornment,
+  Tooltip,
+  Dialog,
+  Snackbar,
 } from "@mui/material";
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Search as SearchIcon, Visibility as VisibilityIcon, MoreVert as MoreVertIcon } from "@mui/icons-material";
-import { UserCreate, UserUpdate } from "../types/user";
+import CheckIcon from '@mui/icons-material/Check';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Search as SearchIcon,
+  Delete as DeleteIcon,
+  Home as HomeIcon,
+  Cancel as CancelIcon,
+} from "@mui/icons-material";
+import { Button, Select, MenuItem } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import { useTheme, useMediaQuery } from "@mui/material";
 import { User } from "../types/auth";
 import userService from "../api/services/userService";
-import PermissionGate from "../components/auth/PermissionGate";
-import { Chip, Tooltip } from "@mui/material";
-import UserForm from "../components/UserForm";
-import { Block as BlockIcon } from "@mui/icons-material";
-import Menu from "@mui/material/Menu";
-import MenuItem from "@mui/material/MenuItem";
-import { useNavigate } from "react-router-dom";
 
-function Users() {
-  function getInitials(name: string) {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
-  }
+// Style object for confirmation popup divider
+const confirmDividerStyle = {
+  border: 'none',
+  borderTop: '1px solid #e5e7eb',
+  margin: 0,
+  height: 0,
+};
 
-  // All state hooks at the top!
-  // Removed duplicate selectedUser declaration
-  // Removed duplicate users declaration
+const Users = () => {
+  const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
-  const [deactivateLoading, setDeactivateLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  // Add User dialog state
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const navigate = useNavigate();
+  const [roleFilter, setRoleFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmDialogType, setConfirmDialogType] = useState<'delete' | 'edit' | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'name' | 'created_at'>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // --- Success Toast Handler ---
+  const showSuccessToast = (message: string) => setSnackbar(message);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -73,310 +79,552 @@ function Users() {
         tenant_id: u.tenant_id ?? null,
         phone_number: u.phone_number ?? null,
         is_active: u.is_active ?? true,
+        created_at: u.created_at,
       }));
       setUsers(mappedUsers);
+      setTotalUsers(mappedUsers.length);
     } catch (err: any) {
-      setError(err?.detail || "Failed to fetch users. Please try again.");
+      setError(err?.message || err?.detail || "Failed to fetch users.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchUsers();
+    const timer = setTimeout(() => {
+      fetchUsers();
+    }, 500);
+    return () => clearTimeout(timer);
   }, [fetchUsers]);
 
-  const handleEditClick = useCallback((user: User) => {
-    navigate(`/user/create`, { state: { user, isEdit: true } });
-  }, [navigate]);
-
-  const handleDeleteClick = useCallback((user: User) => {
-    setSelectedUser(user);
-    setDeleteDialogOpen(true);
-  }, []);
-
-  const handleDeleteConfirm = useCallback(async () => {
-    if (selectedUser) {
-      try {
-        setDeleteLoading(true);
-        await userService.deleteUser(selectedUser.id);
-        setDeleteDialogOpen(false);
-        setSelectedUser(null);
-        fetchUsers();
-      } catch (err: any) {
-        setError(err?.detail || "Failed to delete user. Please try again.");
-      } finally {
-        setDeleteLoading(false);
-      }
-    }
-  }, [selectedUser, fetchUsers]);
-
-  const handleDeactivateClick = useCallback((user: User) => {
-    setSelectedUser(user);
-    setDeactivateDialogOpen(true);
-  }, []);
-
-  const handleDeactivateConfirm = useCallback(async () => {
-    if (selectedUser) {
-      try {
-        setDeactivateLoading(true);
-        await userService.updateUser(selectedUser.id, {
-          full_name: selectedUser.full_name,
-          phone_number: selectedUser.phone_number ?? null,
-          tenant_id: selectedUser.tenant_id ?? null,
-          is_active: false,
-        });
-        setDeactivateDialogOpen(false);
-        setSelectedUser(null);
-        fetchUsers();
-      } catch (err) {
-        setError("Failed to deactivate user.");
-      } finally {
-        setDeactivateLoading(false);
-      }
-    }
-  }, [selectedUser, fetchUsers]);
-
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [menuUser, setMenuUser] = useState<User | null>(null);
-
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, user: User) => {
-    setMenuAnchorEl(event.currentTarget);
-    setMenuUser(user);
+  const handleDeleteClick = (user: User) => {
+    setUserToDelete(user);
+    setConfirmDialogType('delete');
+    setConfirmDialogOpen(true);
   };
 
-  const handleMenuClose = () => {
-    setMenuAnchorEl(null);
-    setMenuUser(null);
+  const handleConfirmDelete = async () => {
+    if (!userToDelete) return;
+    try {
+      setDeleteLoading(true);
+      await userService.deleteUser(userToDelete.id);
+      setConfirmDialogOpen(false);
+      setUserToDelete(null);
+      showSuccessToast("User deleted successfully");
+      fetchUsers();
+    } catch (err: any) {
+      setError(err?.message || err?.detail || "Failed to delete user.");
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
-  // Filter users by search
-  const filteredUsers = useMemo(() => {
-    if (!search.trim()) return users;
-    return users.filter(
-      (u) =>
+  // Get unique roles for filter dropdown
+  const uniqueRoles = Array.from(new Set(users.map(u => u.role).filter(Boolean)));
+
+  // Filter users by search, role, and status
+  const filteredUsers = users.filter(
+    (u) => {
+      const matchesSearch =
         u.full_name.toLowerCase().includes(search.toLowerCase()) ||
         u.email.toLowerCase().includes(search.toLowerCase()) ||
-        String(u.id).includes(search)
-    );
-  }, [users, search]);
-
-  // Memoize table rows to prevent unnecessary re-renders
-  const tableRows = useMemo(() => {
-    if (filteredUsers.length === 0) {
-      return (
-        <TableRow>
-          <TableCell colSpan={6} align="center">
-            <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-              No users found. Click "Add User" to create one.
-            </Typography>
-          </TableCell>
-        </TableRow>
-      );
+        String(u.id).includes(search);
+      
+      const matchesRole = roleFilter === "All" || u.role === roleFilter;
+      
+      const matchesStatus = statusFilter === "All" ||
+        (statusFilter === "Active" && u.is_active) ||
+        (statusFilter === "Inactive" && !u.is_active);
+      
+      return matchesSearch && matchesRole && matchesStatus;
     }
-    return filteredUsers.map((user) => (
-      <TableRow key={user.id} hover sx={{ height: 64, "&:hover": { background: "#F3F4F6" } }}>
-        <TableCell>{user.id}</TableCell>
-        <TableCell>{user.full_name}</TableCell>
-        <TableCell>{user.email}</TableCell>
-        <TableCell>
-          <Chip
-            label={user.role ? user.role.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()) : "Unknown"}
-            color="primary"
-            variant="outlined"
-          />
-        </TableCell>
-        <TableCell>
-          <Chip
-            label={user.is_active ? "Active" : "Inactive"}
-            color={user.is_active ? "success" : "default"}
-            sx={{ fontWeight: 600 }}
-          />
-        </TableCell>
-        <TableCell align="right">
-          <IconButton onClick={e => handleMenuOpen(e, user)}>
-            <MoreVertIcon />
-          </IconButton>
-        </TableCell>
-      </TableRow>
-    ));
-  }, [filteredUsers, handleEditClick, handleDeleteClick, handleDeactivateClick]);
+  );
+
+  // Sort all filtered users
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    let aVal: any = a.full_name;
+    let bVal: any = b.full_name;
+
+    if (sortBy === 'created_at') {
+      aVal = a.created_at ? new Date(a.created_at).getTime() : 0;
+      bVal = b.created_at ? new Date(b.created_at).getTime() : 0;
+    } else if (sortBy === 'name') {
+      aVal = a.full_name.toLowerCase();
+      bVal = b.full_name.toLowerCase();
+    }
+
+    if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Get paginated users from sorted results
+  const paginatedUsers = sortedUsers.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
   return (
-    <Box>
-      {/* Header with stats, search, and add user */}
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: { xs: "column", sm: "row" },
-          justifyContent: "space-between",
-          alignItems: { xs: "stretch", sm: "center" },
-          gap: 2,
-          mb: 3,
-        }}
-      >
-        <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap" }}>
-          <Paper sx={{ p: { xs: 1.5, sm: 2 }, minWidth: { xs: 120, sm: 160 }, flex: { xs: 1, sm: "unset" }, textAlign: "center" }}>
-            <Typography variant="h6" sx={{ fontSize: { xs: "0.9rem", sm: "1rem" } }}>Total Users</Typography>
-            <Typography variant="h4" color="primary" sx={{ fontSize: { xs: "1.5rem", sm: "2.125rem" } }}>{users.length}</Typography>
-          </Paper>
-        </Stack>
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: { xs: "column", sm: "row" },
-            alignItems: { xs: "stretch", sm: "center" },
-            gap: 1.5,
-          }}
-        >
-          <Paper
-            component="form"
+    <Box sx={{
+      px: { xs: 2, md: 4 },
+      pb: 4,
+      minHeight: "100vh",
+      backgroundColor: "#f8fafc",
+      display: "flex",
+      flexDirection: "column"
+    }}>
+      {/* Header - Aligned with RoleManagement */}
+      <Box sx={{ pt: 1.5, pb: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <IconButton
+            onClick={() => navigate("/")}
             sx={{
-              p: "2px 8px",
-              display: "flex",
-              alignItems: "center",
-              width: { xs: "100%", sm: 260, md: 300 },
-              borderRadius: 2,
-              boxShadow: "none",
-              background: "#F3F4F6",
+              backgroundColor: "#1a1a2e",
+              borderRadius: 1.2,
+              width: 44,
+              height: 44,
+              "&:hover": { backgroundColor: "#2d2d44" }
             }}
-            onSubmit={e => e.preventDefault()}
           >
-            <SearchIcon sx={{ color: "#64748b", mr: 1 }} />
-            <InputBase
-              placeholder="Search by name, email, or ID"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              sx={{ flex: 1, fontSize: { xs: 14, sm: 16 } }}
-            />
-          </Paper>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => navigate("/user/create")}
-            sx={{ borderRadius: 2, fontWeight: 600, whiteSpace: "nowrap" }}
-          >
-            Add User
-          </Button>
+            <HomeIcon sx={{ color: "white", fontSize: 24 }} />
+          </IconButton>
+          <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#1A1A2E", letterSpacing: "-1px" }}>
+            User Management
+          </Typography>
+        </Box>
+        {/* Actions Row */}
+        <Box sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+          width: { xs: "100%", sm: "auto" },
+          flexWrap: { xs: "wrap", sm: "nowrap" }
+        }}>
+          <TextField
+            placeholder="Search Name"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            variant="outlined"
+            size="small"
+            fullWidth={isMobile}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: "#94a3b8", fontSize: 20 }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              width: { xs: "48%", sm: "200px" },
+              "& .MuiOutlinedInput-root": {
+                bgcolor: "white",
+                borderRadius: "12px",
+                fontSize: "0.9rem",
+                fontWeight: 500,
+                "& fieldset": { borderColor: "#e2e8f0", borderWidth: "1.2px" },
+                "&:hover fieldset": { borderColor: "#cbd5e1" },
+                "&.Mui-focused": {
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.03)",
+                  "& fieldset": { borderColor: "#1A1A2E", borderWidth: "1.8px" },
+                }
+              }
+            }}
+          />
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography sx={{ fontSize: "0.9rem", fontWeight: 600, color: "#1a1a2e", whiteSpace: "nowrap" }}>
+              Role:
+            </Typography>
+            <Select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              size="small"
+              sx={{
+                width: { xs: "48%", sm: "140px" },
+                bgcolor: "white",
+                borderRadius: "12px",
+                fontSize: "0.9rem",
+                fontWeight: 500,
+                "& .MuiOutlinedInput-notchedOutline": { borderColor: "#e2e8f0", borderWidth: "1.2px" },
+                "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#1A1A2E", borderWidth: "1.8px" },
+              }}
+            >
+              <MenuItem value="All">All</MenuItem>
+              {uniqueRoles.map((role) => (
+                <MenuItem key={role} value={role}>
+                  {role.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                </MenuItem>
+              ))}
+            </Select>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography sx={{ fontSize: "0.9rem", fontWeight: 600, color: "#1a1a2e", whiteSpace: "nowrap" }}>
+              Status:
+            </Typography>
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              size="small"
+              sx={{
+                width: { xs: "48%", sm: "140px" },
+                bgcolor: "white",
+                borderRadius: "12px",
+                fontSize: "0.9rem",
+                fontWeight: 500,
+                "& .MuiOutlinedInput-notchedOutline": { borderColor: "#e2e8f0", borderWidth: "1.2px" },
+                "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#1A1A2E", borderWidth: "1.8px" },
+              }}
+            >
+              <MenuItem value="All">All</MenuItem>
+              <MenuItem value="Active">Active</MenuItem>
+              <MenuItem value="Inactive">Inactive</MenuItem>
+            </Select>
+          </Box>
+          <Tooltip title="Add User">
+            <IconButton
+              onClick={() => navigate("/user/create")}
+              sx={{
+                backgroundColor: "#1a1a2e",
+                color: "white",
+                borderRadius: 1.2,
+                width: 44,
+                height: 44,
+                boxShadow: "0 4px 10px rgba(26,26,46,0.2)",
+                "&:hover": { backgroundColor: "#2d2d44", transform: "translateY(-1px)" }
+              }}
+            >
+              <AddIcon sx={{ fontSize: 24 }} />
+            </IconButton>
+          </Tooltip>
         </Box>
       </Box>
 
-      {error && (
-        <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+      <Paper sx={{
+        borderRadius: "12px",
+        overflow: "hidden",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.01)",
+        border: "1px solid #e2e8f0",
+        bgcolor: "white",
+        flexGrow: 1,
+        display: "flex",
+        flexDirection: "column"
+      }}>
+        {error && (
+          <Alert severity="error" sx={{ m: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
-      {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
-          <Table sx={{ minWidth: 600 }}>
-            <TableHead>
-              <TableRow sx={{ background: "#F3F4F6", height: 56 }}>
-                <TableCell><strong>ID</strong></TableCell>
-                <TableCell><strong>Full Name</strong></TableCell>
-                <TableCell><strong>Email</strong></TableCell>
-                <TableCell><strong>Role</strong></TableCell>
-                <TableCell><strong>Status</strong></TableCell>
-                <TableCell align="right"><strong>Actions</strong></TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {tableRows}
-            </TableBody>
-          </Table>
+        {/* Info Bar */}
+        {!loading && totalUsers > 0 && (
+          <Box sx={{ py: 1.2, px: 3, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f1f5f9", bgcolor: "#fcfdfe" }}>
+            <Typography sx={{ fontSize: "0.80rem", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              User Directory
+            </Typography>
+            <Typography sx={{ fontSize: "0.85rem", color: "#94a3b8", fontWeight: 500 }}>
+              Showing <Box component="span" sx={{ color: "#1a1a2e", fontWeight: 700 }}>{filteredUsers.length > 0 ? Math.min(page * rowsPerPage + 1, filteredUsers.length) : 0}-{Math.min((page + 1) * rowsPerPage, filteredUsers.length)}</Box> of <Box component="span" sx={{ color: "#1a1a2e", fontWeight: 700 }}>{filteredUsers.length}</Box> users
+            </Typography>
+          </Box>
+        )}
+
+        <TableContainer sx={{}}>
+          {loading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", p: 8 }}>
+              <CircularProgress sx={{ color: "#1a1a2e" }} />
+            </Box>
+          ) : (
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell
+                    sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e", cursor: 'pointer' }}
+                    onClick={() => {
+                      if (sortBy === 'name') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      else { setSortBy('name'); setSortOrder('asc'); }
+                    }}
+                  >
+                    Full Name {sortBy === 'name' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Email</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Phone Number</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Role</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Status</TableCell>
+                  <TableCell
+                    sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e", cursor: 'pointer' }}
+                    onClick={() => {
+                      if (sortBy === 'created_at') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      else { setSortBy('created_at'); setSortOrder('asc'); }
+                    }}
+                  >
+                    Created Date {sortBy === 'created_at' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Edit</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Delete</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {paginatedUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
+                      <Typography variant="body1" color="text.secondary">
+                        No users available.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedUsers.map((user) => (
+                    <TableRow
+                      key={user.id}
+                      hover
+                      sx={{
+                        "&.MuiTableRow-hover:hover": { bgcolor: "#f1f5f9" },
+                        "& td": { borderBottom: "1px solid #f1f5f9" }
+                      }}
+                    >
+                      <TableCell sx={{ fontWeight: 700, color: "#1a1a2e", py: 0.8, px: 2, fontSize: "0.85rem" }}>
+                        {user.full_name}
+                      </TableCell>
+                      <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem" }}>{user.email}</TableCell>
+                      <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem" }}>{user.phone_number || "-"}</TableCell>
+                      <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem" }}>
+                        {user.role ? user.role.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()) : "Unknown"}
+                      </TableCell>
+                      <TableCell sx={{ py: 0.8, px: 2 }}>
+                        <Box sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 1,
+                          px: 1.2,
+                          py: 0.35,
+                          borderRadius: "20px",
+                          bgcolor: user.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                          color: user.is_active ? "#059669" : "#dc2626",
+                          border: `1px solid ${user.is_active ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)"}`
+                        }}>
+                          <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "currentColor" }} />
+                          <Typography sx={{ fontWeight: 700, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            {user.is_active ? "Active" : "Inactive"}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem" }}>
+                        {user.created_at
+                          ? new Date(user.created_at).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
+                          : "-"}
+                      </TableCell>
+                      <TableCell sx={{ py: 0.8, px: 2 }}>
+                        <Tooltip title="Edit">
+                          <IconButton
+                            size="small"
+                            onClick={() => navigate(`/user/create`, { state: { user, isEdit: true } })}
+                            sx={{
+                              color: "#94a3b8",
+                              "&:hover": { color: "#1713eaff" }
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell sx={{ py: 0.9, px: 2 }}>
+                        <Tooltip title="Delete">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteClick(user)}
+                            sx={{
+                              color: "#94a3b8",
+                              "&:hover": { color: "#ef4444" }
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
         </TableContainer>
-      )}
+        {/* Custom Pagination Footer */}
+        {!loading && filteredUsers.length > 0 && (
+          <Box sx={{
+            px: 2,
+            py: 1,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            borderTop: "1px solid #f1f5f9",
+            bgcolor: "#fcfdfe"
+          }}>
+            {/* Left: Rows Per Page */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b" }}>
+                Rows per page
+              </Typography>
+              <Select
+                value={rowsPerPage}
+                onChange={(e) => {
+                  setRowsPerPage(Number(e.target.value));
+                  setPage(0);
+                }}
+                size="small"
+                sx={{
+                  height: "28px",
+                  width: "65px",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  bgcolor: "white",
+                  borderRadius: "6px",
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: "#e2e8f0" },
+                }}
+              >
+                <MenuItem value={10}>10</MenuItem>
+                <MenuItem value={20}>20</MenuItem>
+                <MenuItem value={25}>25</MenuItem>
+                <MenuItem value={50}>50</MenuItem>
+              </Select>
+            </Box>
+            {/* Right: Page Navigation */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b" }}>
+                <Box component="span" sx={{ color: "#1a1a2e" }}>{page * rowsPerPage + 1}-{Math.min((page + 1) * rowsPerPage, totalUsers)}</Box> of <Box component="span" sx={{ color: "#1a1a2e" }}>{totalUsers}</Box>
+              </Typography>
+              <Box sx={{ display: "flex", gap: 0.5 }}>
+                <IconButton
+                  size="small"
+                  disabled={page === 0}
+                  onClick={() => setPage(page - 1)}
+                  sx={{ border: "1px solid #e2e8f0", borderRadius: "6px", p: 0.4, "&:hover": { bgcolor: "#f1f5f9" } }}
+                >
+                  <Box component="span" sx={{ fontSize: '1.1rem' }}>{'<'}</Box>
+                </IconButton>
+                <IconButton
+                  size="small"
+                  disabled={page >= Math.ceil(totalUsers / rowsPerPage) - 1}
+                  onClick={() => setPage(page + 1)}
+                  sx={{ border: "1px solid #e2e8f0", borderRadius: "6px", p: 0.4, "&:hover": { bgcolor: "#f1f5f9" } }}
+                >
+                  <Box component="span" sx={{ fontSize: '1.1rem' }}>{'>'}</Box>
+                </IconButton>
+              </Box>
+            </Box>
+          </Box>
+        )}
+      </Paper>
 
-
-
-      {/* Add User modal */}
-      <UserForm
-        open={addDialogOpen}
-        onClose={() => setAddDialogOpen(false)}
-        onSubmit={async (data) => {
-          try {
-            // Only pass UserCreate type
-            await userService.createUser(data as UserCreate);
-            setAddDialogOpen(false);
-            fetchUsers();
-          } catch (err: any) {
-            setError(err?.detail || "Failed to create user. Please try again.");
+      <Dialog
+        open={confirmDialogOpen}
+        onClose={() => !deleteLoading && setConfirmDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            maxWidth: 600,
+            width: '100%',
+            p: 0,
+            position: 'absolute',
+            top: '5%',
+            left: '50%',
+            transform: 'translate(-50%, 0)',
+            height: '30%',
+            minHeight: '20px',
+            overflowY: 'auto',
           }
         }}
-        isEdit={false}
-      />
-
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => !deleteLoading && setDeleteDialogOpen(false)}
       >
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete user <strong>{selectedUser?.email}</strong>? This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleteLoading}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteConfirm}
-            color="error"
-            variant="contained"
+        {/* Header bar with title and close icon */}
+        <Box sx={{
+          bgcolor: '#18183a',
+          borderTopLeftRadius: 12,
+          borderTopRightRadius: 12,
+          px: 2,
+          py: 0.10,
+          minHeight: 4,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.10)',
+        }}>
+          <Box />
+          <IconButton
+            aria-label="close"
+            onClick={() => setConfirmDialogOpen(false)}
             disabled={deleteLoading}
+            sx={{ color: 'white', bgcolor: 'transparent', borderRadius: 2 }}
           >
-            {deleteLoading ? "Deleting..." : "Delete"}
-          </Button>
-        </DialogActions>
+            <CancelIcon sx={{ fontSize: 28 }} />
+          </IconButton>
+        </Box>
+        {/* Message, check icon, and buttons area */}
+        <Box sx={{ px: 4, pt: 4, pb: 2.5, bgcolor: 'white', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, textAlign: 'left' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+            <CheckIcon sx={{ fontSize: 50, color: '#43a047', mr: 2, p: 0 }} />
+            <Typography sx={{ fontWeight: 175, fontSize: '1.9rem', color: '#18183a', letterSpacing: '-1px', lineHeight: 1.1 }}>
+              Please Confirm
+            </Typography>
+          </Box>
+          <Typography sx={{ fontSize: '1.05rem', color: '#18183a', fontWeight: 125, mb: 1.2, ml: 3 }}>
+            {confirmDialogType === 'delete'
+              ? 'Are you sure you want to delete user?'
+              : confirmDialogType === 'edit'
+                ? 'Are you sure you want to update this user?'
+                : ''}
+          </Typography>
+          <Box sx={{ width: '100%', mb: 0.5 }}>
+            <hr style={confirmDividerStyle} />
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, width: '100%', mt: 0.5 }}>
+            <Button
+              onClick={() => setConfirmDialogOpen(false)}
+              disabled={deleteLoading}
+              sx={{
+                color: '#ef4444',
+                backgroundColor: 'transparent',
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                px: 4,
+                borderRadius: 0,
+                minWidth: 120,
+                boxShadow: 'none',
+                border: 'none',
+                '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' }
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDialogType === 'delete' ? handleConfirmDelete : undefined}
+              disabled={deleteLoading}
+              sx={{
+                color: '#43a047',
+                backgroundColor: 'transparent',
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                px: 4,
+                borderRadius: 0,
+                minWidth: 120,
+                boxShadow: 'none',
+                border: 'none',
+                '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' }
+              }}
+            >
+              {deleteLoading ? "Deleting..." : "Confirm"}
+            </Button>
+          </Box>
+        </Box>
       </Dialog>
-
-      <Dialog
-        open={deactivateDialogOpen}
-        onClose={() => !deactivateLoading && setDeactivateDialogOpen(false)}
+      <Snackbar
+        open={!!snackbar}
+        autoHideDuration={3000}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        onClose={() => setSnackbar(null)}
       >
-        <DialogTitle>Confirm Deactivate</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to deactivate this user{" "}
-            <strong>{selectedUser?.email}</strong>? This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeactivateDialogOpen(false)} disabled={deactivateLoading}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeactivateConfirm}
-            color="warning"
-            variant="contained"
-            disabled={deactivateLoading}
-          >
-            {deactivateLoading ? "Deactivating..." : "Deactivate"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Menu
-        anchorEl={menuAnchorEl}
-        open={Boolean(menuAnchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={() => { handleEditClick(menuUser!); handleMenuClose(); }}>
-          <EditIcon sx={{ mr: 1 }} /> Edit
-        </MenuItem>
-        <MenuItem onClick={() => { handleDeactivateClick(menuUser!); handleMenuClose(); }}>
-          <BlockIcon sx={{ mr: 1 }} /> Deactivate
-        </MenuItem>
-        <MenuItem onClick={() => { handleDeleteClick(menuUser!); handleMenuClose(); }}>
-          <DeleteIcon sx={{ mr: 1 }} /> Delete
-        </MenuItem>
-      </Menu>
-    </Box>
+        <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: '100%' }}>
+          {snackbar}
+        </Alert>
+      </Snackbar>
+    </Box >
   );
-}
+};
 
 export default Users;

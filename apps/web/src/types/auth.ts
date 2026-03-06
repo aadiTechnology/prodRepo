@@ -22,6 +22,7 @@ export interface User {
   tenant_id?: number | null;
   phone_number?: string | null;
   is_active?: boolean;
+  created_at?: string;
   tenant?: TenantInfo | null;
 }
 

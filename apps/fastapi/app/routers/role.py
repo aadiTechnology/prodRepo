@@ -37,7 +37,19 @@ async def role_summary(db: Session = Depends(get_db), current_user: CurrentUser 
     }
 
 
-@router.get("", response_model=RoleListResponse)
+@router.get("/dropdown")
+async def get_roles_dropdown(db: Session = Depends(get_db)):
+    """Get simple role list for dropdowns (id and name only) - no authentication required for dropdowns."""
+    try:
+        roles = db.query(Role.id, Role.name).filter(Role.is_deleted == False, Role.is_active == True).all()
+        return {
+            "success": True,
+            "data": [{"id": r[0], "name": r[1]} for r in roles]
+        }
+    except Exception as e:
+        logging.error(f"Error fetching roles dropdown: {str(e)}")
+        return {"success": False, "data": [], "message": str(e)}
+
 
 @router.get("", response_model=RoleListResponse)
 async def list_roles(
