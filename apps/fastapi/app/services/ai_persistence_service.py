@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.logging_config import get_logger
 from app.models.ai_entities import Requirement, UserStory, TestCase
 from app.services.ai_models import AIResponse
 from app.services.cache_service import generate_requirement_hash
+
+logger = get_logger(__name__)
 
 
 def _int_or_none(value: str | None) -> int | None:
@@ -85,4 +88,5 @@ def save_ai_response(db: Session, ai_response: AIResponse, requirement_text: str
     _ = db_req.user_stories
     for us in db_req.user_stories:
         _ = us.test_cases
+    logger.info("Persistence completed")
     return db_req

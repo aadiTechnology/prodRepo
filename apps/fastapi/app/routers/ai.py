@@ -1,7 +1,10 @@
+import time
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, get_current_user
+from app.core.logging_config import get_logger
 from app.models.user import User, UserRole
 from app.schemas.ai import InterpretRequest, InterpretResponse, GenerateStoryAndTestsRequest
 from app.services.intent_service import interpret
@@ -12,6 +15,7 @@ from app.services.ai_models import AIResponse
 from app.models.ai_entities import Requirement
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
+logger = get_logger(__name__)
 
 
 def _saved_requirement_to_dict(db_req: Requirement) -> dict:
@@ -98,26 +102,57 @@ async def ai_generate_story_and_tests(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict:
     """Generate user stories and test cases, persist to DB, return saved data. Super Admin only."""
-    if current_user.role != UserRole.SUPER_ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Super Admin can use this endpoint.",
-        )
-    requirement = body.requirement
-    requirement_hash = generate_requirement_hash(requirement)
-    db_req = get_requirement_by_hash(db, requirement_hash)
-    if db_req is not None:
+    request_start = time.perf_counter()
+    logger.info("Request received: generate-story-and-tests")
+
+    try:
+        if current_user.role != UserRole.SUPER_ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only Super Admin can use this endpoint.",
+            )
+        requirement = body.requirement
+        requirement_hash = generate_requirement_hash(requirement)
+
+        db_lookup_start = time.perf_counter()
+        db_req = get_requirement_by_hash(db, requirement_hash)
+        db_lookup_duration_ms = (time.perf_counter() - db_lookup_start) * 1000
+        logger.info("Database lookup executed, duration_ms=%.2f", db_lookup_duration_ms)
+
+        if db_req is not None:
+            logger.info("Duplicate requirement detected, requirement_hash=%s", requirement_hash[:16])
+            total_ms = (time.perf_counter() - request_start) * 1000
+            logger.info("Request completed, duration_ms=%.2f, source=database", total_ms)
+            return _saved_requirement_to_dict(db_req)
+
+        cached = get_cached_response(requirement)
+        if cached is not None:
+            response.headers["X-Cache"] = "HIT"
+            total_ms = (time.perf_counter() - request_start) * 1000
+            logger.info("Request completed, duration_ms=%.2f, source=cache", total_ms)
+            return cached
+
+        response.headers["X-Cache"] = "MISS"
+        result = generate_story_and_tests(body.requirement)
+        cache_response(requirement, result)
+        ai_response = AIResponse.model_validate(result)
+
+        persist_start = time.perf_counter()
+        db_req = save_ai_response(db, ai_response, requirement)
+        persist_duration_ms = (time.perf_counter() - persist_start) * 1000
+        logger.info("Persistence completed, duration_ms=%.2f", persist_duration_ms)
+
+        total_ms = (time.perf_counter() - request_start) * 1000
+        logger.info("Request completed, duration_ms=%.2f, source=generated", total_ms)
         return _saved_requirement_to_dict(db_req)
-    cached = get_cached_response(requirement)
-    if cached is not None:
-        response.headers["X-Cache"] = "HIT"
-        return cached
-    response.headers["X-Cache"] = "MISS"
-    result = generate_story_and_tests(body.requirement)
-    cache_response(requirement, result)
-    ai_response = AIResponse.model_validate(result)
-    db_req = save_ai_response(db, ai_response, requirement)
-    return _saved_requirement_to_dict(db_req)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        total_ms = (time.perf_counter() - request_start) * 1000
+        logger.exception("Unexpected exception in generate-story-and-tests: %s", e)
+        logger.error("API failure: generate-story-and-tests, duration_ms=%.2f", total_ms)
+        raise
 
 
 @router.post("/save-story-and-tests")
