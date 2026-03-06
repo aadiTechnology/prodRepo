@@ -205,22 +205,37 @@ function Users() {
   return (
     <Box>
       {/* Header with stats, search, and add user */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Stack direction="row" spacing={3}>
-          <Paper sx={{ p: 2, minWidth: 180, textAlign: "center" }}>
-            <Typography variant="h6">Total Users</Typography>
-            <Typography variant="h4" color="primary">{users.length}</Typography>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", sm: "row" },
+          justifyContent: "space-between",
+          alignItems: { xs: "stretch", sm: "center" },
+          gap: 2,
+          mb: 3,
+        }}
+      >
+        <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap" }}>
+          <Paper sx={{ p: { xs: 1.5, sm: 2 }, minWidth: { xs: 120, sm: 160 }, flex: { xs: 1, sm: "unset" }, textAlign: "center" }}>
+            <Typography variant="h6" sx={{ fontSize: { xs: "0.9rem", sm: "1rem" } }}>Total Users</Typography>
+            <Typography variant="h4" color="primary" sx={{ fontSize: { xs: "1.5rem", sm: "2.125rem" } }}>{users.length}</Typography>
           </Paper>
-          {/* Add more stats cards here if needed */}
         </Stack>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", sm: "row" },
+            alignItems: { xs: "stretch", sm: "center" },
+            gap: 1.5,
+          }}
+        >
           <Paper
             component="form"
             sx={{
               p: "2px 8px",
               display: "flex",
               alignItems: "center",
-              width: 300,
+              width: { xs: "100%", sm: 260, md: 300 },
               borderRadius: 2,
               boxShadow: "none",
               background: "#F3F4F6",
@@ -232,14 +247,14 @@ function Users() {
               placeholder="Search by name, email, or ID"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              sx={{ flex: 1, fontSize: 16 }}
+              sx={{ flex: 1, fontSize: { xs: 14, sm: 16 } }}
             />
           </Paper>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => navigate("/user/create")}
-            sx={{ borderRadius: 2, fontWeight: 600 }}
+            sx={{ borderRadius: 2, fontWeight: 600, whiteSpace: "nowrap" }}
           >
             Add User
           </Button>
@@ -257,8 +272,8 @@ function Users() {
           <CircularProgress />
         </Box>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
+        <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+          <Table sx={{ minWidth: 600 }}>
             <TableHead>
               <TableRow sx={{ background: "#F3F4F6", height: 56 }}>
                 <TableCell><strong>ID</strong></TableCell>
