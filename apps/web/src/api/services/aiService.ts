@@ -9,12 +9,15 @@ export interface GenerateStoryAndTestsResult {
   user_stories: Array<{
     id: number;
     title: string;
+    prerequisite: string[] | null;
     story: string;
     acceptance_criteria: string[] | null;
   }>;
   test_cases: Array<{
     id: number;
     scenario: string;
+    pre_requisite: string[] | string | null;
+    test_data: string[] | string | null;
     steps: string[] | null;
     expected_result: string;
   }>;
