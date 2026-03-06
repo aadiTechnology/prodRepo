@@ -21,6 +21,7 @@ class Requirement(Base):
     __tablename__ = "requirements"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    requirement_hash = Column(String(64), nullable=True, index=True)
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=False)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)

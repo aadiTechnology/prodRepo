@@ -6,8 +6,8 @@ from app.models.user import User, UserRole
 from app.schemas.ai import InterpretRequest, InterpretResponse, GenerateStoryAndTestsRequest
 from app.services.intent_service import interpret
 from app.services.ai_service import generate_story_and_tests
-from app.services.cache_service import get_cached_response, cache_response
-from app.services.ai_persistence_service import save_ai_response
+from app.services.cache_service import get_cached_response, cache_response, generate_requirement_hash
+from app.services.ai_persistence_service import save_ai_response, get_requirement_by_hash
 from app.services.ai_models import AIResponse
 from app.models.ai_entities import Requirement
 
@@ -104,6 +104,10 @@ async def ai_generate_story_and_tests(
             detail="Only Super Admin can use this endpoint.",
         )
     requirement = body.requirement
+    requirement_hash = generate_requirement_hash(requirement)
+    db_req = get_requirement_by_hash(db, requirement_hash)
+    if db_req is not None:
+        return _saved_requirement_to_dict(db_req)
     cached = get_cached_response(requirement)
     if cached is not None:
         response.headers["X-Cache"] = "HIT"
@@ -112,7 +116,7 @@ async def ai_generate_story_and_tests(
     result = generate_story_and_tests(body.requirement)
     cache_response(requirement, result)
     ai_response = AIResponse.model_validate(result)
-    db_req = save_ai_response(db, ai_response)
+    db_req = save_ai_response(db, ai_response, requirement)
     return _saved_requirement_to_dict(db_req)
 
 

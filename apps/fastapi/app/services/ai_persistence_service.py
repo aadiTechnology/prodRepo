@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.ai_entities import Requirement, UserStory, TestCase
 from app.services.ai_models import AIResponse
+from app.services.cache_service import generate_requirement_hash
 
 
 def _int_or_none(value: str | None) -> int | None:
@@ -15,13 +16,25 @@ def _int_or_none(value: str | None) -> int | None:
         return None
 
 
-def save_ai_response(db: Session, ai_response: AIResponse) -> Requirement:
+def get_requirement_by_hash(db: Session, requirement_hash: str) -> Requirement | None:
+    return (
+        db.query(Requirement)
+        .options(
+            joinedload(Requirement.user_stories).joinedload(UserStory.test_cases),
+        )
+        .filter(Requirement.requirement_hash == requirement_hash)
+        .first()
+    )
+
+
+def save_ai_response(db: Session, ai_response: AIResponse, requirement_text: str | None = None) -> Requirement:
     req = ai_response.requirement
     meta = req.metadata
     tenant_id = _int_or_none(meta.tenant_id or ai_response.tenant_id)
     created_by = _int_or_none(meta.created_by)
 
     db_req = Requirement(
+        requirement_hash=generate_requirement_hash(requirement_text) if requirement_text else None,
         title=req.title,
         description=req.description,
         tenant_id=tenant_id,

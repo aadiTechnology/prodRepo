@@ -1,10 +1,10 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv(os.getenv("ENV_FILE", ".env"))
+load_dotenv(os.getenv("ENV_FILE", ".env.test"))
 
 from app.core.database import Base, get_database_url
-from app.models import user
+from app.models import *  # noqa: F401, F403 - load all models for Base.metadata / autogenerate
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
