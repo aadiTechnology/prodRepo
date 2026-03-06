@@ -31,7 +31,7 @@ def save_ai_response(db: Session, ai_response: AIResponse) -> Requirement:
     db.add(db_req)
     db.flush()
 
-    pydantic_us_id_to_db_id: dict[str, int] = {}
+    saved_user_stories: list[UserStory] = []
     for us in ai_response.user_stories:
         us_meta = us.metadata
         db_us = UserStory(
@@ -46,15 +46,15 @@ def save_ai_response(db: Session, ai_response: AIResponse) -> Requirement:
         )
         db.add(db_us)
         db.flush()
-        pydantic_us_id_to_db_id[us.id] = db_us.id
+        saved_user_stories.append(db_us)
 
-    for tc in ai_response.test_cases:
-        tc_meta = tc.metadata
-        db_us_id = pydantic_us_id_to_db_id.get(tc.user_story_id)
-        if db_us_id is None:
+    for i, tc in enumerate(ai_response.test_cases):
+        db_us = saved_user_stories[i % len(saved_user_stories)] if saved_user_stories else None
+        if db_us is None:
             continue
+        tc_meta = tc.metadata
         db_tc = TestCase(
-            user_story_id=db_us_id,
+            user_story_id=db_us.id,
             test_case_id=tc.test_case_id,
             scenario=tc.scenario,
             pre_requisite=tc.pre_requisite if tc.pre_requisite else None,

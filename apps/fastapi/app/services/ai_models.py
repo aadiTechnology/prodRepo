@@ -10,15 +10,12 @@ class BaseMetadata(BaseModel):
 
 
 class Requirement(BaseModel):
-    id: str
     title: str
     description: str
     metadata: BaseMetadata
 
 
 class UserStory(BaseModel):
-    id: str
-    requirement_id: str
     title: str
     prerequisite: list[str]
     story: str
@@ -27,8 +24,6 @@ class UserStory(BaseModel):
 
 
 class TestCase(BaseModel):
-    id: str
-    user_story_id: str
     test_case_id: str
     scenario: str
     pre_requisite: list[str]

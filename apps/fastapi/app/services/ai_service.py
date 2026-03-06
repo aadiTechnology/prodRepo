@@ -18,9 +18,6 @@ def generate_story_and_tests(requirement: str) -> dict[str, Any]:
         """You are a Senior Product Analyst and Senior QA Engineer.
 Convert the following Requirement into User Stories and Test Cases.
 
-TRACEABILITY:
-- Each user story must reference the originating requirement (requirement_id).
-- Each test case must reference the originating user story (user_story_id).
 Hierarchy: Requirement → UserStory → TestCase.
 
 USER STORY RULES:
@@ -35,7 +32,7 @@ TEST CASE RULES:
 - Cover normal and edge scenarios.
 
 For metadata use: tenant_id null, created_by "system", created_at as ISO datetime (e.g. 2025-03-04T12:00:00Z), is_super_admin_accessible true.
-Generate requirement id, user story ids, and test case ids as short unique strings (e.g. REQ-1, US-1, TC-1).
+Do not generate database IDs; output only content fields.
 
 Requirement:
 {requirement}
