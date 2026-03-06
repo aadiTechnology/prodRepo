@@ -388,8 +388,22 @@ function MainLayout() {
           </Toolbar>
         </AppBar>
 
-        <Box component="main" sx={{ flexGrow: 1, py: 0, mb: "50px", overflow: "auto" }}>
-          <PageContainer maxWidth={false} sx={{ px: { xs: 1, md: 1.5 } }}>
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            overflow: "auto",
+            minHeight: 0, // CRITICAL: ensures flex child doesn't overflow parent incorrectly
+          }}
+        >
+          <PageContainer
+            maxWidth={false}
+            sx={{
+              px: { xs: 1, sm: 2, md: 2, lg: 3, xl: 4 },
+              py: { xs: 0.5, sm: 1 }, // Compact padding
+              maxWidth: "100% !important",
+            }}
+          >
             <Outlet />
           </PageContainer>
         </Box>
