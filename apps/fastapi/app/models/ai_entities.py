@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    String,
+    Text,
+)
+from sqlalchemy.orm import relationship
+
+from app.core.database import Base
+
+
+class Requirement(Base):
+    __tablename__ = "requirements"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    title = Column(String(500), nullable=False)
+    description = Column(Text, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+    is_super_admin_accessible = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_by = Column(Integer, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+    updated_by = Column(Integer, nullable=True)
+
+    user_stories = relationship("UserStory", back_populates="requirement", cascade="all, delete-orphan")
+
+
+class UserStory(Base):
+    __tablename__ = "user_stories"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    requirement_id = Column(Integer, ForeignKey("requirements.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(500), nullable=False)
+    prerequisite = Column(JSON, nullable=True)
+    story = Column(Text, nullable=False)
+    acceptance_criteria = Column(JSON, nullable=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+    is_super_admin_accessible = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_by = Column(Integer, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+    updated_by = Column(Integer, nullable=True)
+
+    requirement = relationship("Requirement", back_populates="user_stories")
+    test_cases = relationship("TestCase", back_populates="user_story", cascade="all, delete-orphan")
+
+
+class TestCase(Base):
+    __tablename__ = "test_cases"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_story_id = Column(Integer, ForeignKey("user_stories.id", ondelete="CASCADE"), nullable=False)
+    test_case_id = Column(String(100), nullable=False)
+    scenario = Column(String(1000), nullable=False)
+    pre_requisite = Column(JSON, nullable=True)
+    test_data = Column(JSON, nullable=True)
+    steps = Column(JSON, nullable=True)
+    expected_result = Column(Text, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+    is_super_admin_accessible = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_by = Column(Integer, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+    updated_by = Column(Integer, nullable=True)
+
+    user_story = relationship("UserStory", back_populates="test_cases")

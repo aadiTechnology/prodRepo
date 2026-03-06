@@ -7,8 +7,62 @@ from app.schemas.ai import InterpretRequest, InterpretResponse, GenerateStoryAnd
 from app.services.intent_service import interpret
 from app.services.ai_service import generate_story_and_tests
 from app.services.cache_service import get_cached_response, cache_response
+from app.services.ai_persistence_service import save_ai_response
+from app.services.ai_models import AIResponse
+from app.models.ai_entities import Requirement
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
+
+
+def _saved_requirement_to_dict(db_req: Requirement) -> dict:
+    requirement = {
+        "id": db_req.id,
+        "title": db_req.title,
+        "description": db_req.description,
+        "tenant_id": db_req.tenant_id,
+        "is_super_admin_accessible": db_req.is_super_admin_accessible,
+        "created_at": db_req.created_at,
+        "created_by": db_req.created_by,
+        "updated_at": db_req.updated_at,
+        "updated_by": db_req.updated_by,
+    }
+    user_stories = [
+        {
+            "id": us.id,
+            "requirement_id": us.requirement_id,
+            "title": us.title,
+            "prerequisite": us.prerequisite,
+            "story": us.story,
+            "acceptance_criteria": us.acceptance_criteria,
+            "tenant_id": us.tenant_id,
+            "is_super_admin_accessible": us.is_super_admin_accessible,
+            "created_at": us.created_at,
+            "created_by": us.created_by,
+            "updated_at": us.updated_at,
+            "updated_by": us.updated_by,
+        }
+        for us in db_req.user_stories
+    ]
+    test_cases = []
+    for us in db_req.user_stories:
+        for tc in us.test_cases:
+            test_cases.append({
+                "id": tc.id,
+                "user_story_id": tc.user_story_id,
+                "test_case_id": tc.test_case_id,
+                "scenario": tc.scenario,
+                "pre_requisite": tc.pre_requisite,
+                "test_data": tc.test_data,
+                "steps": tc.steps,
+                "expected_result": tc.expected_result,
+                "tenant_id": tc.tenant_id,
+                "is_super_admin_accessible": tc.is_super_admin_accessible,
+                "created_at": tc.created_at,
+                "created_by": tc.created_by,
+                "updated_at": tc.updated_at,
+                "updated_by": tc.updated_by,
+            })
+    return {"requirement": requirement, "user_stories": user_stories, "test_cases": test_cases}
 
 
 @router.post("/interpret", response_model=InterpretResponse)
@@ -40,9 +94,10 @@ async def ai_interpret(
 async def ai_generate_story_and_tests(
     body: GenerateStoryAndTestsRequest,
     response: Response,
+    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict:
-    """Generate user stories and test cases from a requirement. Super Admin only."""
+    """Generate user stories and test cases, persist to DB, return saved data. Super Admin only."""
     if current_user.role != UserRole.SUPER_ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -56,4 +111,22 @@ async def ai_generate_story_and_tests(
     response.headers["X-Cache"] = "MISS"
     result = generate_story_and_tests(body.requirement)
     cache_response(requirement, result)
-    return result
+    ai_response = AIResponse.model_validate(result)
+    db_req = save_ai_response(db, ai_response)
+    return _saved_requirement_to_dict(db_req)
+
+
+@router.post("/save-story-and-tests")
+async def ai_save_story_and_tests(
+    body: AIResponse,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Persist AI-generated requirement, user stories, and test cases. Super Admin only."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    save_ai_response(db, body)
+    return {"status": "saved"}
