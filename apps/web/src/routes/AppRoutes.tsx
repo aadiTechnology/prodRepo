@@ -19,6 +19,7 @@ const Profile = lazy(() => import("../pages/ProfilePage"));
 const SessionExpired = lazy(() => import("../pages/SessionExpired"));
 const TenantList = lazy(() => import("../pages/tenants/TenantList"));
 const AddTenant = lazy(() => import("../pages/tenants/AddTenant"));
+const RequirementGeneratePage = lazy(() => import("../pages/RequirementGeneratePage"));
 
 const CreateUser = lazy(() => import("../pages/CreateUser"));
 
@@ -136,6 +137,14 @@ export default function AppRoutes() {
             element={
               <ProtectedRoute>
                 <Home />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ai/generate"
+            element={
+              <ProtectedRoute>
+                <RequirementGeneratePage />
               </ProtectedRoute>
             }
           />
