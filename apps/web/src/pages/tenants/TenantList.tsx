@@ -119,10 +119,8 @@ const TenantList = () => {
 
     return (
         <Box sx={{
-            px: { xs: 2, md: 4 },
-            pb: 4,
-            minHeight: "100vh",
-            backgroundColor: "#f8fafc",
+            px: { xs: 1.5, sm: 2, md: 4 },
+            pb: 2,
             display: "flex",
             flexDirection: "column"
         }}>
@@ -202,33 +200,33 @@ const TenantList = () => {
 
                 {/* Info Bar */}
                 {!loading && totalTenants > 0 && (
-                    <Box sx={{ py: 1.2, px: 3, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f1f5f9", bgcolor: "#fcfdfe" }}>
-                        <Typography sx={{ fontSize: "0.80rem", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    <Box sx={{ py: 1.4, px: 3, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f1f5f9", bgcolor: "#fcfdfe" }}>
+                        <Typography sx={{ fontSize: "0.82rem", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
                             Tenant Directory
                         </Typography>
-                        <Typography sx={{ fontSize: "0.85rem", color: "#94a3b8", fontWeight: 500 }}>
+                        <Typography sx={{ fontSize: "0.9rem", color: "#94a3b8", fontWeight: 500 }}>
                             Showing <Box component="span" sx={{ color: "#1a1a2e", fontWeight: 700 }}>{Math.min(page * rowsPerPage + 1, totalTenants)}-{Math.min((page + 1) * rowsPerPage, totalTenants)}</Box> of <Box component="span" sx={{ color: "#1a1a2e", fontWeight: 700 }}>{totalTenants}</Box> tenants
                         </Typography>
                     </Box>
                 )}
 
-                <TableContainer sx={{ maxHeight: "calc(100vh - 200px)" }}>
+                <TableContainer sx={{ maxHeight: "calc(100vh - 280px)", overflowX: "auto" }}>
                     {loading ? (
                         <Box sx={{ display: "flex", justifyContent: "center", p: 8 }}>
                             <CircularProgress sx={{ color: "#1a1a2e" }} />
                         </Box>
                     ) : (
-                        <Table size="small" stickyHeader>
+                        <Table stickyHeader>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Logo</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Tenant Name</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Owner</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Email</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Created Date</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Edit</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.80rem", px: 2, py: 1.2, bgcolor: "#1a1a2e" }}>Delete</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.875rem", px: 2.5, py: 1.6, bgcolor: "#1a1a2e" }}>Logo</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.875rem", px: 2.5, py: 1.6, bgcolor: "#1a1a2e" }}>Tenant Name</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.875rem", px: 2.5, py: 1.6, bgcolor: "#1a1a2e" }}>Owner</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.875rem", px: 2.5, py: 1.6, bgcolor: "#1a1a2e" }}>Email</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.875rem", px: 2.5, py: 1.6, bgcolor: "#1a1a2e" }}>Status</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.875rem", px: 2.5, py: 1.6, bgcolor: "#1a1a2e" }}>Created Date</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.875rem", px: 2.5, py: 1.6, bgcolor: "#1a1a2e" }}>Edit</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "white", fontSize: "0.875rem", px: 2.5, py: 1.6, bgcolor: "#1a1a2e" }}>Delete</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -246,79 +244,77 @@ const TenantList = () => {
                                             key={tenant.id}
                                             hover
                                             sx={{
-                                                "&.MuiTableRow-hover:hover": { bgcolor: "#f1f5f9" },
+                                                "&.MuiTableRow-hover:hover": { bgcolor: "#f8fafc" },
                                                 "& td": { borderBottom: "1px solid #f1f5f9" }
                                             }}
                                         >
-                                            <TableCell sx={{ py: 0.8, px: 2 }}>
+                                            <TableCell sx={{ py: 1.2, px: 2.5 }}>
                                                 {tenant.logo_url ? (
                                                     <img
                                                         src={tenant.logo_url}
                                                         alt={tenant.name}
-                                                        style={{ height: 28, width: "auto", maxWidth: 80, objectFit: "contain" }}
+                                                        style={{ height: 36, width: "auto", maxWidth: 100, objectFit: "contain" }}
                                                         onError={(e) => { e.currentTarget.style.display = "none"; }}
                                                     />
                                                 ) : (
-                                                    <Typography variant="caption" color="text.secondary">—</Typography>
+                                                    <Typography sx={{ fontSize: "0.9rem", color: "#94a3b8" }}>—</Typography>
                                                 )}
                                             </TableCell>
-                                            <TableCell sx={{ fontWeight: 700, color: "#1a1a2e", py: 0.8, px: 2, fontSize: "0.85rem" }}>
+                                            <TableCell sx={{ fontWeight: 700, color: "#1a1a2e", py: 1.2, px: 2.5, fontSize: "0.92rem" }}>
                                                 {tenant.name}
                                             </TableCell>
-                                            <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem", fontWeight: 500 }}>{tenant.owner_name}</TableCell>
-                                            <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem" }}>{tenant.email}</TableCell>
-                                            <TableCell sx={{ py: 0.8, px: 2 }}>
+                                            <TableCell sx={{ color: "#475569", py: 1.2, px: 2.5, fontSize: "0.9rem", fontWeight: 500 }}>{tenant.owner_name}</TableCell>
+                                            <TableCell sx={{ color: "#475569", py: 1.2, px: 2.5, fontSize: "0.9rem" }}>{tenant.email}</TableCell>
+                                            <TableCell sx={{ py: 1.2, px: 2.5 }}>
                                                 <Box sx={{
                                                     display: "inline-flex",
                                                     alignItems: "center",
                                                     gap: 1,
-                                                    px: 1.2,
-                                                    py: 0.35,
+                                                    px: 1.5,
+                                                    py: 0.5,
                                                     borderRadius: "20px",
                                                     bgcolor: tenant.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
                                                     color: tenant.is_active ? "#059669" : "#dc2626",
                                                     border: `1px solid ${tenant.is_active ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)"}`
                                                 }}>
-                                                    <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "currentColor" }} />
-                                                    <Typography sx={{ fontWeight: 700, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                                    <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "currentColor" }} />
+                                                    <Typography sx={{ fontWeight: 700, fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                                                         {tenant.is_active ? "Active" : "Inactive"}
                                                     </Typography>
                                                 </Box>
                                             </TableCell>
-                                            <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem", fontWeight: 500 }}>
+                                            <TableCell sx={{ color: "#475569", py: 1.2, px: 2.5, fontSize: "0.9rem", fontWeight: 500 }}>
                                                 {new Date(tenant.created_at).toLocaleDateString('en-US', {
                                                     month: 'short',
                                                     day: '2-digit',
                                                     year: 'numeric'
                                                 })}
                                             </TableCell>
-                                            <TableCell sx={{ py: 0.8, px: 2 }}>
+                                            <TableCell sx={{ py: 1.2, px: 2.5 }}>
                                                 <Tooltip title="Edit">
                                                     <IconButton
-                                                        size="small"
                                                         onClick={() => navigate(`/tenants/${tenant.id}/edit`)}
                                                         sx={{
                                                             color: "#64748b",
-                                                            p: 0.5,
+                                                            p: 0.8,
                                                             "&:hover": { color: "#2626e4", bgcolor: "#f1f5f9" }
                                                         }}
                                                     >
-                                                        <EditIcon fontSize="small" />
+                                                        <EditIcon sx={{ fontSize: 20 }} />
                                                     </IconButton>
                                                 </Tooltip>
                                             </TableCell>
-                                            <TableCell sx={{ py: 0.8, px: 2 }}>
+                                            <TableCell sx={{ py: 1.2, px: 2.5 }}>
                                                 <Tooltip title="Delete">
                                                     <IconButton
-                                                        size="small"
                                                         onClick={() => handleDeleteClick(tenant)}
                                                         sx={{
                                                             color: "#64748b",
-                                                            p: 0.5,
+                                                            p: 0.8,
                                                             "&:hover": { color: "#ef4444", bgcolor: "#fee2e2" }
                                                         }}
                                                     >
-                                                        <DeleteIcon fontSize="small" />
+                                                        <DeleteIcon sx={{ fontSize: 20 }} />
                                                     </IconButton>
                                                 </Tooltip>
                                             </TableCell>
@@ -333,8 +329,8 @@ const TenantList = () => {
                 {/* Custom Pagination Footer */}
                 {!loading && tenants.length > 0 && (
                     <Box sx={{
-                        px: 2,
-                        py: 1,
+                        px: 3,
+                        py: 1.2,
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
@@ -343,7 +339,7 @@ const TenantList = () => {
                     }}>
                         {/* Left: Rows Per Page */}
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b" }}>
+                            <Typography sx={{ fontSize: "0.875rem", fontWeight: 600, color: "#64748b" }}>
                                 Rows per page
                             </Typography>
                             <Select
@@ -354,9 +350,9 @@ const TenantList = () => {
                                 }}
                                 size="small"
                                 sx={{
-                                    height: "28px",
-                                    width: "65px",
-                                    fontSize: "0.8rem",
+                                    height: "32px",
+                                    width: "72px",
+                                    fontSize: "0.875rem",
                                     fontWeight: 600,
                                     bgcolor: "white",
                                     borderRadius: "6px",
@@ -372,7 +368,7 @@ const TenantList = () => {
 
                         {/* Right: Page Navigation */}
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                            <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b" }}>
+                            <Typography sx={{ fontSize: "0.875rem", fontWeight: 600, color: "#64748b" }}>
                                 <Box component="span" sx={{ color: "#1a1a2e" }}>{page * rowsPerPage + 1}-{Math.min((page + 1) * rowsPerPage, totalTenants)}</Box> of <Box component="span" sx={{ color: "#1a1a2e" }}>{totalTenants}</Box>
                             </Typography>
                             <Box sx={{ display: "flex", gap: 0.5 }}>
@@ -380,18 +376,18 @@ const TenantList = () => {
                                     size="small"
                                     disabled={page === 0}
                                     onClick={() => setPage(page - 1)}
-                                    sx={{ border: "1px solid #e2e8f0", borderRadius: "6px", p: 0.4, "&:hover": { bgcolor: "#f1f5f9" } }}
+                                    sx={{ border: "1px solid #e2e8f0", borderRadius: "6px", p: 0.6, "&:hover": { bgcolor: "#f1f5f9" } }}
                                 >
-                                    <PrevIcon sx={{ fontSize: "1.1rem" }} />
+                                    <PrevIcon sx={{ fontSize: "1.2rem" }} />
                                 </IconButton>
 
                                 <IconButton
                                     size="small"
                                     disabled={page >= Math.ceil(totalTenants / rowsPerPage) - 1}
                                     onClick={() => setPage(page + 1)}
-                                    sx={{ border: "1px solid #e2e8f0", borderRadius: "6px", p: 0.4, "&:hover": { bgcolor: "#f1f5f9" } }}
+                                    sx={{ border: "1px solid #e2e8f0", borderRadius: "6px", p: 0.6, "&:hover": { bgcolor: "#f1f5f9" } }}
                                 >
-                                    <NextIcon sx={{ fontSize: "1.1rem" }} />
+                                    <NextIcon sx={{ fontSize: "1.2rem" }} />
                                 </IconButton>
                             </Box>
                         </Box>
