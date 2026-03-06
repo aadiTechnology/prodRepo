@@ -22,13 +22,19 @@ import Tooltip from '@mui/material/Tooltip';
 
 // Local service for password change (since no changePasswordService exists)
 const changePasswordService = {
-  changePassword: async ({ old_password, new_password, status }: { old_password: string; new_password: string; status: boolean }) => {
-    // You may need to adjust the endpoint to match your backend
-    // Here we use a common REST pattern for password change
+  changePassword: async ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) => {
+    // Get token from localStorage (same as AuthContext)
+    const token = localStorage.getItem("auth_token");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
     const response = await fetch("/api/account/change-password", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ old_password, new_password, status }),
+      headers,
+      body: JSON.stringify({ currentPassword, newPassword }),
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -85,9 +91,8 @@ function ChangePassword() {
     setLoading(true);
     try {
       await changePasswordService.changePassword({
-        old_password: oldPassword,
-        new_password: newPassword,
-        status: status === "ACTIVE",
+        currentPassword: oldPassword,
+        newPassword: newPassword
       });
       setSnackbar("Password changed successfully.");
       setTimeout(() => navigate("/profile"), 1200);
