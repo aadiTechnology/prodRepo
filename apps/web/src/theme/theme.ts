@@ -1,32 +1,11 @@
 /**
  * MUI Theme Configuration
- * Main theme file that combines all theme configurations
+ * Theme layer built from design tokens (Phase 3).
+ * Single entry point for the app; tokens are the source of truth.
  */
 
-import { createTheme, ThemeOptions } from "@mui/material/styles";
-import { palette } from "./palette";
-import { typography } from "./typography";
-import { breakpoints } from "./breakpoints";
-import { spacing } from "./spacing";
-import { components } from "./components";
+import { createAppTheme } from "./build";
 
-const themeOptions: ThemeOptions = {
-  palette: palette,
-  typography,
-  breakpoints,
-  spacing,
-  shape: {
-    borderRadius: 8,
-  },
-};
-
-// Create base theme
-const baseTheme = createTheme(themeOptions);
-
-// Create final theme with component overrides
-const theme = createTheme({
-  ...baseTheme,
-  components: components(baseTheme),
-});
+const theme = createAppTheme();
 
 export default theme;
