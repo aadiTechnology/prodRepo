@@ -1,15 +1,13 @@
 import { BrowserRouter } from "react-router-dom";
-import { ThemeProvider, CssBaseline } from "@mui/material";
 import AppRoutes from "./routes/AppRoutes";
-import theme from "./theme/theme";
+import AppThemeProvider from "./theme/AppThemeProvider";
 import { AuthProvider, RBACProvider } from "./context";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 export default function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
+      <AppThemeProvider>
         <BrowserRouter>
           <ErrorBoundary>
             <RBACProvider>
@@ -19,7 +17,7 @@ export default function App() {
             </RBACProvider>
           </ErrorBoundary>
         </BrowserRouter>
-      </ThemeProvider>
+      </AppThemeProvider>
     </ErrorBoundary>
   );
 }
