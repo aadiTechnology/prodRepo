@@ -7,11 +7,6 @@ import {
     CircularProgress,
     Breadcrumbs,
     Link,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogContentText,
-    DialogActions,
     Paper,
     Divider,
 } from "@mui/material";
@@ -25,6 +20,7 @@ import {
 import { useNavigate, useParams, Link as RouterLink } from "react-router-dom";
 import { Tenant } from "../../types/tenant";
 import tenantService from "../../api/services/tenantService";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 
 // ─── Design tokens matching TenantList ───────────────────────
 const NAV = "#1a1a2e";
@@ -379,43 +375,27 @@ const TenantDetail = () => {
             </Box>
 
             {/* ── Delete Confirmation Dialog ── */}
-            <Dialog
+            <ConfirmDialog
                 open={deleteDialogOpen}
-                onClose={() => !deleteLoading && setDeleteDialogOpen(false)}
-                PaperProps={{ sx: { borderRadius: "12px", width: "100%", maxWidth: 450 } }}
-            >
-                <DialogTitle sx={{ fontWeight: 700, color: "error.main" }}>
-                    Confirm Tenant Deletion
-                </DialogTitle>
-                <DialogContent>
-                    <DialogContentText sx={{ mb: 2 }}>
+                title="Confirm Tenant Deletion"
+                message=""
+                messageNode={
+                    <Typography component="span">
                         Are you sure you want to delete <strong>{tenant?.name}</strong>?
-                    </DialogContentText>
-                    <Alert severity="warning" sx={{ borderRadius: "8px" }}>
+                    </Typography>
+                }
+                warningContent={
+                    <Alert severity="warning" sx={{ borderRadius: "8px", mt: 2 }}>
                         This is a <strong>Soft Delete</strong>. The tenant will be removed from the list,
                         and <strong>all associated user accounts</strong> will be deactivated immediately.
                     </Alert>
-                </DialogContent>
-                <DialogActions sx={{ p: 3, pt: 0 }}>
-                    <Button
-                        onClick={() => setDeleteDialogOpen(false)}
-                        disabled={deleteLoading}
-                        sx={{ borderRadius: "8px", textTransform: "none" }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleDeleteTenant}
-                        color="error"
-                        variant="contained"
-                        disabled={deleteLoading}
-                        startIcon={deleteLoading ? <CircularProgress size={16} color="inherit" /> : <DeleteIcon />}
-                        sx={{ borderRadius: "8px", px: 3, textTransform: "none", boxShadow: "none" }}
-                    >
-                        {deleteLoading ? "Deleting…" : "Delete Permanently"}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                }
+                confirmText="Delete Permanently"
+                confirmVariant="error"
+                onConfirm={handleDeleteTenant}
+                onCancel={() => setDeleteDialogOpen(false)}
+                loading={deleteLoading}
+            />
         </>
     );
 };

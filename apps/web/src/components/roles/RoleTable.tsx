@@ -17,15 +17,13 @@ import {
 import RoleInfoBox from "./RoleInfoBox";
 import {
   Lock as LockIcon,
-  Visibility as ViewIcon,
-  Edit as EditIcon,
   Block as DeactivateIcon,
-  Delete as DeleteIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Role, PaginatedResponse } from "../../types/role.types";
 import ConfirmDialog from "../common/ConfirmDialog";
+import TableRowActions from "../reusable/TableRowActions";
 import StatusChip from "./StatusChip";
 import ScopeChip from "./ScopeChip";
 import dayjs from "dayjs";
@@ -174,57 +172,33 @@ export default function RoleTable({
       ),
     },
     {
-      field: "view",
-      headerName: "View",
-      minWidth: 60,
+      field: "actions",
+      headerName: "Actions",
+      minWidth: 120,
       sortable: false,
       filterable: false,
       align: "center",
       renderCell: (params: GridRenderCellParams<Role>) => (
-        <IconButton size="small" aria-label="view" onClick={async () => {
-          try {
-            const details = await roleService.getRoleById(params.row.id);
-            setRoleDetails({
-              ...details,
-              status: details.is_active ? "ACTIVE" : "INACTIVE",
-            });
-          } catch (e) {
-            setRoleDetails(params.row);
-          }
-          setSelectedRole(params.row);
-          setInfoBoxOpen(true);
-        }}>
-          <ViewIcon fontSize="small" />
-        </IconButton>
-      ),
-    },
-    {
-      field: "edit",
-      headerName: "Edit",
-      minWidth: 60,
-      sortable: false,
-      filterable: false,
-      align: "center",
-      renderCell: (params: GridRenderCellParams<Role>) => (
-        <IconButton size="small" aria-label="edit" onClick={() => navigate(`/roles/${params.row.id}/edit`)}>
-          <EditIcon fontSize="small" />
-        </IconButton>
-      ),
-    },
-    {
-      field: "delete",
-      headerName: "Delete",
-      minWidth: 60,
-      sortable: false,
-      filterable: false,
-      align: "center",
-      renderCell: (params: GridRenderCellParams<Role>) => (
-        <IconButton size="small" aria-label="delete" onClick={() => {
-          setSelectedRole(params.row);
-          setDeleteDialogOpen(true);
-        }}>
-          <DeleteIcon fontSize="small" />
-        </IconButton>
+        <TableRowActions
+          onView={async () => {
+            try {
+              const details = await roleService.getRoleById(params.row.id);
+              setRoleDetails({
+                ...details,
+                status: details.is_active ? "ACTIVE" : "INACTIVE",
+              });
+            } catch (e) {
+              setRoleDetails(params.row);
+            }
+            setSelectedRole(params.row);
+            setInfoBoxOpen(true);
+          }}
+          onEdit={() => navigate(`/roles/${params.row.id}/edit`)}
+          onDelete={() => {
+            setSelectedRole(params.row);
+            setDeleteDialogOpen(true);
+          }}
+        />
       ),
     },
   ];

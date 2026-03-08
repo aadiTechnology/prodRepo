@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   Box,
   Paper,
@@ -7,14 +7,9 @@ import {
   Typography,
   CircularProgress,
   Alert,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
 } from "@mui/material";
-import { PageHeader } from "../components/common";
+import { ListPageLayout, DataTable } from "../components/reusable";
+import { PageHeader } from "../components/layout";
 import aiService, {
   type GenerateStoryAndTestsResult,
 } from "../api/services/aiService";
@@ -55,19 +50,79 @@ export default function RequirementGeneratePage() {
     handleGenerate();
   }, [handleGenerate]);
 
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        flex: 1,
-        minHeight: "100%",
-        width: "100%",
-        backgroundColor: "#f8fafc",
-      }}
-    >
-      <PageHeader title="Generate story and tests" />
+  const testCaseColumns = useMemo(
+    () => [
+      {
+        id: "scenario",
+        label: "Scenario",
+        render: (row: (typeof result extends null ? never : GenerateStoryAndTestsResult["test_cases"][0]) & Record<string, unknown>) => (
+          <Typography variant="body2">{(row as { scenario?: string }).scenario}</Typography>
+        ),
+      },
+      {
+        id: "pre_requisite",
+        label: "Pre-Requisite",
+        render: (row: (typeof result extends null ? never : GenerateStoryAndTestsResult["test_cases"][0]) & Record<string, unknown>) => {
+          const preReqList = normalizeToList((row as { pre_requisite?: string[] | string | null }).pre_requisite);
+          return preReqList.length > 0 ? (
+            <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+              {preReqList.map((p, i) => (
+                <li key={i}><Typography variant="body2">{p}</Typography></li>
+              ))}
+            </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary">—</Typography>
+          );
+        },
+      },
+      {
+        id: "test_data",
+        label: "Test Data",
+        render: (row: (typeof result extends null ? never : GenerateStoryAndTestsResult["test_cases"][0]) & Record<string, unknown>) => {
+          const testDataList = normalizeToList((row as { test_data?: string[] | string | null }).test_data);
+          return testDataList.length > 0 ? (
+            <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+              {testDataList.map((d, i) => (
+                <li key={i}><Typography variant="body2">{d}</Typography></li>
+              ))}
+            </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary">—</Typography>
+          );
+        },
+      },
+      {
+        id: "steps",
+        label: "Steps",
+        render: (row: (typeof result extends null ? never : GenerateStoryAndTestsResult["test_cases"][0]) & Record<string, unknown>) => {
+          const steps = (row as { steps?: string[] }).steps;
+          return steps && steps.length > 0 ? (
+            <Box component="ol" sx={{ m: 0, pl: 2.5 }}>
+              {steps.map((step, i) => (
+                <li key={i}><Typography variant="body2">{step}</Typography></li>
+              ))}
+            </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary">—</Typography>
+          );
+        },
+      },
+      {
+        id: "expected_result",
+        label: "Expected Result",
+        render: (row: (typeof result extends null ? never : GenerateStoryAndTestsResult["test_cases"][0]) & Record<string, unknown>) => (
+          <Typography variant="body2">{(row as { expected_result?: string }).expected_result}</Typography>
+        ),
+      },
+    ],
+    []
+  );
 
+  return (
+    <ListPageLayout
+      header={<PageHeader title="Generate story and tests" />}
+      contentPaddingSize="normal"
+    >
       <Paper
         sx={{
           flex: 1,
@@ -208,78 +263,16 @@ export default function RequirementGeneratePage() {
             <Typography variant="subtitle1" fontWeight={700} gutterBottom sx={{ mb: 1.5 }}>
               Test Cases
             </Typography>
-            <TableContainer component={Paper} variant="outlined" sx={{ border: "1px solid #e2e8f0", borderRadius: "8px" }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow sx={{ bgcolor: "#f1f5f9" }}>
-                    <TableCell sx={{ fontWeight: 700 }}>Scenario</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Pre-Requisite</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Test Data</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Steps</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Expected Result</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {result.test_cases.map((tc) => {
-                    const preReqList = normalizeToList(tc.pre_requisite);
-                    const testDataList = normalizeToList(tc.test_data);
-                    const hasTestData = testDataList.length > 0;
-                    return (
-                      <TableRow key={tc.id} hover>
-                        <TableCell sx={{ verticalAlign: "top" }}>
-                          <Typography variant="body2">{tc.scenario}</Typography>
-                        </TableCell>
-                        <TableCell sx={{ verticalAlign: "top" }}>
-                          {preReqList.length > 0 ? (
-                            <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
-                              {preReqList.map((p, i) => (
-                                <li key={i}>
-                                  <Typography variant="body2">{p}</Typography>
-                                </li>
-                              ))}
-                            </Box>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">—</Typography>
-                          )}
-                        </TableCell>
-                        <TableCell sx={{ verticalAlign: "top" }}>
-                          {hasTestData ? (
-                            <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
-                              {testDataList.map((d, i) => (
-                                <li key={i}>
-                                  <Typography variant="body2">{d}</Typography>
-                                </li>
-                              ))}
-                            </Box>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">—</Typography>
-                          )}
-                        </TableCell>
-                        <TableCell sx={{ verticalAlign: "top" }}>
-                          {tc.steps && tc.steps.length > 0 ? (
-                            <Box component="ol" sx={{ m: 0, pl: 2.5 }}>
-                              {tc.steps.map((step, i) => (
-                                <li key={i}>
-                                  <Typography variant="body2">{step}</Typography>
-                                </li>
-                              ))}
-                            </Box>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">—</Typography>
-                          )}
-                        </TableCell>
-                        <TableCell sx={{ verticalAlign: "top" }}>
-                          <Typography variant="body2">{tc.expected_result}</Typography>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <DataTable
+              columns={testCaseColumns}
+              data={result.test_cases as (GenerateStoryAndTestsResult["test_cases"][0] & Record<string, unknown>)[]}
+              emptyMessage="No test cases."
+              stickyHeader={false}
+              size="small"
+            />
           </Box>
         )}
       </Paper>
-    </Box>
+    </ListPageLayout>
   );
 }

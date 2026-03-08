@@ -1,10 +1,3 @@
-// Style object for confirmation popup divider
-const confirmDividerStyle = {
-  border: 'none',
-  borderTop: '0.225px solid #e5e7eb',
-  margin: 0,
-  height: 0,
-};
 // Custom snackbar style for success toast
 const successSnackbarBoxSx = {
   display: 'flex',
@@ -34,19 +27,14 @@ import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Box, Typography, TextField, Button, Snackbar, Alert, FormControl, InputLabel, Select, MenuItem, CircularProgress, Stack, Paper, Grid, Switch } from "@mui/material";
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 import SaveIcon from '@mui/icons-material/Save';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
-import Divider from '@mui/material/Divider';
-import CancelIcon from '@mui/icons-material/Cancel';
-import CheckIcon from '@mui/icons-material/Check';
 import roleService from "../api/services/roleService";
 import { useAuth } from "../context/AuthContext";
 import HomeIcon from '@mui/icons-material/Home';
 import Tooltip from '@mui/material/Tooltip';
+import ConfirmDialog from "../components/common/ConfirmDialog";
+import { FormSectionTitle } from "../components/reusable";
 function AddRole() {
   // --- Success Toast Handler ---
   const showSuccessToast = (message: string) => setSnackbar(message);
@@ -267,7 +255,7 @@ function AddRole() {
           {/* Header */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 2, bgcolor: "#1a1a2e" }}>
             <AssignmentIndIcon sx={{ color: "white", fontSize: 22 }} />
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "white", textTransform: "uppercase", letterSpacing: "1px" }}>Role Information</Typography>
+            <FormSectionTitle sx={(theme) => ({ color: theme.palette.common.white, mb: 0 })}>Role Information</FormSectionTitle>
           </Box>
           <Box sx={{ p: 3 }}>
             <form onSubmit={handleSubmit} autoComplete="off">
@@ -381,100 +369,15 @@ function AddRole() {
             {snackbar}
           </Alert>
         </Snackbar>
-        <Dialog
+        <ConfirmDialog
           open={confirmOpen}
-          onClose={handleCancel}
-          PaperProps={{
-            sx: {
-              borderRadius: 3,
-              maxWidth: 600,
-              width: '100%',
-              p: 0,
-              position: 'absolute',
-              top: '5%',
-              left: '50%',
-              transform: 'translate(-50%, 0)',
-              height: '30%',
-              minHeight: '20px',
-              overflowY: 'auto',
-            }
-          }}
-        >
-          {/* Header bar with title and close icon (from RoleManagementPage) */}
-          <Box sx={{
-            bgcolor: '#18183a',
-            borderTopLeftRadius: 12,
-            borderTopRightRadius: 12,
-            px: 2,
-            py: 0.10,
-            minHeight: 4,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            width: '100%',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.10)',
-          }}>
-            <Box />
-            <IconButton
-              aria-label="close"
-              onClick={handleCancel}
-              sx={{ color: 'white', bgcolor: 'transparent', borderRadius: 2 }}
-            >
-              <CancelIcon sx={{ fontSize: 28 }} />
-            </IconButton>
-          </Box>
-          {/* Message, check icon, and buttons area (from RoleManagementPage) */}
-          <Box sx={{ px: 4, pt: 4, pb: 2.5, bgcolor: 'white', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, textAlign: 'left' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-              <CheckIcon sx={{ fontSize: 50, color: '#43a047', mr: 2, p: 0 }} />
-              <Typography sx={{ fontWeight: 175, fontSize: '1.9rem', color: '#18183a', letterSpacing: '-1px', lineHeight: 1.1 }}>
-                Please Confirm
-              </Typography>
-            </Box>
-            <Typography sx={{ fontSize: '1.05rem', color: '#18183a', fontWeight: 125, mb: 1.2, ml: 3 }}>
-              {isEditMode ? 'Are you sure you want to update this role?' : 'Are you sure you want to save this role?'}
-            </Typography>
-            <Box sx={{ width: '100%', mb: 0.5 }}>
-              <hr style={confirmDividerStyle} />
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, width: '100%', mt: 0.5 }}>
-              <Button
-                onClick={handleCancel}
-                sx={{
-                  color: '#ef4444',
-                  backgroundColor: 'transparent',
-                  fontWeight: 'bold',
-                  fontSize: '1.1rem',
-                  px: 4,
-                  borderRadius: 0,
-                  minWidth: 120,
-                  boxShadow: 'none',
-                  border: 'none',
-                  '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' }
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleConfirm}
-                sx={{
-                  color: '#43a047',
-                  backgroundColor: 'transparent',
-                  fontWeight: 'bold',
-                  fontSize: '1.1rem',
-                  px: 4,
-                  borderRadius: 0,
-                  minWidth: 120,
-                  boxShadow: 'none',
-                  border: 'none',
-                  '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' }
-                }}
-              >
-                Confirm
-              </Button>
-            </Box>
-          </Box>
-        </Dialog>
+          title="Please Confirm"
+          message={isEditMode ? "Are you sure you want to update this role?" : "Are you sure you want to save this role?"}
+          confirmText="Confirm"
+          confirmVariant="primary"
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+        />
       </Box>
     </Box>
   );

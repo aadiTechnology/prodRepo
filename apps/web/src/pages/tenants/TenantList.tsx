@@ -1,27 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
     Box,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Typography,
-    IconButton,
     Alert,
     CircularProgress,
-    Tooltip,
     Snackbar,
 } from "@mui/material";
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Home as HomeIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { Tenant } from "../../types/tenant";
 import tenantService from "../../api/services/tenantService";
-import { ListPageLayout } from "../../components/reusable";
-import { ListPageToolbar } from "../../components/reusable";
-import { DirectoryInfoBar } from "../../components/reusable";
-import { TablePaginationBar } from "../../components/reusable";
+import { ListPageLayout, ListPageToolbar, DirectoryInfoBar, TablePaginationBar, DataTable, TableRowActions } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 
@@ -114,6 +103,62 @@ const TenantList = () => {
         return 0;
     });
 
+    const tenantColumns = useMemo(
+        () => [
+            {
+                id: "logo",
+                label: "Logo",
+                render: (t: Tenant) =>
+                    t.logo_url ? (
+                        <img
+                            src={t.logo_url}
+                            alt={t.name}
+                            style={{ height: 32, width: "auto", maxWidth: 90, objectFit: "contain" }}
+                            onError={(e) => { e.currentTarget.style.display = "none"; }}
+                        />
+                    ) : (
+                        <Typography sx={{ fontSize: "0.85rem", color: "#94a3b8" }}>—</Typography>
+                    ),
+            },
+            { id: "name", label: "Tenant Name", field: "name" as keyof Tenant, render: (t: Tenant) => t.name },
+            { id: "owner_name", label: "Owner", field: "owner_name" as keyof Tenant },
+            { id: "email", label: "Email", field: "email" as keyof Tenant },
+            {
+                id: "status",
+                label: "Status",
+                render: (t: Tenant) => (
+                    <Box
+                        sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 1,
+                            px: 1.2,
+                            py: 0.35,
+                            borderRadius: "20px",
+                            bgcolor: t.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                            color: t.is_active ? "#059669" : "#dc2626",
+                            border: `1px solid ${t.is_active ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)"}`,
+                        }}
+                    >
+                        <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "currentColor" }} />
+                        <Typography sx={{ fontWeight: 700, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            {t.is_active ? "Active" : "Inactive"}
+                        </Typography>
+                    </Box>
+                ),
+            },
+            {
+                id: "created_at",
+                label: "Created Date",
+                render: (t: Tenant) =>
+                    t.created_at && !isNaN(new Date(t.created_at).getTime())
+                        ? new Date(t.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })
+                        : "-",
+            },
+        ],
+        []
+    );
+
     return (
         <ListPageLayout
             pageBackground
@@ -151,267 +196,21 @@ const TenantList = () => {
                 />
             )}
 
-                <TableContainer sx={{ maxHeight: "calc(100vh - 200px)" }}>
-                    {loading ? (
-                        <Box sx={{ display: "flex", justifyContent: "center", p: 8 }}>
-                            <CircularProgress sx={{ color: "#1a1a2e" }} />
-                        </Box>
-                    ) : (
-                        <Table size="small" stickyHeader>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell
-                                        sx={{
-                                            fontWeight: 700,
-                                            color: "white",
-                                            fontSize: "0.80rem",
-                                            px: 2,
-                                            py: 1.2,
-                                            bgcolor: "#1a1a2e",
-                                        }}
-                                    >
-                                        Logo
-                                    </TableCell>
-                                    <TableCell
-                                        sx={{
-                                            fontWeight: 700,
-                                            color: "white",
-                                            fontSize: "0.80rem",
-                                            px: 2,
-                                            py: 1.2,
-                                            bgcolor: "#1a1a2e",
-                                            cursor: "pointer",
-                                            userSelect: "none",
-                                        }}
-                                        onClick={() => {
-                                            if (sortBy === "name") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                                            else { setSortBy("name"); setSortOrder("asc"); }
-                                        }}
-                                    >
-                                        Tenant Name{" "}
-                                        {sortBy === "name" ? (sortOrder === "asc" ? "▲" : "▼") : ""}
-                                    </TableCell>
-                                    <TableCell
-                                        sx={{
-                                            fontWeight: 700,
-                                            color: "white",
-                                            fontSize: "0.80rem",
-                                            px: 2,
-                                            py: 1.2,
-                                            bgcolor: "#1a1a2e",
-                                        }}
-                                    >
-                                        Owner
-                                    </TableCell>
-                                    <TableCell
-                                        sx={{
-                                            fontWeight: 700,
-                                            color: "white",
-                                            fontSize: "0.80rem",
-                                            px: 2,
-                                            py: 1.2,
-                                            bgcolor: "#1a1a2e",
-                                        }}
-                                    >
-                                        Email
-                                    </TableCell>
-                                    <TableCell
-                                        sx={{
-                                            fontWeight: 700,
-                                            color: "white",
-                                            fontSize: "0.80rem",
-                                            px: 2,
-                                            py: 1.2,
-                                            bgcolor: "#1a1a2e",
-                                        }}
-                                    >
-                                        Status
-                                    </TableCell>
-                                    <TableCell
-                                        sx={{
-                                            fontWeight: 700,
-                                            color: "white",
-                                            fontSize: "0.80rem",
-                                            px: 2,
-                                            py: 1.2,
-                                            bgcolor: "#1a1a2e",
-                                            cursor: "pointer",
-                                            userSelect: "none",
-                                        }}
-                                        onClick={() => {
-                                            if (sortBy === "created_at") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                                            else { setSortBy("created_at"); setSortOrder("asc"); }
-                                        }}
-                                    >
-                                        Created Date{" "}
-                                        {sortBy === "created_at" ? (sortOrder === "asc" ? "▲" : "▼") : ""}
-                                    </TableCell>
-                                    <TableCell
-                                        sx={{
-                                            fontWeight: 700,
-                                            color: "white",
-                                            fontSize: "0.80rem",
-                                            px: 2,
-                                            py: 1.2,
-                                            bgcolor: "#1a1a2e",
-                                        }}
-                                    >
-                                        Edit
-                                    </TableCell>
-                                    <TableCell
-                                        sx={{
-                                            fontWeight: 700,
-                                            color: "white",
-                                            fontSize: "0.80rem",
-                                            px: 2,
-                                            py: 1.2,
-                                            bgcolor: "#1a1a2e",
-                                        }}
-                                    >
-                                        Delete
-                                    </TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {sortedTenants.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
-                                            <Typography variant="body1" color="text.secondary">
-                                                No tenants available.
-                                            </Typography>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    sortedTenants.map((tenant) => (
-                                        <TableRow
-                                            key={tenant.id}
-                                            hover
-                                            sx={{
-                                                "&.MuiTableRow-hover:hover": { bgcolor: "#f1f5f9" },
-                                                "& td": { borderBottom: "1px solid #f1f5f9" },
-                                            }}
-                                        >
-                                            <TableCell sx={{ py: 0.8, px: 2 }}>
-                                                {tenant.logo_url ? (
-                                                    <img
-                                                        src={tenant.logo_url}
-                                                        alt={tenant.name}
-                                                        style={{
-                                                            height: 32,
-                                                            width: "auto",
-                                                            maxWidth: 90,
-                                                            objectFit: "contain",
-                                                        }}
-                                                        onError={(e) => {
-                                                            e.currentTarget.style.display = "none";
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <Typography sx={{ fontSize: "0.85rem", color: "#94a3b8" }}>
-                                                        —
-                                                    </Typography>
-                                                )}
-                                            </TableCell>
-                                            <TableCell
-                                                sx={{
-                                                    fontWeight: 700,
-                                                    color: "#1a1a2e",
-                                                    py: 0.8,
-                                                    px: 2,
-                                                    fontSize: "0.85rem",
-                                                }}
-                                            >
-                                                {tenant.name}
-                                            </TableCell>
-                                            <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem" }}>
-                                                {tenant.owner_name}
-                                            </TableCell>
-                                            <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem" }}>
-                                                {tenant.email}
-                                            </TableCell>
-                                            <TableCell sx={{ py: 0.8, px: 2 }}>
-                                                <Box
-                                                    sx={{
-                                                        display: "inline-flex",
-                                                        alignItems: "center",
-                                                        gap: 1,
-                                                        px: 1.2,
-                                                        py: 0.35,
-                                                        borderRadius: "20px",
-                                                        bgcolor: tenant.is_active
-                                                            ? "rgba(16, 185, 129, 0.1)"
-                                                            : "rgba(239, 68, 68, 0.1)",
-                                                        color: tenant.is_active ? "#059669" : "#dc2626",
-                                                        border: `1px solid ${tenant.is_active
-                                                            ? "rgba(16, 185, 129, 0.2)"
-                                                            : "rgba(239, 68, 68, 0.2)"
-                                                            }`,
-                                                    }}
-                                                >
-                                                    <Box
-                                                        sx={{
-                                                            width: 5,
-                                                            height: 5,
-                                                            borderRadius: "50%",
-                                                            bgcolor: "currentColor",
-                                                        }}
-                                                    />
-                                                    <Typography
-                                                        sx={{
-                                                            fontWeight: 700,
-                                                            fontSize: "0.7rem",
-                                                            textTransform: "uppercase",
-                                                            letterSpacing: "0.5px",
-                                                        }}
-                                                    >
-                                                        {tenant.is_active ? "Active" : "Inactive"}
-                                                    </Typography>
-                                                </Box>
-                                            </TableCell>
-                                            <TableCell sx={{ color: "#475569", py: 0.8, px: 2, fontSize: "0.85rem" }}>
-                                                {tenant.created_at && !isNaN(new Date(tenant.created_at).getTime())
-                                                    ? new Date(tenant.created_at).toLocaleDateString("en-US", {
-                                                        month: "short",
-                                                        day: "2-digit",
-                                                        year: "numeric",
-                                                    })
-                                                    : "-"}
-                                            </TableCell>
-                                            <TableCell sx={{ py: 0.8, px: 2 }}>
-                                                <Tooltip title="Edit">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => navigate(`/tenants/${tenant.id}/edit`)}
-                                                        sx={{
-                                                            color: "#94a3b8",
-                                                            "&:hover": { color: "#1713eaff" },
-                                                        }}
-                                                    >
-                                                        <EditIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </TableCell>
-                                            <TableCell sx={{ py: 0.9, px: 2 }}>
-                                                <Tooltip title="Delete">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => handleDeleteClick(tenant)}
-                                                        sx={{
-                                                            color: "#94a3b8",
-                                                            "&:hover": { color: "#ef4444" },
-                                                        }}
-                                                    >
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
+                <DataTable<Tenant & Record<string, unknown>>
+                    columns={tenantColumns}
+                    data={sortedTenants as (Tenant & Record<string, unknown>)[]}
+                    loading={loading}
+                    emptyMessage="No tenants available."
+                    renderRowActions={(tenant) => (
+                        <TableRowActions
+                            onEdit={() => navigate(`/tenants/${tenant.id}/edit`)}
+                            onDelete={() => handleDeleteClick(tenant)}
+                        />
                     )}
-                </TableContainer>
+                    stickyHeader
+                    size="small"
+                    maxHeight="calc(100vh - 200px)"
+                />
 
                 {!loading && tenants.length > 0 && (
                     <TablePaginationBar

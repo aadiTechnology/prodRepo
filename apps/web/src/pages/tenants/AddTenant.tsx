@@ -33,24 +33,7 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../../components/common";
 import tenantService from "../../api/services/tenantService";
-
-// ─── Section label ─────────────────────────────────────────────────────────────
-const SectionLabel = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-        <Box sx={{ color: "#1a1a2e", display: "flex", alignItems: "center" }}>{icon}</Box>
-        <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.6px" }}>
-            {title}
-        </Typography>
-    </Box>
-);
-
-// ─── Field label ───────────────────────────────────────────────────────────────
-const FieldLabel = ({ children, required }: { children: React.ReactNode; required?: boolean }) => (
-    <Typography sx={{ fontSize: "0.73rem", fontWeight: 700, color: "#64748b", mb: 0.5, display: "flex", alignItems: "center", gap: 0.3 }}>
-        {children}
-        {required && <Box component="span" sx={{ color: "#ef4444", fontSize: "0.8rem", lineHeight: 1 }}>*</Box>}
-    </Typography>
-);
+import { ListPageLayout, FormSectionLabel, FieldLabel } from "../../components/reusable";
 
 // ─── TextField sx ──────────────────────────────────────────────────────────────
 const buildFieldSx = (hasError: boolean) => ({
@@ -206,55 +189,51 @@ const AddTenant = () => {
     );
 
     return (
-        <Box sx={{
-            px: { xs: 1.5, sm: 2, md: 3 },
-            display: "flex",
-            flexDirection: "column",
-            height: "calc(100vh - 0px)",
-            overflow: "hidden",
-        }}>
-            {/* ── Page Header ── */}
-            <PageHeader
-                onBack={() => navigate("/")}
-                backIcon={<HomeIcon sx={{ color: "white", fontSize: 24 }} />}
-                title={
-                    <>
-                        <Box component="span" onClick={() => navigate("/tenants")}
-                            sx={{ color: "#94a3b8", cursor: "pointer", "&:hover": { color: "#1a1a2e" } }}>
-                            Tenants
-                        </Box>
-                        <Box component="span" sx={{ color: "#cbd5e1", mx: 1.5 }}>/</Box>
-                        {isEditMode ? "Edit Tenant" : "Add Tenant"}
-                    </>
-                }
-                actions={
-                    <>
-                        <Tooltip title="Cancel">
-                            <IconButton onClick={() => navigate("/tenants")}
-                                sx={{ color: "#ef4444", backgroundColor: "#fee2e2", borderRadius: 1.2, width: 40, height: 40, "&:hover": { backgroundColor: "#fecaca" } }}>
-                                <CancelIcon sx={{ fontSize: 22 }} />
-                            </IconButton>
-                        </Tooltip>
-                        <Tooltip title={isEditMode ? "Update Tenant" : "Save Tenant"}>
-                            <span>
-                                <IconButton onClick={handleSubmit} disabled={loading}
-                                    sx={{
-                                        backgroundColor: "#10b981", color: "white", borderRadius: 1.2, width: 40, height: 40,
-                                        "&:hover": { backgroundColor: "#059669" }, "&.Mui-disabled": { backgroundColor: "#cbd5e1", color: "white" }
-                                    }}>
-                                    {loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon sx={{ fontSize: 20 }} />}
-                                </IconButton>
-                            </span>
-                        </Tooltip>
-                    </>
-                }
-            />
-
-            {/* Alerts */}
-            {error && <Alert severity="error" icon={<ErrorIcon />} sx={{ mb: 1, borderRadius: "8px", py: 0.3 }} onClose={() => setError(null)}>{error}</Alert>}
-            {success && <Alert severity="success" sx={{ mb: 1, borderRadius: "8px", py: 0.3 }}>{success}</Alert>}
-
-            {/* ── Scrollable form area ── */}
+        <ListPageLayout
+            pageBackground={true}
+            contentPaddingSize="none"
+            header={
+                <>
+                    <PageHeader
+                        onBack={() => navigate("/")}
+                        backIcon={<HomeIcon sx={{ color: "white", fontSize: 24 }} />}
+                        title={
+                            <>
+                                <Box component="span" onClick={() => navigate("/tenants")}
+                                    sx={{ color: "#94a3b8", cursor: "pointer", "&:hover": { color: "#1a1a2e" } }}>
+                                    Tenants
+                                </Box>
+                                <Box component="span" sx={{ color: "#cbd5e1", mx: 1.5 }}>/</Box>
+                                {isEditMode ? "Edit Tenant" : "Add Tenant"}
+                            </>
+                        }
+                        actions={
+                            <>
+                                <Tooltip title="Cancel">
+                                    <IconButton onClick={() => navigate("/tenants")}
+                                        sx={{ color: "#ef4444", backgroundColor: "#fee2e2", borderRadius: 1.2, width: 40, height: 40, "&:hover": { backgroundColor: "#fecaca" } }}>
+                                        <CancelIcon sx={{ fontSize: 22 }} />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title={isEditMode ? "Update Tenant" : "Save Tenant"}>
+                                    <span>
+                                        <IconButton onClick={handleSubmit} disabled={loading}
+                                            sx={{
+                                                backgroundColor: "#10b981", color: "white", borderRadius: 1.2, width: 40, height: 40,
+                                                "&:hover": { backgroundColor: "#059669" }, "&.Mui-disabled": { backgroundColor: "#cbd5e1", color: "white" }
+                                            }}>
+                                            {loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon sx={{ fontSize: 20 }} />}
+                                        </IconButton>
+                                    </span>
+                                </Tooltip>
+                            </>
+                        }
+                    />
+                    {error && <Alert severity="error" icon={<ErrorIcon />} sx={{ mb: 1, borderRadius: "8px", py: 0.3 }} onClose={() => setError(null)}>{error}</Alert>}
+                    {success && <Alert severity="success" sx={{ mb: 1, borderRadius: "8px", py: 0.3 }}>{success}</Alert>}
+                </>
+            }
+        >
             <Box sx={{ flex: 1, overflowY: "auto", pb: 2, pr: 0.5 }}>
                 <Paper elevation={0} sx={{ borderRadius: "10px", border: "1px solid #e2e8f0", bgcolor: "white", overflow: "hidden" }}>
 
@@ -279,7 +258,7 @@ const AddTenant = () => {
 
                             {/* Company Info */}
                             <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.5 }}>
-                                <SectionLabel icon={<BusinessIcon sx={{ fontSize: 15 }} />} title="Company Information" />
+                                <FormSectionLabel icon={<BusinessIcon sx={{ fontSize: 15 }} />} title="Company Information" />
                                 <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
                                     <Box>
                                         <FieldLabel required>Tenant Name</FieldLabel>
@@ -320,7 +299,7 @@ const AddTenant = () => {
 
                             {/* Address */}
                             <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.5, pb: 2 }}>
-                                <SectionLabel icon={<LocationIcon sx={{ fontSize: 15 }} />} title="Address" />
+                                <FormSectionLabel icon={<LocationIcon sx={{ fontSize: 15 }} />} title="Address" />
                                 <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
                                     <Box sx={{ gridColumn: "1 / 3" }}>
                                         <FieldLabel>Address Line 1</FieldLabel>
@@ -356,7 +335,7 @@ const AddTenant = () => {
                         <Box>
                             {/* Administrator */}
                             <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.5 }}>
-                                <SectionLabel icon={<PersonIcon sx={{ fontSize: 15 }} />} title="Administrator" />
+                                <FormSectionLabel icon={<PersonIcon sx={{ fontSize: 15 }} />} title="Administrator" />
                                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
                                     <Box>
                                         <FieldLabel required>Full Name</FieldLabel>
@@ -429,7 +408,7 @@ const AddTenant = () => {
 
                             {/* Branding */}
                             <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.5, pb: 2 }}>
-                                <SectionLabel icon={<UploadIcon sx={{ fontSize: 15 }} />} title="Branding / Logo" />
+                                <FormSectionLabel icon={<UploadIcon sx={{ fontSize: 15 }} />} title="Branding / Logo" />
 
                                 <Tabs value={logoTab}
                                     onChange={(_, v) => { setLogoTab(v); setFormData(p => ({ ...p, logo_url: "" })); }}
@@ -560,7 +539,7 @@ const AddTenant = () => {
                     </Box>
                 </Paper>
             </Box>
-        </Box>
+        </ListPageLayout>
     );
 };
 
