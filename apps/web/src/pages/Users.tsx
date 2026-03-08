@@ -15,31 +15,15 @@ import {
   TextField,
   InputAdornment,
   Tooltip,
-  Dialog,
   Snackbar,
 } from "@mui/material";
-import CheckIcon from '@mui/icons-material/Check';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Search as SearchIcon,
-  Delete as DeleteIcon,
-  Home as HomeIcon,
-  Cancel as CancelIcon,
-} from "@mui/icons-material";
+import { Add as AddIcon, Edit as EditIcon, Search as SearchIcon, Delete as DeleteIcon, Home as HomeIcon } from "@mui/icons-material";
 import { Button, Select, MenuItem } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useTheme, useMediaQuery } from "@mui/material";
 import { User } from "../types/auth";
 import userService from "../api/services/userService";
-
-// Style object for confirmation popup divider
-const confirmDividerStyle = {
-  border: 'none',
-  borderTop: '1px solid #e5e7eb',
-  margin: 0,
-  height: 0,
-};
+import ConfirmDialog from "../components/common/ConfirmDialog";
 
 const Users = () => {
   const navigate = useNavigate();
@@ -512,107 +496,15 @@ const Users = () => {
         )}
       </Paper>
 
-      <Dialog
+      <ConfirmDialog
         open={confirmDialogOpen}
-        onClose={() => !deleteLoading && setConfirmDialogOpen(false)}
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            maxWidth: 600,
-            width: '100%',
-            p: 0,
-            position: 'absolute',
-            top: '5%',
-            left: '50%',
-            transform: 'translate(-50%, 0)',
-            height: '30%',
-            minHeight: '20px',
-            overflowY: 'auto',
-          }
-        }}
-      >
-        {/* Header bar with title and close icon */}
-        <Box sx={{
-          bgcolor: '#18183a',
-          borderTopLeftRadius: 12,
-          borderTopRightRadius: 12,
-          px: 2,
-          py: 0.10,
-          minHeight: 4,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          width: '100%',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.10)',
-        }}>
-          <Box />
-          <IconButton
-            aria-label="close"
-            onClick={() => setConfirmDialogOpen(false)}
-            disabled={deleteLoading}
-            sx={{ color: 'white', bgcolor: 'transparent', borderRadius: 2 }}
-          >
-            <CancelIcon sx={{ fontSize: 28 }} />
-          </IconButton>
-        </Box>
-        {/* Message, check icon, and buttons area */}
-        <Box sx={{ px: 4, pt: 4, pb: 2.5, bgcolor: 'white', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, textAlign: 'left' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-            <CheckIcon sx={{ fontSize: 50, color: '#43a047', mr: 2, p: 0 }} />
-            <Typography sx={{ fontWeight: 175, fontSize: '1.9rem', color: '#18183a', letterSpacing: '-1px', lineHeight: 1.1 }}>
-              Please Confirm
-            </Typography>
-          </Box>
-          <Typography sx={{ fontSize: '1.05rem', color: '#18183a', fontWeight: 125, mb: 1.2, ml: 3 }}>
-            {confirmDialogType === 'delete'
-              ? 'Are you sure you want to delete user?'
-              : confirmDialogType === 'edit'
-                ? 'Are you sure you want to update this user?'
-                : ''}
-          </Typography>
-          <Box sx={{ width: '100%', mb: 0.5 }}>
-            <hr style={confirmDividerStyle} />
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, width: '100%', mt: 0.5 }}>
-            <Button
-              onClick={() => setConfirmDialogOpen(false)}
-              disabled={deleteLoading}
-              sx={{
-                color: '#ef4444',
-                backgroundColor: 'transparent',
-                fontWeight: 'bold',
-                fontSize: '1.1rem',
-                px: 4,
-                borderRadius: 0,
-                minWidth: 120,
-                boxShadow: 'none',
-                border: 'none',
-                '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' }
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmDialogType === 'delete' ? handleConfirmDelete : undefined}
-              disabled={deleteLoading}
-              sx={{
-                color: '#43a047',
-                backgroundColor: 'transparent',
-                fontWeight: 'bold',
-                fontSize: '1.1rem',
-                px: 4,
-                borderRadius: 0,
-                minWidth: 120,
-                boxShadow: 'none',
-                border: 'none',
-                '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' }
-              }}
-            >
-              {deleteLoading ? "Deleting..." : "Confirm"}
-            </Button>
-          </Box>
-        </Box>
-      </Dialog>
+        title="Please Confirm"
+        message={confirmDialogType === "delete" ? "Are you sure you want to delete user?" : confirmDialogType === "edit" ? "Are you sure you want to update this user?" : ""}
+        confirmText={deleteLoading ? "Deleting…" : "Confirm"}
+        onConfirm={confirmDialogType === "delete" ? handleConfirmDelete : () => setConfirmDialogOpen(false)}
+        onCancel={() => setConfirmDialogOpen(false)}
+        loading={deleteLoading}
+      />
       <Snackbar
         open={!!snackbar}
         autoHideDuration={3000}

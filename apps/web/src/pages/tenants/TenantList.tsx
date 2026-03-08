@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
     Box,
-    Paper,
     Table,
     TableBody,
     TableCell,
@@ -12,41 +11,22 @@ import {
     IconButton,
     Alert,
     CircularProgress,
-    TextField,
-    InputAdornment,
     Tooltip,
-    Select,
-    MenuItem,
-    Dialog,
     Snackbar,
-    Button,
 } from "@mui/material";
-import CheckIcon from "@mui/icons-material/Check";
-import {
-    Add as AddIcon,
-    Edit as EditIcon,
-    Search as SearchIcon,
-    Delete as DeleteIcon,
-    Home as HomeIcon,
-    Cancel as CancelIcon,
-} from "@mui/icons-material";
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Home as HomeIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { useTheme, useMediaQuery } from "@mui/material";
 import { Tenant } from "../../types/tenant";
 import tenantService from "../../api/services/tenantService";
-
-// Style object for confirmation popup divider
-const confirmDividerStyle = {
-    border: "none",
-    borderTop: "1px solid #e5e7eb",
-    margin: 0,
-    height: 0,
-};
+import { ListPageLayout } from "../../components/reusable";
+import { ListPageToolbar } from "../../components/reusable";
+import { DirectoryInfoBar } from "../../components/reusable";
+import { TablePaginationBar } from "../../components/reusable";
+import { PageHeader } from "../../components/layout";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 
 const TenantList = () => {
     const navigate = useNavigate();
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
     const [tenants, setTenants] = useState<Tenant[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -135,166 +115,41 @@ const TenantList = () => {
     });
 
     return (
-        <Box
-            sx={{
-                px: { xs: 2, md: 4 },
-                pb: 4,
-                minHeight: "100vh",
-                backgroundColor: "#f8fafc",
-                display: "flex",
-                flexDirection: "column",
-            }}
+        <ListPageLayout
+            pageBackground
+            contentPaddingSize="none"
+            header={
+                <PageHeader
+                    title="Tenant Management"
+                    onBack={() => navigate("/")}
+                    backIcon={<HomeIcon sx={{ color: "white", fontSize: 24 }} />}
+                    actions={
+                        <ListPageToolbar
+                            searchValue={search}
+                            onSearchChange={setSearch}
+                            searchPlaceholder="Search tenants..."
+                            onAddClick={() => navigate("/tenants/add")}
+                            addLabel="Add Tenant"
+                            addIcon={<AddIcon sx={{ fontSize: 24 }} />}
+                        />
+                    }
+                />
+            }
         >
-            {/* Header */}
-            <Box
-                sx={{
-                    pt: 1.5,
-                    pb: 1.5,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                }}
-            >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <IconButton
-                        onClick={() => navigate("/")}
-                        sx={{
-                            backgroundColor: "#1a1a2e",
-                            borderRadius: 1.2,
-                            width: 44,
-                            height: 44,
-                            "&:hover": { backgroundColor: "#2d2d44" },
-                        }}
-                    >
-                        <HomeIcon sx={{ color: "white", fontSize: 24 }} />
-                    </IconButton>
-                    <Typography
-                        variant="h5"
-                        sx={{
-                            fontWeight: 700,
-                            fontSize: "22px",
-                            color: "#1A1A2E",
-                            letterSpacing: "-1px",
-                        }}
-                    >
-                        Tenant Management
-                    </Typography>
-                </Box>
+            {error && (
+                <Alert severity="error" sx={{ m: 2 }} onClose={() => setError(null)}>
+                    {error}
+                </Alert>
+            )}
 
-                {/* Actions Row */}
-                <Box
-                    sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 2,
-                        width: { xs: "100%", sm: "auto" },
-                    }}
-                >
-                    <TextField
-                        placeholder="Search tenants..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        variant="outlined"
-                        size="small"
-                        fullWidth={isMobile}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon sx={{ color: "#94a3b8", fontSize: 20 }} />
-                                </InputAdornment>
-                            ),
-                        }}
-                        sx={{
-                            width: { xs: "100%", sm: "280px" },
-                            "& .MuiOutlinedInput-root": {
-                                bgcolor: "white",
-                                borderRadius: "12px",
-                                fontSize: "0.9rem",
-                                fontWeight: 500,
-                                "& fieldset": { borderColor: "#e2e8f0", borderWidth: "1.2px" },
-                                "&:hover fieldset": { borderColor: "#cbd5e1" },
-                                "&.Mui-focused": {
-                                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.03)",
-                                    "& fieldset": { borderColor: "#1A1A2E", borderWidth: "1.8px" },
-                                },
-                            },
-                        }}
-                    />
-                    <Tooltip title="Add Tenant">
-                        <IconButton
-                            onClick={() => navigate("/tenants/add")}
-                            sx={{
-                                backgroundColor: "#1a1a2e",
-                                color: "white",
-                                borderRadius: 1.2,
-                                width: 44,
-                                height: 44,
-                                boxShadow: "0 4px 10px rgba(26,26,46,0.2)",
-                                "&:hover": { backgroundColor: "#2d2d44", transform: "translateY(-1px)" },
-                            }}
-                        >
-                            <AddIcon sx={{ fontSize: 24 }} />
-                        </IconButton>
-                    </Tooltip>
-                </Box>
-            </Box>
-
-            <Paper
-                sx={{
-                    borderRadius: "12px",
-                    overflow: "hidden",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.01)",
-                    border: "1px solid #e2e8f0",
-                    bgcolor: "white",
-                    flexGrow: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                }}
-            >
-                {error && (
-                    <Alert severity="error" sx={{ m: 2 }} onClose={() => setError(null)}>
-                        {error}
-                    </Alert>
-                )}
-
-                {/* Info Bar */}
-                {!loading && totalTenants > 0 && (
-                    <Box
-                        sx={{
-                            py: 1.2,
-                            px: 3,
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            borderBottom: "1px solid #f1f5f9",
-                            bgcolor: "#fcfdfe",
-                        }}
-                    >
-                        <Typography
-                            sx={{
-                                fontSize: "0.80rem",
-                                color: "#64748b",
-                                fontWeight: 600,
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                            }}
-                        >
-                            Tenant Directory
-                        </Typography>
-                        <Typography sx={{ fontSize: "0.85rem", color: "#94a3b8", fontWeight: 500 }}>
-                            Showing{" "}
-                            <Box component="span" sx={{ color: "#1a1a2e", fontWeight: 700 }}>
-                                {Math.min(page * rowsPerPage + 1, totalTenants)}-
-                                {Math.min((page + 1) * rowsPerPage, totalTenants)}
-                            </Box>{" "}
-                            of{" "}
-                            <Box component="span" sx={{ color: "#1a1a2e", fontWeight: 700 }}>
-                                {totalTenants}
-                            </Box>{" "}
-                            tenants
-                        </Typography>
-                    </Box>
-                )}
+            {!loading && totalTenants > 0 && (
+                <DirectoryInfoBar
+                    label="Tenant Directory"
+                    rangeStart={Math.min(page * rowsPerPage + 1, totalTenants)}
+                    rangeEnd={Math.min((page + 1) * rowsPerPage, totalTenants)}
+                    total={totalTenants}
+                />
+            )}
 
                 <TableContainer sx={{ maxHeight: "calc(100vh - 200px)" }}>
                     {loading ? (
@@ -558,242 +413,29 @@ const TenantList = () => {
                     )}
                 </TableContainer>
 
-                {/* Custom Pagination Footer */}
                 {!loading && tenants.length > 0 && (
-                    <Box
-                        sx={{
-                            px: 2,
-                            py: 1,
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            borderTop: "1px solid #f1f5f9",
-                            bgcolor: "#fcfdfe",
+                    <TablePaginationBar
+                        page={page}
+                        rowsPerPage={rowsPerPage}
+                        totalRows={totalTenants}
+                        onPageChange={setPage}
+                        onRowsPerPageChange={(v) => {
+                            setRowsPerPage(v);
+                            setPage(0);
                         }}
-                    >
-                        {/* Left: Rows Per Page */}
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b" }}>
-                                Rows per page
-                            </Typography>
-                            <Select
-                                value={rowsPerPage}
-                                onChange={(e) => {
-                                    setRowsPerPage(Number(e.target.value));
-                                    setPage(0);
-                                }}
-                                size="small"
-                                sx={{
-                                    height: "28px",
-                                    width: "65px",
-                                    fontSize: "0.8rem",
-                                    fontWeight: 600,
-                                    bgcolor: "white",
-                                    borderRadius: "6px",
-                                    "& .MuiOutlinedInput-notchedOutline": { borderColor: "#e2e8f0" },
-                                }}
-                            >
-                                <MenuItem value={10}>10</MenuItem>
-                                <MenuItem value={20}>20</MenuItem>
-                                <MenuItem value={25}>25</MenuItem>
-                                <MenuItem value={50}>50</MenuItem>
-                            </Select>
-                        </Box>
-
-                        {/* Right: Page Navigation with numbered boxes */}
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                            {/* Prev arrow */}
-                            <IconButton
-                                size="small"
-                                disabled={page === 0}
-                                onClick={() => setPage(page - 1)}
-                                sx={{
-                                    width: 30, height: 30,
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: "6px",
-                                    fontSize: "0.85rem",
-                                    color: "#64748b",
-                                    "&:hover": { bgcolor: "#f1f5f9" },
-                                    "&.Mui-disabled": { opacity: 0.35 },
-                                }}
-                            >
-                                {"<"}
-                            </IconButton>
-
-                            {/* Numbered page boxes */}
-                            {Array.from({ length: Math.ceil(totalTenants / rowsPerPage) }, (_, i) => i).map((i) => (
-                                <Box
-                                    key={i}
-                                    onClick={() => setPage(i)}
-                                    sx={{
-                                        width: 30, height: 30,
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        borderRadius: "6px",
-                                        border: "1px solid",
-                                        borderColor: page === i ? "#1a1a2e" : "#e2e8f0",
-                                        bgcolor: page === i ? "#1a1a2e" : "white",
-                                        color: page === i ? "white" : "#64748b",
-                                        fontSize: "0.8rem",
-                                        fontWeight: page === i ? 700 : 500,
-                                        cursor: "pointer",
-                                        userSelect: "none",
-                                        transition: "all 0.15s",
-                                        "&:hover": {
-                                            bgcolor: page === i ? "#1a1a2e" : "#f1f5f9",
-                                            borderColor: page === i ? "#1a1a2e" : "#cbd5e1",
-                                        },
-                                    }}
-                                >
-                                    {i + 1}
-                                </Box>
-                            ))}
-
-                            {/* Next arrow */}
-                            <IconButton
-                                size="small"
-                                disabled={page >= Math.ceil(totalTenants / rowsPerPage) - 1}
-                                onClick={() => setPage(page + 1)}
-                                sx={{
-                                    width: 30, height: 30,
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: "6px",
-                                    fontSize: "0.85rem",
-                                    color: "#64748b",
-                                    "&:hover": { bgcolor: "#f1f5f9" },
-                                    "&.Mui-disabled": { opacity: 0.35 },
-                                }}
-                            >
-                                {">"}
-                            </IconButton>
-                        </Box>
-                    </Box>
+                    />
                 )}
-            </Paper>
 
-            {/* Confirm Delete Dialog — matches RoleManagementPage & Users style */}
-            <Dialog
+            <ConfirmDialog
                 open={confirmDialogOpen}
-                onClose={() => !deleteLoading && setConfirmDialogOpen(false)}
-                PaperProps={{
-                    sx: {
-                        borderRadius: 3,
-                        maxWidth: 600,
-                        width: "100%",
-                        p: 0,
-                        position: "absolute",
-                        top: "5%",
-                        left: "50%",
-                        transform: "translate(-50%, 0)",
-                        height: "30%",
-                        minHeight: "20px",
-                        overflowY: "auto",
-                    },
-                }}
-            >
-                {/* Header bar */}
-                <Box
-                    sx={{
-                        bgcolor: "#18183a",
-                        borderTopLeftRadius: 12,
-                        borderTopRightRadius: 12,
-                        px: 2,
-                        py: 0.1,
-                        minHeight: 4,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        width: "100%",
-                        boxShadow: "0 2px 12px rgba(0,0,0,0.10)",
-                    }}
-                >
-                    <Box />
-                    <IconButton
-                        aria-label="close"
-                        onClick={() => setConfirmDialogOpen(false)}
-                        disabled={deleteLoading}
-                        sx={{ color: "white", bgcolor: "transparent", borderRadius: 2 }}
-                    >
-                        <CancelIcon sx={{ fontSize: 28 }} />
-                    </IconButton>
-                </Box>
+                title="Confirm Delete"
+                message={`Are you sure you want to delete tenant ${tenantToDelete?.name ?? ""}?`}
+                confirmText={deleteLoading ? "Deleting…" : "Confirm"}
+                onConfirm={handleConfirmDelete}
+                onCancel={() => setConfirmDialogOpen(false)}
+                loading={deleteLoading}
+            />
 
-                {/* Content */}
-                <Box
-                    sx={{
-                        px: 4,
-                        pt: 4,
-                        pb: 2.5,
-                        bgcolor: "white",
-                        borderBottomLeftRadius: 12,
-                        borderBottomRightRadius: 12,
-                        textAlign: "left",
-                    }}
-                >
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
-                        <CheckIcon sx={{ fontSize: 50, color: "#43a047", mr: 2, p: 0 }} />
-                        <Typography
-                            sx={{
-                                fontWeight: 175,
-                                fontSize: "1.9rem",
-                                color: "#18183a",
-                                letterSpacing: "-1px",
-                                lineHeight: 1.1,
-                            }}
-                        >
-                            Please Confirm
-                        </Typography>
-                    </Box>
-                    <Typography
-                        sx={{ fontSize: "1.05rem", color: "#18183a", fontWeight: 125, mb: 1.2, ml: 3 }}
-                    >
-                        Are you sure you want to delete tenant{" "}
-                        <strong>{tenantToDelete?.name}</strong>?
-                    </Typography>
-                    <Box sx={{ width: "100%", mb: 0.5 }}>
-                        <hr style={confirmDividerStyle} />
-                    </Box>
-                    <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, width: "100%", mt: 0.5 }}>
-                        <Button
-                            onClick={() => setConfirmDialogOpen(false)}
-                            disabled={deleteLoading}
-                            sx={{
-                                color: "#ef4444",
-                                backgroundColor: "transparent",
-                                fontWeight: "bold",
-                                fontSize: "1.1rem",
-                                px: 4,
-                                borderRadius: 0,
-                                minWidth: 120,
-                                boxShadow: "none",
-                                border: "none",
-                                "&:hover": { backgroundColor: "transparent", textDecoration: "underline" },
-                            }}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleConfirmDelete}
-                            disabled={deleteLoading}
-                            sx={{
-                                color: "#43a047",
-                                backgroundColor: "transparent",
-                                fontWeight: "bold",
-                                fontSize: "1.1rem",
-                                px: 4,
-                                borderRadius: 0,
-                                minWidth: 120,
-                                boxShadow: "none",
-                                border: "none",
-                                "&:hover": { backgroundColor: "transparent", textDecoration: "underline" },
-                            }}
-                        >
-                            {deleteLoading ? "Deleting..." : "Confirm"}
-                        </Button>
-                    </Box>
-                </Box>
-            </Dialog>
-
-            {/* Success Snackbar */}
             <Snackbar
                 open={!!snackbar}
                 autoHideDuration={3000}
@@ -804,7 +446,7 @@ const TenantList = () => {
                     {snackbar}
                 </Alert>
             </Snackbar>
-        </Box>
+        </ListPageLayout>
     );
 };
 
