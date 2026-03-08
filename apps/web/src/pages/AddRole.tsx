@@ -1,27 +1,3 @@
-// Custom snackbar style for success toast
-const successSnackbarBoxSx = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 1.5,
-  px: 2.5,
-  py: 1.2,
-  borderRadius: 3,
-  bgcolor: '#2B2B2B',
-  boxShadow: '0 4px 24px 0 rgba(0,0,0,0.18)',
-  minWidth: 320,
-  maxWidth: 425,
-  mx: 'auto',
-  '& .success-snackbar-icon': {
-    width: 32,
-    height: 32,
-    borderRadius: '50%',
-    bgcolor: '#4CAF50',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-};
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Box, Typography, TextField, Button, Snackbar, Alert, FormControl, InputLabel, Select, MenuItem, CircularProgress, Stack, Paper, Grid, Switch } from "@mui/material";
@@ -185,7 +161,7 @@ function AddRole() {
       {/* Header - Aligned with AddTenant */}
       <Box sx={{ pt: 1.5, pb: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <IconButton onClick={() => navigate("/")} sx={{ backgroundColor: "#1a1a2e", borderRadius: 1.2, width: 44, height: 44, "&:hover": { backgroundColor: "#2d2d44" } }}>
+          <IconButton onClick={() => navigate("/")} sx={(theme) => ({ backgroundColor: theme.palette.grey[800], borderRadius: 1.2, width: 44, height: 44, "&:hover": { backgroundColor: theme.palette.grey[700] } })}>
             <HomeIcon sx={{ color: "white", fontSize: 24 }} />
           </IconButton>
           <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#1A1A2E", letterSpacing: "-1px" }}>
@@ -198,13 +174,13 @@ function AddRole() {
           <Tooltip title="Cancel and Go Back">
             <IconButton
               onClick={() => navigate("/roles")}
-              sx={{
-                color: '#fff',
-                backgroundColor: '#fee2e2',
-                borderRadius: '12px', // 25% smaller than 16px
-                width: 48, // 25% smaller than 64px
-                height: 48, // 25% smaller than 64px
-                boxShadow: '0 2px 8px 0 rgba(239,68,68,0.10)',
+              sx={(theme) => ({
+                color: theme.palette.error.contrastText,
+                backgroundColor: theme.palette.error.light,
+                borderRadius: 1.5,
+                width: 48,
+                height: 48,
+                boxShadow: theme.shadows[2],
                 border: 'none',
                 p: 0,
                 m: 0,
@@ -213,12 +189,12 @@ function AddRole() {
                 justifyContent: 'center',
                 transition: 'background 0.2s, color 0.2s',
                 '&:hover': {
-                  backgroundColor: '#fecaca',
-                  color: '#fff',
+                  backgroundColor: theme.palette.error.light,
+                  color: theme.palette.error.contrastText,
                 },
-              }}
+              })}
             >
-              <CloseIcon sx={{ fontSize: 24, color: '#ef4444', bgcolor: '#fff', borderRadius: '50%', p: 0.375 }} />
+              <CloseIcon sx={(theme) => ({ fontSize: 24, color: theme.palette.error.main, bgcolor: theme.palette.background.paper, borderRadius: '50%', p: 0.375 })} />
             </IconButton>
           </Tooltip>
           <Tooltip title={isEditMode ? "Update Role" : "Save Role"}>
@@ -251,9 +227,9 @@ function AddRole() {
       </Box>
       {/* Form content - match AddTenant style */}
       <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
-        <Paper sx={{ p: 0, borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.01)", overflow: "hidden", minWidth: 420, width: 480, maxWidth: '100%' }}>
+        <Paper sx={(theme) => ({ p: 0, borderRadius: 2, border: `1px solid ${theme.palette.divider}`, boxShadow: theme.shadows[1], overflow: "hidden", minWidth: 420, width: 480, maxWidth: '100%' })}>
           {/* Header */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 2, bgcolor: "#1a1a2e" }}>
+          <Box sx={(theme) => ({ display: "flex", alignItems: "center", gap: 1.5, p: 2, bgcolor: theme.palette.grey[800] })}>
             <AssignmentIndIcon sx={{ color: "white", fontSize: 22 }} />
             <FormSectionTitle sx={(theme) => ({ color: theme.palette.common.white, mb: 0 })}>Role Information</FormSectionTitle>
           </Box>
@@ -300,10 +276,10 @@ function AddRole() {
                   />
                 </Grid>
                 <Grid item xs={12}>
-                  <Box sx={{ p: 2, bgcolor: "#f1f5f9", borderRadius: "16px", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <Box sx={(theme) => ({ p: 2, bgcolor: theme.palette.grey[100], borderRadius: 2, border: `1px solid ${theme.palette.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between" })}>
                     <Box>
-                      <Typography sx={{ fontSize: "0.9rem", fontWeight: 700, color: "#1e293b" }}>Account Active</Typography>
-                      <Typography variant="caption" sx={{ color: "#64748b", fontSize: "0.75rem" }}>Control system access for this role</Typography>
+                      <Typography sx={(theme) => ({ fontSize: "0.9rem", fontWeight: 700, color: theme.palette.text.primary })}>Account Active</Typography>
+                      <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, fontSize: "0.75rem" })}>Control system access for this role</Typography>
                     </Box>
                     <Switch checked={status === "ACTIVE"} onChange={e => setStatus(e.target.checked ? "ACTIVE" : "INACTIVE")} name="is_active" size="small" color="primary" />
                   </Box>
@@ -314,44 +290,44 @@ function AddRole() {
                 <Button
                   type="submit"
                   variant="text"
-                  sx={{
-                    minWidth: 165, // 10% larger than 150
+                  sx={(theme) => ({
+                    minWidth: 165,
                     fontWeight: 750,
                     borderRadius: 0,
-                    color: '#22c55e', // green text
+                    color: theme.palette.success.main,
                     backgroundColor: 'transparent',
                     boxShadow: 'none',
                     border: 'none',
-                    fontSize: '1.21rem', // 10% larger than 1.1rem
-                    px: 4.4, // 10% larger than 4
-                    py: 1.1, // 10% larger than 1
+                    fontSize: '1.21rem',
+                    px: 4.4,
+                    py: 1.1,
                     '&:hover': {
                       backgroundColor: 'transparent',
                       textDecoration: 'underline',
                     },
-                  }}
+                  })}
                 >
                   Save
                 </Button>
                 <Button
                   variant="text"
                   onClick={() => navigate("/roles")}
-                  sx={{
-                    minWidth: 132, // 10% larger than 120
+                  sx={(theme) => ({
+                    minWidth: 132,
                     fontWeight: 700,
                     borderRadius: 0,
-                    color: '#ef4444', // red text
+                    color: theme.palette.error.main,
                     backgroundColor: 'transparent',
                     boxShadow: 'none',
                     border: 'none',
-                    fontSize: '1.21rem', // 10% larger than 1.1rem
-                    px: 4.4, // 10% larger than 4
-                    py: 1.1, // 10% larger than 1
+                    fontSize: '1.21rem',
+                    px: 4.4,
+                    py: 1.1,
                     '&:hover': {
                       backgroundColor: 'transparent',
                       textDecoration: 'underline',
                     },
-                  }}
+                  })}
                 >
                   Cancel
                 </Button>

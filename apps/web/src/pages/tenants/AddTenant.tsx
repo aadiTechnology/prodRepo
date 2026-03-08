@@ -35,19 +35,19 @@ import { PageHeader } from "../../components/common";
 import tenantService from "../../api/services/tenantService";
 import { ListPageLayout, FormSectionLabel, FieldLabel } from "../../components/reusable";
 
-// ─── TextField sx ──────────────────────────────────────────────────────────────
-const buildFieldSx = (hasError: boolean) => ({
+// ─── TextField sx (theme-driven) ───────────────────────────────────────────────
+const buildFieldSx = (hasError: boolean) => (theme: { palette: { divider: string; error: { main: string }; grey: Record<number, string>; primary: { main: string }; background: { paper: string } } }) => ({
     "& .MuiOutlinedInput-root": {
-        borderRadius: "8px",
-        bgcolor: "white",
+        borderRadius: 1,
+        bgcolor: theme.palette.background.paper,
         fontSize: "0.875rem",
         fontWeight: 500,
-        "& fieldset": { borderColor: hasError ? "#ef4444" : "#e2e8f0", borderWidth: hasError ? "1.5px" : "1.2px" },
-        "&:hover fieldset": { borderColor: hasError ? "#ef4444" : "#cbd5e1" },
+        "& fieldset": { borderColor: hasError ? theme.palette.error.main : theme.palette.divider, borderWidth: hasError ? "1.5px" : "1.2px" },
+        "&:hover fieldset": { borderColor: hasError ? theme.palette.error.main : theme.palette.grey[400] },
         "&.Mui-focused": {
-            "& fieldset": { borderColor: hasError ? "#ef4444" : "#1a1a2e", borderWidth: "1.8px" },
+            "& fieldset": { borderColor: hasError ? theme.palette.error.main : theme.palette.primary.main, borderWidth: "1.8px" },
         },
-        "& .MuiInputBase-input.Mui-disabled": { WebkitTextFillColor: "#94a3b8" },
+        "& .MuiInputBase-input.Mui-disabled": { WebkitTextFillColor: theme.palette.grey[500] },
     },
     "& .MuiFormHelperText-root": { fontSize: "0.7rem", mt: 0.3, ml: 0 },
 });
@@ -200,7 +200,7 @@ const AddTenant = () => {
                         title={
                             <>
                                 <Box component="span" onClick={() => navigate("/tenants")}
-                                    sx={{ color: "#94a3b8", cursor: "pointer", "&:hover": { color: "#1a1a2e" } }}>
+                                    sx={(theme) => ({ color: theme.palette.text.secondary, cursor: "pointer", "&:hover": { color: theme.palette.text.primary } })}>
                                     Tenants
                                 </Box>
                                 <Box component="span" sx={{ color: "#cbd5e1", mx: 1.5 }}>/</Box>
@@ -211,17 +211,17 @@ const AddTenant = () => {
                             <>
                                 <Tooltip title="Cancel">
                                     <IconButton onClick={() => navigate("/tenants")}
-                                        sx={{ color: "#ef4444", backgroundColor: "#fee2e2", borderRadius: 1.2, width: 40, height: 40, "&:hover": { backgroundColor: "#fecaca" } }}>
+                                        sx={(theme) => ({ color: theme.palette.error.main, backgroundColor: theme.palette.error.light, borderRadius: 1.2, width: 40, height: 40, "&:hover": { backgroundColor: theme.palette.error.light } })}>
                                         <CancelIcon sx={{ fontSize: 22 }} />
                                     </IconButton>
                                 </Tooltip>
                                 <Tooltip title={isEditMode ? "Update Tenant" : "Save Tenant"}>
                                     <span>
                                         <IconButton onClick={handleSubmit} disabled={loading}
-                                            sx={{
-                                                backgroundColor: "#10b981", color: "white", borderRadius: 1.2, width: 40, height: 40,
-                                                "&:hover": { backgroundColor: "#059669" }, "&.Mui-disabled": { backgroundColor: "#cbd5e1", color: "white" }
-                                            }}>
+                                            sx={(theme) => ({
+                                                backgroundColor: theme.palette.success.main, color: theme.palette.success.contrastText, borderRadius: 1.2, width: 40, height: 40,
+                                                "&:hover": { backgroundColor: theme.palette.success.dark }, "&.Mui-disabled": { backgroundColor: theme.palette.grey[400], color: "white" }
+                                            })}>
                                             {loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon sx={{ fontSize: 20 }} />}
                                         </IconButton>
                                     </span>
@@ -235,7 +235,7 @@ const AddTenant = () => {
             }
         >
             <Box sx={{ flex: 1, overflowY: "auto", pb: 2, pr: 0.5 }}>
-                <Paper elevation={0} sx={{ borderRadius: "10px", border: "1px solid #e2e8f0", bgcolor: "white", overflow: "hidden" }}>
+                <Paper elevation={0} sx={(theme) => ({ borderRadius: 1.25, border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.background.paper, overflow: "hidden" })}>
 
                     {/* Dark header */}
                     <Box sx={{ py: 1, px: { xs: 2, md: 3 }, display: "flex", justifyContent: "space-between", alignItems: "center", bgcolor: "#1a1a2e" }}>
@@ -243,7 +243,7 @@ const AddTenant = () => {
                             {isEditMode ? "Edit Tenant Details" : "New Tenant Details"}
                         </Typography>
                         <Typography sx={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)" }}>
-                            <Box component="span" sx={{ color: "#f87171" }}>*</Box> required fields
+                            <Box component="span" sx={(theme) => ({ color: theme.palette.error.light })}>*</Box> required fields
                         </Typography>
                     </Box>
 
@@ -254,7 +254,7 @@ const AddTenant = () => {
                         gap: 0,
                     }}>
                         {/* ── LEFT COLUMN ── */}
-                        <Box sx={{ borderRight: { md: "1px solid #f1f5f9" } }}>
+                        <Box sx={(theme) => ({ borderRight: { md: `1px solid ${theme.palette.divider}` } })}>
 
                             {/* Company Info */}
                             <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.5 }}>
@@ -280,22 +280,22 @@ const AddTenant = () => {
                                             onChange={handleChange} placeholder="Brief business description…"
                                             multiline rows={2} sx={buildFieldSx(false)} />
                                     </Box>
-                                    <Box sx={{
+                                    <Box sx={(theme) => ({
                                         gridColumn: "1 / 3",
                                         display: "flex", alignItems: "center", justifyContent: "space-between",
-                                        px: 1.5, py: 0.8, borderRadius: "8px", border: "1.2px solid #e2e8f0", bgcolor: "#f8fafc",
-                                    }}>
+                                        px: 1.5, py: 0.8, borderRadius: 1, border: `1.2px solid ${theme.palette.divider}`, bgcolor: theme.palette.grey[50],
+                                    })}>
                                         <Box>
-                                            <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: "#1e293b" }}>Account Active</Typography>
-                                            <Typography sx={{ fontSize: "0.7rem", color: "#64748b" }}>Control system access</Typography>
+                                            <Typography sx={(theme) => ({ fontSize: "0.82rem", fontWeight: 700, color: theme.palette.text.primary })}>Account Active</Typography>
+                                            <Typography sx={(theme) => ({ fontSize: "0.7rem", color: theme.palette.text.secondary })}>Control system access</Typography>
                                         </Box>
                                         <Switch checked={formData.is_active} onChange={handleChange} name="is_active" size="small"
-                                            sx={{ "& .MuiSwitch-switchBase.Mui-checked": { color: "#10b981" }, "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#10b981" } }} />
+                                            sx={(theme) => ({ "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.success.main }, "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.success.main } })} />
                                     </Box>
                                 </Box>
                             </Box>
 
-                            <Divider sx={{ borderColor: "#f1f5f9" }} />
+                            <Divider sx={(theme) => ({ borderColor: theme.palette.divider })} />
 
                             {/* Address */}
                             <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.5, pb: 2 }}>
@@ -359,9 +359,9 @@ const AddTenant = () => {
                             {/* Security — add mode only */}
                             {!isEditMode && (
                                 <>
-                                    <Divider sx={{ borderColor: "#f1f5f9" }} />
+                                    <Divider sx={(theme) => ({ borderColor: theme.palette.divider })} />
                                     <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.5, pb: 1.5 }}>
-                                        <SectionLabel icon={<SecurityIcon sx={{ fontSize: 15 }} />} title="Security" />
+                                        <FormSectionLabel icon={<SecurityIcon sx={{ fontSize: 15 }} />} title="Security" />
                                         <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
                                             <Box>
                                                 <FieldLabel required>Password</FieldLabel>
@@ -404,7 +404,7 @@ const AddTenant = () => {
                                 </>
                             )}
 
-                            <Divider sx={{ borderColor: "#f1f5f9" }} />
+                            <Divider sx={(theme) => ({ borderColor: theme.palette.divider })} />
 
                             {/* Branding */}
                             <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.5, pb: 2 }}>
@@ -412,12 +412,12 @@ const AddTenant = () => {
 
                                 <Tabs value={logoTab}
                                     onChange={(_, v) => { setLogoTab(v); setFormData(p => ({ ...p, logo_url: "" })); }}
-                                    sx={{
+                                    sx={(theme) => ({
                                         mb: 1.5, minHeight: 32,
                                         "& .MuiTab-root": { py: 0.5, minHeight: 32, fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase" },
-                                        "& .MuiTabs-indicator": { height: 2, bgcolor: "#1a1a2e" },
-                                        borderBottom: "1px solid #e2e8f0",
-                                    }}
+                                        "& .MuiTabs-indicator": { height: 2, bgcolor: theme.palette.primary.main },
+                                        borderBottom: `1px solid ${theme.palette.divider}`,
+                                    })}
                                 >
                                     <Tab icon={<UploadIcon sx={{ fontSize: 14 }} />} iconPosition="start" label="Upload" />
                                     <Tab icon={<LinkIcon sx={{ fontSize: 14 }} />} iconPosition="start" label="URL" />
@@ -425,16 +425,16 @@ const AddTenant = () => {
 
                                 {logoTab === 0 ? (
                                     <Box sx={{
-                                        p: 2, border: "2px dashed #e2e8f0", borderRadius: "8px",
+                                        p: 2, border: (t) => `2px dashed ${t.palette.divider}`, borderRadius: 1,
                                         display: "flex", flexDirection: "column", alignItems: "center", gap: 1.2,
-                                        bgcolor: "#f8fafc", "&:hover": { borderColor: "#cbd5e1" },
+                                        bgcolor: "grey.50", "&:hover": { borderColor: "grey.400" },
                                     }}>
                                         {formData.logo_url && formData.logo_url.startsWith("data:") ? (
                                             <Box sx={{ position: "relative", display: "inline-block" }}>
                                                 <img src={formData.logo_url} alt="Logo Preview"
-                                                    style={{ height: 56, maxWidth: 160, objectFit: "contain", borderRadius: 6, border: "1px solid #e2e8f0" }} />
+                                                    style={{ height: 56, maxWidth: 160, objectFit: "contain", borderRadius: 6 }} />
                                                 <IconButton size="small" onClick={handleClearLogo}
-                                                    sx={{ position: "absolute", top: -7, right: -7, bgcolor: "#ef4444", color: "white", width: 20, height: 20, "&:hover": { bgcolor: "#dc2626" } }}>
+                                                    sx={(theme) => ({ position: "absolute", top: -7, right: -7, bgcolor: theme.palette.error.main, color: theme.palette.error.contrastText, width: 20, height: 20, "&:hover": { bgcolor: theme.palette.error.dark } })}>
                                                     <DeleteIcon sx={{ fontSize: 12 }} />
                                                 </IconButton>
                                             </Box>
@@ -448,10 +448,10 @@ const AddTenant = () => {
                                         <input accept="image/*" id="logo-upload-input" type="file" hidden onChange={handleLogoUpload} />
                                         <label htmlFor="logo-upload-input">
                                             <Box component="span" sx={{
-                                                px: 2.5, py: 0.7, bgcolor: "#1a1a2e", borderRadius: "7px",
+                                                px: 2.5, py: 0.7, bgcolor: "grey.800", borderRadius: "7px",
                                                 color: "white", fontSize: "0.78rem", fontWeight: 700,
                                                 cursor: "pointer", display: "inline-block",
-                                                "&:hover": { bgcolor: "#2d2d44" },
+                                                "&:hover": { bgcolor: "grey.700" },
                                             }}>
                                                 {formData.logo_url && formData.logo_url.startsWith("data:") ? "Change File" : "Choose File"}
                                             </Box>
@@ -466,10 +466,10 @@ const AddTenant = () => {
                                                 onChange={handleChange} placeholder="https://example.com/logo.png"
                                                 error={Boolean(errors.logo_url)} helperText={errors.logo_url}
                                                 InputProps={{
-                                                    startAdornment: <InputAdornment position="start"><LinkIcon sx={{ color: "#94a3b8", fontSize: 16 }} /></InputAdornment>,
+                                                    startAdornment: <InputAdornment position="start"><LinkIcon sx={(theme) => ({ color: theme.palette.text.secondary, fontSize: 16 })} /></InputAdornment>,
                                                     endAdornment: formData.logo_url && !formData.logo_url.startsWith("data:") ? (
                                                         <InputAdornment position="end">
-                                                            <IconButton onClick={handleClearLogo} size="small" sx={{ color: "#ef4444" }}>
+                                                            <IconButton onClick={handleClearLogo} size="small" sx={(theme) => ({ color: theme.palette.error.main })}>
                                                                 <DeleteIcon sx={{ fontSize: 15 }} />
                                                             </IconButton>
                                                         </InputAdornment>
@@ -493,11 +493,11 @@ const AddTenant = () => {
                         </Box>
                     </Box>
 
-                    <Box sx={{
+                    <Box sx={(theme) => ({
                         px: { xs: 2, md: 3 }, py: 1.2,
-                        borderTop: "1px solid #f1f5f9", bgcolor: "#fcfdfe",
+                        borderTop: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.grey[50],
                         display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 0,
-                    }}>
+                    })}>
                         <Button
                             onClick={() => navigate("/tenants")}
                             sx={{
@@ -519,8 +519,8 @@ const AddTenant = () => {
                         <Button
                             onClick={loading ? undefined : handleSubmit}
                             disabled={loading}
-                            sx={{
-                                color: "#43a047",
+                            sx={(theme) => ({
+                                color: theme.palette.success.main,
                                 backgroundColor: "transparent",
                                 fontWeight: "bold",
                                 fontSize: "1.1rem",
@@ -531,8 +531,8 @@ const AddTenant = () => {
                                 border: "none",
                                 textTransform: "none",
                                 "&:hover": { backgroundColor: "transparent", textDecoration: "underline" },
-                                "&.Mui-disabled": { color: "#94a3b8" },
-                            }}
+                                "&.Mui-disabled": { color: theme.palette.text.secondary },
+                            })}
                         >
                             {loading ? "Saving…" : isEditMode ? "Update" : "Save"}
                         </Button>

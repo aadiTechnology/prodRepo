@@ -124,19 +124,19 @@ export default function RequirementGeneratePage() {
       contentPaddingSize="normal"
     >
       <Paper
-        sx={{
+        sx={(theme) => ({
           flex: 1,
           minHeight: 0,
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          borderRadius: "12px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.01)",
-          border: "1px solid #e2e8f0",
-          bgcolor: "white",
+          borderRadius: 1.5,
+          boxShadow: theme.shadows[1],
+          border: `1px solid ${theme.palette.divider}`,
+          bgcolor: theme.palette.background.paper,
           p: 3,
           width: "100%",
-        }}
+        })}
       >
         <Typography fontWeight={600} sx={{ mb: 1 }}>
           Enter Requirement
@@ -188,14 +188,14 @@ export default function RequirementGeneratePage() {
 
         {result && (
           <Box
-            sx={{
+            sx={(theme) => ({
               flex: 1,
               minHeight: 0,
               overflow: "auto",
               mt: 3,
               pt: 3,
-              borderTop: "1px solid #e2e8f0",
-            }}
+              borderTop: `1px solid ${theme.palette.divider}`,
+            })}
           >
             <Typography variant="subtitle1" fontWeight={700} gutterBottom>
               Requirement
@@ -212,12 +212,12 @@ export default function RequirementGeneratePage() {
                 <Paper
                   key={us.id}
                   variant="outlined"
-                  sx={{
+                  sx={(theme) => ({
                     p: 2,
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "8px",
-                    bgcolor: "#fafbfc",
-                  }}
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: 1,
+                    bgcolor: theme.palette.grey[50],
+                  })}
                 >
                   <Typography fontWeight={700} sx={{ mb: 1 }}>
                     {us.title}

@@ -21,39 +21,8 @@ import { useNavigate, useParams, Link as RouterLink } from "react-router-dom";
 import { Tenant } from "../../types/tenant";
 import tenantService from "../../api/services/tenantService";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
-
-// ─── Design tokens matching TenantList ───────────────────────
-const NAV = "#1a1a2e";
-const NAV2 = "#2d2d44";
-const LABEL = "#64748b";
-const BG = "#f5f6fa";
-const BORDER = "#e2e8f0";
-
-// ─── Field Row ───────────────────────────────────────────────
-interface RowProps { label: string; children: React.ReactNode; last?: boolean; }
-const FieldRow = ({ label, children, last }: RowProps) => (
-    <Box>
-        <Box
-            sx={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 2,
-                py: 2.5,
-                px: 3,
-                flexWrap: { xs: "wrap", sm: "nowrap" },
-            }}
-        >
-            <Typography
-                variant="body2"
-                sx={{ minWidth: 180, flexShrink: 0, color: LABEL, pt: 0.3 }}
-            >
-                {label}
-            </Typography>
-            <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
-        </Box>
-        {!last && <Divider sx={{ mx: 0 }} />}
-    </Box>
-);
+import { DetailFieldRow } from "../../components/reusable";
+import StatusChip from "../../components/roles/StatusChip";
 
 // ─── Main Component ──────────────────────────────────────────
 const TenantDetail = () => {
@@ -111,7 +80,7 @@ const TenantDetail = () => {
 
     return (
         <>
-            <Box sx={{ minHeight: "100vh", bgcolor: BG, p: { xs: 2, sm: 2 }, pt: { xs: 2, sm: 2 } }}>
+            <Box sx={(theme) => ({ minHeight: "100vh", bgcolor: theme.palette.background.default, p: { xs: 2, sm: 2 }, pt: { xs: 2, sm: 2 } })}>
 
                 {/* ── Breadcrumb ── */}
                 <Breadcrumbs sx={{ mb: 2.5 }}>
@@ -142,30 +111,30 @@ const TenantDetail = () => {
                     {/* Left: icon + name + meta */}
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                         <Box
-                            sx={{
+                            sx={(theme) => ({
                                 width: 48,
                                 height: 48,
-                                borderRadius: "8px",
-                                border: `1.5px solid ${BORDER}`,
-                                bgcolor: "white",
+                                borderRadius: 1,
+                                border: `1.5px solid ${theme.palette.divider}`,
+                                bgcolor: theme.palette.background.paper,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 flexShrink: 0,
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-                            }}
+                                boxShadow: theme.shadows[1],
+                            })}
                         >
-                            <BusinessIcon sx={{ fontSize: 24, color: LABEL }} />
+                            <BusinessIcon sx={(theme) => ({ fontSize: 24, color: theme.palette.text.secondary })} />
                         </Box>
                         <Box>
                             <Typography
                                 variant="h6"
                                 fontWeight={700}
-                                sx={{ color: NAV, lineHeight: 1.2, fontSize: { xs: 16, sm: 20 } }}
+                                sx={(theme) => ({ color: theme.palette.text.primary, lineHeight: 1.2, fontSize: { xs: 16, sm: 20 } })}
                             >
                                 {tenant.name}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: LABEL }}>
+                            <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary })}>
                                 ID: {tenant.id}&nbsp;&nbsp;•&nbsp;&nbsp;Created:{" "}
                                 {new Date(tenant.created_at).toLocaleDateString("en-US", {
                                     month: "short",
@@ -184,15 +153,15 @@ const TenantDetail = () => {
                             size="small"
                             startIcon={<BackIcon sx={{ fontSize: 16 }} />}
                             onClick={() => navigate("/tenants")}
-                            sx={{
-                                borderRadius: "8px",
+                            sx={(theme) => ({
+                                borderRadius: 1,
                                 textTransform: "none",
-                                borderColor: BORDER,
-                                color: "#374151",
+                                borderColor: theme.palette.divider,
+                                color: theme.palette.text.primary,
                                 fontWeight: 500,
                                 fontSize: 13,
-                                "&:hover": { borderColor: "#94a3b8", bgcolor: "rgba(0,0,0,0.02)" },
-                            }}
+                                "&:hover": { borderColor: theme.palette.grey[400], bgcolor: theme.palette.action.hover },
+                            })}
                         >
                             Back to List
                         </Button>
@@ -205,7 +174,7 @@ const TenantDetail = () => {
                             startIcon={<DeleteIcon sx={{ fontSize: 16 }} />}
                             onClick={() => setDeleteDialogOpen(true)}
                             sx={{
-                                borderRadius: "8px",
+                                borderRadius: 1,
                                 textTransform: "none",
                                 fontWeight: 500,
                                 fontSize: 13,
@@ -220,15 +189,15 @@ const TenantDetail = () => {
                             size="small"
                             startIcon={<EditIcon sx={{ fontSize: 16 }} />}
                             onClick={() => navigate(`/tenants/${id}/edit`)}
-                            sx={{
-                                borderRadius: "8px",
+                            sx={(theme) => ({
+                                borderRadius: 1,
                                 textTransform: "none",
                                 fontWeight: 600,
                                 fontSize: 13,
-                                bgcolor: NAV,
-                                "&:hover": { bgcolor: NAV2 },
+                                bgcolor: theme.palette.grey[800],
+                                "&:hover": { bgcolor: theme.palette.grey[700] },
                                 boxShadow: "none",
-                            }}
+                            })}
                         >
                             Edit Tenant
                         </Button>
@@ -240,7 +209,7 @@ const TenantDetail = () => {
                     <Alert
                         severity="error"
                         onClose={() => setError(null)}
-                        sx={{ mb: 2, borderRadius: "8px", border: `1px solid #fecaca` }}
+                        sx={(theme) => ({ mb: 2, borderRadius: 1, border: `1px solid ${theme.palette.error.light}` })}
                     >
                         {error}
                     </Alert>
@@ -248,7 +217,7 @@ const TenantDetail = () => {
                 {success && (
                     <Alert
                         severity="success"
-                        sx={{ mb: 2, borderRadius: "8px", border: `1px solid #bbf7d0` }}
+                        sx={(theme) => ({ mb: 2, borderRadius: 1, border: `1px solid ${theme.palette.success.light}` })}
                     >
                         {success}
                     </Alert>
@@ -257,117 +226,88 @@ const TenantDetail = () => {
                 {/* ── Profile Details Card ── */}
                 <Paper
                     elevation={0}
-                    sx={{
-                        borderRadius: "12px",
-                        border: `1px solid ${BORDER}`,
-                        bgcolor: "white",
+                    sx={(theme) => ({
+                        borderRadius: 1.5,
+                        border: `1px solid ${theme.palette.divider}`,
+                        bgcolor: theme.palette.background.paper,
                         overflow: "hidden",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-                    }}
+                        boxShadow: theme.shadows[1],
+                    })}
                 >
                     {/* Card Header */}
                     <Box
-                        sx={{
+                        sx={(theme) => ({
                             px: 3,
                             py: 2,
-                            borderBottom: `1px solid ${BORDER}`,
-                        }}
+                            borderBottom: `1px solid ${theme.palette.divider}`,
+                        })}
                     >
                         <Typography
                             variant="body1"
                             fontWeight={700}
-                            sx={{ color: NAV, fontSize: 15 }}
+                            sx={(theme) => ({ color: theme.palette.text.primary, fontSize: 15 })}
                         >
                             Profile Details
                         </Typography>
                     </Box>
 
                     {/* ── Tenant Name ── */}
-                    <FieldRow label="Tenant Name">
-                        <Typography variant="body2" sx={{ color: NAV, fontWeight: 600 }}>
+                    <DetailFieldRow label="Tenant Name" last={false}>
+                        <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.primary, fontWeight: 600 })}>
                             {tenant.name}
                         </Typography>
-                    </FieldRow>
+                    </DetailFieldRow>
 
                     {/* ── Tenant Status ── */}
-                    <FieldRow label="Tenant Status">
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 0.6,
-                                    px: 1.2,
-                                    py: 0.4,
-                                    borderRadius: "20px",
-                                    bgcolor: isActive ? "#f0fdf4" : "#fff1f2",
-                                    border: `1px solid ${isActive ? "#bbf7d0" : "#fecdd3"}`,
-                                }}
-                            >
-                                <Box
-                                    sx={{
-                                        width: 7,
-                                        height: 7,
-                                        borderRadius: "50%",
-                                        bgcolor: isActive ? "#10b981" : "#ef4444",
-                                    }}
-                                />
-                                <Typography
-                                    variant="caption"
-                                    fontWeight={700}
-                                    sx={{ color: isActive ? "#10b981" : "#ef4444", fontSize: 12 }}
-                                >
-                                    {isActive ? "Active" : "Inactive"}
-                                </Typography>
-                            </Box>
-                        </Box>
-                    </FieldRow>
+                    <DetailFieldRow label="Tenant Status" last={false}>
+                        <StatusChip status={isActive ? "ACTIVE" : "INACTIVE"} />
+                    </DetailFieldRow>
 
                     {/* ── Account Owner ── */}
-                    <FieldRow label="Account Owner">
-                        <Typography variant="body2" sx={{ color: NAV, fontWeight: 600 }}>
+                    <DetailFieldRow label="Account Owner" last={false}>
+                        <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.primary, fontWeight: 600 })}>
                             {tenant.owner_name}
                         </Typography>
-                    </FieldRow>
+                    </DetailFieldRow>
 
                     {/* ── Email Address (read-only) ── */}
-                    <FieldRow label="Email Address">
-                        <Typography variant="body2" sx={{ color: NAV, fontWeight: 600 }}>
+                    <DetailFieldRow label="Email Address" last={false}>
+                        <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.primary, fontWeight: 600 })}>
                             {tenant.email}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: "#3b82f6", display: "block", mt: 0.3 }}>
+                        <Typography variant="caption" sx={(theme) => ({ color: theme.palette.info.main, display: "block", mt: 0.3 })}>
                             Primary contact for system notifications and billing
                         </Typography>
-                    </FieldRow>
+                    </DetailFieldRow>
 
                     {/* ── Phone Number ── */}
-                    <FieldRow label="Phone Number">
-                        <Typography variant="body2" sx={{ color: NAV, fontWeight: 600 }}>
+                    <DetailFieldRow label="Phone Number" last={false}>
+                        <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.primary, fontWeight: 600 })}>
                             {tenant.phone || "—"}
                         </Typography>
-                    </FieldRow>
+                    </DetailFieldRow>
 
                     {/* ── Business Description ── */}
-                    <FieldRow label="Business Description" last>
-                        <Typography variant="body2" sx={{ color: NAV, fontWeight: 500, lineHeight: 1.7 }}>
+                    <DetailFieldRow label="Business Description" last>
+                        <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.primary, fontWeight: 500, lineHeight: 1.7 })}>
                             {tenant.description || "—"}
                         </Typography>
-                    </FieldRow>
+                    </DetailFieldRow>
 
                     {/* ── Footer notice ── */}
                     <Box
-                        sx={{
+                        sx={(theme) => ({
                             display: "flex",
                             alignItems: "flex-start",
                             gap: 1,
                             px: 3,
                             py: 1.5,
-                            bgcolor: "#f8fafc",
-                            borderTop: `1px solid ${BORDER}`,
-                        }}
+                            bgcolor: theme.palette.grey[50],
+                            borderTop: `1px solid ${theme.palette.divider}`,
+                        })}
                     >
-                        <InfoIcon sx={{ fontSize: 15, color: LABEL, mt: 0.1, flexShrink: 0 }} />
-                        <Typography variant="caption" sx={{ color: LABEL, lineHeight: 1.6 }}>
+                        <InfoIcon sx={(theme) => ({ fontSize: 15, color: theme.palette.text.secondary, mt: 0.1, flexShrink: 0 })} />
+                        <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, lineHeight: 1.6 })}>
                             All fields are read-only on this screen. Click &quot;Edit Tenant&quot; to modify details.
                         </Typography>
                     </Box>
@@ -385,7 +325,7 @@ const TenantDetail = () => {
                     </Typography>
                 }
                 warningContent={
-                    <Alert severity="warning" sx={{ borderRadius: "8px", mt: 2 }}>
+                    <Alert severity="warning" sx={{ borderRadius: 1, mt: 2 }}>
                         This is a <strong>Soft Delete</strong>. The tenant will be removed from the list,
                         and <strong>all associated user accounts</strong> will be deactivated immediately.
                     </Alert>

@@ -1,13 +1,5 @@
-// Style object for confirmation popup divider
-const confirmDividerStyle = {
-  border: 'none',
-  borderTop: '0.225px solid #e5e7eb',
-  margin: 0,
-  height: 0,
-};
-
 import { useState, useEffect } from "react";
-import { Box, Button, TextField, MenuItem, Typography, IconButton, InputAdornment, CircularProgress, Stack, Paper, Grid, Switch, Alert, Snackbar, Dialog, Tooltip } from "@mui/material";
+import { Box, Button, TextField, MenuItem, Typography, IconButton, InputAdornment, CircularProgress, Stack, Paper, Grid, Switch, Alert, Snackbar, Dialog, Tooltip, Divider } from "@mui/material";
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate, useLocation } from "react-router-dom";
@@ -198,16 +190,16 @@ export default function CreateUser() {
   };
 
   return (
-    <Box sx={{ px: { xs: 2, md: 4 }, pb: 2, backgroundColor: "#f8fafc", display: "flex", flexDirection: "column" }}>
+    <Box sx={(theme) => ({ px: { xs: 2, md: 4 }, pb: 2, backgroundColor: theme.palette.grey[50], display: "flex", flexDirection: "column" })}>
       {/* Header - Aligned with AddRole */}
       <Box sx={{ pt: 1.5, pb: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <IconButton onClick={() => navigate("/")} sx={{ backgroundColor: "#1a1a2e", borderRadius: 1.2, width: 44, height: 44, "&:hover": { backgroundColor: "#2d2d44" } }}>
+          <IconButton onClick={() => navigate("/")} sx={(theme) => ({ backgroundColor: theme.palette.grey[800], borderRadius: 1.2, width: 44, height: 44, "&:hover": { backgroundColor: theme.palette.grey[700] } })}>
             <HomeIcon sx={{ color: "white", fontSize: 24 }} />
           </IconButton>
-          <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "22px", color: "#1A1A2E", letterSpacing: "-1px" }}>
-            <Box component="span" onClick={() => navigate("/users")} sx={{ color: "#94a3b8", cursor: "pointer", "&:hover": { color: "#1a1a2e" } }}>Users</Box>
-            <Box component="span" sx={{ color: "#cbd5e1", mx: 1.5 }}>/</Box>
+          <Typography variant="h5" sx={(theme) => ({ fontWeight: 700, fontSize: "22px", color: theme.palette.text.primary, letterSpacing: "-1px" })}>
+            <Box component="span" onClick={() => navigate("/users")} sx={(theme) => ({ color: theme.palette.text.secondary, cursor: "pointer", "&:hover": { color: theme.palette.text.primary } })}>Users</Box>
+            <Box component="span" sx={(theme) => ({ color: theme.palette.grey[400], mx: 1.5 })}>/</Box>
             {isEdit ? "Edit User" : "Add User"}
           </Typography>
         </Box>
@@ -242,13 +234,13 @@ export default function CreateUser() {
             <IconButton
               onClick={handleSubmit}
               disabled={false}
-              sx={{
-                color: '#fff',
-                backgroundColor: '#22c55e',
-                borderRadius: '12px',
+              sx={(theme) => ({
+                color: theme.palette.success.contrastText,
+                backgroundColor: theme.palette.success.main,
+                borderRadius: 1.5,
                 width: 48,
                 height: 48,
-                boxShadow: '0 2px 8px 0 rgba(34,197,94,0.10)',
+                boxShadow: theme.shadows[2],
                 border: 'none',
                 p: 0,
                 m: 0,
@@ -257,16 +249,16 @@ export default function CreateUser() {
                 justifyContent: 'center',
                 transition: 'background 0.2s, color 0.2s',
                 '&:hover': {
-                  backgroundColor: '#4ade80',
-                  color: '#fff',
+                  backgroundColor: theme.palette.success.light,
+                  color: theme.palette.success.contrastText,
                 },
                 '&:disabled': {
-                  backgroundColor: '#cbd5e1',
-                  color: '#94a3b8',
+                  backgroundColor: theme.palette.grey[400],
+                  color: theme.palette.grey[500],
                 },
-              }}
+              })}
             >
-              {loading ? <CircularProgress size={24} color="inherit" /> : <SaveIcon sx={{ fontSize: 24, color: '#fff' }} />}
+              {loading ? <CircularProgress size={24} color="inherit" /> : <SaveIcon sx={(theme) => ({ fontSize: 24, color: theme.palette.success.contrastText })} />}
             </IconButton>
           </Tooltip>
         </Stack>
@@ -274,9 +266,9 @@ export default function CreateUser() {
 
       {/* Form content - match AddRole style */}
       <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
-        <Paper sx={{ p: 0, borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.01)", overflow: "hidden", minWidth: 420, width: 520, maxWidth: '100%' }}>
+        <Paper sx={(theme) => ({ p: 0, borderRadius: 2, border: `1px solid ${theme.palette.divider}`, boxShadow: theme.shadows[1], overflow: "hidden", minWidth: 420, width: 520, maxWidth: '100%' })}>
           {/* Header */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 2, bgcolor: "#1a1a2e" }}>
+          <Box sx={(theme) => ({ display: "flex", alignItems: "center", gap: 1.5, p: 2, bgcolor: theme.palette.grey[800] })}>
             <PersonIcon sx={{ color: "white", fontSize: 22 }} />
             <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "white", textTransform: "uppercase", letterSpacing: "1px" }}>User Information</Typography>
           </Box>
@@ -292,7 +284,7 @@ export default function CreateUser() {
                     onChange={handleChange}
                     placeholder="Enter full name"
                     variant="outlined"
-                    sx={{ bgcolor: '#fff' }}
+                    sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
                     required
                     inputProps={{ minLength: 2 }}
                   />
@@ -306,7 +298,7 @@ export default function CreateUser() {
                     onChange={handleChange}
                     placeholder="Enter email address"
                     variant="outlined"
-                    sx={{ bgcolor: '#fff' }}
+                    sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
                     required
                     disabled={isEdit}
                   />
@@ -324,7 +316,7 @@ export default function CreateUser() {
                         onChange={handleChange}
                         placeholder="Enter password"
                         variant="outlined"
-                        sx={{ bgcolor: '#fff' }}
+                        sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
                         required
                         InputProps={{
                           endAdornment: (
@@ -352,7 +344,7 @@ export default function CreateUser() {
                         onChange={handleChange}
                         placeholder="Confirm password"
                         variant="outlined"
-                        sx={{ bgcolor: '#fff' }}
+                        sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
                         required
                         InputProps={{
                           endAdornment: (
@@ -383,7 +375,7 @@ export default function CreateUser() {
                     onChange={handleChange}
                     placeholder="Select a role"
                     variant="outlined"
-                    sx={{ bgcolor: '#fff' }}
+                    sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
                     required
                     disabled={loadingRoles || roles.length === 0}
                   >
@@ -401,10 +393,10 @@ export default function CreateUser() {
 
                 {isEdit && (
                   <Grid item xs={12}>
-                    <Box sx={{ p: 2, bgcolor: "#f1f5f9", borderRadius: "16px", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <Box sx={(theme) => ({ p: 2, bgcolor: theme.palette.grey[100], borderRadius: 2, border: `1px solid ${theme.palette.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between" })}>
                       <Box>
-                        <Typography sx={{ fontSize: "0.9rem", fontWeight: 700, color: "#1e293b" }}>Account Active</Typography>
-                        <Typography variant="caption" sx={{ color: "#64748b", fontSize: "0.75rem" }}>Control system access for this user</Typography>
+                        <Typography sx={(theme) => ({ fontSize: "0.9rem", fontWeight: 700, color: theme.palette.text.primary })}>Account Active</Typography>
+                        <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, fontSize: "0.75rem" })}>Control system access for this user</Typography>
                       </Box>
                       <Switch
                         checked={formData.is_active}
@@ -425,11 +417,11 @@ export default function CreateUser() {
                   type="submit"
                   variant="text"
                   disabled={false}
-                  sx={{
+                  sx={(theme) => ({
                     minWidth: 165,
                     fontWeight: 750,
                     borderRadius: 0,
-                    color: '#22c55e',
+                    color: theme.palette.success.main,
                     backgroundColor: 'transparent',
                     boxShadow: 'none',
                     border: 'none',
@@ -441,9 +433,9 @@ export default function CreateUser() {
                       textDecoration: 'underline',
                     },
                     '&:disabled': {
-                      color: '#cbd5e1',
+                      color: theme.palette.grey[400],
                     },
-                  }}
+                  })}
                 >
                   {loading ? "Saving..." : "Save"}
                 </Button>
@@ -451,11 +443,11 @@ export default function CreateUser() {
                   variant="text"
                   onClick={() => navigate("/users")}
                   disabled={loading}
-                  sx={{
+                  sx={(theme) => ({
                     minWidth: 132,
                     fontWeight: 700,
                     borderRadius: 0,
-                    color: '#ef4444',
+                    color: theme.palette.error.main,
                     backgroundColor: 'transparent',
                     boxShadow: 'none',
                     border: 'none',
@@ -467,9 +459,9 @@ export default function CreateUser() {
                       textDecoration: 'underline',
                     },
                     '&:disabled': {
-                      color: '#cbd5e1',
+                      color: theme.palette.grey[400],
                     },
-                  }}
+                  })}
                 >
                   Cancel
                 </Button>
@@ -512,8 +504,8 @@ export default function CreateUser() {
         }}
       >
         {/* Header bar with title and close icon */}
-        <Box sx={{
-          bgcolor: '#18183a',
+        <Box sx={(theme) => ({
+          bgcolor: theme.palette.grey[800],
           borderTopLeftRadius: 12,
           borderTopRightRadius: 12,
           px: 2,
@@ -523,8 +515,8 @@ export default function CreateUser() {
           alignItems: 'center',
           justifyContent: 'space-between',
           width: '100%',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.10)',
-        }}>
+          boxShadow: theme.shadows[2],
+        })}>
           <Box />
           <IconButton
             aria-label="close"
@@ -536,25 +528,23 @@ export default function CreateUser() {
           </IconButton>
         </Box>
         {/* Message, check icon, and buttons area */}
-        <Box sx={{ px: 4, pt: 4, pb: 2.5, bgcolor: 'white', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, textAlign: 'left' }}>
+        <Box sx={(theme) => ({ px: 4, pt: 4, pb: 2.5, bgcolor: theme.palette.background.paper, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, textAlign: 'left' })}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-            <CheckIcon sx={{ fontSize: 50, color: '#43a047', mr: 2, p: 0 }} />
-            <Typography sx={{ fontWeight: 175, fontSize: '1.9rem', color: '#18183a', letterSpacing: '-1px', lineHeight: 1.1 }}>
+            <CheckIcon sx={(theme) => ({ fontSize: 50, color: theme.palette.success.main, mr: 2, p: 0 })} />
+            <Typography sx={(theme) => ({ fontWeight: 175, fontSize: '1.9rem', color: theme.palette.text.primary, letterSpacing: '-1px', lineHeight: 1.1 })}>
               Please Confirm
             </Typography>
           </Box>
-          <Typography sx={{ fontSize: '1.05rem', color: '#18183a', fontWeight: 125, mb: 1.2, ml: 3 }}>
+          <Typography sx={(theme) => ({ fontSize: '1.05rem', color: theme.palette.text.primary, fontWeight: 125, mb: 1.2, ml: 3 })}>
             {isEdit ? 'Are you sure you want to update this user?' : 'Are you sure you want to save this user?'}
           </Typography>
-          <Box sx={{ width: '100%', mb: 0.5 }}>
-            <hr style={confirmDividerStyle} />
-          </Box>
+          <Divider sx={{ my: 0.5 }} />
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, width: '100%', mt: 0.5 }}>
             <Button
               onClick={handleCancel}
               disabled={loading}
-              sx={{
-                color: '#ef4444',
+              sx={(theme) => ({
+                color: theme.palette.error.main,
                 backgroundColor: 'transparent',
                 fontWeight: 'bold',
                 fontSize: '1.1rem',
@@ -564,15 +554,15 @@ export default function CreateUser() {
                 boxShadow: 'none',
                 border: 'none',
                 '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' }
-              }}
+              })}
             >
               Cancel
             </Button>
             <Button
               onClick={handleConfirm}
               disabled={loading}
-              sx={{
-                color: '#43a047',
+              sx={(theme) => ({
+                color: theme.palette.success.main,
                 backgroundColor: 'transparent',
                 fontWeight: 'bold',
                 fontSize: '1.1rem',
@@ -582,7 +572,7 @@ export default function CreateUser() {
                 boxShadow: 'none',
                 border: 'none',
                 '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' }
-              }}
+              })}
             >
               {loading ? "Processing..." : "Confirm"}
             </Button>

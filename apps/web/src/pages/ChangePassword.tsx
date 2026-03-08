@@ -1,13 +1,6 @@
-// Style object for confirmation popup divider
-const confirmDividerStyle = {
-  border: 'none',
-  borderTop: '0.225px solid #e5e7eb',
-  margin: 0,
-  height: 0,
-};
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, Typography, TextField, Button, Snackbar, Alert, CircularProgress, Stack, Paper, Grid, Switch, InputAdornment } from "@mui/material";
+import { Box, Typography, TextField, Button, Snackbar, Alert, CircularProgress, Stack, Paper, Grid, Switch, InputAdornment, Divider } from "@mui/material";
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
@@ -395,7 +388,7 @@ function ChangePassword() {
               Are you sure you want to change your password?
             </Typography>
             <Box sx={{ width: '100%', mb: 0.5 }}>
-              <hr style={confirmDividerStyle} />
+              <Divider sx={{ my: 0.5 }} />
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, width: '100%', mt: 0.5 }}>
               <Button

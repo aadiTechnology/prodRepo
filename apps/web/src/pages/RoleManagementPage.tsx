@@ -13,6 +13,7 @@ import roleService from "../api/services/roleService";
 import { ListPageLayout, ListPageToolbar, DirectoryInfoBar, TablePaginationBar, DataTable, TableRowActions } from "../components/reusable";
 import { PageHeader } from "../components/layout";
 import ConfirmDialog from "../components/common/ConfirmDialog";
+import StatusChip from "../components/roles/StatusChip";
 
 const RoleManagementPage = () => {
   const navigate = useNavigate();
@@ -78,26 +79,7 @@ const RoleManagementPage = () => {
       {
         id: "status",
         label: "Status" as const,
-        render: (r: Role) => (
-          <Box
-            sx={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 1,
-              px: 1.2,
-              py: 0.35,
-              borderRadius: "20px",
-              bgcolor: r.status === "ACTIVE" ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
-              color: r.status === "ACTIVE" ? "#059669" : "#dc2626",
-              border: `1px solid ${r.status === "ACTIVE" ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)"}`,
-            }}
-          >
-            <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "currentColor" }} />
-            <Typography sx={{ fontWeight: 700, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              {r.status === "ACTIVE" ? "Active" : "Inactive"}
-            </Typography>
-          </Box>
-        ),
+        render: (r: Role) => <StatusChip status={r.status} />,
       },
       {
         id: "createdAt",

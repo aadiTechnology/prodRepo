@@ -14,6 +14,7 @@ import userService from "../api/services/userService";
 import ConfirmDialog from "../components/common/ConfirmDialog";
 import { ListPageLayout, ListPageToolbar, DirectoryInfoBar, DataTable, TableRowActions, TablePaginationBar } from "../components/reusable";
 import { PageHeader } from "../components/layout";
+import StatusChip from "../components/roles/StatusChip";
 import { Home as HomeIcon } from "@mui/icons-material";
 
 const Users = () => {
@@ -150,26 +151,7 @@ const Users = () => {
       {
         id: "status",
         label: "Status" as const,
-        render: (u: User) => (
-          <Box
-            sx={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 1,
-              px: 1.2,
-              py: 0.35,
-              borderRadius: "20px",
-              bgcolor: u.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
-              color: u.is_active ? "#059669" : "#dc2626",
-              border: `1px solid ${u.is_active ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)"}`,
-            }}
-          >
-            <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "currentColor" }} />
-            <Typography sx={{ fontWeight: 700, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              {u.is_active ? "Active" : "Inactive"}
-            </Typography>
-          </Box>
-        ),
+        render: (u: User) => <StatusChip status={u.is_active ? "ACTIVE" : "INACTIVE"} />,
       },
       {
         id: "created_at",
