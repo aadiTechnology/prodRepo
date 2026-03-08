@@ -7,8 +7,9 @@ import {
   Button,
   CircularProgress,
 } from "@mui/material";
+import { ReactNode } from "react";
 
-interface ConfirmDialogProps {
+export interface ConfirmDialogProps {
   open: boolean;
   title: string;
   message: string;
@@ -16,13 +17,22 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
+  /** Replace default message with custom content (e.g. interpolated text). */
+  messageNode?: ReactNode;
+  /** Optional warning block below message (e.g. Alert for soft-delete). */
+  warningContent?: ReactNode;
+  /** Confirm button color. Default "error". */
+  confirmVariant?: "error" | "primary" | "warning";
 }
 
 export default function ConfirmDialog({
   open,
   title,
   message,
+  messageNode,
+  warningContent,
   confirmText,
+  confirmVariant = "error",
   onConfirm,
   onCancel,
   loading = false,
@@ -31,7 +41,8 @@ export default function ConfirmDialog({
     <Dialog open={open} onClose={loading ? undefined : onCancel} aria-labelledby="confirm-dialog-title">
       <DialogTitle id="confirm-dialog-title">{title}</DialogTitle>
       <DialogContent>
-        <DialogContentText>{message}</DialogContentText>
+        {messageNode != null ? messageNode : <DialogContentText>{message}</DialogContentText>}
+        {warningContent}
       </DialogContent>
       <DialogActions>
         <Button onClick={onCancel} disabled={loading}>
@@ -39,7 +50,7 @@ export default function ConfirmDialog({
         </Button>
         <Button
           onClick={onConfirm}
-          color="error"
+          color={confirmVariant}
           variant="contained"
           disabled={loading}
           startIcon={loading ? <CircularProgress size={18} /> : undefined}
