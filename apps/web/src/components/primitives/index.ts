@@ -32,6 +32,9 @@ export type { TextFieldProps } from "./TextField";
 export { default as Select } from "./Select";
 export type { SelectProps } from "./Select";
 
+export { default as MenuItem } from "./MenuItem";
+export type { MenuItemProps } from "./MenuItem";
+
 export { default as Checkbox } from "./Checkbox";
 export type { CheckboxProps } from "./Checkbox";
 

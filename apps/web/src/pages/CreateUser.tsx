@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Box, Button, TextField, MenuItem, Typography, IconButton, InputAdornment, CircularProgress, Stack, Paper, Grid, Switch, Alert, Snackbar, Dialog, Tooltip, Divider } from "@mui/material";
+import { Box, Typography, Paper, Grid, Switch, Alert, Snackbar, Tooltip, Divider } from "@mui/material";
+import { Button, TextField, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, InputAdornment, CircularProgress } from "../components/primitives";
+import { SaveButton, CancelButton, EmailInput, PasswordInput } from "../components/semantic";
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate, useLocation } from "react-router-dom";
@@ -290,7 +292,7 @@ export default function CreateUser() {
                   />
                 </Grid>
                 <Grid item xs={12}>
-                  <TextField
+                  <EmailInput
                     fullWidth
                     label="Email Address"
                     name="email"
@@ -307,77 +309,44 @@ export default function CreateUser() {
                 {!isEdit && (
                   <>
                     <Grid item xs={12} sm={6}>
-                      <TextField
+                      <PasswordInput
                         fullWidth
                         label="Password"
                         name="password"
-                        type={showPassword ? "text" : "password"}
                         value={formData.password}
                         onChange={handleChange}
                         placeholder="Enter password"
                         variant="outlined"
                         sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
                         required
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton
-                                aria-label="toggle password visibility"
-                                onClick={handleClickShowPassword}
-                                onMouseDown={handleMouseDownPassword}
-                                edge="end"
-                              >
-                                {showPassword ? <VisibilityOff /> : <Visibility />}
-                              </IconButton>
-                            </InputAdornment>
-                          ),
-                        }}
                       />
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                      <TextField
+                      <PasswordInput
                         fullWidth
                         label="Confirm Password"
                         name="confirm_password"
-                        type={showConfirmPassword ? "text" : "password"}
                         value={formData.confirm_password}
                         onChange={handleChange}
                         placeholder="Confirm password"
                         variant="outlined"
                         sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
                         required
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton
-                                aria-label="toggle confirm password visibility"
-                                onClick={handleClickShowConfirmPassword}
-                                onMouseDown={handleMouseDownPassword}
-                                edge="end"
-                              >
-                                {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                              </IconButton>
-                            </InputAdornment>
-                          ),
-                        }}
                       />
                     </Grid>
                   </>
                 )}
 
                 <Grid item xs={12}>
-                  <TextField
-                    select
+                  <Select
                     fullWidth
                     label="Role"
                     name="role_code"
                     value={formData.role_code}
                     onChange={handleChange}
-                    placeholder="Select a role"
-                    variant="outlined"
-                    sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
                     required
                     disabled={loadingRoles || roles.length === 0}
+                    sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
                   >
                     {loadingRoles ? (
                       <MenuItem value="" disabled>Loading roles...</MenuItem>
@@ -388,7 +357,7 @@ export default function CreateUser() {
                         <MenuItem key={role.id} value={role.code}>{role.name}</MenuItem>
                       ))
                     )}
-                  </TextField>
+                  </Select>
                 </Grid>
 
                 {isEdit && (
@@ -413,10 +382,11 @@ export default function CreateUser() {
               {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 4 }}>
-                <Button
+                <SaveButton
                   type="submit"
                   variant="text"
                   disabled={false}
+                  loading={loading}
                   sx={(theme) => ({
                     minWidth: 165,
                     fontWeight: 750,
@@ -438,8 +408,8 @@ export default function CreateUser() {
                   })}
                 >
                   {loading ? "Saving..." : "Save"}
-                </Button>
-                <Button
+                </SaveButton>
+                <CancelButton
                   variant="text"
                   onClick={() => navigate("/users")}
                   disabled={loading}
@@ -464,7 +434,7 @@ export default function CreateUser() {
                   })}
                 >
                   Cancel
-                </Button>
+                </CancelButton>
               </Box>
             </form>
           </Box>
@@ -540,7 +510,7 @@ export default function CreateUser() {
           </Typography>
           <Divider sx={{ my: 0.5 }} />
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, width: '100%', mt: 0.5 }}>
-            <Button
+            <CancelButton
               onClick={handleCancel}
               disabled={loading}
               sx={(theme) => ({
@@ -557,7 +527,7 @@ export default function CreateUser() {
               })}
             >
               Cancel
-            </Button>
+            </CancelButton>
             <Button
               onClick={handleConfirm}
               disabled={loading}

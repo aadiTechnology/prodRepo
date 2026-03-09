@@ -8,18 +8,15 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   Box,
   Paper,
-  TextField,
-  Button,
   Typography,
   Alert,
   Link as MuiLink,
-  InputAdornment,
-  IconButton,
   Grid,
-  CircularProgress,
   Zoom,
   Fade,
 } from "@mui/material";
+import { TextField, Button, InputAdornment, IconButton, CircularProgress } from "../components/primitives";
+import { EmailInput, PasswordInput } from "../components/semantic";
 import {
   Email as EmailIcon,
   Lock as LockIcon,
@@ -230,10 +227,9 @@ export default function Login() {
                 <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
                   Email Address <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
                 </Typography>
-                <TextField
+                <EmailInput
                   name="email"
                   placeholder="Enter Your Email"
-                  type="email"
                   value={formData.email}
                   onChange={handleChange}
                   error={!!errors.email}
@@ -280,10 +276,9 @@ export default function Login() {
                 <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
                   Password <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
                 </Typography>
-                <TextField
+                <PasswordInput
                   name="password"
                   placeholder="Enter Your Password"
-                  type={showPassword ? "text" : "password"}
                   value={formData.password}
                   onChange={handleChange}
                   error={!!errors.password}
@@ -296,18 +291,6 @@ export default function Login() {
                     }
                   }}
                   InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end" sx={{ pr: 1 }}>
-                        <IconButton
-                          aria-label="toggle password visibility"
-                          onClick={togglePasswordVisibility}
-                          edge="end"
-                          size="small"
-                        >
-                          {showPassword ? <VisibilityOff sx={{ fontSize: "1.1rem" }} /> : <Visibility sx={{ fontSize: "1.1rem" }} />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
                     sx: {
                       borderRadius: "8px",
                       backgroundColor: "#ffffff",

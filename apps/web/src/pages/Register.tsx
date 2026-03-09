@@ -9,11 +9,11 @@ import {
   Box,
   Container,
   Paper,
-  TextField,
-  Button,
   Typography,
   Alert,
 } from "@mui/material";
+import { TextField, Button } from "../components/primitives";
+import { EmailInput, PhoneInput, PasswordInput } from "../components/semantic";
 import apiClient from "../api/client";
 import { UserResponse } from "../types/user";
 
@@ -154,10 +154,9 @@ export default function Register() {
           )}
 
           <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <TextField
+            <EmailInput
               name="email"
               label="Email"
-              type="email"
               value={formData.email}
               onChange={handleChange}
               required
@@ -176,10 +175,9 @@ export default function Register() {
               autoComplete="name"
             />
 
-            <TextField
+            <PhoneInput
               name="phone_number"
               label="Phone Number"
-              type="tel"
               value={formData.phone_number}
               onChange={handleChange}
               fullWidth
@@ -190,10 +188,9 @@ export default function Register() {
               }}
             />
 
-            <TextField
+            <PasswordInput
               name="password"
               label="Password"
-              type="password"
               value={formData.password}
               onChange={handleChange}
               required
@@ -202,10 +199,9 @@ export default function Register() {
               helperText="Password must be at least 6 characters"
             />
 
-            <TextField
+            <PasswordInput
               name="confirmPassword"
               label="Confirm Password"
-              type="password"
               value={formData.confirmPassword}
               onChange={handleChange}
               required

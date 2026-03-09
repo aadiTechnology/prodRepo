@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { Box, Typography, TextField, Button, Snackbar, Alert, FormControl, InputLabel, Select, MenuItem, CircularProgress, Stack, Paper, Grid, Switch } from "@mui/material";
+import { Box, Typography, Snackbar, Alert, Stack, Paper, Grid, Switch } from "@mui/material";
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 import SaveIcon from '@mui/icons-material/Save';
-import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
 import roleService from "../api/services/roleService";
 import { useAuth } from "../context/AuthContext";
 import HomeIcon from '@mui/icons-material/Home';
 import Tooltip from '@mui/material/Tooltip';
+import { TextField, IconButton, CircularProgress } from "../components/primitives";
+import { SaveButton, CancelButton } from "../components/semantic";
 import ConfirmDialog from "../components/common/ConfirmDialog";
 import { FormSectionTitle } from "../components/reusable";
 function AddRole() {
@@ -287,9 +288,10 @@ function AddRole() {
               </Grid>
               {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 4 }}>
-                <Button
+                <SaveButton
                   type="submit"
                   variant="text"
+                  loading={loading}
                   sx={(theme) => ({
                     minWidth: 165,
                     fontWeight: 750,
@@ -308,8 +310,8 @@ function AddRole() {
                   })}
                 >
                   Save
-                </Button>
-                <Button
+                </SaveButton>
+                <CancelButton
                   variant="text"
                   onClick={() => navigate("/roles")}
                   sx={(theme) => ({
@@ -330,7 +332,7 @@ function AddRole() {
                   })}
                 >
                   Cancel
-                </Button>
+                </CancelButton>
               </Box>
             </form>
           </Box>

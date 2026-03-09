@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, Typography, TextField, Button, Snackbar, Alert, CircularProgress, Stack, Paper, Grid, Switch, InputAdornment, Divider } from "@mui/material";
+import { Box, Typography, Snackbar, Alert, Stack, Paper, Grid, Switch, Divider } from "@mui/material";
+import Tooltip from '@mui/material/Tooltip';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 import SaveIcon from '@mui/icons-material/Save';
-import Dialog from '@mui/material/Dialog';
-import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
 import CancelIcon from '@mui/icons-material/Cancel';
 import CheckIcon from '@mui/icons-material/Check';
 import HomeIcon from '@mui/icons-material/Home';
-import Tooltip from '@mui/material/Tooltip';
+import { Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, InputAdornment, CircularProgress } from "../components/primitives";
+import { SaveButton, CancelButton, PasswordInput } from "../components/semantic";
 
 // Local service for password change (since no changePasswordService exists)
 const changePasswordService = {
@@ -181,7 +181,7 @@ function ChangePassword() {
             <form onSubmit={handleSubmit} autoComplete="off">
               <Grid container spacing={3}>
                 <Grid item xs={12}>
-                  <TextField
+                  <PasswordInput
                     fullWidth
                     label="Current Password"
                     value={oldPassword}
@@ -190,25 +190,11 @@ function ChangePassword() {
                     variant="outlined"
                     sx={{ bgcolor: '#fff' }}
                     required
-                    type={showOldPassword ? "text" : "password"}
                     inputProps={{ minLength: 6 }}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            aria-label={showOldPassword ? "Hide current password" : "Show current password"}
-                            onClick={() => setShowOldPassword((show) => !show)}
-                            edge="end"
-                          >
-                            {showOldPassword ? <VisibilityOff /> : <Visibility />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
                   />
                 </Grid>
                 <Grid item xs={12}>
-                  <TextField
+                  <PasswordInput
                     fullWidth
                     label="New Password"
                     value={newPassword}
@@ -217,28 +203,14 @@ function ChangePassword() {
                     variant="outlined"
                     sx={{ bgcolor: '#fff' }}
                     required
-                    type={showNewPassword ? "text" : "password"}
                     inputProps={{ minLength: 6 }}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            aria-label={showNewPassword ? "Hide password" : "Show password"}
-                            onClick={() => setShowNewPassword((show) => !show)}
-                            edge="end"
-                          >
-                            {showNewPassword ? <VisibilityOff /> : <Visibility />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
                   />
                   <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.85rem', mt: 0.5, display: 'block' }}>
                     Password must be at least 8 characters and must contain at least 1 letter and 1 number.
                   </Typography>
                 </Grid>
                 <Grid item xs={12}>
-                  <TextField
+                  <PasswordInput
                     fullWidth
                     label="Confirm Password"
                     value={confirmPassword}
@@ -247,21 +219,7 @@ function ChangePassword() {
                     variant="outlined"
                     sx={{ bgcolor: '#fff' }}
                     required
-                    type={showConfirmPassword ? "text" : "password"}
                     inputProps={{ minLength: 6 }}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                            onClick={() => setShowConfirmPassword((show) => !show)}
-                            edge="end"
-                          >
-                            {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -276,7 +234,7 @@ function ChangePassword() {
               </Grid>
               {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 4 }}>
-                <Button
+                <SaveButton
                   type="submit"
                   variant="text"
                   sx={{
@@ -297,8 +255,8 @@ function ChangePassword() {
                   }}
                 >
                   Save
-                </Button>
-                <Button
+                </SaveButton>
+                <CancelButton
                   variant="text"
                   onClick={() => navigate("/profile")}
                   sx={{
@@ -319,7 +277,7 @@ function ChangePassword() {
                   }}
                 >
                   Cancel
-                </Button>
+                </CancelButton>
               </Box>
             </form>
           </Box>
@@ -391,7 +349,7 @@ function ChangePassword() {
               <Divider sx={{ my: 0.5 }} />
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, width: '100%', mt: 0.5 }}>
-              <Button
+              <CancelButton
                 onClick={handleCancel}
                 sx={{
                   color: '#ef4444',
@@ -407,7 +365,7 @@ function ChangePassword() {
                 }}
               >
                 Cancel
-              </Button>
+              </CancelButton>
               <Button
                 onClick={handleConfirm}
                 sx={{
