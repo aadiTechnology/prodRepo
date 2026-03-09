@@ -5,7 +5,7 @@
  */
 
 import type { Theme } from "@mui/material/styles";
-import { createAppTheme } from "../build";
+import { createAppTheme } from "../themeBuilder";
 import { mergeTokenOverrides } from "../themeStudio/mergeTokenOverrides";
 import { getTokenOverridesFromTenantConfig } from "./tenantTokenOverrides";
 import type { TenantThemeConfig } from "./types";

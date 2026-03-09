@@ -36,7 +36,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import AddIcon from "@mui/icons-material/Add";
 import SaveIcon from "@mui/icons-material/Save";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import { createAppTheme } from "../../theme/build";
+import { createAppTheme } from "../../theme/themeBuilder";
 import { mergeTokenOverrides } from "../../theme/themeStudio/mergeTokenOverrides";
 import { buildExportConfig, downloadThemeConfig } from "../../theme/themeStudio/buildExportConfig";
 import { tokens } from "../../tokens";

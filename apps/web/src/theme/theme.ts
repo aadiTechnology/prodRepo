@@ -4,7 +4,7 @@
  * Single entry point for the app; tokens are the source of truth.
  */
 
-import { createAppTheme } from "./build";
+import { createAppTheme } from "./themeBuilder";
 
 const theme = createAppTheme();
 
