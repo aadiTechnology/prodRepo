@@ -13,6 +13,7 @@ from app.models.menu import Menu
 from app.models.user_profile import UserProfile
 from app.models.revoked_token import RevokedToken
 from app.models.ai_entities import Requirement, UserStory, TestCase
+from app.models.theme_template import ThemeTemplate
 
 # Export all models for convenience
 __all__ = [
@@ -31,4 +32,5 @@ __all__ = [
     "Requirement",
     "UserStory",
     "TestCase",
+    "ThemeTemplate",
 ]

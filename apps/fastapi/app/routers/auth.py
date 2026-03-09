@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.services.rbac_service import get_user_roles 
 from app.schemas.auth import LoginRequest, TokenResponse, UserWithRole, LoginContextResponse, TenantInfo
 from app.schemas.user import UserCreate, UserResponse
-from app.services import user_service, rbac_service
+from app.services import user_service, rbac_service, theme_template_service
 from app.models.user import UserRole
 from app.utils.security import verify_password, create_access_token
 from app.core.exceptions import UnauthorizedException, ForbiddenException
@@ -104,11 +104,16 @@ async def login_with_context(
         if not tenant or not tenant.is_active or tenant.is_deleted:
             logger.warning(f"Login blocked (Context): Tenant {user.tenant_id} is inactive or deleted (User: {user.email})")
             raise ForbiddenException("Tenant is deactivated. Contact system administrator.")
+        theme_config = None
+        if getattr(tenant, "theme_template_id", None):
+            theme_config = theme_template_service.get_template_config(db, tenant.theme_template_id)
         tenant_info = TenantInfo(
             id=tenant.id,
             name=tenant.name,
             code=tenant.code,
             logo_url=tenant.logo_url,
+            theme_template_id=getattr(tenant, "theme_template_id", None),
+            theme_config=theme_config,
             address_line1=tenant.address_line1,
             address_line2=tenant.address_line2,
             city=tenant.city,
@@ -156,11 +161,16 @@ async def get_current_user_info(
         from app.models.tenant import Tenant
         tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
         if tenant and tenant.is_active and not tenant.is_deleted:
+            theme_config = None
+            if getattr(tenant, "theme_template_id", None):
+                theme_config = theme_template_service.get_template_config(db, tenant.theme_template_id)
             tenant_info = TenantInfo(
                 id=tenant.id,
                 name=tenant.name,
                 code=tenant.code,
                 logo_url=tenant.logo_url,
+                theme_template_id=getattr(tenant, "theme_template_id", None),
+                theme_config=theme_config,
                 address_line1=tenant.address_line1,
                 address_line2=tenant.address_line2,
                 city=tenant.city,
@@ -173,7 +183,8 @@ async def get_current_user_info(
         email=current_user.email,
         full_name=current_user.full_name,
         role=current_user.role,
-        tenant=tenant_info
+        tenant_id=current_user.tenant_id,
+        tenant=tenant_info,
     )
 
 @router.post("/logout")

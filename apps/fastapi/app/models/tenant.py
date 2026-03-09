@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, UnicodeText
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, UnicodeText, ForeignKey
 from sqlalchemy.dialects.mssql import NVARCHAR
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -24,6 +24,7 @@ class Tenant(Base):
 
     # Branding
     logo_url = Column(NVARCHAR(length=None), nullable=True)  # Correct way to specify NVARCHAR(MAX) in mssql dialect
+    theme_template_id = Column(Integer, ForeignKey("theme_templates.id", ondelete="SET NULL"), nullable=True, index=True)  # Optional link to Theme Template for token overrides
 
     # Address
     address_line1 = Column(String(200), nullable=True)
@@ -49,4 +50,5 @@ class Tenant(Base):
     users = relationship("User", back_populates="tenant")
     roles = relationship("Role", back_populates="tenant")
     menus = relationship("Menu", back_populates="tenant")
+    theme_template = relationship("ThemeTemplate", foreign_keys=[theme_template_id])
 

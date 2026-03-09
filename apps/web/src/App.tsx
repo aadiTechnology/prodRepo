@@ -1,23 +1,23 @@
 import { BrowserRouter } from "react-router-dom";
 import AppRoutes from "./routes/AppRoutes";
-import AppThemeProvider from "./theme/AppThemeProvider";
 import { AuthProvider, RBACProvider } from "./context";
+import ThemeFromTenantProvider from "./theme/ThemeFromTenantProvider";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppThemeProvider>
-        <BrowserRouter>
-          <ErrorBoundary>
-            <RBACProvider>
-              <AuthProvider>
+      <BrowserRouter>
+        <RBACProvider>
+          <AuthProvider>
+            <ThemeFromTenantProvider>
+              <ErrorBoundary>
                 <AppRoutes />
-              </AuthProvider>
-            </RBACProvider>
-          </ErrorBoundary>
-        </BrowserRouter>
-      </AppThemeProvider>
+              </ErrorBoundary>
+            </ThemeFromTenantProvider>
+          </AuthProvider>
+        </RBACProvider>
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }

@@ -38,6 +38,7 @@ import {
   VpnKey as PermissionIcon,
   Dashboard as DashboardIcon,
   ChevronLeft as ChevronLeftIcon,
+  Palette as ThemeStudioIcon,
 } from "@mui/icons-material";
 import { useRBAC } from "../../context/RBACContext";
 import { useAuth } from "../../context/AuthContext";
@@ -166,6 +167,7 @@ const ALLOWED_ROUTES = new Set([
   '/permissions',
   '/dashboard',
   '/profile',
+  '/admin/theme-studio',
 ]);
 
 const isAllowedRoute = (path: string | undefined): boolean => {
@@ -254,6 +256,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
           icon: <ConfigIcon />,
           children: [
             { title: "Role Management", path: "/roles", icon: <RoleIcon fontSize="small" /> },
+            { title: "Theme Studio", path: "/admin/theme-studio", icon: <ThemeStudioIcon fontSize="small" /> },
             { title: "Menu", path: "/menus", icon: <MenuListIcon fontSize="small" /> },
             { title: "Permission", path: "/permissions", icon: <PermissionIcon fontSize="small" /> },
           ],

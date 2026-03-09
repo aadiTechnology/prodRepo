@@ -16,6 +16,7 @@ class TenantBase(BaseModel):
     is_active: bool = True
     # Branding
     logo_url: Optional[str] = None
+    theme_template_id: Optional[int] = None
     # Address
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None
@@ -47,6 +48,7 @@ class TenantUpdate(BaseModel):
     is_active: Optional[bool] = None
     # Branding
     logo_url: Optional[str] = None
+    theme_template_id: Optional[int] = None
     # Address
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None

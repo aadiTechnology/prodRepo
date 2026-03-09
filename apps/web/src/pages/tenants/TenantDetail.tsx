@@ -287,6 +287,18 @@ const TenantDetail = () => {
                         </Typography>
                     </DetailFieldRow>
 
+                    {/* ── Theme Template ── */}
+                    <DetailFieldRow label="Theme Template" last={false}>
+                        <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.primary, fontWeight: 500 })}>
+                            {tenant.theme_template_id != null ? `ID ${tenant.theme_template_id}` : "—"}
+                        </Typography>
+                        {tenant.theme_template_id != null && (
+                            <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, display: "block", mt: 0.3 })}>
+                                Tenant branding is applied from this template at login.
+                            </Typography>
+                        )}
+                    </DetailFieldRow>
+
                     {/* ── Business Description ── */}
                     <DetailFieldRow label="Business Description" last>
                         <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.primary, fontWeight: 500, lineHeight: 1.7 })}>

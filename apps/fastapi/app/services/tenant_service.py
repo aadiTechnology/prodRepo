@@ -89,6 +89,7 @@ def provision_tenant(db: Session, data: TenantProvision, created_by: int | None 
             description=data.description,
             is_active=data.is_active,
             logo_url=data.logo_url,
+            theme_template_id=data.theme_template_id,
             address_line1=data.address_line1,
             address_line2=data.address_line2,
             city=data.city,
@@ -173,8 +174,12 @@ def update_tenant(db: Session, tenant_id: int, data: TenantUpdate, updated_by: i
         tenant.phone = data.phone
     if data.description is not None:
         tenant.description = data.description
-    if "logo_url" in data.model_fields_set:
-        tenant.logo_url = data.logo_url
+    # Optional fields that can be explicitly set to null - use only keys that were sent
+    sent = data.model_dump(exclude_unset=True)
+    if "logo_url" in sent:
+        tenant.logo_url = sent["logo_url"]
+    if "theme_template_id" in sent:
+        tenant.theme_template_id = sent["theme_template_id"]
     if data.address_line1 is not None:
         tenant.address_line1 = data.address_line1
     if data.address_line2 is not None:

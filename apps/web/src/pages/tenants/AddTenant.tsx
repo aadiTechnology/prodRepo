@@ -14,6 +14,10 @@ import {
     Tabs,
     Tab,
     Divider,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
 } from "@mui/material";
 import {
     Home as HomeIcon,
@@ -33,7 +37,9 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../../components/common";
 import tenantService from "../../api/services/tenantService";
+import themeTemplateService from "../../api/services/themeTemplateService";
 import { ListPageLayout, FormSectionLabel, FieldLabel } from "../../components/reusable";
+import type { ThemeTemplate } from "../../types/themeTemplate";
 
 // ─── TextField sx (theme-driven) ───────────────────────────────────────────────
 const buildFieldSx = (hasError: boolean) => (theme: { palette: { divider: string; error: { main: string }; grey: Record<number, string>; primary: { main: string }; background: { paper: string } } }) => ({
@@ -72,9 +78,11 @@ const AddTenant = () => {
         admin_password: "", confirm_password: "",
         phone: "", description: "", is_active: true,
         logo_url: "",
+        theme_template_id: null as number | null,
         address_line1: "", address_line2: "", city: "", state: "", pin_code: "",
     });
     const [initialFormData, setInitialFormData] = useState<typeof formData | null>(null);
+    const [templates, setTemplates] = useState<ThemeTemplate[]>([]);
 
     const fetchTenant = useCallback(async () => {
         if (!id) return;
@@ -86,6 +94,7 @@ const AddTenant = () => {
                 email: data.email || "", admin_password: "", confirm_password: "",
                 phone: data.phone || "", description: data.description || "",
                 is_active: data.is_active, logo_url: data.logo_url || "",
+                theme_template_id: data.theme_template_id ?? null,
                 address_line1: data.address_line1 || "", address_line2: data.address_line2 || "",
                 city: data.city || "", state: data.state || "", pin_code: data.pin_code || "",
             };
@@ -100,6 +109,10 @@ const AddTenant = () => {
     }, [id]);
 
     useEffect(() => { if (isEditMode) fetchTenant(); }, [fetchTenant, isEditMode]);
+
+    useEffect(() => {
+        themeTemplateService.list({ page_size: 500 }).then(r => setTemplates(r.items || [])).catch(() => setTemplates([]));
+    }, []);
 
     const validateField = (name: string, value: any) => {
         let e = "";
@@ -162,6 +175,7 @@ const AddTenant = () => {
                 name: formData.name, owner_name: formData.owner_name,
                 phone: formData.phone, description: formData.description,
                 is_active: formData.is_active, logo_url: formData.logo_url || null,
+                theme_template_id: formData.theme_template_id ?? null,
                 address_line1: formData.address_line1 || null, address_line2: formData.address_line2 || null,
                 city: formData.city || null, state: formData.state || null, pin_code: formData.pin_code || null,
             };
@@ -489,6 +503,27 @@ const AddTenant = () => {
                                         )}
                                     </Box>
                                 )}
+
+                                <Box sx={{ mt: 2 }}>
+                                    <FieldLabel>Theme Template</FieldLabel>
+                                    <FormControl fullWidth size="small" sx={(theme) => ({ "& .MuiOutlinedInput-root": { borderRadius: 1, bgcolor: theme.palette.background.paper } })}>
+                                        <InputLabel id="theme-template-label">Template (tenant branding)</InputLabel>
+                                        <Select
+                                            labelId="theme-template-label"
+                                            value={formData.theme_template_id ?? ""}
+                                            label="Template (tenant branding)"
+                                            onChange={(e) => setFormData(prev => ({ ...prev, theme_template_id: e.target.value === "" ? null : Number(e.target.value) }))}
+                                        >
+                                            <MenuItem value="">None</MenuItem>
+                                            {templates.map(t => (
+                                                <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                    <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, display: "block", mt: 0.5 })}>
+                                        When set, this template is applied at login for this tenant.
+                                    </Typography>
+                                </Box>
                             </Box>
                         </Box>
                     </Box>

@@ -22,9 +22,10 @@ from app.models import (  # noqa: F401
     Role,
     Feature,
     Menu,
+    ThemeTemplate,
 )
 
-from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai
+from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template
 
 # Setup logging first
 setup_logging()
@@ -72,6 +73,7 @@ app.include_router(feature.router)
 app.include_router(rbac.router)
 app.include_router(profile.router)
 app.include_router(ai.router)
+app.include_router(theme_template.router)
 
 # Mount static files for profile images
 # Ensure the directory exists

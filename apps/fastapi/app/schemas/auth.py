@@ -1,6 +1,6 @@
 """Authentication schemas."""
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Any
 from app.models.user import UserRole
 from app.schemas.menu import MenuNode
 
@@ -18,11 +18,14 @@ class TokenResponse(BaseModel):
 
 
 class TenantInfo(BaseModel):
-    """Tenant information returned at login."""
+    """Tenant information returned at login and /me. Includes theme template config when assigned."""
     id: int
     name: str
     code: str
     logo_url: Optional[str] = None
+    theme_template_id: Optional[int] = None
+    """When set, theme_config contains the template's token overrides for dynamic theme generation."""
+    theme_config: Optional[dict[str, Any]] = None
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None
     city: Optional[str] = None

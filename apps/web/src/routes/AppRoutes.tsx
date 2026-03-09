@@ -22,6 +22,7 @@ const AddTenant = lazy(() => import("../pages/tenants/AddTenant"));
 const RequirementGeneratePage = lazy(() => import("../pages/RequirementGeneratePage"));
 
 const CreateUser = lazy(() => import("../pages/CreateUser"));
+const ThemeStudioPage = lazy(() => import("../pages/admin/ThemeStudioPage"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -171,6 +172,14 @@ export default function AppRoutes() {
             element={
               <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
                 <AddTenant />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/theme-studio"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
+                <ThemeStudioPage />
               </ProtectedRoute>
             }
           />

@@ -10,7 +10,7 @@ export type {
   TenantAccentColors,
 } from "./types";
 export { getTokenOverridesFromTenantConfig } from "./tenantTokenOverrides";
-export { createTenantTheme } from "./tenantThemeGenerator";
+export { createTenantTheme, createTenantThemeFromTokenOverrides } from "./tenantThemeGenerator";
 export {
   TenantBrandingProvider,
   useTenantBranding,

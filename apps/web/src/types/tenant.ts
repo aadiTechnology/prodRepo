@@ -9,6 +9,7 @@ export interface Tenant {
     is_active: boolean;
     // Branding
     logo_url?: string | null;
+    theme_template_id?: number | null;
     // Address
     address_line1?: string | null;
     address_line2?: string | null;
@@ -28,6 +29,7 @@ export interface TenantCreate {
     is_active?: boolean;
     // Branding
     logo_url?: string | null;
+    theme_template_id?: number | null;
     // Address
     address_line1?: string | null;
     address_line2?: string | null;
@@ -49,6 +51,7 @@ export interface TenantUpdate {
     is_active?: boolean;
     // Branding
     logo_url?: string | null;
+    theme_template_id?: number | null;
     // Address
     address_line1?: string | null;
     address_line2?: string | null;
