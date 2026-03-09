@@ -6,7 +6,8 @@ import {
   DialogActions,
   Button,
   CircularProgress,
-} from "@mui/material";
+} from "../primitives";
+import { CancelButton } from "../semantic";
 import { ReactNode } from "react";
 
 export interface ConfirmDialogProps {
@@ -45,9 +46,9 @@ export default function ConfirmDialog({
         {warningContent}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCancel} disabled={loading}>
+        <CancelButton onClick={onCancel} disabled={loading}>
           Cancel
-        </Button>
+        </CancelButton>
         <Button
           onClick={onConfirm}
           color={confirmVariant}

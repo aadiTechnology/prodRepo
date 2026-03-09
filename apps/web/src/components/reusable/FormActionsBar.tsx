@@ -4,7 +4,9 @@
  * Theme-driven; no business logic.
  */
 
-import { Box, Button, Stack, CircularProgress, SxProps, Theme } from "@mui/material";
+import { Box, Stack, SxProps, Theme } from "@mui/material";
+import { Button, CircularProgress } from "../primitives";
+import { SaveButton, CancelButton } from "../semantic";
 import { ReactNode } from "react";
 
 export interface FormActionsBarProps {
@@ -50,19 +52,19 @@ export default function FormActionsBar({
       {extra != null ? <Box>{extra}</Box> : <Box />}
       <Stack direction="row" spacing={spacing} alignItems="center">
         {onSecondary != null && (
-          <Button variant="outlined" onClick={onSecondary} disabled={loading}>
+          <CancelButton variant="outlined" onClick={onSecondary} disabled={loading}>
             {secondaryLabel}
-          </Button>
+          </CancelButton>
         )}
-        <Button
+        <SaveButton
           variant="contained"
           color="primary"
           onClick={onPrimary}
           disabled={primaryDisabled || loading}
-          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : undefined}
+          loading={loading}
         >
           {primaryLabel}
-        </Button>
+        </SaveButton>
       </Stack>
     </Box>
   );

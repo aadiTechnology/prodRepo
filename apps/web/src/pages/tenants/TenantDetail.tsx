@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
     Box,
-    Button,
     Typography,
     Alert,
     CircularProgress,
@@ -10,6 +9,8 @@ import {
     Paper,
     Divider,
 } from "@mui/material";
+import { Button } from "../../components/primitives";
+import { CancelButton } from "../../components/semantic";
 import {
     Edit as EditIcon,
     Business as BusinessIcon,
@@ -148,7 +149,7 @@ const TenantDetail = () => {
                     {/* Right: action buttons */}
                     <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
                         {/* Back */}
-                        <Button
+                        <CancelButton
                             variant="outlined"
                             size="small"
                             startIcon={<BackIcon sx={{ fontSize: 16 }} />}
@@ -164,7 +165,7 @@ const TenantDetail = () => {
                             })}
                         >
                             Back to List
-                        </Button>
+                        </CancelButton>
 
                         {/* Delete */}
                         <Button

@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import {
     Box,
-    Button,
     Paper,
     Typography,
-    TextField,
     Alert,
     CircularProgress,
     IconButton,
@@ -14,11 +12,9 @@ import {
     Tabs,
     Tab,
     Divider,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
 } from "@mui/material";
+import { Button, TextField, Select, MenuItem } from "../../components/primitives";
+import { SaveButton, CancelButton, EmailInput, PhoneInput, PasswordInput } from "../../components/semantic";
 import {
     Home as HomeIcon,
     Business as BusinessIcon,
@@ -283,7 +279,7 @@ const AddTenant = () => {
                                     </Box>
                                     <Box>
                                         <FieldLabel>Phone</FieldLabel>
-                                        <TextField fullWidth size="small" name="phone" value={formData.phone}
+                                        <PhoneInput fullWidth size="small" name="phone" value={formData.phone}
                                             onChange={handleChange} placeholder="1234567890"
                                             error={Boolean(errors.phone)} helperText={errors.phone}
                                             inputProps={{ maxLength: 15 }} sx={buildFieldSx(Boolean(errors.phone))} />
@@ -360,7 +356,7 @@ const AddTenant = () => {
                                     </Box>
                                     <Box>
                                         <FieldLabel required>Email Address</FieldLabel>
-                                        <TextField fullWidth size="small" name="email" value={formData.email}
+                                        <EmailInput fullWidth size="small" name="email" value={formData.email}
                                             onChange={handleChange} placeholder="admin@example.com"
                                             disabled={isEditMode}
                                             error={Boolean(errors.email)}
@@ -379,38 +375,19 @@ const AddTenant = () => {
                                         <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
                                             <Box>
                                                 <FieldLabel required>Password</FieldLabel>
-                                                <TextField fullWidth size="small" name="admin_password"
-                                                    type={showPassword ? "text" : "password"}
+                                                <PasswordInput fullWidth size="small" name="admin_password"
                                                     value={formData.admin_password} onChange={handleChange}
                                                     placeholder="Min 8 characters"
                                                     error={Boolean(errors.admin_password)} helperText={errors.admin_password}
-                                                    InputProps={{
-                                                        endAdornment: (
-                                                            <InputAdornment position="end">
-                                                                <IconButton onClick={() => setShowPassword(!showPassword)} size="small" edge="end">
-                                                                    {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                                                                </IconButton>
-                                                            </InputAdornment>
-                                                        )
-                                                    }}
                                                     sx={buildFieldSx(Boolean(errors.admin_password))} />
                                             </Box>
                                             <Box>
                                                 <FieldLabel required>Confirm Password</FieldLabel>
-                                                <TextField fullWidth size="small" name="confirm_password"
-                                                    type={showConfirmPassword ? "text" : "password"}
+                                                <PasswordInput fullWidth size="small" name="confirm_password"
+                                                    label="Confirm Password"
                                                     value={formData.confirm_password} onChange={handleChange}
                                                     placeholder="Re-enter password"
                                                     error={Boolean(errors.confirm_password)} helperText={errors.confirm_password}
-                                                    InputProps={{
-                                                        endAdornment: (
-                                                            <InputAdornment position="end">
-                                                                <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} size="small" edge="end">
-                                                                    {showConfirmPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                                                                </IconButton>
-                                                            </InputAdornment>
-                                                        )
-                                                    }}
                                                     sx={buildFieldSx(Boolean(errors.confirm_password))} />
                                             </Box>
                                         </Box>
@@ -506,20 +483,19 @@ const AddTenant = () => {
 
                                 <Box sx={{ mt: 2 }}>
                                     <FieldLabel>Theme Template</FieldLabel>
-                                    <FormControl fullWidth size="small" sx={(theme) => ({ "& .MuiOutlinedInput-root": { borderRadius: 1, bgcolor: theme.palette.background.paper } })}>
-                                        <InputLabel id="theme-template-label">Template (tenant branding)</InputLabel>
-                                        <Select
-                                            labelId="theme-template-label"
-                                            value={formData.theme_template_id ?? ""}
-                                            label="Template (tenant branding)"
-                                            onChange={(e) => setFormData(prev => ({ ...prev, theme_template_id: e.target.value === "" ? null : Number(e.target.value) }))}
-                                        >
-                                            <MenuItem value="">None</MenuItem>
-                                            {templates.map(t => (
-                                                <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
+                                    <Select
+                                        fullWidth
+                                        size="small"
+                                        label="Template (tenant branding)"
+                                        value={formData.theme_template_id ?? ""}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, theme_template_id: e.target.value === "" ? null : Number(e.target.value) }))}
+                                        sx={(theme) => ({ "& .MuiOutlinedInput-root": { borderRadius: 1, bgcolor: theme.palette.background.paper } })}
+                                    >
+                                        <MenuItem value="">None</MenuItem>
+                                        {templates.map(t => (
+                                            <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>
+                                        ))}
+                                    </Select>
                                     <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, display: "block", mt: 0.5 })}>
                                         When set, this template is applied at login for this tenant.
                                     </Typography>
@@ -533,7 +509,7 @@ const AddTenant = () => {
                         borderTop: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.grey[50],
                         display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 0,
                     })}>
-                        <Button
+                        <CancelButton
                             onClick={() => navigate("/tenants")}
                             sx={{
                                 color: "#ef4444",
@@ -550,10 +526,11 @@ const AddTenant = () => {
                             }}
                         >
                             Cancel
-                        </Button>
-                        <Button
+                        </CancelButton>
+                        <SaveButton
                             onClick={loading ? undefined : handleSubmit}
                             disabled={loading}
+                            loading={loading}
                             sx={(theme) => ({
                                 color: theme.palette.success.main,
                                 backgroundColor: "transparent",
@@ -570,7 +547,7 @@ const AddTenant = () => {
                             })}
                         >
                             {loading ? "Saving…" : isEditMode ? "Update" : "Save"}
-                        </Button>
+                        </SaveButton>
                     </Box>
                 </Paper>
             </Box>

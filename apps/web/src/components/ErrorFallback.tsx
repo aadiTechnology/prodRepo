@@ -3,7 +3,8 @@
  * Simple fallback UI for error boundaries
  */
 
-import { Box, Typography, Button } from "@mui/material";
+import { Box, Typography } from "@mui/material";
+import { Button } from "./primitives";
 import { ErrorOutline } from "@mui/icons-material";
 
 interface ErrorFallbackProps {

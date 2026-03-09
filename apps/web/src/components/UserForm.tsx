@@ -1,18 +1,22 @@
 import { useState, useEffect, useCallback, memo } from "react";
 import {
+  Box,
+  Alert,
+  Switch,
+  FormControlLabel,
+} from "@mui/material";
+import {
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
   Button,
-  Box,
-  Alert,
+  Select,
   MenuItem,
-  Switch,
-  FormControlLabel,
   CircularProgress,
-} from "@mui/material";
+} from "./primitives";
+import { SaveButton, CancelButton, EmailInput, PasswordInput } from "./semantic";
 import { User, UserCreate, UserUpdate } from "../types/user";
 import roleService from "../api/services/roleService";
 import tenantService from "../api/services/tenantService";
@@ -189,10 +193,9 @@ function UserForm({ open, onClose, onSubmit, user, isEdit = false }: UserFormPro
                 {error}
               </Alert>
             )}
-            <TextField
+            <EmailInput
               name="email"
               label="Email"
-              type="email"
               value={formData.email}
               onChange={handleChange}
               disabled={isEdit}
@@ -209,18 +212,16 @@ function UserForm({ open, onClose, onSubmit, user, isEdit = false }: UserFormPro
               disabled={isProtected}
             />
             {!isEdit && (
-              <TextField
+              <PasswordInput
                 name="password"
                 label="Password"
-                type="password"
                 value={formData.password}
                 onChange={handleChange}
                 required
                 fullWidth
               />
             )}
-            <TextField
-              select
+            <Select
               name="role_id"
               label="Role"
               value={formData.role_id}
@@ -235,11 +236,10 @@ function UserForm({ open, onClose, onSubmit, user, isEdit = false }: UserFormPro
                   {role.name} ({role.scope})
                 </MenuItem>
               ))}
-            </TextField>
+            </Select>
             {/* Tenant dropdown only if role is TENANT */}
             {roles.find((r) => r.id === formData.role_id)?.scope === "TENANT" && (
-              <TextField
-                select
+              <Select
                 name="tenant_id"
                 label="Tenant"
                 value={formData.tenant_id}
@@ -254,7 +254,7 @@ function UserForm({ open, onClose, onSubmit, user, isEdit = false }: UserFormPro
                     {tenant.name}
                   </MenuItem>
                 ))}
-              </TextField>
+              </Select>
             )}
             {/* Status toggle (disabled if protected) */}
             {isEdit && (
@@ -274,12 +274,12 @@ function UserForm({ open, onClose, onSubmit, user, isEdit = false }: UserFormPro
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose} disabled={loading}>
+          <CancelButton onClick={onClose} disabled={loading}>
             Cancel
-          </Button>
-          <Button type="submit" variant="contained" disabled={loading || isProtected}>
-            {loading ? <CircularProgress size={20} /> : isEdit ? "Update" : "Create"}
-          </Button>
+          </CancelButton>
+          <SaveButton type="submit" variant="contained" disabled={loading || isProtected} loading={loading}>
+            {isEdit ? "Update" : "Create"}
+          </SaveButton>
         </DialogActions>
       </form>
     </Dialog>

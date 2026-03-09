@@ -16,17 +16,13 @@ import {
   CardContent,
   Typography,
   Grid,
-  TextField,
-  Select,
-  MenuItem,
-  InputLabel,
-  FormControl,
-  Button,
   Divider,
   CircularProgress,
   Snackbar,
   Alert,
 } from "@mui/material";
+import { TextField, Select, MenuItem, Button } from "../primitives";
+import { SaveButton } from "../semantic";
 import KeyIcon from "@mui/icons-material/VpnKey";
 import { useNavigate, useParams } from "react-router-dom";
 import PermissionGroup from "../../components/roles/PermissionGroup";
@@ -267,24 +263,23 @@ export default function RoleForm({
                 />
               </Grid>
               <Grid item xs={12} md={4}>
-                <FormControl fullWidth required>
-                  <InputLabel sx={{ color: MUTED }}>Role Scope</InputLabel>
-                  <Select
-                    name="scope_type"
-                    value={form.scope_type}
-                    onChange={handleScopeChange}
-                    label="Role Scope"
-                    sx={{
-                      bgcolor: FIELD_BG,
-                      borderRadius: 2,
-                      color: "text.primary",
-                      ".MuiSelect-icon": { color: MUTED },
-                    }}
-                  >
-                    <MenuItem value="PLATFORM">Platform</MenuItem>
-                    <MenuItem value="TENANT">Tenant</MenuItem>
-                  </Select>
-                </FormControl>
+                <Select
+                  name="scope_type"
+                  value={form.scope_type}
+                  onChange={handleScopeChange}
+                  label="Role Scope"
+                  required
+                  fullWidth
+                  sx={{
+                    bgcolor: FIELD_BG,
+                    borderRadius: 2,
+                    color: "text.primary",
+                    ".MuiSelect-icon": { color: MUTED },
+                  }}
+                >
+                  <MenuItem value="PLATFORM">Platform</MenuItem>
+                  <MenuItem value="TENANT">Tenant</MenuItem>
+                </Select>
               </Grid>
               {/* Row 2 */}
               <Grid item xs={12}>
@@ -310,25 +305,24 @@ export default function RoleForm({
               {/* Row 3: Tenant */}
               {form.scope_type === "TENANT" && (
                 <Grid item xs={12}>
-                  <FormControl fullWidth required>
-                    <InputLabel sx={{ color: MUTED }}>Select Tenant</InputLabel>
-                    <Select
-                      name="tenant_id"
-                      value={form.tenant_id || ""}
-                      onChange={handleChange}
-                      label="Select Tenant"
-                      sx={{
-                        bgcolor: FIELD_BG,
-                        borderRadius: 2,
-                        color: "text.primary",
-                        ".MuiSelect-icon": { color: MUTED },
-                      }}
-                    >
-                      {tenants.map(t => (
-                        <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <Select
+                    name="tenant_id"
+                    value={form.tenant_id || ""}
+                    onChange={handleChange}
+                    label="Select Tenant"
+                    required
+                    fullWidth
+                    sx={{
+                      bgcolor: FIELD_BG,
+                      borderRadius: 2,
+                      color: "text.primary",
+                      ".MuiSelect-icon": { color: MUTED },
+                    }}
+                  >
+                    {tenants.map(t => (
+                      <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>
+                    ))}
+                  </Select>
                 </Grid>
               )}
             </Grid>
@@ -403,21 +397,20 @@ export default function RoleForm({
             {/* Submit Button */}
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 4 }}>
               {/* Status Selector */}
-              <FormControl sx={{ minWidth: 120 }}>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  name="is_active"
-                  value={form.is_active ? "ACTIVE" : "INACTIVE"}
-                  label="Status"
-                  onChange={e => setForm((f: RoleFormValues) => ({ ...f, is_active: e.target.value === "ACTIVE" }))}
-                >
-                  <MenuItem value="ACTIVE">Active</MenuItem>
-                  <MenuItem value="INACTIVE">Inactive</MenuItem>
-                </Select>
-              </FormControl>
-              <Button
+              <Select
+                name="is_active"
+                value={form.is_active ? "ACTIVE" : "INACTIVE"}
+                label="Status"
+                onChange={e => setForm((f: RoleFormValues) => ({ ...f, is_active: e.target.value === "ACTIVE" }))}
+                sx={{ minWidth: 120 }}
+              >
+                <MenuItem value="ACTIVE">Active</MenuItem>
+                <MenuItem value="INACTIVE">Inactive</MenuItem>
+              </Select>
+              <SaveButton
                 type="submit"
                 variant="contained"
+                loading={loading}
                 sx={{
                   bgcolor: ACCENT,
                   color: "#fff",
@@ -430,10 +423,9 @@ export default function RoleForm({
                   minWidth: 120,
                 }}
                 disabled={loading}
-                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : null}
               >
                 {isEdit ? "Update Role" : "Create Role"}
-              </Button>
+              </SaveButton>
             </Box>
           </form>
         </Card>

@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback, ChangeEvent, useRef } from "react";
 import {
     Box,
     Typography,
-    TextField,
-    Button,
     Avatar,
     Paper,
     CircularProgress,
@@ -17,6 +15,8 @@ import {
     MenuItem,
     ListItemIcon,
 } from "@mui/material";
+import { Button, TextField } from "../components/primitives";
+import { SaveButton, EmailInput } from "../components/semantic";
 import {
     PhotoCamera as PhotoCameraIcon,
     AddAPhoto as AddAPhotoIcon,
@@ -526,7 +526,7 @@ const ProfilePage = () => {
                     {/* Email — read only */}
                     <Box>
                         <FieldLabel>Email Address</FieldLabel>
-                        <TextField
+                        <EmailInput
                             fullWidth
                             size="small"
                             value={profile?.email ?? ""}
@@ -607,12 +607,12 @@ const ProfilePage = () => {
                     <Typography sx={(theme) => ({ fontSize: "0.77rem", color: theme.palette.text.secondary, fontWeight: 500 })}>
                         JPG, PNG, GIF or WebP · max 5 MB · Click avatar to change photo
                     </Typography>
-                    <Button
+                    <SaveButton
                         variant="contained"
                         size="small"
                         onClick={handleSave}
                         disabled={!isModified || saving}
-                        startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <SaveIcon />}
+                        loading={saving}
                         sx={(theme) => ({
                             bgcolor: theme.palette.success.main,
                             color: theme.palette.success.contrastText,
@@ -627,7 +627,7 @@ const ProfilePage = () => {
                         })}
                     >
                         {saving ? "Saving…" : "Save Changes"}
-                    </Button>
+                    </SaveButton>
                 </Box>
             </Paper>
 
