@@ -4,18 +4,15 @@ from typing import Optional, List, Any
 from app.models.user import UserRole
 from app.schemas.menu import MenuNode
 
-
 class LoginRequest(BaseModel):
     """Login request schema."""
     email: EmailStr
     password: str
 
-
 class TokenResponse(BaseModel):
     """Token response schema."""
     access_token: str
     token_type: str = "bearer"
-
 
 class TenantInfo(BaseModel):
     """Tenant information returned at login and /me. Includes theme template config when assigned."""
@@ -35,7 +32,6 @@ class TenantInfo(BaseModel):
     class Config:
         from_attributes = True
 
-
 class UserWithRole(BaseModel):
     """User response with role."""
     id: int
@@ -44,10 +40,12 @@ class UserWithRole(BaseModel):
     role: UserRole
     tenant_id: Optional[int] = None
     tenant: Optional[TenantInfo] = None
+    profile_image_path: Optional[str] = None
+    is_impersonation: Optional[bool] = None
+    original_user_id: Optional[int] = None
 
     class Config:
         from_attributes = True
-
 
 class CurrentUser(BaseModel):
     """Current authenticated user."""
@@ -55,15 +53,15 @@ class CurrentUser(BaseModel):
     email: EmailStr
     full_name: str
     role: UserRole
-    tenant_id: Optional[int] = None  # Added to support tenant-based authorization
+    tenant_id: Optional[int] = None
+    is_impersonation: Optional[bool] = None
+    original_user_id: Optional[int] = None
 
     class Config:
         from_attributes = True
 
-
 class LoginContextResponse(BaseModel):
     """Extended login response including RBAC context."""
-
     access_token: str
     token_type: str = "bearer"
     user: UserWithRole
@@ -71,7 +69,6 @@ class LoginContextResponse(BaseModel):
     permissions: List[str]
     menus: List[MenuNode]
     tenant: Optional[TenantInfo] = None
-
 
 def create_user_with_role(user):
     """Create a user with role."""

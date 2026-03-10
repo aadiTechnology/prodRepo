@@ -101,6 +101,8 @@ def get_current_user(
         full_name=user.full_name,
         role=user.role,
         tenant_id=user.tenant_id,
+        is_impersonation=payload.get("is_impersonation"),
+        original_user_id=payload.get("original_user_id"),
     )
 
 

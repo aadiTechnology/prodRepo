@@ -74,6 +74,9 @@ def get_user(db: Session, user_id: int) -> User:
         raise NotFoundException("User", user_id)
     return user
 
+# Alias for compatibility
+get_user_by_id = get_user
+
 def get_user_by_email(db: Session, email: str) -> User | None:
     """Get a user by email (excluding soft-deleted)."""
     return db.query(User).filter(User.email == email, User.is_deleted == False).first()  # noqa: E712
