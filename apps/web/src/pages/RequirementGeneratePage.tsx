@@ -14,7 +14,7 @@ import aiService, {
   type GenerateStoryAndTestsResult,
 } from "../api/services/aiService";
 
-function normalizeToList(value: string[] | string | null): string[] {
+function normalizeToList(value: string[] | string | null | undefined): string[] {
   if (value == null) return [];
   return Array.isArray(value) ? value : [value];
 }

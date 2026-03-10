@@ -343,7 +343,14 @@ export default function CreateUser() {
                     label="Role"
                     name="role_code"
                     value={formData.role_code}
-                    onChange={handleChange}
+                    onChange={(event) => {
+                      const { value } = event.target;
+                      setFormData((prev) => ({
+                        ...prev,
+                        role_code: typeof value === "string" ? value : String(value ?? ""),
+                      }));
+                      setError(null);
+                    }}
                     required
                     disabled={loadingRoles || roles.length === 0}
                     sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
