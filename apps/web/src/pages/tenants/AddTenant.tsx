@@ -13,6 +13,7 @@ import {
     Tab,
     Divider,
 } from "@mui/material";
+import type { Theme } from "@mui/material/styles";
 import { Button, TextField, Select, MenuItem } from "../../components/primitives";
 import { SaveButton, CancelButton, EmailInput, PhoneInput, PasswordInput } from "../../components/semantic";
 import {
@@ -38,7 +39,7 @@ import { ListPageLayout, FormSectionLabel, FieldLabel } from "../../components/r
 import type { ThemeTemplate } from "../../types/themeTemplate";
 
 // ─── TextField sx (theme-driven) ───────────────────────────────────────────────
-const buildFieldSx = (hasError: boolean) => (theme: { palette: { divider: string; error: { main: string }; grey: Record<number, string>; primary: { main: string }; background: { paper: string } } }) => ({
+const buildFieldSx = (hasError: boolean) => (theme: Theme) => ({
     "& .MuiOutlinedInput-root": {
         borderRadius: 1,
         bgcolor: theme.palette.background.paper,
