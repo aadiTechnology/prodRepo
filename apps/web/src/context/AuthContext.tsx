@@ -17,6 +17,8 @@ interface AuthContextType extends AuthState {
   loginWithContext: (credentials: LoginRequest) => Promise<LoginContextResponse>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  exitImpersonation: () => Promise<void>;
+  applyLoginContextResponse: (response: LoginContextResponse) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -90,7 +92,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(getStoredToken());
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  const { clearRBACData } = useRBAC();
+  const { clearRBACData, setRBACData } = useRBAC();
   const [logoutLoading, setLogoutLoading] = useState(false);
 
   // Memoize isAuthenticated to prevent unnecessary recalculations
@@ -156,14 +158,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(response.access_token);
       saveToken(response.access_token);
 
-      // Merge tenant info into user so user.tenant is accessible everywhere
-      const userWithTenant = response.tenant
-        ? { ...response.user, tenant: response.tenant }
-        : response.user;
+      // Merge tenant info and profile_image_path into user
+      const userWithExtras = {
+        ...response.user,
+        tenant: response.tenant || response.user.tenant,
+        profile_image_path: response.user.profile_image_path
+      };
 
       // Save user information
-      setUser(userWithTenant);
-      saveUser(userWithTenant);
+      setUser(userWithExtras);
+      saveUser(userWithExtras);
 
       return response;
     } catch (error) {
@@ -175,6 +179,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(false);
     }
   }, []);
+
+  const applyLoginContextResponse = useCallback((response: LoginContextResponse) => {
+    setToken(response.access_token);
+    saveToken(response.access_token);
+
+    const userWithExtras = {
+      ...response.user,
+      tenant: response.tenant || response.user.tenant,
+      profile_image_path: response.user.profile_image_path
+    };
+
+    setUser(userWithExtras);
+    saveUser(userWithExtras);
+    setRBACData({ roles: response.roles, menus: response.menus });
+  }, [setRBACData]);
 
   /**
    * Logout user (calls API, clears storage, resets context, navigates)
@@ -202,6 +221,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }
   }, [clearRBACData, navigate]);
+
+  /**
+   * Exit impersonation and return to system admin session
+   */
+  const exitImpersonation = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await authService.exitImpersonation();
+      applyLoginContextResponse(response);
+
+      enqueueSnackbar("Returned to system admin view", { variant: "success" });
+      navigate("/tenants");
+    } catch (error) {
+      console.error("Failed to exit impersonation:", error);
+      enqueueSnackbar("Failed to exit tenant view", { variant: "error" });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [applyLoginContextResponse, navigate]);
 
   /**
    * Handle session timeout after inactivity
@@ -277,8 +316,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       logout,
       logoutLoading,
       refreshUser,
+      exitImpersonation,
+      applyLoginContextResponse,
     }),
-    [user, token, isAuthenticated, isLoading, login, loginWithContext, logout, logoutLoading, refreshUser]
+    [user, token, isAuthenticated, isLoading, login, loginWithContext, logout, logoutLoading, refreshUser, exitImpersonation, applyLoginContextResponse]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

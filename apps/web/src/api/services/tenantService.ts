@@ -1,5 +1,6 @@
 import { apiClient } from "../client";
 import { Tenant, TenantCreate, TenantProvisionRequest, TenantUpdate, TenantProvisionResponse } from "../../types/tenant";
+import { User } from "../../types/auth";
 
 export const tenantService = {
     /**
@@ -46,6 +47,14 @@ export const tenantService = {
      */
     activate: async (id: number): Promise<void> => {
         await apiClient.post(`/tenants/${id}/activate`);
+    },
+
+    /**
+     * Get the admin user for a tenant
+     */
+    getTenantAdminUser: async (tenantId: number): Promise<User> => {
+        const response = await apiClient.get(`/tenants/${tenantId}/admin-user`);
+        return response.data;
     },
 
     /**

@@ -30,6 +30,9 @@ export interface User {
   is_active?: boolean;
   created_at?: string;
   tenant?: TenantInfo | null;
+  profile_image_path?: string | null;
+  is_impersonation?: boolean;
+  original_user_id?: number;
 }
 
 export interface LoginRequest {

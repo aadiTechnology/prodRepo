@@ -5,38 +5,51 @@ import {
     Alert,
     CircularProgress,
     Snackbar,
+    IconButton,
+    Tooltip,
 } from "@mui/material";
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Home as HomeIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import {
+    Home as HomeIcon,
+    Login as LoginIcon,
+} from "@mui/icons-material";
 import { Tenant } from "../../types/tenant";
 import tenantService from "../../api/services/tenantService";
-import { ListPageLayout, ListPageToolbar, DirectoryInfoBar, TablePaginationBar, DataTable, TableRowActions } from "../../components/reusable";
+import { useAuth } from "../../context/AuthContext";
+import authService from "../../api/services/authService";
+import { enqueueSnackbar } from "notistack";
+import {
+    ListPageLayout,
+    ListPageToolbar,
+    DirectoryInfoBar,
+    DataTable,
+    TableRowActions,
+    TablePaginationBar
+} from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
-import ConfirmDialog from "../../components/common/ConfirmDialog";
 import StatusChip from "../../components/roles/StatusChip";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 
 const TenantList = () => {
     const navigate = useNavigate();
+    const { user, applyLoginContextResponse } = useAuth();
     const [tenants, setTenants] = useState<Tenant[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [impersonationLoading, setImpersonationLoading] = useState<number | null>(null);
 
-    // Search and Pagination states
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalTenants, setTotalTenants] = useState(0);
 
-    // Confirm dialog states
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [tenantToDelete, setTenantToDelete] = useState<Tenant | null>(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
 
-    // Snackbar/toast state
     const [snackbar, setSnackbar] = useState<string | null>(null);
     const showSuccessToast = (message: string) => setSnackbar(message);
 
-    // Sorting state
     const [sortBy, setSortBy] = useState<"name" | "created_at">("created_at");
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
@@ -86,132 +99,161 @@ const TenantList = () => {
         }
     };
 
-    // Client-side sort on fetched tenants
-    const sortedTenants = [...tenants].sort((a, b) => {
-        let aVal: any;
-        let bVal: any;
-
-        if (sortBy === "created_at") {
-            aVal = a.created_at ? new Date(a.created_at).getTime() : 0;
-            bVal = b.created_at ? new Date(b.created_at).getTime() : 0;
-        } else {
-            aVal = (a.name || "").toLowerCase();
-            bVal = (b.name || "").toLowerCase();
+    const handleLoginAsTenant = async (tenantId: number) => {
+        try {
+            setImpersonationLoading(tenantId);
+            const adminUser = await tenantService.getTenantAdminUser(tenantId);
+            const response = await authService.impersonate(adminUser.id);
+            applyLoginContextResponse(response);
+            enqueueSnackbar("Logged in as tenant successfully", { variant: "success" });
+            navigate("/");
+        } catch (error: any) {
+            console.error('Failed to login as tenant:', error);
+            enqueueSnackbar('Failed to login as tenant', { variant: 'error' });
+        } finally {
+            setImpersonationLoading(null);
         }
+    };
 
-        if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
-        if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
-        return 0;
-    });
+    const isSystemAdmin = !user?.tenant_id;
+
+    const filteredTenants = useMemo(() => {
+        return [...tenants].sort((a, b) => {
+            let aVal: any;
+            let bVal: any;
+
+            if (sortBy === "created_at") {
+                aVal = a.created_at ? new Date(a.created_at).getTime() : 0;
+                bVal = b.created_at ? new Date(b.created_at).getTime() : 0;
+            } else {
+                aVal = (a.name || "").toLowerCase();
+                bVal = (b.name || "").toLowerCase();
+            }
+
+            if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+            if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+            return 0;
+        });
+    }, [tenants, sortBy, sortOrder]);
 
     const tenantColumns = useMemo(
         () => [
             {
                 id: "logo",
                 label: "Logo",
-                render: (t: Tenant) =>
-                    t.logo_url ? (
-                        <img
-                            src={t.logo_url}
-                            alt={t.name}
-                            style={{ height: 32, width: "auto", maxWidth: 90, objectFit: "contain" }}
-                            onError={(e) => { e.currentTarget.style.display = "none"; }}
-                        />
-                    ) : (
-                        <Typography sx={(theme) => ({ fontSize: "0.85rem", color: theme.palette.text.secondary })}>—</Typography>
-                    ),
+                render: (row: Tenant) => row.logo_url ? (
+                    <img
+                        src={row.logo_url}
+                        alt={row.name}
+                        style={{ height: 32, width: "auto", maxWidth: 90, objectFit: "contain" }}
+                    />
+                ) : "-"
             },
-            { id: "name", label: "Tenant Name", field: "name" as keyof Tenant, render: (t: Tenant) => t.name },
-            { id: "owner_name", label: "Owner", field: "owner_name" as keyof Tenant },
-            { id: "email", label: "Email", field: "email" as keyof Tenant },
+            { id: "name", label: "Tenant Name", field: "name" },
+            { id: "owner_name", label: "Owner", field: "owner_name" },
+            { id: "email", label: "Email", field: "email" },
             {
                 id: "status",
                 label: "Status",
-                render: (t: Tenant) => <StatusChip status={t.is_active ? "ACTIVE" : "INACTIVE"} />,
+                render: (row: Tenant) => <StatusChip status={row.is_active ? "ACTIVE" : "INACTIVE"} />
             },
             {
                 id: "created_at",
                 label: "Created Date",
-                render: (t: Tenant) =>
-                    t.created_at && !isNaN(new Date(t.created_at).getTime())
-                        ? new Date(t.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })
-                        : "-",
-            },
+                render: (row: Tenant) =>
+                    row.created_at ? new Date(row.created_at).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }) : "-"
+            }
         ],
         []
     );
 
+    const rangeStart = totalTenants > 0 ? Math.min(page * rowsPerPage + 1, totalTenants) : 0;
+    const rangeEnd = Math.min((page + 1) * rowsPerPage, totalTenants);
+
     return (
         <ListPageLayout
-            pageBackground
-            contentPaddingSize="none"
             header={
-                <PageHeader
-                    title="Tenant Management"
-                    onBack={() => navigate("/")}
-                    backIcon={<HomeIcon sx={{ color: "white", fontSize: 24 }} />}
-                    actions={
-                        <ListPageToolbar
-                            searchValue={search}
-                            onSearchChange={setSearch}
-                            searchPlaceholder="Search tenants..."
-                            onAddClick={() => navigate("/tenants/add")}
-                            addLabel="Add Tenant"
-                            addIcon={<AddIcon sx={{ fontSize: 24 }} />}
-                        />
-                    }
-                />
+                <>
+                    <PageHeader
+                        title="Tenant Management"
+                        onBack={() => navigate("/")}
+                        backIcon={<HomeIcon sx={{ fontSize: 24 }} />}
+                        actions={
+                            <ListPageToolbar
+                                searchValue={search}
+                                onSearchChange={setSearch}
+                                searchPlaceholder="Search tenants..."
+                                onAddClick={() => navigate("/tenants/add")}
+                                addLabel="Add Tenant"
+                            />
+                        }
+                    />
+                    {error && (
+                        <Alert severity="error" sx={{ m: 2 }} onClose={() => setError(null)}>
+                            {error}
+                        </Alert>
+                    )}
+                </>
             }
         >
-            {error && (
-                <Alert severity="error" sx={{ m: 2 }} onClose={() => setError(null)}>
-                    {error}
-                </Alert>
-            )}
-
             {!loading && totalTenants > 0 && (
                 <DirectoryInfoBar
                     label="Tenant Directory"
-                    rangeStart={Math.min(page * rowsPerPage + 1, totalTenants)}
-                    rangeEnd={Math.min((page + 1) * rowsPerPage, totalTenants)}
+                    rangeStart={rangeStart}
+                    rangeEnd={rangeEnd}
                     total={totalTenants}
                 />
             )}
-
-                <DataTable<Tenant & Record<string, unknown>>
-                    columns={tenantColumns}
-                    data={sortedTenants as (Tenant & Record<string, unknown>)[]}
-                    loading={loading}
-                    emptyMessage="No tenants available."
-                    renderRowActions={(tenant) => (
+            <DataTable<Tenant & Record<string, unknown>>
+                columns={tenantColumns}
+                data={filteredTenants as (Tenant & Record<string, unknown>)[]}
+                loading={loading}
+                emptyMessage="No tenants available."
+                renderRowActions={(row) => (
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <TableRowActions
-                            onEdit={() => navigate(`/tenants/${tenant.id}/edit`)}
-                            onDelete={() => handleDeleteClick(tenant)}
+                            onEdit={() => navigate(`/tenants/${row.id}/edit`)}
+                            onDelete={() => handleDeleteClick(row)}
                         />
-                    )}
-                    stickyHeader
-                    size="small"
-                    maxHeight="calc(100vh - 200px)"
-                />
-
-                {!loading && tenants.length > 0 && (
-                    <TablePaginationBar
-                        page={page}
-                        rowsPerPage={rowsPerPage}
-                        totalRows={totalTenants}
-                        onPageChange={setPage}
-                        onRowsPerPageChange={(v) => {
-                            setRowsPerPage(v);
-                            setPage(0);
-                        }}
-                    />
+                        {isSystemAdmin && (
+                            <Tooltip title="Login as this tenant">
+                                <IconButton
+                                    size="small"
+                                    color="primary"
+                                    onClick={() => handleLoginAsTenant(row.id)}
+                                    disabled={impersonationLoading === row.id || !row.is_active}
+                                >
+                                    {impersonationLoading === row.id ? (
+                                        <CircularProgress size={16} />
+                                    ) : (
+                                        <LoginIcon fontSize="small" />
+                                    )}
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                    </Box>
                 )}
+                stickyHeader
+                size="small"
+            />
+            {!loading && totalTenants > 0 && (
+                <TablePaginationBar
+                    page={page}
+                    rowsPerPage={rowsPerPage}
+                    totalRows={totalTenants}
+                    onPageChange={setPage}
+                    onRowsPerPageChange={(v) => {
+                        setRowsPerPage(v);
+                        setPage(0);
+                    }}
+                />
+            )}
 
             <ConfirmDialog
                 open={confirmDialogOpen}
-                title="Confirm Delete"
-                message={`Are you sure you want to delete tenant ${tenantToDelete?.name ?? ""}?`}
-                confirmText={deleteLoading ? "Deleting…" : "Confirm"}
+                title="Please Confirm"
+                message={`Are you sure you want to delete tenant ${tenantToDelete?.name}?`}
+                confirmText={deleteLoading ? "Deleting..." : "Confirm"}
                 onConfirm={handleConfirmDelete}
                 onCancel={() => setConfirmDialogOpen(false)}
                 loading={deleteLoading}

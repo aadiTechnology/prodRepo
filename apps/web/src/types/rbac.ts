@@ -18,6 +18,7 @@ export interface LoginContextResponse {
   token_type: string;
   user: User;
   roles: string[];
+  permissions: string[];
   menus: MenuNode[];
   tenant?: TenantInfo | null;
 }

@@ -3,8 +3,8 @@
  * Main application layout with navigation and responsive design
  */
 
-import { AppBar, Toolbar, Typography, Box, Container, IconButton, useMediaQuery, useTheme, Menu, MenuItem, Avatar, Chip, ListItemIcon, Divider } from "@mui/material";
-import { Menu as MenuIcon, Logout as LogoutIcon, Person as PersonIcon, Lock as LockIcon } from "@mui/icons-material";
+import { AppBar, Toolbar, Typography, Box, Container, IconButton, useMediaQuery, useTheme, Menu, MenuItem, Avatar, Chip, ListItemIcon, Divider, Button, Tooltip } from "@mui/material";
+import { Menu as MenuIcon, Logout as LogoutIcon, Person as PersonIcon, Lock as LockIcon, ArrowBack as ArrowBackIcon, Home as HomeIcon } from "@mui/icons-material";
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { useState, useCallback, memo, useEffect } from "react";
 import { appName } from "../config";
@@ -20,7 +20,7 @@ function MainLayout() {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, exitImpersonation } = useAuth();
   const { clearRBACData } = useRBAC();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -79,10 +79,16 @@ function MainLayout() {
     }
   }, []);
 
-  // Fetch on mount
+  // Fetch on mount or when user changes
   useEffect(() => {
-    if (isAuthenticated) refreshAvatar();
-  }, [isAuthenticated, refreshAvatar]);
+    if (isAuthenticated) {
+      if (user?.profile_image_path) {
+        setAvatarSrc(toFullUrl(user.profile_image_path));
+      } else {
+        refreshAvatar();
+      }
+    }
+  }, [isAuthenticated, user?.id, user?.profile_image_path, refreshAvatar]);
 
   // Listen for profile-image-updated event fired by ProfilePage after upload
   useEffect(() => {
@@ -178,64 +184,55 @@ function MainLayout() {
             }),
           }}
         >
-          <Toolbar sx={{ minHeight: 68, px: { xs: 2, md: 3 } }}>
-            {isMobile && (
-              <IconButton
-                color="inherit"
-                edge="start"
-                onClick={handleMobileMenuToggle}
-                aria-label="menu"
-                sx={{ mr: 2, "&:hover": { backgroundColor: "rgba(0,0,0,0.04)" } }}
-              >
-                <MenuIcon />
-              </IconButton>
-            )}
-
-            {/* Dynamic Logo / Title Logic */}
+          <Toolbar
+            sx={{
+              minHeight: 68,
+              px: { xs: 2, md: 3 },
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}
+          >
+            {/* Column 1: Left - Logo & Branding */}
             <Box
-              component={Link}
-              to="/"
               sx={{
-                display: "flex",
-                alignItems: "center",
-                textDecoration: "none",
+                flex: { xs: '0 1 auto', md: 1 },
+                display: 'flex',
+                alignItems: 'center',
                 gap: 1.5,
                 zIndex: 2,
               }}
             >
-              {user?.tenant ? (
-                // Tenant User: show their logo or tenant name
-                user.tenant.logo_url && !logoError ? (
-                  // Has Logo URL
-                  <Box
-                    component="img"
-                    src={user.tenant.logo_url}
-                    alt={user.tenant.name}
-                    sx={{ height: 45, maxWidth: 180, objectFit: "contain", borderRadius: "8px" }}
-                    onError={() => setLogoError(true)}
-                  />
-                ) : (
-                  // No logo or broken logo — show tenant name
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 700,
-                      color: "text.primary",
-                      fontSize: isMobile ? "1rem" : "1.25rem"
-                    }}
-                  >
-                    {user.tenant.name}
-                  </Typography>
-                )
-              ) : (
-                // System Admin: show Aadi Technology branding
-                <>
-                  <Box
-                    component="img"
-                    src="/aaadi.webp"
-                    alt="Aadi Technology Logo"
-                    sx={{ height: "45px", objectFit: "contain", borderRadius: "8px" }}
-                  />
+              {isMobile && (
+                <IconButton
+                  color="inherit"
+                  edge="start"
+                  onClick={handleMobileMenuToggle}
+                  aria-label="menu"
+                  sx={{ mr: 1, "&:hover": { backgroundColor: "rgba(0,0,0,0.04)" } }}
+                >
+                  <MenuIcon />
+                </IconButton>
+              )}
+
+              <Box
+                component={Link}
+                to="/"
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  textDecoration: "none",
+                  gap: 1.5,
+                }}
+              >
+                <Box
+                  component="img"
+                  src={user?.tenant?.logo_url && !logoError ? user.tenant.logo_url : "/aaadi.webp"}
+                  alt="Logo"
+                  sx={{ height: "45px", objectFit: "contain", borderRadius: "8px" }}
+                  onError={() => setLogoError(true)}
+                />
+                {!user?.tenant && (
                   <Typography
                     variant="h6"
                     sx={{
@@ -247,17 +244,74 @@ function MainLayout() {
                   >
                     Aadi Technology
                   </Typography>
-                </>
+                )}
+              </Box>
+
+              {/* Back to System View (Home icon) when impersonating - Now on the left side */}
+              {user?.is_impersonation && (
+                <Tooltip title="Back to Tenant List">
+                  <IconButton
+                    onClick={exitImpersonation}
+                    sx={{
+                      color: 'primary.main',
+                      backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                      ml: 1,
+                      '&:hover': {
+                        backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                      }
+                    }}
+                  >
+                    <HomeIcon />
+                  </IconButton>
+                </Tooltip>
               )}
             </Box>
 
-            {/* Spacer for centered layout - can be removed if strictly following user placement */}
+            {/* Column 2: Center - Tenant Name (Visible on MD+) */}
+            {!isMobile && user?.tenant && (
+              <Box
+                sx={{
+                  flex: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1,
+                  px: 2
+                }}
+              >
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 800,
+                    letterSpacing: "0.5px",
+                    background: "linear-gradient(45deg, #1e293b 30%, #334155 90%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    textAlign: "center",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis"
+                  }}
+                >
+                  {user.tenant.name}
+                </Typography>
+              </Box>
+            )}
 
-            <Box sx={{ flexGrow: 1 }} />
+            {/* Column 3: Right - Actions & User Menu */}
+            <Box
+              sx={{
+                flex: { xs: '0 1 auto', md: 1 },
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 2,
+                zIndex: 2,
+              }}
+            >
 
-            {/* User menu */}
-            {isAuthenticated && user && (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2, zIndex: 2 }}>
+              {/* User menu */}
+              {isAuthenticated && user && (
                 <Box
                   onClick={handleUserMenuOpen}
                   sx={{
@@ -313,78 +367,79 @@ function MainLayout() {
                     {!avatarSrc && (user.full_name || 'U').charAt(0).toUpperCase()}
                   </Avatar>
                 </Box>
+              )}
 
-                <Menu
-                  anchorEl={userMenuAnchor}
-                  open={Boolean(userMenuAnchor)}
-                  onClose={handleUserMenuClose}
-                  anchorOrigin={{
-                    vertical: "bottom",
-                    horizontal: "right",
-                  }}
-                  transformOrigin={{
-                    vertical: "top",
-                    horizontal: "right",
-                  }}
-                  PaperProps={{
-                    elevation: 0,
-                    sx: {
-                      mt: 2,
-                      width: 260,
-                      overflow: 'visible',
-                      filter: 'drop-shadow(0px 12px 32px rgba(0,0,0,0.1))',
-                      borderRadius: "20px",
-                      border: '1px solid rgba(0,0,0,0.06)',
-                      padding: "8px",
-                      '&:before': {
-                        content: '""',
-                        display: 'block',
-                        position: 'absolute',
-                        top: 0,
-                        right: 20,
-                        width: 12,
-                        height: 12,
-                        bgcolor: 'background.paper',
-                        transform: 'translateY(-50%) rotate(45deg)',
-                        zIndex: 0,
-                      },
+              {/* Profile Menu */}
+              <Menu
+                anchorEl={userMenuAnchor}
+                open={Boolean(userMenuAnchor)}
+                onClose={handleUserMenuClose}
+                anchorOrigin={{
+                  vertical: "bottom",
+                  horizontal: "right",
+                }}
+                transformOrigin={{
+                  vertical: "top",
+                  horizontal: "right",
+                }}
+                PaperProps={{
+                  elevation: 0,
+                  sx: {
+                    mt: 2,
+                    width: 260,
+                    overflow: 'visible',
+                    filter: 'drop-shadow(0px 12px 32px rgba(0,0,0,0.1))',
+                    borderRadius: "20px",
+                    border: '1px solid rgba(0,0,0,0.06)',
+                    padding: "8px",
+                    '&:before': {
+                      content: '""',
+                      display: 'block',
+                      position: 'absolute',
+                      top: 0,
+                      right: 20,
+                      width: 12,
+                      height: 12,
+                      bgcolor: 'background.paper',
+                      transform: 'translateY(-50%) rotate(45deg)',
+                      zIndex: 0,
                     },
-                  }}
-                >
-                  <Box sx={{ px: 2, py: 2, mb: 1, borderRadius: "14px", background: "rgba(0,0,0,0.02)" }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "text.primary" }}>
-                      {(user.full_name || '').substring(0, 100).replace(/[<>'\"]/g, '')}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
-                      {(user.email || '').substring(0, 150).replace(/[<>'\"]/g, '')}
-                    </Typography>
-                  </Box>
+                  },
+                }}
+              >
+                <Box sx={{ px: 2, py: 2, mb: 1, borderRadius: "14px", background: "rgba(0,0,0,0.02)" }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "text.primary" }}>
+                    {user?.full_name?.substring(0, 100).replace(/[<>'\"]/g, '') || 'User'}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
+                    {user?.email?.substring(0, 150).replace(/[<>'\"]/g, '') || ''}
+                  </Typography>
+                </Box>
 
-                  <MenuItem onClick={handleProfileClick} sx={{ py: 1.5, borderRadius: "12px", gap: 1.5 }}>
-                    <ListItemIcon sx={{ minWidth: "auto !important" }}>
-                      <PersonIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                    </ListItemIcon>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Account Profile</Typography>
-                  </MenuItem>
+                <MenuItem onClick={handleProfileClick} sx={{ py: 1.5, borderRadius: "12px", gap: 1.5 }}>
+                  <ListItemIcon sx={{ minWidth: "auto !important" }}>
+                    <PersonIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                  </ListItemIcon>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>Account Profile</Typography>
+                </MenuItem>
 
-                  <MenuItem onClick={handleChangePasswordClick} sx={{ py: 1.5, borderRadius: "12px", gap: 1.5 }}>
-                    <ListItemIcon sx={{ minWidth: "auto !important" }}>
-                      <LockIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                    </ListItemIcon>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Security Settings</Typography>
-                  </MenuItem>
+                <MenuItem onClick={handleChangePasswordClick} sx={{ py: 1.5, borderRadius: "12px", gap: 1.5 }}>
+                  <ListItemIcon sx={{ minWidth: "auto !important" }}>
+                    <LockIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                  </ListItemIcon>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>Security Settings</Typography>
+                </MenuItem>
 
-                  <Divider sx={{ my: 1, opacity: 0.5 }} />
+                <Divider sx={{ my: 1, opacity: 0.5 }} />
 
-                  <MenuItem onClick={handleLogout} sx={{ py: 1.5, borderRadius: "12px", gap: 1.5, color: "error.main", "&:hover": { bgcolor: "error.lighter" } }}>
-                    <ListItemIcon sx={{ minWidth: "auto !important" }}>
-                      <LogoutIcon fontSize="small" sx={{ color: "error.main" }} />
-                    </ListItemIcon>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>Logout Session</Typography>
-                  </MenuItem>
-                </Menu>
-              </Box>
-            )}
+                <MenuItem onClick={handleLogout} sx={{ py: 1.5, borderRadius: "12px", gap: 1.5, color: "error.main", "&:hover": { bgcolor: "error.lighter" } }}>
+                  <ListItemIcon sx={{ minWidth: "auto !important" }}>
+                    <LogoutIcon fontSize="small" sx={{ color: "error.main" }} />
+                  </ListItemIcon>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>Logout Session</Typography>
+                </MenuItem>
+              </Menu>
+            </Box>
           </Toolbar>
         </AppBar>
 

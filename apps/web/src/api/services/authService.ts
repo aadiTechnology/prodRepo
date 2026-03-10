@@ -38,6 +38,22 @@ export const authService = {
   logout: async (): Promise<void> => {
     await apiClient.post("/auth/logout");
   },
+
+  /**
+   * Impersonate a user (system admin only)
+   */
+  impersonate: async (userId: number): Promise<LoginContextResponse> => {
+    const response = await apiClient.post<LoginContextResponse>(`/auth/impersonate/${userId}`);
+    return response.data;
+  },
+
+  /**
+   * Exit impersonation and return to system admin session
+   */
+  exitImpersonation: async (): Promise<LoginContextResponse> => {
+    const response = await apiClient.post<LoginContextResponse>("/auth/exit-impersonation");
+    return response.data;
+  },
 };
 
 export default authService;

@@ -4,14 +4,9 @@ import { Box, CircularProgress } from "@mui/material";
 import MainLayout from "../layout/MainLayout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import ChangePassword from "../pages/ChangePassword";
-import RoleManagementPage from "../pages/RoleManagementPage"; // <-- Add this import
-import AddRole from "../pages/AddRole"; // <-- Add this import
-import EditRole from "../pages/EditRole";
-
 
 // Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
-const About = lazy(() => import("../pages/About"));
 const Users = lazy(() => import("../pages/Users"));
 const Login = lazy(() => import("../pages/Login"));
 const Register = lazy(() => import("../pages/Register"));
@@ -20,9 +15,11 @@ const SessionExpired = lazy(() => import("../pages/SessionExpired"));
 const TenantList = lazy(() => import("../pages/tenants/TenantList"));
 const AddTenant = lazy(() => import("../pages/tenants/AddTenant"));
 const RequirementGeneratePage = lazy(() => import("../pages/RequirementGeneratePage"));
-
 const CreateUser = lazy(() => import("../pages/CreateUser"));
 const ThemeStudioPage = lazy(() => import("../pages/admin/ThemeStudioPage"));
+const RoleManagementPage = lazy(() => import("../pages/RoleManagementPage"));
+const AddRole = lazy(() => import("../pages/AddRole"));
+const EditRole = lazy(() => import("../pages/EditRole"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -49,141 +46,28 @@ export default function AppRoutes() {
 
         {/* Protected routes with layout */}
         <Route element={<MainLayout />}>
-                    <Route
-                      path="/user/create"
-                      element={
-                        <ProtectedRoute>
-                          <CreateUser />
-                        </ProtectedRoute>
-                      }
-                    />
-          {/* Basic authentication - no permissions required */}
-          <Route
-            path="/roles"
-            element={
-              <ProtectedRoute>
-                <RoleManagementPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/roles/create"
-            element={
-              <ProtectedRoute>
-                <AddRole />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/roles/:id/edit"
-            element={
-              <ProtectedRoute>
-                <EditRole />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
 
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/users"
-            element={
-              <ProtectedRoute>
-                <Users />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/change-password"
-            element={
-              <ProtectedRoute>
-                <ChangePassword />
-              </ProtectedRoute>
-            }
-          />
+          {/* User Management */}
+          <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
+          <Route path="/user/create" element={<ProtectedRoute><CreateUser /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
 
-          <Route
-            path="/roles"
-            element={
-              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}>
-                <RoleManagementPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/roles/create"
-            element={
-              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}>
-                <AddRole />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/roles/edit/:id"
-            element={
-              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}>
-                <AddRole />
-              </ProtectedRoute>
-            }
-          />
+          {/* Role Management */}
+          <Route path="/roles" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}><RoleManagementPage /></ProtectedRoute>} />
+          <Route path="/roles/create" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}><AddRole /></ProtectedRoute>} />
+          <Route path="/roles/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}><EditRole /></ProtectedRoute>} />
+          <Route path="/roles/edit/:id" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}><AddRole /></ProtectedRoute>} />
 
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Home />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ai/generate"
-            element={
-              <ProtectedRoute>
-                <RequirementGeneratePage />
-              </ProtectedRoute>
-            }
-          />
+          {/* AI Features */}
+          <Route path="/ai/generate" element={<ProtectedRoute><RequirementGeneratePage /></ProtectedRoute>} />
 
-          <Route
-            path="/tenants"
-            element={
-              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
-                <TenantList />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tenants/add"
-            element={
-              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
-                <AddTenant />
-              </ProtectedRoute>
-            }
-          />
-         
-          <Route
-            path="/tenants/:id/edit"
-            element={
-              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
-                <AddTenant />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/theme-studio"
-            element={
-              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
-                <ThemeStudioPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/user/create" element={<CreateUser />} />
+          {/* System Administration - Super Admin only */}
+          <Route path="/tenants" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><TenantList /></ProtectedRoute>} />
+          <Route path="/tenants/add" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><AddTenant /></ProtectedRoute>} />
+          <Route path="/tenants/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><AddTenant /></ProtectedRoute>} />
+          <Route path="/admin/theme-studio" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><ThemeStudioPage /></ProtectedRoute>} />
         </Route>
       </Routes>
     </Suspense>
