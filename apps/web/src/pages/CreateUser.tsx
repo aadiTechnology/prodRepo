@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Box, Typography, Paper, Grid, Switch, Alert, Snackbar, Tooltip, Divider } from "@mui/material";
-import { Button, TextField, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, InputAdornment, CircularProgress } from "../components/primitives";
+import { Box, Paper, Grid, Switch, Alert, Snackbar, Tooltip, Divider } from "@mui/material";
+import { Button, TextField, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, InputAdornment, CircularProgress, Stack, Typography } from "../components/primitives";
 import { SaveButton, CancelButton, EmailInput, PasswordInput } from "../components/semantic";
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
