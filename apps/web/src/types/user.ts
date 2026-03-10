@@ -21,6 +21,14 @@ export interface UserUpdate {
   role?: string;
 }
 
+export interface UserResponse extends User {
+  tenant_id?: number | null;
+  phone_number?: string | null;
+  is_active: boolean;
+  created_at: string;
+  roles?: string[] | null;
+}
+
 export interface ApiError {
   detail?: string;
   [key: string]: any;

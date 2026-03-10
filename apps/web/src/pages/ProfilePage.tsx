@@ -15,6 +15,7 @@ import {
     MenuItem,
     ListItemIcon,
 } from "@mui/material";
+import type { Theme } from "@mui/material/styles";
 import { Button, TextField } from "../components/primitives";
 import { SaveButton, EmailInput } from "../components/semantic";
 import {
@@ -85,7 +86,7 @@ const FieldLabel = ({ children, required }: { children: React.ReactNode; require
 
 // ─── shared TextField sx ──────────────────────────────────────────────────────
 
-const editableSx = (theme: { palette: { divider: string; primary: { main: string }; error: { main: string }; background: { paper: string }; grey: Record<number, string> }; shadows: (string | undefined)[] }) => ({
+const editableSx = (theme: Theme) => ({
     "& .MuiOutlinedInput-root": {
         bgcolor: theme.palette.background.paper,
         borderRadius: 1.25,
@@ -102,7 +103,7 @@ const editableSx = (theme: { palette: { divider: string; primary: { main: string
     "& .MuiFormHelperText-root": { fontSize: "0.74rem", mt: 0.5 },
 });
 
-const readonlySx = (theme: { palette: { divider: string; grey: Record<number, string> } }) => ({
+const readonlySx = (theme: Theme) => ({
     "& .MuiOutlinedInput-root": {
         borderRadius: 1.25,
         bgcolor: theme.palette.grey[50],
@@ -276,7 +277,7 @@ const ProfilePage = () => {
                             <IconButton
                                 onClick={handleSave}
                                 disabled={!isModified || saving}
-                                sx={{
+                                sx={(theme) => ({
                                     backgroundColor: "#10b981",
                                     color: "white",
                                     borderRadius: 1.2,
@@ -288,7 +289,7 @@ const ProfilePage = () => {
                                         transform: (!isModified || saving) ? "none" : "translateY(-1px)",
                                     },
                                     "&.Mui-disabled": { backgroundColor: "grey.400", color: "white" },
-                                }}
+                                })}
                             >
                                 {saving ? <CircularProgress size={22} color="inherit" /> : <SaveIcon sx={{ fontSize: 22 }} />}
                             </IconButton>
