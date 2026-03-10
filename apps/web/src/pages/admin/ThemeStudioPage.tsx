@@ -21,6 +21,7 @@ import {
   Stack,
   InputAdornment,
   List,
+  ListItem,
   ListItemButton,
   ListItemText,
   IconButton,
@@ -142,7 +143,13 @@ function TokenEditor({
 
   const updateRadius = useCallback(
     (value: number) => {
-      const semantic = { ...(overrides.radius?.semantic ?? tokens.radius.semantic), input: value, card: value };
+      // Radius semantic tokens are strongly typed; clamp to supported values
+      const clamped = value <= 4 ? 4 : value <= 8 ? 8 : 12;
+      const semantic = {
+        ...(overrides.radius?.semantic ?? tokens.radius.semantic),
+        input: clamped,
+        card: clamped,
+      } as typeof tokens.radius.semantic;
       onChange({
         ...overrides,
         radius: {
@@ -538,10 +545,9 @@ export default function ThemeStudioPage() {
               <>
                 <List dense disablePadding sx={{ maxHeight: 160, overflow: "auto" }}>
                   {templates.map((t) => (
-                    <ListItemButton
+                    <ListItem
                       key={t.id}
-                      selected={selectedTemplateId === t.id}
-                      onClick={() => handleLoadTemplate(t)}
+                      disablePadding
                       secondaryAction={
                         <IconButton
                           size="small"
@@ -556,8 +562,13 @@ export default function ThemeStudioPage() {
                         </IconButton>
                       }
                     >
-                      <ListItemText primary={t.name} secondary={t.description || undefined} />
-                    </ListItemButton>
+                      <ListItemButton
+                        selected={selectedTemplateId === t.id}
+                        onClick={() => handleLoadTemplate(t)}
+                      >
+                        <ListItemText primary={t.name} secondary={t.description || undefined} />
+                      </ListItemButton>
+                    </ListItem>
                   ))}
                 </List>
                 <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
