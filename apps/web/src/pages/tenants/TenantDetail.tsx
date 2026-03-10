@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
     Box,
-    Typography,
     Alert,
     CircularProgress,
     Breadcrumbs,
@@ -9,7 +8,7 @@ import {
     Paper,
     Divider,
 } from "@mui/material";
-import { Button } from "../../components/primitives";
+import { Button, Typography } from "../../components/primitives";
 import { CancelButton } from "../../components/semantic";
 import {
     Edit as EditIcon,
@@ -70,8 +69,16 @@ const TenantDetail = () => {
 
     // ── Loading ──
     if (loading) return (
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh", bgcolor: BG }}>
-            <CircularProgress sx={{ color: NAV }} />
+        <Box
+            sx={(theme) => ({
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                minHeight: theme.spacing(30),
+                bgcolor: theme.palette.background.default,
+            })}
+        >
+            <CircularProgress sx={(theme) => ({ color: theme.palette.primary.main })} />
         </Box>
     );
 
@@ -89,11 +96,20 @@ const TenantDetail = () => {
                         component={RouterLink}
                         to="/tenants"
                         underline="hover"
-                        sx={{ fontSize: 13, color: LABEL }}
+                        sx={(theme) => ({
+                            ...theme.typography.caption,
+                            color: theme.palette.text.secondary,
+                        })}
                     >
                         Tenants
                     </Link>
-                    <Typography sx={{ fontSize: 13, color: "#1a1a2e", fontWeight: 600 }}>
+                    <Typography
+                        sx={(theme) => ({
+                            ...theme.typography.caption,
+                            fontWeight: theme.typography.fontWeightMedium,
+                            color: theme.palette.text.primary,
+                        })}
+                    >
                         {tenant.name}
                     </Typography>
                 </Breadcrumbs>
