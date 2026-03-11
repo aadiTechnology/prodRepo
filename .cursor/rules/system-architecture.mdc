@@ -1,0 +1,65 @@
+---
+description: Enforce system architecture layering for frontend, backend, database, and AI work.
+alwaysApply: true
+---
+
+# System Architecture Rules
+
+Use `SYSTEM_ARCHITECTURE.md` as the canonical architecture reference for this repository.
+
+## Stack
+
+- Frontend: React + TypeScript
+- Backend: FastAPI
+- Database: SQL Server
+- AI: LangChain-based generation services
+
+## Backend Rules
+
+The backend architecture is:
+
+`Controller -> Service -> Repository`
+
+Apply these rules:
+
+- Controllers expose API endpoints and handle request/response concerns only.
+- Services contain business logic, orchestration, validation, and feature workflows.
+- Repositories interact with SQL Server and encapsulate persistence access.
+- Do not put business logic in controllers.
+- Do not query the database directly from controllers.
+- Do not bypass services when implementing feature behavior.
+
+## AI Rules
+
+AI generation logic is a shared capability and must be reusable across features.
+
+Apply these rules:
+
+- Keep LangChain orchestration in reusable AI or service layers.
+- Do not duplicate prompts, chains, or parsing logic across features when shared behavior is possible.
+- Controllers must not contain AI workflow logic.
+- Feature services may call shared AI generation components.
+
+## Frontend Rules
+
+The frontend architecture is:
+
+`Primitive -> Semantic -> Feature`
+
+Apply these rules:
+
+- Primitive components are generic UI building blocks.
+- Semantic components are domain-specific UI elements built from primitives.
+- Feature modules implement end-to-end user workflows.
+- Do not place feature workflow logic in primitive components.
+- Do not make primitives depend on feature modules.
+- Keep domain meaning in semantic components and workflow orchestration in features or pages.
+
+## Decision Guidance
+
+When making changes:
+
+1. Place code in the narrowest correct layer.
+2. Prefer reuse over duplication.
+3. Preserve dependency direction from higher-level orchestration to lower-level reusable layers.
+4. If a change conflicts with these rules, refactor toward the architecture instead of adding exceptions unless a documented constraint requires it.
