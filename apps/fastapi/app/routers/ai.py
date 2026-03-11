@@ -10,7 +10,15 @@ from app.schemas.ai import InterpretRequest, InterpretResponse, GenerateStoryAnd
 from app.services.intent_service import interpret
 from app.services.ai_service import generate_story_and_tests
 from app.services.cache_service import get_cached_response, cache_response, generate_requirement_hash
-from app.services.ai_persistence_service import save_ai_response, get_requirement_by_hash
+from app.services.ai_persistence_service import (
+    save_ai_response,
+    get_requirement_by_hash,
+    get_draft_artifacts,
+    approve_user_story as service_approve_user_story,
+    reject_user_story as service_reject_user_story,
+    approve_test_case as service_approve_test_case,
+    reject_test_case as service_reject_test_case,
+)
 from app.services.ai_models import AIResponse
 from app.models.ai_entities import Requirement
 
@@ -38,6 +46,7 @@ def _saved_requirement_to_dict(db_req: Requirement) -> dict:
             "prerequisite": us.prerequisite,
             "story": us.story,
             "acceptance_criteria": us.acceptance_criteria,
+            "review_status": getattr(us, "review_status", "draft"),
             "tenant_id": us.tenant_id,
             "is_super_admin_accessible": us.is_super_admin_accessible,
             "created_at": us.created_at,
@@ -59,6 +68,7 @@ def _saved_requirement_to_dict(db_req: Requirement) -> dict:
                 "test_data": tc.test_data,
                 "steps": tc.steps,
                 "expected_result": tc.expected_result,
+                "review_status": getattr(tc, "review_status", "draft"),
                 "tenant_id": tc.tenant_id,
                 "is_super_admin_accessible": tc.is_super_admin_accessible,
                 "created_at": tc.created_at,
@@ -169,3 +179,90 @@ async def ai_save_story_and_tests(
         )
     save_ai_response(db, body)
     return {"status": "saved"}
+
+
+@router.get("/drafts")
+async def get_drafts(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Retrieve draft artifacts (requirements with draft user stories or test cases). Super Admin only."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    requirements = get_draft_artifacts(db)
+    return {"items": [_saved_requirement_to_dict(r) for r in requirements]}
+
+
+@router.patch("/user-stories/{user_story_id}/approve")
+async def approve_user_story(
+    user_story_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Approve a user story. Super Admin only."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    us = service_approve_user_story(db, user_story_id, updated_by=current_user.id)
+    if not us:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User story not found.")
+    return {"id": us.id, "review_status": us.review_status}
+
+
+@router.patch("/user-stories/{user_story_id}/reject")
+async def reject_user_story(
+    user_story_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Reject a user story. Super Admin only."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    us = service_reject_user_story(db, user_story_id, updated_by=current_user.id)
+    if not us:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User story not found.")
+    return {"id": us.id, "review_status": us.review_status}
+
+
+@router.patch("/test-cases/{test_case_id}/approve")
+async def approve_test_case(
+    test_case_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Approve a test case. Super Admin only."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    tc = service_approve_test_case(db, test_case_id, updated_by=current_user.id)
+    if not tc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test case not found.")
+    return {"id": tc.id, "review_status": tc.review_status}
+
+
+@router.patch("/test-cases/{test_case_id}/reject")
+async def reject_test_case(
+    test_case_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Reject a test case. Super Admin only."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    tc = service_reject_test_case(db, test_case_id, updated_by=current_user.id)
+    if not tc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test case not found.")
+    return {"id": tc.id, "review_status": tc.review_status}

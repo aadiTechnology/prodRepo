@@ -168,6 +168,7 @@ const ALLOWED_ROUTES = new Set([
   '/dashboard',
   '/profile',
   '/admin/theme-studio',
+  '/ai/review',
 ]);
 
 const isAllowedRoute = (path: string | undefined): boolean => {
@@ -257,6 +258,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
           children: [
             { title: "Role Management", path: "/roles", icon: <RoleIcon fontSize="small" /> },
             { title: "Theme Studio", path: "/admin/theme-studio", icon: <ThemeStudioIcon fontSize="small" /> },
+            { title: "AI Review", path: "/ai/review", icon: <DashboardIcon fontSize="small" /> },
             { title: "Menu", path: "/menus", icon: <MenuListIcon fontSize="small" /> },
             { title: "Permission", path: "/permissions", icon: <PermissionIcon fontSize="small" /> },
           ],

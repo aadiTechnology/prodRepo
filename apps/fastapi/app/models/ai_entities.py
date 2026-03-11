@@ -34,6 +34,11 @@ class Requirement(Base):
     user_stories = relationship("UserStory", back_populates="requirement", cascade="all, delete-orphan")
 
 
+REVIEW_STATUS_DRAFT = "draft"
+REVIEW_STATUS_APPROVED = "approved"
+REVIEW_STATUS_REJECTED = "rejected"
+
+
 class UserStory(Base):
     __tablename__ = "user_stories"
 
@@ -43,6 +48,7 @@ class UserStory(Base):
     prerequisite = Column(JSON, nullable=True)
     story = Column(Text, nullable=False)
     acceptance_criteria = Column(JSON, nullable=True)
+    review_status = Column(String(20), nullable=False, default=REVIEW_STATUS_DRAFT)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
     is_super_admin_accessible = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -61,6 +67,7 @@ class TestCase(Base):
     user_story_id = Column(Integer, ForeignKey("user_stories.id", ondelete="CASCADE"), nullable=False)
     test_case_id = Column(String(100), nullable=False)
     scenario = Column(String(1000), nullable=False)
+    review_status = Column(String(20), nullable=False, default=REVIEW_STATUS_DRAFT)
     pre_requisite = Column(JSON, nullable=True)
     test_data = Column(JSON, nullable=True)
     steps = Column(JSON, nullable=True)

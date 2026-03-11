@@ -13,7 +13,7 @@ import {
   CircularProgress,
   Box,
 } from "@mui/material";
-import { ReactNode } from "react";
+import { type Key, ReactNode } from "react";
 
 export interface DataTableColumn<T> {
   id: string;
@@ -36,6 +36,10 @@ export interface DataTableProps<T> {
   size?: "small" | "medium";
   /** Max height for TableContainer (e.g. "calc(100vh - 200px)"). Optional. */
   maxHeight?: string | number;
+  /** Optional row click handler. */
+  onRowClick?: (row: T) => void;
+  /** Stable row key when index is not sufficient. */
+  getRowKey?: (row: T, index: number) => Key;
 }
 
 function getCellValue<T>(row: T, field: keyof T | string): ReactNode {
@@ -44,7 +48,7 @@ function getCellValue<T>(row: T, field: keyof T | string): ReactNode {
   return v != null ? String(v) : "";
 }
 
-export default function DataTable<T extends Record<string, unknown>>({
+export default function DataTable<T extends object>({
   columns,
   data,
   loading = false,
@@ -53,6 +57,8 @@ export default function DataTable<T extends Record<string, unknown>>({
   stickyHeader = true,
   size = "small",
   maxHeight,
+  onRowClick,
+  getRowKey,
 }: DataTableProps<T>) {
   const hasActions = renderRowActions != null;
 
@@ -108,11 +114,13 @@ export default function DataTable<T extends Record<string, unknown>>({
             ) : (
               data.map((row, idx) => (
                 <TableRow
-                  key={idx}
+                  key={getRowKey ? getRowKey(row, idx) : idx}
                   hover
                   sx={(theme) => ({
                     "&.MuiTableRow-hover:hover": { bgcolor: theme.palette.action.hover },
+                    cursor: onRowClick ? "pointer" : "default",
                   })}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >
                   {columns.map((col) => (
                     <TableCell

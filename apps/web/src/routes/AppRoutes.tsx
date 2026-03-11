@@ -1,9 +1,10 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Outlet } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { Box, CircularProgress } from "@mui/material";
 import MainLayout from "../layout/MainLayout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import ChangePassword from "../pages/ChangePassword";
+import { AIReviewProvider } from "../features/aiReview";
 
 // Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
@@ -15,6 +16,8 @@ const SessionExpired = lazy(() => import("../pages/SessionExpired"));
 const TenantList = lazy(() => import("../pages/tenants/TenantList"));
 const AddTenant = lazy(() => import("../pages/tenants/AddTenant"));
 const RequirementGeneratePage = lazy(() => import("../pages/RequirementGeneratePage"));
+const ArtifactReviewPage = lazy(() => import("../pages/ArtifactReviewPage"));
+const ArtifactReviewDetailPage = lazy(() => import("../pages/ArtifactReviewDetailPage"));
 const CreateUser = lazy(() => import("../pages/CreateUser"));
 const ThemeStudioPage = lazy(() => import("../pages/admin/ThemeStudioPage"));
 const RoleManagementPage = lazy(() => import("../pages/RoleManagementPage"));
@@ -34,6 +37,14 @@ const PageLoader = () => (
     <CircularProgress />
   </Box>
 );
+
+function AIReviewRouteLayout() {
+  return (
+    <AIReviewProvider>
+      <Outlet />
+    </AIReviewProvider>
+  );
+}
 
 export default function AppRoutes() {
   return (
@@ -62,6 +73,17 @@ export default function AppRoutes() {
 
           {/* AI Features */}
           <Route path="/ai/generate" element={<ProtectedRoute><RequirementGeneratePage /></ProtectedRoute>} />
+          <Route
+            path="/ai/review"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
+                <AIReviewRouteLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<ArtifactReviewPage />} />
+            <Route path=":storyId" element={<ArtifactReviewDetailPage />} />
+          </Route>
 
           {/* System Administration - Super Admin only */}
           <Route path="/tenants" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><TenantList /></ProtectedRoute>} />

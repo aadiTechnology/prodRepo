@@ -100,6 +100,7 @@ export const colorTokens = {
     inactive: "#64748b",
     pending: "#ed6c02",
     draft: "#94a3b8",
+    rejected: "#d32f2f",
     archived: "#64748b",
   },
 } as const;
