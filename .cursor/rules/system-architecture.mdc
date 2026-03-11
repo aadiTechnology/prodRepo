@@ -1,11 +1,11 @@
 ---
-description: Enforce system architecture layering for frontend, backend, database, and AI work.
+description: Always respect the system architecture, AI reuse rules, and module extension-first development.
 alwaysApply: true
 ---
 
 # System Architecture Rules
 
-Use `SYSTEM_ARCHITECTURE.md` as the canonical architecture reference for this repository.
+Always follow the architecture defined in `SYSTEM_ARCHITECTURE.md`.
 
 ## Stack
 
@@ -28,6 +28,8 @@ Apply these rules:
 - Do not put business logic in controllers.
 - Do not query the database directly from controllers.
 - Do not bypass services when implementing feature behavior.
+- Prefer extending an existing controller, service, or repository before creating a new one.
+- Do not create duplicate services or repository flows that solve the same problem.
 
 ## AI Rules
 
@@ -36,9 +38,12 @@ AI generation logic is a shared capability and must be reusable across features.
 Apply these rules:
 
 - Keep LangChain orchestration in reusable AI or service layers.
-- Do not duplicate prompts, chains, or parsing logic across features when shared behavior is possible.
+- Reuse existing AI generation services whenever possible.
+- Do not duplicate prompts, chains, parsing logic, or generation workflows across features when shared behavior is possible.
 - Controllers must not contain AI workflow logic.
 - Feature services may call shared AI generation components.
+- Prefer extending existing AI modules before introducing new AI services.
+- AI artifacts must follow the review lifecycle defined in `ai_review_workflow.md` when that reference is available in the repository.
 
 ## Frontend Rules
 
@@ -54,6 +59,8 @@ Apply these rules:
 - Do not place feature workflow logic in primitive components.
 - Do not make primitives depend on feature modules.
 - Keep domain meaning in semantic components and workflow orchestration in features or pages.
+- Prefer extending an existing primitive, semantic component, or feature module before creating a new one.
+- Do not create duplicate components when an existing module can be extended safely.
 
 ## Decision Guidance
 
@@ -62,4 +69,5 @@ When making changes:
 1. Place code in the narrowest correct layer.
 2. Prefer reuse over duplication.
 3. Preserve dependency direction from higher-level orchestration to lower-level reusable layers.
-4. If a change conflicts with these rules, refactor toward the architecture instead of adding exceptions unless a documented constraint requires it.
+4. Prefer extending existing modules, services, and components over creating parallel implementations.
+5. If a change conflicts with these rules, refactor toward the architecture instead of adding exceptions unless a documented constraint requires it.
