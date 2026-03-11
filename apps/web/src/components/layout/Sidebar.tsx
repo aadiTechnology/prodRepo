@@ -39,12 +39,13 @@ import {
   Dashboard as DashboardIcon,
   ChevronLeft as ChevronLeftIcon,
   Palette as ThemeStudioIcon,
+  
 } from "@mui/icons-material";
 import { useRBAC } from "../../context/RBACContext";
 import { useAuth } from "../../context/AuthContext";
 import MenuRenderer from "../menu/MenuRenderer";
 import MenuIconResolver from "../menu/MenuIcon";
-
+import AssignmentIcon from "@mui/icons-material/Assignment";
 const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 80;
 
@@ -168,6 +169,7 @@ const ALLOWED_ROUTES = new Set([
   '/dashboard',
   '/profile',
   '/admin/theme-studio',
+  '/ai/generate',
   '/ai/review',
 ]);
 
@@ -261,6 +263,8 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
             { title: "AI Review", path: "/ai/review", icon: <DashboardIcon fontSize="small" /> },
             { title: "Menu", path: "/menus", icon: <MenuListIcon fontSize="small" /> },
             { title: "Permission", path: "/permissions", icon: <PermissionIcon fontSize="small" /> },
+            { title: "GenerateUserStory", path: "/ai/generate", icon: <AssignmentIcon fontSize="small" /> },
+            
           ],
         },
       ];

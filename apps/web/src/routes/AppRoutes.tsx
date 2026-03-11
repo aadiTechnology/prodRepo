@@ -72,7 +72,14 @@ export default function AppRoutes() {
           <Route path="/roles/edit/:id" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}><AddRole /></ProtectedRoute>} />
 
           {/* AI Features */}
-          <Route path="/ai/generate" element={<ProtectedRoute><RequirementGeneratePage /></ProtectedRoute>} />
+          <Route
+            path="/ai/generate"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
+                <RequirementGeneratePage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/ai/review"
             element={
