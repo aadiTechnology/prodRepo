@@ -38,3 +38,19 @@ class AIResponse(BaseModel):
     requirement: Requirement
     user_stories: list[UserStory]
     test_cases: list[TestCase]
+
+
+class RegeneratedUserStory(BaseModel):
+    title: str
+    prerequisite: list[str]
+    story: str
+    acceptance_criteria: list[str]
+
+
+class RegeneratedTestCase(BaseModel):
+    test_case_id: str
+    scenario: str
+    pre_requisite: list[str]
+    test_data: list[str] | None
+    steps: list[str]
+    expected_result: str

@@ -3,7 +3,7 @@
  * Renders related test cases for a selected user story.
  */
 
-import { Box, Typography } from "../primitives";
+import { Box, Button, Typography } from "../primitives";
 import { DataTable } from "../reusable";
 import ReviewStatusBadge from "./ReviewStatusBadge";
 import ApproveButton from "./ApproveButton";
@@ -14,8 +14,12 @@ export interface TestCaseTableProps {
   testCases: TestCaseItem[];
   onApprove?: (testCaseId: number) => void;
   onReject?: (testCaseId: number) => void;
+  onEdit?: (testCaseId: number) => void;
+  onRegenerate?: (testCaseId: number) => void;
   approvingId?: number | null;
   rejectingId?: number | null;
+  savingId?: number | null;
+  regeneratingId?: number | null;
 }
 
 function renderList(
@@ -46,8 +50,12 @@ export default function TestCaseTable({
   testCases,
   onApprove,
   onReject,
+  onEdit,
+  onRegenerate,
   approvingId = null,
   rejectingId = null,
+  savingId = null,
+  regeneratingId = null,
 }: TestCaseTableProps) {
   return (
     <DataTable<TestCaseItem>
@@ -72,6 +80,30 @@ export default function TestCaseTable({
           render: (testCase) => (
             <ReviewStatusBadge status={testCase.review_status ?? "draft"} />
           ),
+        },
+        {
+          id: "rejection_reason",
+          label: "Rejection Reason",
+          render: (testCase) =>
+            testCase.review_status === "rejected" && testCase.rejection_reason ? (
+              <Box
+                sx={{
+                  px: 1.5,
+                  py: 1,
+                  borderRadius: 1,
+                    bgcolor: "rgba(211, 47, 47, 0.08)",
+                  color: "error.dark",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                }}
+              >
+                {testCase.rejection_reason}
+              </Box>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                -
+              </Typography>
+            ),
         },
         {
           id: "steps",
@@ -105,6 +137,27 @@ export default function TestCaseTable({
                     }
                     onClick={() => onReject(testCase.id)}
                   />
+                </Box>
+              ) : testCase.review_status === "rejected" ? (
+                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    disabled={savingId === testCase.id || regeneratingId === testCase.id}
+                    onClick={() => onEdit?.(testCase.id)}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="warning"
+                    disabled={savingId === testCase.id || regeneratingId === testCase.id}
+                    onClick={() => onRegenerate?.(testCase.id)}
+                  >
+                    Regenerate
+                  </Button>
                 </Box>
               ) : null
           : undefined

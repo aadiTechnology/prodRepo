@@ -104,17 +104,17 @@ def save_ai_response(db: Session, ai_response: AIResponse, requirement_text: str
 
 
 def get_draft_artifacts(db: Session) -> list[Requirement]:
-    """Return requirements that have at least one user_story or test_case in draft."""
+    """Return requirements that have at least one user_story or test_case pending review."""
     sub_q = (
         db.query(Requirement.id)
         .join(UserStory, UserStory.requirement_id == Requirement.id)
-        .filter(UserStory.review_status == REVIEW_STATUS_DRAFT)
+        .filter(UserStory.review_status != REVIEW_STATUS_APPROVED)
     )
     sub_tc = (
         db.query(Requirement.id)
         .join(UserStory, UserStory.requirement_id == Requirement.id)
         .join(TestCase, TestCase.user_story_id == UserStory.id)
-        .filter(TestCase.review_status == REVIEW_STATUS_DRAFT)
+        .filter(TestCase.review_status != REVIEW_STATUS_APPROVED)
     )
     requirement_ids = set(sub_q.all()) | set(sub_tc.all())
     ids = [r[0] for r in requirement_ids]
@@ -134,13 +134,31 @@ def get_draft_artifacts(db: Session) -> list[Requirement]:
 def get_user_story(db: Session, user_story_id: int) -> UserStory | None:
     return (
         db.query(UserStory)
+        .options(
+            joinedload(UserStory.requirement),
+            joinedload(UserStory.test_cases),
+        )
         .filter(UserStory.id == user_story_id)
         .first()
     )
 
 
 def get_test_case(db: Session, test_case_id: int) -> TestCase | None:
-    return db.query(TestCase).filter(TestCase.id == test_case_id).first()
+    return (
+        db.query(TestCase)
+        .options(
+            joinedload(TestCase.user_story).joinedload(UserStory.requirement),
+        )
+        .filter(TestCase.id == test_case_id)
+        .first()
+    )
+
+
+def _reset_to_draft(entity: UserStory | TestCase, updated_by: int | None = None) -> None:
+    entity.review_status = REVIEW_STATUS_DRAFT
+    entity.rejection_reason = None
+    entity.updated_by = updated_by
+    entity.updated_at = datetime.utcnow()
 
 
 def approve_user_story(db: Session, user_story_id: int, updated_by: int | None = None) -> UserStory | None:
@@ -148,6 +166,7 @@ def approve_user_story(db: Session, user_story_id: int, updated_by: int | None =
     if not us:
         return None
     us.review_status = REVIEW_STATUS_APPROVED
+    us.rejection_reason = None
     us.updated_by = updated_by
     us.updated_at = datetime.utcnow()
     db.commit()
@@ -155,11 +174,17 @@ def approve_user_story(db: Session, user_story_id: int, updated_by: int | None =
     return us
 
 
-def reject_user_story(db: Session, user_story_id: int, updated_by: int | None = None) -> UserStory | None:
+def reject_user_story(
+    db: Session,
+    user_story_id: int,
+    reason: str,
+    updated_by: int | None = None,
+) -> UserStory | None:
     us = get_user_story(db, user_story_id)
     if not us:
         return None
     us.review_status = REVIEW_STATUS_REJECTED
+    us.rejection_reason = reason.strip()
     us.updated_by = updated_by
     us.updated_at = datetime.utcnow()
     db.commit()
@@ -172,6 +197,7 @@ def approve_test_case(db: Session, test_case_id: int, updated_by: int | None = N
     if not tc:
         return None
     tc.review_status = REVIEW_STATUS_APPROVED
+    tc.rejection_reason = None
     tc.updated_by = updated_by
     tc.updated_at = datetime.utcnow()
     db.commit()
@@ -179,13 +205,69 @@ def approve_test_case(db: Session, test_case_id: int, updated_by: int | None = N
     return tc
 
 
-def reject_test_case(db: Session, test_case_id: int, updated_by: int | None = None) -> TestCase | None:
+def reject_test_case(
+    db: Session,
+    test_case_id: int,
+    reason: str,
+    updated_by: int | None = None,
+) -> TestCase | None:
     tc = get_test_case(db, test_case_id)
     if not tc:
         return None
     tc.review_status = REVIEW_STATUS_REJECTED
+    tc.rejection_reason = reason.strip()
     tc.updated_by = updated_by
     tc.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(tc)
+    return tc
+
+
+def update_user_story_content(
+    db: Session,
+    user_story_id: int,
+    *,
+    title: str,
+    prerequisite: list[str],
+    story: str,
+    acceptance_criteria: list[str],
+    updated_by: int | None = None,
+) -> UserStory | None:
+    us = get_user_story(db, user_story_id)
+    if not us:
+        return None
+    us.title = title.strip()
+    us.prerequisite = prerequisite if prerequisite else None
+    us.story = story.strip()
+    us.acceptance_criteria = acceptance_criteria if acceptance_criteria else None
+    _reset_to_draft(us, updated_by=updated_by)
+    db.commit()
+    db.refresh(us)
+    return us
+
+
+def update_test_case_content(
+    db: Session,
+    test_case_id: int,
+    *,
+    artifact_test_case_id: str,
+    scenario: str,
+    pre_requisite: list[str],
+    test_data: list[str] | None,
+    steps: list[str],
+    expected_result: str,
+    updated_by: int | None = None,
+) -> TestCase | None:
+    tc = get_test_case(db, test_case_id)
+    if not tc:
+        return None
+    tc.test_case_id = artifact_test_case_id.strip()
+    tc.scenario = scenario.strip()
+    tc.pre_requisite = pre_requisite if pre_requisite else None
+    tc.test_data = test_data if test_data else None
+    tc.steps = steps if steps else None
+    tc.expected_result = expected_result.strip()
+    _reset_to_draft(tc, updated_by=updated_by)
     db.commit()
     db.refresh(tc)
     return tc

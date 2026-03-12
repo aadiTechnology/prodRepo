@@ -10,6 +10,7 @@ export interface UserStoryItem {
   story: string;
   acceptance_criteria: string[] | null;
   review_status: ReviewStatus;
+  rejection_reason?: string | null;
   tenant_id: number | null;
   is_super_admin_accessible: boolean;
   created_at: string;
@@ -28,6 +29,7 @@ export interface TestCaseItem {
   steps: string[] | null;
   expected_result: string;
   review_status: ReviewStatus;
+  rejection_reason?: string | null;
   tenant_id: number | null;
   is_super_admin_accessible: boolean;
   created_at: string;
@@ -60,6 +62,30 @@ export interface GenerateStoryAndTestsResult {
   test_cases: TestCaseItem[];
 }
 
+export interface RejectArtifactPayload {
+  reason: string;
+}
+
+export interface UpdateUserStoryPayload {
+  title: string;
+  prerequisite: string[];
+  story: string;
+  acceptance_criteria: string[];
+}
+
+export interface UpdateTestCasePayload {
+  test_case_id: string;
+  scenario: string;
+  pre_requisite: string[];
+  test_data: string[] | null;
+  steps: string[];
+  expected_result: string;
+}
+
+export interface RegenerateArtifactPayload {
+  feedback: string;
+}
+
 export const aiService = {
   generateStoryAndTests: async (
     requirement: string
@@ -81,8 +107,30 @@ export const aiService = {
     return response.data;
   },
 
-  rejectUserStory: async (userStoryId: number): Promise<{ id: number; review_status: string }> => {
-    const response = await apiClient.patch(`/api/ai/user-stories/${userStoryId}/reject`);
+  rejectUserStory: async (
+    userStoryId: number,
+    payload: RejectArtifactPayload
+  ): Promise<{ id: number; review_status: string; rejection_reason?: string | null }> => {
+    const response = await apiClient.patch(`/api/ai/user-stories/${userStoryId}/reject`, payload);
+    return response.data;
+  },
+
+  updateUserStory: async (
+    userStoryId: number,
+    payload: UpdateUserStoryPayload
+  ): Promise<UserStoryItem> => {
+    const response = await apiClient.patch(`/api/ai/user-stories/${userStoryId}`, payload);
+    return response.data;
+  },
+
+  regenerateUserStory: async (
+    userStoryId: number,
+    payload: RegenerateArtifactPayload
+  ): Promise<UserStoryItem> => {
+    const response = await apiClient.post(
+      `/api/ai/user-stories/${userStoryId}/regenerate`,
+      payload
+    );
     return response.data;
   },
 
@@ -91,8 +139,30 @@ export const aiService = {
     return response.data;
   },
 
-  rejectTestCase: async (testCaseId: number): Promise<{ id: number; review_status: string }> => {
-    const response = await apiClient.patch(`/api/ai/test-cases/${testCaseId}/reject`);
+  rejectTestCase: async (
+    testCaseId: number,
+    payload: RejectArtifactPayload
+  ): Promise<{ id: number; review_status: string; rejection_reason?: string | null }> => {
+    const response = await apiClient.patch(`/api/ai/test-cases/${testCaseId}/reject`, payload);
+    return response.data;
+  },
+
+  updateTestCase: async (
+    testCaseId: number,
+    payload: UpdateTestCasePayload
+  ): Promise<TestCaseItem> => {
+    const response = await apiClient.patch(`/api/ai/test-cases/${testCaseId}`, payload);
+    return response.data;
+  },
+
+  regenerateTestCase: async (
+    testCaseId: number,
+    payload: RegenerateArtifactPayload
+  ): Promise<TestCaseItem> => {
+    const response = await apiClient.post(
+      `/api/ai/test-cases/${testCaseId}/regenerate`,
+      payload
+    );
     return response.data;
   },
 };

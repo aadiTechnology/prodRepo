@@ -30,6 +30,9 @@ export type { ApproveButtonProps } from "./ApproveButton";
 export { default as RejectButton } from "./RejectButton";
 export type { RejectButtonProps } from "./RejectButton";
 
+export { default as ArtifactRejectDialog } from "./ArtifactRejectDialog";
+export type { ArtifactRejectDialogProps } from "./ArtifactRejectDialog";
+
 export { default as StoryDisplay } from "./StoryDisplay";
 export type { StoryDisplayProps } from "./StoryDisplay";
 

@@ -4,12 +4,14 @@
  */
 
 import { AppCard, Box, Stack, Typography } from "../primitives";
+import { Alert } from "@mui/material";
 import ReviewStatusBadge from "./ReviewStatusBadge";
 import type { ReviewStoryRecord } from "../../features/aiReview";
 
 export interface UserStoryDetailProps {
   record: ReviewStoryRecord;
   actions?: React.ReactNode;
+  rejectionReason?: string | null;
 }
 
 function formatCreatedAt(value: string | null | undefined): string {
@@ -24,12 +26,18 @@ function formatCreatedAt(value: string | null | undefined): string {
 export default function UserStoryDetail({
   record,
   actions,
+  rejectionReason,
 }: UserStoryDetailProps) {
   const { requirement, story } = record;
 
   return (
     <AppCard>
       <Stack spacing={3}>
+        {story.review_status === "rejected" && rejectionReason ? (
+          <Alert severity="error">
+            <strong>Rejection reason:</strong> {rejectionReason}
+          </Alert>
+        ) : null}
         <Box
           sx={{
             display: "flex",

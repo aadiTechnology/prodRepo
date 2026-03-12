@@ -15,7 +15,7 @@ export default function ArtifactReviewPage() {
       header={
         <PageHeader
           title="AI Review"
-          subtitle="Review generated user stories before approval."
+          subtitle="Review generated user stories and revise rejected artifacts before approval."
           actions={
             <Button onClick={() => void refresh()} disabled={loading}>
               Refresh
