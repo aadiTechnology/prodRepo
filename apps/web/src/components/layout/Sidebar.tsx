@@ -172,6 +172,7 @@ const ALLOWED_ROUTES = new Set([
   '/ai/generate',
   '/ai/review',
   '/fees/setup',
+  '/fees/discounts',
 ]);
 
 const isAllowedRoute = (path: string | undefined): boolean => {
@@ -291,6 +292,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         icon: <AssignmentIcon />,
         children: [
           { title: "Fee Structure Setup", path: "/fees/setup", icon: <MenuListIcon fontSize="small" /> },
+          { title: "Fee Discounts", path: "/fees/discounts", icon: <MenuListIcon fontSize="small" /> },
         ],
       });
     }
