@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.models.fee_category import FeeCategory
+from app.models.fee import FeeCategory
 
 def get_all_fee_categories(db: Session, tenant_id: int = None):
     query = db.query(FeeCategory)

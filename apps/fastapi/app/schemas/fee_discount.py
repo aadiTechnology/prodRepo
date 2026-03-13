@@ -1,5 +1,6 @@
 from typing import Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, field_validator
+from datetime import datetime
 
 class FeeDiscountBase(BaseModel):
     discount_name: str = Field(..., max_length=150)
@@ -41,27 +42,12 @@ class FeeDiscountResponse(BaseModel):
     discount_name: str
     discount_type: str
     discount_value: float
-    fee_category: Optional[str]
-    applicable_class: Optional[str]
+    fee_category: Optional[str] = None
+    applicable_class: Optional[str] = None
     description: Optional[str] = None
     status: bool
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-
-    @classmethod
-    def from_orm(cls, obj):
-        return cls(
-            id=obj.id,
-            discount_name=obj.discount_name,
-            discount_type=obj.discount_type,
-            discount_value=float(obj.discount_value),
-            fee_category=getattr(obj, 'fee_category', None),
-            applicable_class=getattr(obj, 'applicable_class', None),
-            description=getattr(obj, 'description', None),
-            status=obj.status,
-            created_at=str(obj.created_at) if hasattr(obj, 'created_at') and obj.created_at else None,
-            updated_at=str(obj.updated_at) if hasattr(obj, 'updated_at') and obj.updated_at else None,
-        )
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
