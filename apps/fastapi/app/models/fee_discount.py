@@ -14,5 +14,6 @@ class FeeDiscount(Base):
     applicable_class = Column(String(100), nullable=True)
     description = Column(Text, nullable=True)
     status = Column(Boolean, default=True)
+    is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

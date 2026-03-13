@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
-from app.models.school_class import SchoolClass
+from app.models.academic import ClassModel
 
 def get_all_classes(db: Session, tenant_id: int = None):
-    query = db.query(SchoolClass)
+    query = db.query(ClassModel)
     if tenant_id is not None:
-        query = query.filter(SchoolClass.tenant_id == tenant_id)
-    return query.filter(SchoolClass.is_deleted == False).all()
+        query = query.filter(ClassModel.tenant_id == tenant_id)
+    return query.filter(ClassModel.is_deleted == False).all()
