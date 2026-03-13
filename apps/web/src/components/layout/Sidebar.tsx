@@ -39,13 +39,13 @@ import {
   Dashboard as DashboardIcon,
   ChevronLeft as ChevronLeftIcon,
   Palette as ThemeStudioIcon,
-  
 } from "@mui/icons-material";
 import { useRBAC } from "../../context/RBACContext";
 import { useAuth } from "../../context/AuthContext";
 import MenuRenderer from "../menu/MenuRenderer";
 import MenuIconResolver from "../menu/MenuIcon";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+
 const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 80;
 
@@ -171,6 +171,7 @@ const ALLOWED_ROUTES = new Set([
   '/admin/theme-studio',
   '/ai/generate',
   '/ai/review',
+  '/fees/setup',
 ]);
 
 const isAllowedRoute = (path: string | undefined): boolean => {
@@ -264,14 +265,13 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
             { title: "Menu", path: "/menus", icon: <MenuListIcon fontSize="small" /> },
             { title: "Permission", path: "/permissions", icon: <PermissionIcon fontSize="small" /> },
             { title: "GenerateUserStory", path: "/ai/generate", icon: <AssignmentIcon fontSize="small" /> },
-            
           ],
         },
       ];
     }
 
     // For other roles, map RBAC menus to MenuItemData structure
-    return rbacMenus.map((menu: any) => ({
+    const items = rbacMenus.map((menu: any) => ({
       id: menu.id,
       title: menu.name,
       icon: <MenuIconResolver iconName={menu.icon} />,
@@ -281,7 +281,22 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         icon: <MenuIconResolver iconName={child.icon} fontSize="small" />
       }))
     }));
-  }, [isSuperAdmin, rbacMenus]);
+
+    // Add Fees for Tenant Admin (explicitly shown if not in RBAC)
+    const isTenantAdmin = ["TENANT_ADMIN", "ADMIN", "admin"].includes(user?.role || "");
+    if (isTenantAdmin) {
+      items.push({
+        id: "fees",
+        title: "Fees",
+        icon: <AssignmentIcon />,
+        children: [
+          { title: "Fee Structure Setup", path: "/fees/setup", icon: <MenuListIcon fontSize="small" /> },
+        ],
+      });
+    }
+
+    return items;
+  }, [isSuperAdmin, rbacMenus, user?.role]);
 
   // Handle section toggling
   const toggleSection = (id: string) => {

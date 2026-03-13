@@ -143,12 +143,12 @@ export default function ProtectedRoute({
     let hasRequiredRole = false;
 
     if (typeof requiredRoles === "string") {
-      hasRequiredRole = hasRole(requiredRoles);
+      hasRequiredRole = hasRole(requiredRoles) || user?.role === requiredRoles;
     } else if (Array.isArray(requiredRoles)) {
       if (requireAllRoles) {
         hasRequiredRole = hasAllRoles(requiredRoles);
       } else {
-        hasRequiredRole = hasAnyRole(requiredRoles);
+        hasRequiredRole = hasAnyRole(requiredRoles) || Boolean(user?.role && requiredRoles.includes(user.role));
       }
     }
 

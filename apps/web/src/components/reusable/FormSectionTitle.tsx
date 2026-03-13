@@ -4,7 +4,7 @@
  * Theme-driven; matches FormSection title style.
  */
 
-import { Typography, TypographyProps } from "@mui/material";
+import { Typography, TypographyProps, SxProps, Theme } from "@mui/material";
 import { ReactNode } from "react";
 
 export interface FormSectionTitleProps {
@@ -12,7 +12,7 @@ export interface FormSectionTitleProps {
   /** Typography variant. Default subtitle2. */
   variant?: TypographyProps["variant"];
   /** Additional sx. */
-  sx?: TypographyProps["sx"];
+  sx?: SxProps<Theme>;
 }
 
 export default function FormSectionTitle({
@@ -23,14 +23,16 @@ export default function FormSectionTitle({
   return (
     <Typography
       variant={variant}
-      sx={(theme) => ({
-        fontWeight: theme.typography.fontWeightBold,
-        textTransform: "uppercase",
-        letterSpacing: theme.typography.subtitle2?.letterSpacing ?? "0.05em",
-        color: theme.palette.text.secondary,
-        mb: 1.5,
-        ...(typeof sx === "function" ? sx(theme) : sx ?? {}),
-      })}
+      sx={[
+        (theme: Theme) => ({
+          fontWeight: theme.typography.fontWeightBold,
+          textTransform: "uppercase",
+          letterSpacing: theme.typography.subtitle2?.letterSpacing ?? "0.05em",
+          color: theme.palette.text.secondary,
+          mb: 1.5,
+        }),
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
     >
       {children}
     </Typography>

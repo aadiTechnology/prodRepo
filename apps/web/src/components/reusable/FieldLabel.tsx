@@ -27,15 +27,17 @@ export default function FieldLabel({
     <Typography
       component="label"
       variant={variant}
-      sx={(theme) => ({
-        fontWeight: theme.typography.fontWeightBold,
-        color: theme.palette.text.secondary,
-        mb: 0.5,
-        display: "flex",
-        alignItems: "center",
-        gap: 0.3,
-        ...(typeof sx === "function" ? sx(theme) : sx ?? {}),
-      })}
+      sx={[
+        (theme: Theme) => ({
+          fontWeight: theme.typography.fontWeightBold,
+          color: theme.palette.text.secondary,
+          mb: 0.5,
+          display: "flex",
+          alignItems: "center",
+          gap: 0.3,
+        }),
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
     >
       {children}
       {required && (

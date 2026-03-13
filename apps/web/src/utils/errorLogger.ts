@@ -16,7 +16,7 @@ interface ErrorLog {
 }
 
 class ErrorLogger {
-  private isDevelopment = process.env.NODE_ENV === "development";
+  private isDevelopment = import.meta.env.DEV;
 
   /**
    * Log an error to the console and optionally to an error reporting service

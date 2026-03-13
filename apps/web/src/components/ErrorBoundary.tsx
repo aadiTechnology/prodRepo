@@ -41,7 +41,7 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log error to console in development
-    if (process.env.NODE_ENV === "development") {
+    if (import.meta.env.DEV) {
       console.error("ErrorBoundary caught an error:", error, errorInfo);
     }
 
@@ -62,7 +62,7 @@ class ErrorBoundary extends Component<Props, State> {
   logErrorToService = (error: Error, errorInfo: ErrorInfo) => {
     // Use centralized error logger
     errorLogger.logError(error, {
-      componentStack: errorInfo.componentStack,
+      componentStack: errorInfo.componentStack ?? undefined,
     });
   };
 
@@ -99,7 +99,7 @@ class ErrorBoundary extends Component<Props, State> {
               </Typography>
             </Box>
 
-            {process.env.NODE_ENV === "development" && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <Alert severity="error" sx={{ mb: 3 }}>
                 <Typography variant="subtitle2" gutterBottom>
                   Error Details (Development Only):
