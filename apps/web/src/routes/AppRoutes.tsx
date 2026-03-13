@@ -5,6 +5,8 @@ import MainLayout from "../layout/MainLayout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import ChangePassword from "../pages/ChangePassword";
 import { AIReviewProvider } from "../features/aiReview";
+import FeeDiscountsPage from "../pages/fees/FeeDiscountsPage";
+import AddFeeDiscount from "../pages/AddFeeDiscount";
 
 // Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
@@ -23,8 +25,8 @@ const ThemeStudioPage = lazy(() => import("../pages/admin/ThemeStudioPage"));
 const RoleManagementPage = lazy(() => import("../pages/RoleManagementPage"));
 const AddRole = lazy(() => import("../pages/AddRole"));
 const EditRole = lazy(() => import("../pages/EditRole"));
-const FeeStructureSetup = lazy(() => import("../pages/Fees/FeeStructureSetup"));
-const FeeStructureForm = lazy(() => import("../pages/Fees/FeeStructureForm"));
+const FeeStructureSetup = lazy(() => import("../pages/fees/FeeStructureSetup"));
+const FeeStructureForm = lazy(() => import("../pages/fees/FeeStructureForm"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -103,6 +105,32 @@ export default function AppRoutes() {
           <Route path="/fees/setup" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureSetup /></ProtectedRoute>} />
           <Route path="/fees/setup/add" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
           <Route path="/fees/setup/:id/edit" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
+          
+          {/* FEES MODULE */}
+          <Route
+            path="fees/discounts"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN"]}>
+                <FeeDiscountsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="fees/discounts/add"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN"]}>
+                <AddFeeDiscount />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="fees/discounts/:id/edit"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN"]}>
+                <AddFeeDiscount />
+              </ProtectedRoute>
+            }
+          />
           
           <Route path="/admin/theme-studio" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><ThemeStudioPage /></ProtectedRoute>} />
         </Route>
