@@ -14,12 +14,13 @@ from app.models.user_profile import UserProfile
 from app.models.revoked_token import RevokedToken
 from app.models.ai_entities import Requirement, UserStory, TestCase
 from app.models.theme_template import ThemeTemplate
-from app.models.academic import AcademicYear, ClassModel
-from app.models.fee import FeeCategory, FeeStructure, FeeInstallment
-
+from app.models.school_class import SchoolClass
+from app.models.fee_category import FeeCategory
 # Export all models for convenience
 __all__ = [
     "Tenant",
+    "SchoolClass",
+    "FeeCategory",
     "User",
     "UserRole",
     "UserRoleType",
@@ -35,9 +36,4 @@ __all__ = [
     "UserStory",
     "TestCase",
     "ThemeTemplate",
-    "AcademicYear",
-    "ClassModel",
-    "FeeCategory",
-    "FeeStructure",
-    "FeeInstallment",
 ]
