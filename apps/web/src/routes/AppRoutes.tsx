@@ -23,6 +23,8 @@ const ThemeStudioPage = lazy(() => import("../pages/admin/ThemeStudioPage"));
 const RoleManagementPage = lazy(() => import("../pages/RoleManagementPage"));
 const AddRole = lazy(() => import("../pages/AddRole"));
 const EditRole = lazy(() => import("../pages/EditRole"));
+const FeeStructureSetup = lazy(() => import("../pages/Fees/FeeStructureSetup"));
+const FeeStructureForm = lazy(() => import("../pages/Fees/FeeStructureForm"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -96,6 +98,12 @@ export default function AppRoutes() {
           <Route path="/tenants" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><TenantList /></ProtectedRoute>} />
           <Route path="/tenants/add" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><AddTenant /></ProtectedRoute>} />
           <Route path="/tenants/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><AddTenant /></ProtectedRoute>} />
+          
+          {/* Fee Management */}
+          <Route path="/fees/setup" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureSetup /></ProtectedRoute>} />
+          <Route path="/fees/setup/add" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
+          <Route path="/fees/setup/:id/edit" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
+          
           <Route path="/admin/theme-studio" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><ThemeStudioPage /></ProtectedRoute>} />
         </Route>
       </Routes>
