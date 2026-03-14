@@ -5,8 +5,11 @@ import MainLayout from "../layout/MainLayout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import ChangePassword from "../pages/ChangePassword";
 import { AIReviewProvider } from "../features/aiReview";
-import FeeCategoryManagement from '../pages/fees/FeeCategoryManagement';
-import AddEditFeeCategory from '../pages/fees/AddEditFeeCategory';
+import FeeCategoryManagement from "../pages/Fees/FeeCategoryManagement";
+import AddEditFeeCategory from "../pages/Fees/AddEditFeeCategory";
+import FeeDiscountsPage from "../pages/Fees/FeeDiscountsPage";
+import AddFeeDiscount from "../pages/AddFeeDiscount";
+
 // Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
 const Users = lazy(() => import("../pages/Users"));
@@ -24,12 +27,12 @@ const ThemeStudioPage = lazy(() => import("../pages/admin/ThemeStudioPage"));
 const RoleManagementPage = lazy(() => import("../pages/RoleManagementPage"));
 const AddRole = lazy(() => import("../pages/AddRole"));
 const EditRole = lazy(() => import("../pages/EditRole"));
-const ClassFeeStructureAssignmentList = lazy(() => import("../pages/fees"));
+const FeeStructureSetup = lazy(() => import("../pages/Fees/FeeStructureSetup"));
+const FeeStructureForm = lazy(() => import("../pages/Fees/FeeStructureForm"));
+
+// New additions from branch
+const ClassFeeStructureAssignmentList = lazy(() => import("../pages/Fees"));
 const AddClassFeeStructureAssignment = lazy(() => import("../pages/AddClassFeeStructureAssignment"));
-const FeeStructureSetup = lazy(() => import("../pages/fees/FeeStructureSetup"));
-const FeeStructureForm = lazy(() => import("../pages/fees/FeeStructureForm"));
-const FeeDiscountsPage = lazy(() => import("../pages/fees/FeeDiscountsPage"));
-const AddFeeDiscount = lazy(() => import("../pages/AddFeeDiscount"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -71,7 +74,8 @@ export default function AppRoutes() {
           <Route path="/user/create" element={<ProtectedRoute><CreateUser /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
-           {/* Fee Category Management */}
+
+          {/* Fee Category Management */}
           <Route path="/fees/categories" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "admin", "ADMIN"]}><FeeCategoryManagement /></ProtectedRoute>} />
           <Route path="/fees/categories/add" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "admin", "ADMIN"]}><AddEditFeeCategory /></ProtectedRoute>} />
           <Route path="/fees/categories/edit/:id" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "admin", "ADMIN"]}><AddEditFeeCategory /></ProtectedRoute>} />
@@ -108,21 +112,22 @@ export default function AppRoutes() {
           <Route path="/tenants/add" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><AddTenant /></ProtectedRoute>} />
           <Route path="/tenants/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><AddTenant /></ProtectedRoute>} />
           
+          {/* Fee Assignment Routes (from branch) */}
           <Route path="/fees" element={<ProtectedRoute requiredRoles={[ "ADMIN", "TENANT_ADMIN", "ACCOUNT_ADMIN"]}><ClassFeeStructureAssignmentList /></ProtectedRoute>} />
           <Route path="/fees/create" element={<ProtectedRoute requiredRoles={[ "ADMIN", "TENANT_ADMIN", "ACCOUNT_ADMIN"]}><AddClassFeeStructureAssignment /></ProtectedRoute>} />
           <Route path="/fees/edit" element={<ProtectedRoute requiredRoles={[ "ADMIN", "TENANT_ADMIN", "ACCOUNT_ADMIN"]}><AddClassFeeStructureAssignment /></ProtectedRoute>} />
           <Route path="/fees/edit/:id" element={<ProtectedRoute requiredRoles={[ "ADMIN", "TENANT_ADMIN", "ACCOUNT_ADMIN"]}><AddClassFeeStructureAssignment /></ProtectedRoute>} />
-          
+
           {/* Fee Management */}
-          <Route path="/fees/setup" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN","admin", "ADMIN", "admin"]}><FeeStructureSetup /></ProtectedRoute>} />
-          <Route path="/fees/setup/add" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN","admin", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
-          <Route path="/fees/setup/:id/edit" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN","admin", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
+          <Route path="/fees/setup" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureSetup /></ProtectedRoute>} />
+          <Route path="/fees/setup/add" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
+          <Route path="/fees/setup/:id/edit" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
           
-          {/* FEES MODULE */}
+          {/* FEES MODULE (from user request) */}
           <Route
             path="fees/discounts"
             element={
-              <ProtectedRoute requiredRoles={["ACCOUNT_ADMIN", "admin","TENANT_ADMIN", "ADMIN"]}>
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN"]}>
                 <FeeDiscountsPage />
               </ProtectedRoute>
             }
@@ -130,7 +135,7 @@ export default function AppRoutes() {
           <Route
             path="fees/discounts/add"
             element={
-              <ProtectedRoute requiredRoles={["ACCOUNT_ADMIN", "admin", "TENANT_ADMIN", "ADMIN"]}>
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN"]}>
                 <AddFeeDiscount />
               </ProtectedRoute>
             }
@@ -138,12 +143,12 @@ export default function AppRoutes() {
           <Route
             path="fees/discounts/:id/edit"
             element={
-              <ProtectedRoute requiredRoles={["ACCOUNT_ADMIN", "admin", "TENANT_ADMIN", "ADMIN"]}>
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN"]}>
                 <AddFeeDiscount />
               </ProtectedRoute>
             }
           />
-
+          
           <Route path="/admin/theme-studio" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><ThemeStudioPage /></ProtectedRoute>} />
         </Route>
       </Routes>

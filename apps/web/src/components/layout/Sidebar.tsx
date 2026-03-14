@@ -4,187 +4,168 @@ import {
   Drawer,
   Box,
   Toolbar,
-  Divider,
   useTheme,
-  useMediaQuery,
   List,
-  ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
   Typography,
-  InputBase,
   IconButton,
   Tooltip,
   Collapse,
-  Badge,
-  Chip,
   Avatar,
   styled,
   alpha,
   Slide,
+  InputBase,
 } from "@mui/material";
 import {
-  Business as TenantIcon,
-  People as UsersIcon,
-  Settings as ConfigIcon,
-  Search as SearchIcon,
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
   Menu as MenuIcon,
-  GridView as GridIcon,
-  Security as RoleIcon,
-  FormatListBulleted as MenuListIcon,
-  VpnKey as PermissionIcon,
-  Dashboard as DashboardIcon,
-  ChevronLeft as ChevronLeftIcon,
-  Palette as ThemeStudioIcon,
+  Search as SearchIcon,
 } from "@mui/icons-material";
-import { useRBAC } from "../../context/RBACContext";
 import { useAuth } from "../../context/AuthContext";
-import MenuRenderer from "../menu/MenuRenderer";
-import MenuIconResolver from "../menu/MenuIcon";
-import AssignmentIcon from "@mui/icons-material/Assignment";
+
+// Import Icons from assets
+import userIcon from "../../assets/icons/user.png";
+import teamworkIcon from "../../assets/icons/teamwork.png";
+import workingIcon from "../../assets/icons/working.png";
+import schoolIcon from "../../assets/icons/school.png";
+import assetsIcon from "../../assets/icons/assets.png";
+import moneyIcon from "../../assets/icons/money.png";
+import feesIcon from "../../assets/icons/fees.png";
 
 const DRAWER_WIDTH = 280;
-const COLLAPSED_DRAWER_WIDTH = 80;
+const COLLAPSED_DRAWER_WIDTH = 88;
 
-// ============================================
-// SUPER ADMIN STYLED COMPONENTS
-// ============================================
+// COLOR PALETTE
+const COLORS = {
+  coral: "#FF6B6B",
+  turquoise: "#4ECDC4",
+  sunnyYellow: "#FFE66D",
+  softPurple: "#9F7AEA",
+  orange: "#F6AD55",
+  green: "#48BB78",
+  blue: "#4299E1",
+  cream: "#FFF9F0",
+  white: "#FFFFFF",
+  lightGray: "#FAFAFA",
+  textDark: "#2D3748",
+  textMedium: "#718096",
+  textLight: "#A0AEC0",
+};
 
 const SidebarContainer = styled(Box)(({ theme }) => ({
   height: "100%",
   display: "flex",
   flexDirection: "column",
-  backgroundColor: "#1a1a2e",
-  color: "#F8FAFC",
+  backgroundColor: COLORS.cream,
+  color: COLORS.textDark,
   overflow: "hidden",
-  borderRight: "1px solid rgba(255, 255, 255, 0.05)",
+  borderRight: "none",
+  boxShadow: "4px 0 24px rgba(0, 0, 0, 0.04)",
+}));
+
+const HeaderGradient = styled(Box)(({ theme }) => ({
+  padding: theme.spacing(3, 2),
+  background: `linear-gradient(135deg, ${COLORS.turquoise} 0%, ${COLORS.blue} 100%)`,
+  borderRadius: "0 0 40px 40px",
+  marginBottom: theme.spacing(1),
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  color: COLORS.white,
+  boxShadow: "0 8px 20px rgba(78, 205, 196, 0.2)",
+  transition: "all 0.3s ease",
 }));
 
 const SearchWrapper = styled(Box)(({ theme }) => ({
-  padding: theme.spacing(2),
-  marginBottom: theme.spacing(1),
+  padding: theme.spacing(1, 2, 2, 2),
 }));
 
 const SearchInput = styled(Box)(({ theme }) => ({
   display: "flex",
   alignItems: "center",
-  backgroundColor: "rgba(255, 255, 255, 0.03)",
-  borderRadius: "12px",
-  padding: "8px 12px",
-  border: "1px solid rgba(255, 255, 255, 0.08)",
-  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-  "&:hover": {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderColor: "rgba(255, 255, 255, 0.15)",
-  },
+  backgroundColor: alpha(COLORS.white, 0.8),
+  borderRadius: "15px",
+  padding: "6px 12px",
+  border: `1px solid ${alpha(COLORS.turquoise, 0.2)}`,
+  transition: "all 0.3s ease",
   "&:focus-within": {
-    borderColor: "#38bdf8",
-    backgroundColor: "rgba(56, 189, 248, 0.05)",
-    boxShadow: `0 0 0 2px ${alpha("#38bdf8", 0.15)}`,
+    borderColor: COLORS.turquoise,
+    backgroundColor: COLORS.white,
+    boxShadow: `0 0 0 3px ${alpha(COLORS.turquoise, 0.1)}`,
   },
 }));
 
 const NavItem = styled(ListItemButton, {
-  shouldForwardProp: (prop) => prop !== "active" && prop !== "collapsed",
-})<{ active?: boolean; collapsed?: boolean }>(({ theme, active, collapsed }) => ({
-  borderRadius: "12px",
-  margin: "4px 8px",
-  padding: collapsed ? "10px" : "10px 16px",
+  shouldForwardProp: (prop) => prop !== "active" && prop !== "collapsed" && prop !== "itemColor",
+})<{ active?: boolean; collapsed?: boolean; itemColor?: string }>(({ theme, active, collapsed, itemColor }) => ({
+  borderRadius: "20px",
+  margin: "4px 16px",
+  padding: collapsed ? "12px" : "12px 16px",
   justifyContent: collapsed ? "center" : "flex-start",
-  transition: "all 0.2s ease",
-  position: "relative",
-  color: active ? "#38bdf8" : "#94A3B8",
-  backgroundColor: active ? alpha("#38bdf8", 0.1) : "transparent",
+  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+  backgroundColor: active ? alpha(itemColor || COLORS.turquoise, 0.12) : "transparent",
+  color: active ? (itemColor || COLORS.textDark) : COLORS.textMedium,
+  borderLeft: active ? `6px solid ${itemColor || COLORS.turquoise}` : "0px solid transparent",
   "&:hover": {
-    backgroundColor: active ? alpha("#38bdf8", 0.15) : "rgba(255, 255, 255, 0.05)",
-    color: "#F8FAFC",
-    "& .MuiListItemIcon-root": {
-      color: "#38bdf8",
+    backgroundColor: alpha(itemColor || COLORS.turquoise, 0.08),
+    transform: "translateX(4px)",
+    "& .MuiListItemIcon-root img": {
+      filter: "grayscale(0%) brightness(100%)",
+      transform: "scale(1.1)",
     },
   },
   "& .MuiListItemIcon-root": {
-    minWidth: collapsed ? 0 : 40,
-    color: active ? "#38bdf8" : "inherit",
+    minWidth: collapsed ? 0 : 42,
     justifyContent: "center",
-    transition: "color 0.2s ease",
-  },
-  ...(active && !collapsed && {
-    "&::before": {
-      content: '""',
-      position: "absolute",
-      left: 0,
-      top: "15%",
-      height: "70%",
-      width: "4px",
-      backgroundColor: "#38bdf8",
-      borderRadius: "0 4px 4px 0",
+    transition: "all 0.3s ease",
+    "& img": {
+      width: 24,
+      height: 24,
+      filter: active ? "grayscale(0%)" : "grayscale(100%) opacity(0.6)",
+      transition: "all 0.3s ease",
     },
-  }),
+  },
 }));
 
 const SubNavItem = styled(ListItemButton, {
   shouldForwardProp: (prop) => prop !== "active",
 })<{ active?: boolean }>(({ theme, active }) => ({
-  borderRadius: "12px",
-  margin: "2px 8px 2px 48px",
+  borderRadius: "15px",
+  margin: "2px 16px 2px 58px",
   padding: "8px 16px",
-  color: active ? "#38bdf8" : "#94A3B8",
-  backgroundColor: active ? alpha("#38bdf8", 0.1) : "transparent",
-  "&:hover": {
-    backgroundColor: active ? alpha("#38bdf8", 0.15) : "rgba(255, 255, 255, 0.05)",
-    color: "#F8FAFC",
-  },
+  color: active ? COLORS.blue : COLORS.textMedium,
+  backgroundColor: active ? alpha(COLORS.blue, 0.08) : "transparent",
   transition: "all 0.2s ease",
-  position: "relative",
-  "&::before": {
-    content: '""',
-    position: "absolute",
-    left: "-20px",
-    top: 0,
-    bottom: active ? "50%" : "0",
-    width: "1px",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-  },
-  "&::after": {
-    content: '""',
-    position: "absolute",
-    left: "-20px",
-    top: "50%",
-    width: "12px",
-    height: "1px",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+  "&:hover": {
+    backgroundColor: alpha(COLORS.blue, 0.05),
+    color: COLORS.textDark,
   },
 }));
 
-// SECURITY: Whitelist of allowed routes to prevent open redirect attacks
-const ALLOWED_ROUTES = new Set([
-  '/tenants',
-  '/users',
-  '/roles',
-  '/menus',
-  '/permissions',
-  '/dashboard',
-  '/profile',
-  '/admin/theme-studio',
-  '/ai/generate',
-  '/ai/review',
-  '/fees/setup',
-  '/fees/discounts',
-]);
-
-const isAllowedRoute = (path: string | undefined): boolean => {
-  if (!path || typeof path !== 'string') return false;
-  if (!path.startsWith('/')) return false; // Reject non-relative paths
-  return ALLOWED_ROUTES.has(path) || ALLOWED_ROUTES.has(path.split('/')[1]?.replace('?', '') || ''); // Allow dynamic routes like /tenants/123
-};
-
-const sanitizeInput = (input: string): string => {
-  if (typeof input !== 'string') return '';
-  return input.trim().substring(0, 100); // Limit length and trim
-};
+const ProfileCard = styled(Box, {
+  shouldForwardProp: (prop) => prop !== "collapsed",
+})<{ collapsed?: boolean }>(({ theme, collapsed }) => ({
+  margin: theme.spacing(2),
+  padding: collapsed ? theme.spacing(1) : theme.spacing(1.5, 2),
+  backgroundColor: COLORS.white,
+  borderRadius: "24px",
+  display: "flex",
+  alignItems: "center",
+  gap: theme.spacing(1.5),
+  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.03)",
+  border: `1px solid ${alpha(COLORS.textLight, 0.1)}`,
+  marginTop: "auto",
+  marginBottom: theme.spacing(3),
+  transition: "all 0.3s ease",
+  "&:hover": {
+    transform: "translateY(-4px)",
+    boxShadow: "0 15px 35px rgba(0, 0, 0, 0.08)",
+  },
+}));
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -195,374 +176,299 @@ interface SidebarProps {
 
 interface MenuItemData {
   id: string;
-  title: string;
-  icon: React.ReactNode;
+  label: string;
+  icon: string;
   path?: string;
-  children?: { title: string; path: string; icon?: React.ReactNode }[];
+  color?: string;
+  children?: { id: string; label: string; path: string }[];
 }
 
 export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggleCollapse }: SidebarProps) {
-  const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const { menus: rbacMenus } = useRBAC();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [mounted, setMounted] = useState(false);
 
-  // SECURITY: Validate search input
-  const handleSearchChange = (value: string) => {
-    const sanitized = sanitizeInput(value);
-    setSearchTerm(sanitized);
-  };
-
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    const handler = (e: CustomEvent<{ parentId: string }>) => {
-      const id = e.detail?.parentId;
-      if (id != null && String(id).trim() !== "") {
-        setExpandedSections((prev) => ({ ...prev, [String(id)]: true }));
-      }
-    };
-    window.addEventListener("sidebar-expand" as any, handler as any);
-    return () => window.removeEventListener("sidebar-expand" as any, handler as any);
-  }, []);
-
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
-
-  // Consolidate Menu Items based on role
   const menuItems: MenuItemData[] = useMemo(() => {
-    // If Super Admin, use the specific predefined structure
+    const rawRole = user?.role || "";
+    const role = rawRole.toUpperCase();
+    
+    // Role Definitions
+    const isSuperAdmin = role === "SUPER_ADMIN" || role === "SYSTEM_ADMIN";
+    const isTenantAdmin = ["TENANT_ADMIN", "ADMIN"].includes(role);
+    const isUser = !isSuperAdmin && !isTenantAdmin;
+
     if (isSuperAdmin) {
       return [
-        {
-          id: "tenants",
-          title: "Tenants",
-          icon: <TenantIcon />,
+        { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: COLORS.turquoise },
+        { 
+          id: "tenants", 
+          label: "Tenants", 
+          icon: schoolIcon, 
+          color: COLORS.coral,
           children: [
-            { title: "Tenant Management", path: "/tenants", icon: <GridIcon fontSize="small" /> },
-          ],
+            { id: "tenant-mgmt", label: "Tenant Management", path: "/tenants" },
+          ]
         },
-        {
-          id: "users",
-          title: "Users",
-          icon: <UsersIcon />,
+        { 
+          id: "users", 
+          label: "Users", 
+          icon: userIcon, 
+          color: COLORS.softPurple,
           children: [
-            { title: "User Management", path: "/users", icon: <UsersIcon fontSize="small" /> },
-          ],
+            { id: "user-mgmt", label: "User Management", path: "/users" },
+          ]
         },
         {
           id: "config",
-          title: "Config",
-          icon: <ConfigIcon />,
+          label: "System Config",
+          icon: assetsIcon,
+          color: COLORS.textMedium,
           children: [
-            { title: "Role Management", path: "/roles", icon: <RoleIcon fontSize="small" /> },
-            { title: "Theme Studio", path: "/admin/theme-studio", icon: <ThemeStudioIcon fontSize="small" /> },
-            { title: "AI Review", path: "/ai/review", icon: <DashboardIcon fontSize="small" /> },
-            { title: "Menu", path: "/menus", icon: <MenuListIcon fontSize="small" /> },
-            { title: "Permission", path: "/permissions", icon: <PermissionIcon fontSize="small" /> },
-            { title: "GenerateUserStory", path: "/ai/generate", icon: <AssignmentIcon fontSize="small" /> },
-          ],
-        },
+            { id: "roles", label: "Role Management", path: "/roles" },
+            { id: "theme", label: "Theme Studio", path: "/admin/theme-studio" },
+            { id: "ai-review", label: "AI Review", path: "/ai/review" },
+            { id: "ai-gen", label: "Story Generation", path: "/ai/generate" },
+          ]
+        }
       ];
     }
 
-    // For other roles, map RBAC menus to MenuItemData structure
-    const items = rbacMenus.map((menu: any) => ({
-      id: menu.id,
-      title: menu.name,
-      icon: <MenuIconResolver iconName={menu.icon} />,
-      children: menu.children?.map((child: any) => ({
-        title: child.name,
-        path: child.path || "#",
-        icon: <MenuIconResolver iconName={child.icon} fontSize="small" />
-      }))
-    }));
-
-    // Add Fees for Tenant Admin (explicitly shown if not in RBAC)
-    const isTenantAdmin = ["TENANT_ADMIN", "ADMIN", "admin"].includes(user?.role || "");
     if (isTenantAdmin) {
-      items.push({
-        id: "fees",
-        title: "Fees",
-        icon: <AssignmentIcon />,
-        children: [
-          { title: "Fee Structure Setup", path: "/fees/setup", icon: <MenuListIcon fontSize="small" /> },
-          { title: "Fee Discounts", path: "/fees/discounts", icon: <MenuListIcon fontSize="small" /> },
-        ],
-      });
+      return [
+        { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: COLORS.turquoise },
+        { id: "students", label: "Students", icon: userIcon, path: "/students", color: COLORS.coral },
+        { id: "academics", label: "Academics", icon: schoolIcon, path: "/academics", color: COLORS.softPurple },
+        {
+          id: "fees",
+          label: "Fees",
+          icon: feesIcon,
+          color: COLORS.orange,
+          children: [
+            { id: "fee-cat", label: "Fee Category", path: "/fees/categories" },
+            { id: "fee-struct", label: "Fee Structure", path: "/fees/setup" },
+            { id: "fee-discount", label: "Fee Discount", path: "/fees/discounts" },
+            { id: "fee-assign", label: "Assign Fee to Class", path: "/fees" },
+          ]
+        },
+        { id: "staff", label: "Staff", icon: teamworkIcon, path: "/staff", color: COLORS.blue },
+        { id: "finance", label: "Finance", icon: moneyIcon, path: "/finance", color: COLORS.green },
+        { id: "settings", label: "Settings", icon: assetsIcon, path: "/settings", color: COLORS.textMedium },
+      ];
     }
 
-    return items;
-  }, [isSuperAdmin, rbacMenus, user?.role]);
+    // Default User Menu
+    return [
+      { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: COLORS.turquoise },
+      { id: "profile", label: "My Profile", icon: userIcon, path: "/profile", color: COLORS.coral },
+    ];
+  }, [user?.role]);
 
-  // Handle section toggling
-  const toggleSection = (id: string) => {
+  const toggleSection = (id: string, isActive: boolean) => {
     setExpandedSections((prev) => ({
       ...prev,
-      [id]: !prev[id],
+      [id]: prev[id] !== undefined ? !prev[id] : !isActive,
     }));
   };
 
-  const filteredMenuItems = useMemo(() => {
+  const filteredItems = useMemo(() => {
     if (!searchTerm) return menuItems;
-    const lowerSearch = searchTerm.toLowerCase();
-    return menuItems
-      .map((item) => ({
-        ...item,
-        children: item.children?.filter((child) =>
-          child.title.toLowerCase().includes(lowerSearch)
-        ),
-      }))
-      .filter((item) =>
-        item.title.toLowerCase().includes(lowerSearch) ||
-        (item.children && item.children.length > 0)
-      );
+    const term = searchTerm.toLowerCase();
+    return menuItems.filter(item => 
+      item.label.toLowerCase().includes(term) || 
+      item.children?.some(child => child.label.toLowerCase().includes(term))
+    );
   }, [searchTerm, menuItems]);
 
   const drawerContent = (
     <SidebarContainer>
-      <Toolbar sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: collapsed ? "center" : "space-between",
-        px: collapsed ? 1 : 2,
-        minHeight: "72px !important",
-        mb: 1
-      }}>
+      <HeaderGradient>
         {!collapsed && (
-          <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: "-0.5px", color: "#38bdf8" }}>
-            Control Panel
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                bgcolor: COLORS.white,
+                borderRadius: "10px",
+                padding: "6px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 4px 10px rgba(0,0,0,0.1)"
+              }}
+            >
+              <img src={schoolIcon} alt="Logo" style={{ width: "100%", height: "100%" }} />
+            </Box>
+            <Typography variant="h6" sx={{ fontWeight: 900, fontSize: "1rem", color: COLORS.white }}>
+              Campus Axis
+            </Typography>
+          </Box>
         )}
-        <IconButton onClick={onToggleCollapse} sx={{ color: "#94A3B8", "&:hover": { color: "#38bdf8" } }}>
-          {collapsed ? <MenuIcon /> : <ChevronRightIcon sx={{ transform: "rotate(180deg)" }} />}
+        <IconButton
+          onClick={onToggleCollapse}
+          sx={{
+            color: COLORS.white,
+            bgcolor: alpha(COLORS.white, 0.15),
+            "&:hover": { bgcolor: alpha(COLORS.white, 0.25) }
+          }}
+          size="small"
+        >
+          {collapsed ? <MenuIcon fontSize="small" /> : <ChevronRightIcon sx={{ transform: "rotate(180deg)" }} fontSize="small" />}
         </IconButton>
-      </Toolbar>
+      </HeaderGradient>
 
       {!collapsed && (
         <SearchWrapper>
           <SearchInput>
-            <SearchIcon sx={{ color: "#64748B", fontSize: 20, mr: 1 }} />
+            <SearchIcon sx={{ color: alpha(COLORS.turquoise, 0.6), fontSize: 18, mr: 1 }} />
             <InputBase
-              placeholder="Search..."
+              placeholder="Quick Search..."
               value={searchTerm}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              inputProps={{
-                maxLength: 100, // SECURITY: Prevent excessively long input
-              }}
-              sx={{
-                color: "inherit",
-                fontSize: "0.875rem",
-                width: "100%",
-                "& .MuiInputBase-input::placeholder": {
-                  color: "#64748B",
-                  opacity: 1,
-                },
-              }}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              sx={{ fontSize: "0.85rem", width: "100%", fontWeight: 500, color: COLORS.textDark }}
             />
           </SearchInput>
         </SearchWrapper>
       )}
 
-      {collapsed && (
-        <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-          <Tooltip title="Search" placement="right">
-            <IconButton onClick={onToggleCollapse} sx={{ color: "#94A3B8" }}>
-              <SearchIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      )}
+      <Box sx={{ 
+        flexGrow: 1, 
+        overflowY: "auto", 
+        overflowX: "hidden", 
+        px: 1,
+        "&::-webkit-scrollbar": { width: "4px" }, 
+        "&::-webkit-scrollbar-thumb": { backgroundColor: alpha(COLORS.turquoise, 0.2), borderRadius: "2px" } 
+      }}>
+        <List sx={{ pt: 1 }}>
+          {filteredItems.map((item) => {
+            const isActive = location.pathname === item.path || (item.children?.some(child => location.pathname === child.path) ?? false);
+            const isSectionExpanded = expandedSections[item.id] !== undefined ? expandedSections[item.id] : isActive;
 
-      <Box sx={{ flexGrow: 1, overflowY: "auto", overflowX: "hidden", py: 1 }}>
-        <List sx={{ px: 0 }}>
-          {filteredMenuItems.map((item) => (
-            <Box key={item.id} sx={{ mb: 1 }}>
-              <Tooltip title={collapsed ? item.title : ""} placement="right">
-                <NavItem
-                  collapsed={collapsed}
-                  onClick={() => (collapsed ? onToggleCollapse() : toggleSection(item.id))}
-                  active={location.pathname.startsWith(item.path || "") && item.path !== "/"}
-                >
-                  <ListItemIcon>{item.icon}</ListItemIcon>
-                  {!collapsed && (
-                    <>
-                      <ListItemText
-                        primary={item.title}
-                        primaryTypographyProps={{ fontSize: "0.9375rem", fontWeight: 600 }}
-                      />
-                      {item.children && item.children.length > 0 && (
-                        <ExpandMoreIcon
-                          sx={{
-                            fontSize: 18,
-                            transition: "transform 0.3s ease",
-                            transform: expandedSections[item.id] ? "rotate(0deg)" : "rotate(-90deg)",
-                            color: "#64748B"
-                          }}
+            return (
+              <Box key={item.id} sx={{ mb: 0.5 }}>
+                <Tooltip title={collapsed ? item.label : ""} placement="right">
+                  <NavItem
+                    collapsed={collapsed}
+                    onClick={() => {
+                      if (item.children) {
+                        if (collapsed) onToggleCollapse();
+                        toggleSection(item.id, isActive);
+                      } else if (item.path) {
+                        navigate(item.path);
+                      }
+                    }}
+                    active={isActive}
+                    itemColor={item.color}
+                  >
+                    <ListItemIcon>
+                      <img src={item.icon} alt={item.label} />
+                    </ListItemIcon>
+                    {!collapsed && (
+                      <>
+                        <ListItemText
+                          primary={item.label}
+                          primaryTypographyProps={{ fontSize: "0.9rem", fontWeight: isActive ? 800 : 600 }}
                         />
-                      )}
-                    </>
-                  )}
-                </NavItem>
-              </Tooltip>
-
-              {item.children && item.children.length > 0 && (
-                <Collapse in={expandedSections[item.id] && !collapsed} timeout="auto" unmountOnExit>
-                  <List component="div" disablePadding>
-                    {item.children.map((child) => {
-                      // SECURITY: Validate route before navigation
-                      const isValidRoute = isAllowedRoute(child.path);
-                      const isActive = location.pathname === child.path;
-                      return isValidRoute ? (
-                        <SubNavItem
-                          key={child.path}
-                          onClick={() => {
-                            if (isAllowedRoute(child.path)) {
-                              navigate(child.path);
-                            }
-                          }}
-                          active={isActive}
-                        >
-                          <ListItemText
-                            primary={String(child.title || '').substring(0, 100)}
-                            primaryTypographyProps={{
-                              fontSize: "0.8125rem",
-                              fontWeight: isActive ? 600 : 400,
+                        {item.children && (
+                          <ExpandMoreIcon
+                            sx={{
+                              fontSize: 18,
+                              transition: "transform 0.3s ease",
+                              transform: isSectionExpanded ? "rotate(0deg)" : "rotate(-90deg)",
+                              color: alpha(COLORS.textMedium, 0.4)
                             }}
                           />
-                        </SubNavItem>
-                      ) : null;
-                    })}
-                  </List>
-                </Collapse>
-              )}
-            </Box>
-          ))}
+                        )}
+                      </>
+                    )}
+                  </NavItem>
+                </Tooltip>
+
+                {item.children && (
+                  <Collapse in={isSectionExpanded && !collapsed} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding>
+                      {item.children.map((child) => {
+                        const isChildActive = location.pathname === child.path;
+                        return (
+                          <SubNavItem
+                            key={child.id}
+                            onClick={() => navigate(child.path)}
+                            active={isChildActive}
+                          >
+                            <ListItemText
+                              primary={child.label}
+                              primaryTypographyProps={{
+                                fontSize: "0.8rem",
+                                fontWeight: isChildActive ? 700 : 500,
+                              }}
+                            />
+                          </SubNavItem>
+                        );
+                      })}
+                    </List>
+                  </Collapse>
+                )}
+              </Box>
+            );
+          })}
         </List>
       </Box>
 
-      <Box sx={{
-        p: 2,
-        bgcolor: "rgba(0, 0, 0, 0.4)",
-        borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-        mx: 1.5,
-        mb: 2.5,
-        borderRadius: "20px",
-        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        "&:hover": {
-          bgcolor: "rgba(255, 255, 255, 0.05)",
-          transform: "translateY(-2px)",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.2)"
-        }
-      }}>
-        {!collapsed ? (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Avatar
+      <ProfileCard collapsed={collapsed}>
+        <Avatar
+          sx={{
+            width: collapsed ? 44 : 46,
+            height: collapsed ? 44 : 46,
+            bgcolor: COLORS.turquoise,
+            border: `3px solid ${COLORS.white}`,
+            boxShadow: `0 8px 20px ${alpha(COLORS.turquoise, 0.15)}`,
+            fontWeight: 900,
+            fontSize: "1.1rem",
+            color: COLORS.white
+          }}
+        >
+          {(user?.full_name || 'U').charAt(0).toUpperCase()}
+        </Avatar>
+        {!collapsed && (
+          <Box sx={{ flex: 1, overflow: "hidden" }}>
+            <Typography
+              variant="body2"
               sx={{
-                width: 44,
-                height: 44,
-                bgcolor: "#38bdf8",
-                fontSize: "1.1rem",
-                fontWeight: 800,
-                border: "2px solid rgba(56, 189, 248, 0.3)",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.3)"
+                fontWeight: 900,
+                color: COLORS.textDark,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                lineHeight: 1.1,
+                fontSize: "0.85rem"
               }}
             >
-              {(user?.full_name || 'U').charAt(0).toUpperCase()}
-            </Avatar>
-            <Box sx={{ flex: 1, overflow: "hidden" }}>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 800,
-                  color: "#F8FAFC",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  lineHeight: 1.2
-                }}
-              >
-                {sanitizeInput(user?.full_name || "User")}
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{
-                  color: "#94A3B8",
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.75,
-                  mt: 0.25
-                }}
-              >
-                <Box
-                  component="span"
-                  sx={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    bgcolor: "#10b981",
-                    boxShadow: "0 0 8px #10b981"
-                  }}
-                />
-                {sanitizeInput(user?.role || "USER")}
-              </Typography>
-            </Box>
+              {user?.full_name || "Admin User"}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: COLORS.textLight,
+                fontWeight: 700,
+                display: "block",
+                mt: 0.2,
+                fontSize: "0.7rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px"
+              }}
+            >
+              {user?.role || "Staff"}
+            </Typography>
           </Box>
-        ) : (
-          <Tooltip title={`${user?.full_name} (${user?.role})`} placement="right">
-            <Box sx={{ display: "flex", justifyContent: "center" }}>
-              <Badge
-                overlap="circular"
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                variant="dot"
-                sx={{
-                  '& .MuiBadge-badge': {
-                    backgroundColor: '#10b981',
-                    color: '#10b981',
-                    boxShadow: `0 0 0 2px #1a1a2e`,
-                    width: 12,
-                    height: 12,
-                    borderRadius: '50%',
-                    '&::after': {
-                      position: 'absolute',
-                      top: -1,
-                      left: -1,
-                      width: '100%',
-                      height: '100%',
-                      borderRadius: '50%',
-                      animation: 'ripple 1.5s infinite ease-in-out',
-                      border: '1px solid currentColor',
-                      content: '""',
-                    },
-                  },
-                  '@keyframes ripple': {
-                    '0%': { transform: 'scale(.8)', opacity: 1 },
-                    '100%': { transform: 'scale(2.4)', opacity: 0 },
-                  },
-                }}
-              >
-                <Avatar
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    bgcolor: "#38bdf8",
-                    fontSize: "0.9rem",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.3)"
-                  }}
-                >
-                  {(user?.full_name || 'U').charAt(0).toUpperCase()}
-                </Avatar>
-              </Badge>
-            </Box>
-          </Tooltip>
         )}
-      </Box>
+      </ProfileCard>
     </SidebarContainer>
   );
 
@@ -573,10 +479,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         sx={{
           width: { md: collapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH },
           flexShrink: { md: 0 },
-          transition: theme.transitions.create("width", {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-          }),
+          transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
       >
         {/* Mobile drawer */}
@@ -592,8 +495,8 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
             "& .MuiDrawer-paper": {
               boxSizing: "border-box",
               width: DRAWER_WIDTH,
-              borderRight: "none",
-              bgcolor: "#1a1a2e",
+              border: "none",
+              bgcolor: "transparent",
             },
           }}
         >
@@ -608,13 +511,10 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
             "& .MuiDrawer-paper": {
               boxSizing: "border-box",
               width: collapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
-              borderRight: "none",
-              transition: theme.transitions.create("width", {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-              }),
+              border: "none",
+              transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
               overflowX: "hidden",
-              bgcolor: "#1a1a2e",
+              bgcolor: "transparent",
             },
           }}
           open
