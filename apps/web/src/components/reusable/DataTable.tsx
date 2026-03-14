@@ -60,8 +60,9 @@ export default function DataTable<T extends object>({
   onRowClick,
   getRowKey,
 }: DataTableProps<T>) {
-  const hasActions = renderRowActions != null;
-
+ const hasActions = renderRowActions != null;
+  // Defensive: always use an array
+  const safeData = Array.isArray(data) ? data : [];
   return (
     <TableContainer sx={{ maxHeight: maxHeight ?? undefined }}>
       {loading ? (
@@ -106,14 +107,14 @@ export default function DataTable<T extends object>({
             </TableRow>
           </TableHead>
           <TableBody>
-            {data.length === 0 ? (
+            {safeData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length + (hasActions ? 1 : 0)} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={columns.length + (hasActions ? 1 : 0)} align="center" sx={{ py: 8 }}>
                   {emptyMessage}
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((row, idx) => (
+              safeData.map((row, idx) => (
                 <TableRow
                   key={getRowKey ? getRowKey(row, idx) : idx}
                   hover
