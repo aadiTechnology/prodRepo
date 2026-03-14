@@ -43,6 +43,7 @@ class FeeInstallmentBase(BaseModel):
     late_fee_amount: Optional[condecimal(max_digits=10, decimal_places=2)] = None
     late_fee_percentage: Optional[condecimal(max_digits=5, decimal_places=2)] = None
     description: Optional[str] = None
+    name: constr(max_length=100)
 
 class FeeInstallmentCreate(FeeInstallmentBase):
     pass
@@ -83,6 +84,7 @@ class FeeStructureResponse(FeeStructureBase):
     class_name: Optional[str] = None
     fee_category_name: Optional[str] = None
     academic_year_name: Optional[str] = None
+    name: str
 
     class Config:
         from_attributes = True

@@ -25,7 +25,8 @@ from app.models import (  # noqa: F401
     ThemeTemplate,
 )
 
-from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic
+from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, class_fee_structure_assignment, class_router, academic_year, fee_structure
+
 from app.routers import fee_discount, fee_category_router
 
 # Setup logging first
@@ -79,6 +80,10 @@ app.include_router(rbac.router)
 app.include_router(profile.router)
 app.include_router(ai.router)
 app.include_router(academic.router)
+app.include_router(class_fee_structure_assignment.router)
+app.include_router(class_router.router)
+app.include_router(academic_year.router)
+app.include_router(fee_structure.router)
 
 # Mount static files for profile images
 # Ensure the directory exists
