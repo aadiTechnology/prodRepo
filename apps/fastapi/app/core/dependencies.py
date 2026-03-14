@@ -10,11 +10,28 @@ from app.utils.security import decode_access_token
 from app.core.exceptions import UnauthorizedException, ForbiddenException
 from app.core.logging_config import get_logger
 from app.models.revoked_token import RevokedToken
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from app.core.database import SessionLocal
+from app.core.config import settings
 
 logger = get_logger(__name__)
 
 # HTTP Bearer token scheme - set auto_error=False to handle errors ourselves
 security = HTTPBearer(auto_error=False)
+
+# Dependency to get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Dependency to get current tenant (stub, replace with real logic)
+def get_current_tenant():
+    # In a real app, extract tenant_id from user/session/token
+    return 1  # Default tenant_id for testing
 
 def get_current_user(
     request: Request,

@@ -2,15 +2,21 @@ from datetime import date, datetime
 from typing import Optional, List
 from pydantic import BaseModel, constr, condecimal
 
+
 class FeeCategoryBase(BaseModel):
-    id: str
+    """Shared fields for fee categories used in create/update."""
+
     name: constr(max_length=100)
-    code: constr(max_length=20)
+    code: Optional[constr(max_length=20)] = None
     description: Optional[str] = None
     status: bool = True
 
+
 class FeeCategoryCreate(FeeCategoryBase):
+    """Payload for creating a fee category."""
+
     pass
+
 
 class FeeCategoryUpdate(BaseModel):
     name: Optional[str] = None
@@ -18,7 +24,11 @@ class FeeCategoryUpdate(BaseModel):
     description: Optional[str] = None
     status: Optional[bool] = None
 
+
 class FeeCategoryResponse(FeeCategoryBase):
+    """Response model including identifiers and audit fields."""
+
+    id: str
     tenant_id: int
     created_at: datetime
 

@@ -1,15 +1,88 @@
 from datetime import datetime
+from uuid import uuid4
 from sqlalchemy.orm import Session
 from app.models.fee import FeeCategory, FeeStructure, FeeInstallment
 from app.models.academic import ClassModel, AcademicYear
-from app.schemas.fee import FeeStructureCreate, FeeStructureUpdate
+from app.schemas.fee import FeeStructureCreate, FeeStructureUpdate, FeeCategoryCreate, FeeCategoryUpdate
 from app.core.exceptions import NotFoundException, ConflictException
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 def get_fee_categories(db: Session, tenant_id: int) -> list[FeeCategory]:
-    return db.query(FeeCategory).filter(FeeCategory.tenant_id == tenant_id).all()
+    """Return all non-deleted fee categories for a tenant."""
+    return (
+        db.query(FeeCategory)
+        .filter(FeeCategory.tenant_id == tenant_id, FeeCategory.deleted_at.is_(None))
+        .all()
+    )
+
+
+def get_fee_category(db: Session, tenant_id: int, category_id: str) -> FeeCategory:
+    """Return a single fee category or raise if not found."""
+    obj = (
+        db.query(FeeCategory)
+        .filter(
+            FeeCategory.id == category_id,
+            FeeCategory.tenant_id == tenant_id,
+            FeeCategory.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if not obj:
+        raise NotFoundException("FeeCategory", category_id)
+    return obj
+
+
+def create_fee_category(db: Session, obj_in: FeeCategoryCreate, tenant_id: int, user_id: int | None) -> FeeCategory:
+    """Create a new fee category. Code is optional and auto-derived from name when omitted."""
+    name = obj_in.name.strip()
+    code = (obj_in.code or name[:4]).upper()
+
+    db_obj = FeeCategory(
+        id=str(uuid4()),
+        tenant_id=tenant_id,
+        name=name,
+        code=code,
+        description=obj_in.description,
+        status=obj_in.status if obj_in.status is not None else True,
+        created_by=user_id,
+    )
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+
+
+def update_fee_category(
+    db: Session,
+    category_id: str,
+    obj_in: FeeCategoryUpdate,
+    tenant_id: int,
+    user_id: int | None,
+) -> FeeCategory:
+    """Update an existing fee category."""
+    db_obj = get_fee_category(db, tenant_id, category_id)
+
+    update_data = obj_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_obj, field, value)
+
+    db_obj.updated_at = datetime.utcnow()
+    db_obj.updated_by = user_id
+
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+
+
+def delete_fee_category(db: Session, category_id: str, tenant_id: int, user_id: int | None) -> None:
+    """Soft delete a fee category."""
+    db_obj = get_fee_category(db, tenant_id, category_id)
+    db_obj.deleted_at = datetime.utcnow()
+    db_obj.deleted_by = user_id
+    db.commit()
 
 def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academic_year_id: int = None) -> list[FeeStructure]:
     query = db.query(FeeStructure).filter(
