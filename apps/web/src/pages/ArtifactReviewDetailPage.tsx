@@ -18,11 +18,13 @@ import {
   CancelButton,
   RejectButton,
   SaveButton,
+  StoryQualitySection,
   TestCaseTable,
   UserStoryDetail,
 } from "../components/semantic";
 import { useAIReview, type ReviewStoryRecord } from "../features/aiReview";
-import type { TestCaseItem } from "../api/services/aiService";
+import aiService from "../api/services/aiService";
+import type { StoryQualityValidationResult, TestCaseItem } from "../api/services/aiService";
 
 function normalizeList(value: string[] | string | null | undefined): string[] {
   if (value == null) {
@@ -118,6 +120,10 @@ export default function ArtifactReviewDetailPage() {
     | { type: "testCase"; id: number }
     | null
   >(null);
+  const [qualityValidation, setQualityValidation] =
+    useState<StoryQualityValidationResult | null>(null);
+  const [qualityLoading, setQualityLoading] = useState(false);
+  const [qualityDismissed, setQualityDismissed] = useState(false);
 
   useEffect(() => {
     if (record != null) {
@@ -138,6 +144,33 @@ export default function ArtifactReviewDetailPage() {
       }
     }
   }, [editingTestCaseId, record, testCaseFeedbackId]);
+
+  const storyIsApproved = record?.story.review_status === "approved";
+  useEffect(() => {
+    if (!record?.story?.id || !storyIsApproved) {
+      setQualityValidation(null);
+      setQualityDismissed(false);
+      return;
+    }
+    let cancelled = false;
+    setQualityLoading(true);
+    aiService
+      .getStoryQualityValidation(record.story.id)
+      .then((result) => {
+        if (!cancelled) setQualityValidation(result);
+      })
+      .finally(() => {
+        if (!cancelled) setQualityLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [record?.story?.id, storyIsApproved]);
+
+  const qualityHasIssues =
+    qualityValidation &&
+    (qualityValidation.quality_score < 100 ||
+      qualityValidation.improvement_suggestions.length > 0);
 
   if (loading) {
     return (
@@ -326,11 +359,31 @@ export default function ArtifactReviewDetailPage() {
         }
       />
 
-      {storyIsRejected && storyEditOpen ? (
+      {storyIsApproved && (
+        <StoryQualitySection
+          validation={qualityValidation}
+          loading={qualityLoading}
+          hasIssues={!!qualityHasIssues && !qualityDismissed}
+          onImproveWithAI={
+            qualityValidation?.improvement_suggestions?.length
+              ? () =>
+                  void regenerateStory(
+                    record.story.id,
+                    qualityValidation.improvement_suggestions.join("\n")
+                  )
+              : undefined
+          }
+          onEditManually={() => setStoryEditOpen(true)}
+          onContinueAnyway={() => setQualityDismissed(true)}
+          improving={regeneratingStoryId === record.story.id}
+        />
+      )}
+
+      {storyEditOpen ? (
         <AppCard sx={{ mt: 2 }}>
           <Stack spacing={2}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Edit User Story
+              {storyIsRejected ? "Edit User Story" : "Edit User Story (manual)"}
             </Typography>
             <TextField
               label="Title"

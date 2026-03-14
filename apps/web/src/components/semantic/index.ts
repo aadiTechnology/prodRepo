@@ -47,3 +47,6 @@ export type { UserStoryDetailProps } from "./UserStoryDetail";
 
 export { default as TestCaseTable } from "./TestCaseTable";
 export type { TestCaseTableProps } from "./TestCaseTable";
+
+export { default as StoryQualitySection } from "./StoryQualitySection";
+export type { StoryQualitySectionProps } from "./StoryQualitySection";

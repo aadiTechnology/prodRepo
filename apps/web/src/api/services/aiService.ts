@@ -86,6 +86,19 @@ export interface RegenerateArtifactPayload {
   feedback: string;
 }
 
+export interface StoryQualityValidationCheck {
+  name: string;
+  passed: boolean;
+  message: string;
+}
+
+export interface StoryQualityValidationResult {
+  quality_score: number;
+  validation_checks: StoryQualityValidationCheck[];
+  extracted_scenarios: string[];
+  improvement_suggestions: string[];
+}
+
 export const aiService = {
   generateStoryAndTests: async (
     requirement: string
@@ -99,6 +112,15 @@ export const aiService = {
 
   getDrafts: async (): Promise<{ items: ArtifactGroup[] }> => {
     const response = await apiClient.get("/api/ai/drafts");
+    return response.data;
+  },
+
+  getStoryQualityValidation: async (
+    userStoryId: number
+  ): Promise<StoryQualityValidationResult> => {
+    const response = await apiClient.get(
+      `/api/ai/user-stories/${userStoryId}/quality-validation`
+    );
     return response.data;
   },
 

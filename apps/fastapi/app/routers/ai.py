@@ -35,6 +35,10 @@ from app.services.ai_persistence_service import (
     get_user_story,
     get_test_case,
 )
+from app.services.story_quality_service import (
+    validate_story_quality,
+    StoryQualityResult,
+)
 from app.services.ai_models import AIResponse
 from app.models.ai_entities import Requirement
 
@@ -252,6 +256,34 @@ async def get_drafts(
         )
     requirements = get_draft_artifacts(db)
     return {"items": [_saved_requirement_to_dict(r) for r in requirements]}
+
+
+@router.get("/user-stories/{user_story_id}/quality-validation")
+async def get_story_quality_validation(
+    user_story_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Run story quality validation for an approved or draft story. Super Admin only."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    us = get_user_story(db, user_story_id)
+    if not us:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User story not found.")
+    result: StoryQualityResult = validate_story_quality(
+        story_text=us.story or "",
+        acceptance_criteria=us.acceptance_criteria,
+        test_cases=[{"scenario": tc.scenario or ""} for tc in (us.test_cases or [])],
+    )
+    return {
+        "quality_score": result.quality_score,
+        "validation_checks": result.validation_checks,
+        "extracted_scenarios": result.extracted_scenarios,
+        "improvement_suggestions": result.improvement_suggestions,
+    }
 
 
 @router.patch("/user-stories/{user_story_id}/approve")
