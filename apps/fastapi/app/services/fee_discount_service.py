@@ -42,12 +42,11 @@ def create_discount(db: Session, tenant_id: int, data: FeeDiscountCreate):
         raise HTTPException(status_code=500, detail="Database error")
 
 def get_discounts(db: Session, tenant_id: int, search: str = None, page: int = 1, page_size: int = 10):
-    # Only return active (not deleted) discounts
+    # Only return active (status=True) discounts
     query = db.query(FeeDiscount).filter(
         FeeDiscount.tenant_id == tenant_id,
-        FeeDiscount.is_deleted == False
+        FeeDiscount.status == True
     )
-    print("DEBUG SQL QUERY:", str(query.statement))
     if search:
         query = query.filter(FeeDiscount.discount_name.ilike(f"%{search}%"))
     total = query.count()
@@ -85,13 +84,12 @@ def update_discount(db: Session, tenant_id: int, discount_id: int, data: FeeDisc
 def delete_discount(db: Session, tenant_id: int, discount_id: int):
     discount = db.query(FeeDiscount).filter(
         FeeDiscount.id == discount_id,
-        FeeDiscount.tenant_id == tenant_id,
-        FeeDiscount.is_deleted == False
+        FeeDiscount.tenant_id == tenant_id
     ).first()
     if not discount:
         raise HTTPException(status_code=404, detail="Discount not found")
     try:
-        discount.is_deleted = True
+        discount.status = False  # Soft delete using status flag
         db.commit()
         return True
     except SQLAlchemyError:
