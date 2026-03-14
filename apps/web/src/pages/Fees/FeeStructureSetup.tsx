@@ -63,7 +63,11 @@ const FeeStructureSetup = () => {
       setStructures(res.items);
       setTotalRecords(res.total);
     } catch (err: any) {
-      setError(err.message || "Failed to load fee structures.");
+      let msg = err.message || "Failed to load fee structures.";
+      if (err?.response?.status === 409 || msg.toLowerCase().includes("already exists")) {
+          msg = "Fee structure already exists for this class and category";
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -97,7 +101,13 @@ const FeeStructureSetup = () => {
       setConfirmOpen(false);
       fetchData();
     } catch (err: any) {
-      setError(err.message || "Failed to delete structure.");
+      let msg = err.message || "Failed to delete structure.";
+      if (err?.response?.status === 409 || msg.toLowerCase().includes("process") || msg.toLowerCase().includes("pay")) {
+          msg = "Cannot delete structure: Payments have already been processed";
+      } else if (msg.toLowerCase().includes("already exists")) {
+          msg = "Fee structure already exists for this class and category";
+      }
+      setError(msg);
     } finally {
       setDeleteLoading(false);
       setStructureToDelete(null);

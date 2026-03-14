@@ -37,12 +37,15 @@ import * as z from "zod";
 
 // ─── Validation Schema ──────────────────────────────────────────────────────────
 const feeStructureSchema = z.object({
-    academic_year_id: z.coerce.number().min(1, "Academic Year is required"),
-    class_id: z.coerce.number().min(1, "Class is required"),
-    fee_category_id: z.string().min(1, "Fee Category is required"),
-    total_amount: z.coerce.number().min(1, "Amount must be greater than 0"),
+    academic_year_id: z.union([z.number(), z.string().length(0)]).pipe(z.coerce.number()).refine(val => val > 0, "Please select an academic year"),
+    class_id: z.union([z.number(), z.string().length(0)]).pipe(z.coerce.number()).refine(val => val > 0, "Please select class"),
+    fee_category_id: z.string().min(1, "Please select fee category"),
+    total_amount: z.union([z.number(), z.string()]).pipe(z.coerce.number())
+        .refine(val => val > 0, "Amount is required"),
     installment_type: z.enum(["MONTHLY", "QUARTERLY", "YEARLY"]),
-    num_installments: z.coerce.number().min(1, "At least 1 installment required"),
+    num_installments: z.coerce.number()
+        .min(1, "At least 1 installment is required")
+        .max(12, "Maximum 12 installments allowed per year"),
     description: z.string().optional(),
     is_active: z.boolean().default(true),
 });
@@ -52,18 +55,35 @@ type FeeStructureFormValues = z.infer<typeof feeStructureSchema>;
 // ─── TextField sx (theme-driven) ───────────────────────────────────────────────
 const buildFieldSx = (hasError: boolean) => (theme: Theme) => ({
     "& .MuiOutlinedInput-root": {
-        borderRadius: 1,
+        borderRadius: 1.5,
         bgcolor: theme.palette.background.paper,
-        fontSize: "0.875rem",
+        fontSize: "1rem", // Increased from 0.95rem
         fontWeight: 500,
-        "& fieldset": { borderColor: hasError ? theme.palette.error.main : theme.palette.divider, borderWidth: hasError ? "1.5px" : "1.2px" },
+        "& fieldset": { 
+            borderColor: hasError ? theme.palette.error.main : theme.palette.divider, 
+            borderWidth: hasError ? "2px" : "1.2px",
+            transition: "all 0.2s ease-in-out"
+        },
         "&:hover fieldset": { borderColor: hasError ? theme.palette.error.main : theme.palette.grey[400] },
         "&.Mui-focused": {
-            "& fieldset": { borderColor: hasError ? theme.palette.error.main : theme.palette.primary.main, borderWidth: "1.8px" },
+            "& fieldset": { borderColor: hasError ? theme.palette.error.main : theme.palette.primary.main, borderWidth: "2px" },
         },
         "& .MuiInputBase-input.Mui-disabled": { WebkitTextFillColor: theme.palette.grey[500] },
     },
-    "& .MuiFormHelperText-root": { fontSize: "0.7rem", mt: 0.3, ml: 0 },
+    "& .MuiInputLabel-root": { 
+        fontSize: "1rem", // Increased from 0.9rem
+        color: theme.palette.text.secondary,
+        fontWeight: 500,
+        "&.Mui-focused": { 
+            color: hasError ? theme.palette.error.main : theme.palette.primary.main,
+            fontWeight: 600
+        },
+        "&.MuiInputLabel-shrink": {
+            fontSize: "0.9rem", // Larger floating label
+            transform: "translate(14px, -10px) scale(1)" // Calibration for larger size
+        }
+    },
+    "& .MuiFormHelperText-root": { fontSize: "0.8rem", mt: 0.5, ml: 0 },
 });
 
 // ─── FeeStructureForm ──────────────────────────────────────────────────────────
@@ -93,10 +113,10 @@ const FeeStructureForm = () => {
     } = useForm<FeeStructureFormValues>({
         resolver: zodResolver(feeStructureSchema),
         defaultValues: {
-            academic_year_id: 0,
-            class_id: 0,
+            academic_year_id: "" as any,
+            class_id: "" as any,
             fee_category_id: "",
-            total_amount: 0,
+            total_amount: "" as any,
             installment_type: "QUARTERLY",
             num_installments: 4,
             description: "",
@@ -192,6 +212,47 @@ const FeeStructureForm = () => {
         setLoading(true);
         setError(null);
         try {
+            // 1. Validate installment total
+            const instSum = installments.reduce((acc, inst) => acc + (Number(inst.amount) || 0), 0);
+            if (Math.abs(instSum - data.total_amount) > 0.01) {
+                setError("Installment total must equal fee amount");
+                setLoading(false);
+                return;
+            }
+
+            // 2. Validate installments individually
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            
+            let lastDate = new Date(0);
+            for (const inst of installments) {
+                if (Number(inst.amount) <= 0) {
+                    setError("Installment amount must be greater than zero");
+                    setLoading(false);
+                    return;
+                }
+                
+                const instDate = new Date(inst.due_date);
+                if (instDate < now) {
+                    setError("Due date cannot be in the past");
+                    setLoading(false);
+                    return;
+                }
+                
+                if (instDate < lastDate) {
+                    setError("Installment dates must be sequential");
+                    setLoading(false);
+                    return;
+                }
+                lastDate = instDate;
+
+                if (Number(inst.late_fee_amount) < 0) {
+                    setError("Late fee cannot be negative");
+                    setLoading(false);
+                    return;
+                }
+            }
+
             const payload = {
                 ...data,
                 installments: installments.map(({ id, ...rest }) => rest),
@@ -206,7 +267,20 @@ const FeeStructureForm = () => {
             }
             setTimeout(() => navigate("/fees/setup"), 1000);
         } catch (err: any) {
-            setError(err?.message || "Failed to save fee structure.");
+            let msg = err?.message || "Failed to save fee structure.";
+            const isConflict = err?.response?.status === 409 || msg.toLowerCase().includes("exists") || msg.toLowerCase().includes("already");
+            const isInUse = msg.toLowerCase().includes("paid") || msg.toLowerCase().includes("collect") || msg.toLowerCase().includes("process");
+            
+            if (isConflict) {
+                msg = "Fee structure already exists for this class and category";
+            } else if (isInUse) {
+                if (isEditMode) {
+                    msg = "Total amount cannot be less than the amount already collected (or structure is in use)";
+                } else {
+                    msg = "Cannot modify structure: Payments have already been processed";
+                }
+            }
+            setError(msg);
         } finally {
             setLoading(false);
         }
@@ -287,58 +361,57 @@ const FeeStructureForm = () => {
                         <Box sx={(theme) => ({ borderRight: { md: `1px solid ${theme.palette.divider}` } })}>
 
                             {/* Configuration */}
-                            <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.5 }}>
-                                <FormSectionLabel icon={<AssignmentIcon sx={{ fontSize: 15 }} />} title="Configuration" />
-                                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+                            <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 3, pb: 2 }}>
+                                <FormSectionLabel icon={<AssignmentIcon sx={{ fontSize: 16 }} />} title="Configuration" />
+                                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2.5 }}>
                                     <Box>
-                                        <FieldLabel required>Academic Year</FieldLabel>
                                         <Controller
                                             name="academic_year_id"
                                             control={control}
                                             render={({ field }) => (
-                                                <Select {...field} fullWidth size="small" sx={buildFieldSx(Boolean(errors.academic_year_id))}>
-                                                    <MenuItem value={0} disabled>Select Year</MenuItem>
+                                                <Select {...field} label="Academic Year" required fullWidth 
+                                                    error={Boolean(errors.academic_year_id)}
+                                                    helperText={errors.academic_year_id?.message}
+                                                    sx={buildFieldSx(Boolean(errors.academic_year_id))}>
                                                     {academicYears.map(ay => <MenuItem key={ay.id} value={ay.id}>{ay.name}</MenuItem>)}
                                                 </Select>
                                             )}
                                         />
-                                        {errors.academic_year_id && <Typography color="error" variant="caption">{errors.academic_year_id.message}</Typography>}
                                     </Box>
                                     <Box>
-                                        <FieldLabel required>Class</FieldLabel>
                                         <Controller
                                             name="class_id"
                                             control={control}
                                             render={({ field }) => (
-                                                <Select {...field} fullWidth size="small" sx={buildFieldSx(Boolean(errors.class_id))}>
-                                                    <MenuItem value={0} disabled>Select Class</MenuItem>
+                                                <Select {...field} label="Class" required fullWidth 
+                                                    error={Boolean(errors.class_id)}
+                                                    helperText={errors.class_id?.message}
+                                                    sx={buildFieldSx(Boolean(errors.class_id))}>
                                                     {classes.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
                                                 </Select>
                                             )}
                                         />
-                                        {errors.class_id && <Typography color="error" variant="caption">{errors.class_id.message}</Typography>}
                                     </Box>
                                     <Box sx={{ gridColumn: "1 / 3" }}>
-                                        <FieldLabel required>Fee Category</FieldLabel>
                                         <Controller
                                             name="fee_category_id"
                                             control={control}
                                             render={({ field }) => (
-                                                <Select {...field} fullWidth size="small" sx={buildFieldSx(Boolean(errors.fee_category_id))}>
-                                                    <MenuItem value="" disabled>Select Category</MenuItem>
+                                                <Select {...field} label="Fee Category" required fullWidth 
+                                                    error={Boolean(errors.fee_category_id)}
+                                                    helperText={errors.fee_category_id?.message}
+                                                    sx={buildFieldSx(Boolean(errors.fee_category_id))}>
                                                     {categories.map(cat => <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>)}
                                                 </Select>
                                             )}
                                         />
-                                        {errors.fee_category_id && <Typography color="error" variant="caption">{errors.fee_category_id.message}</Typography>}
                                     </Box>
                                     <Box sx={{ gridColumn: "1 / 3" }}>
-                                        <FieldLabel>Description</FieldLabel>
                                         <Controller
                                             name="description"
                                             control={control}
                                             render={({ field }) => (
-                                                <TextField {...field} fullWidth size="small" placeholder="Brief description…" multiline rows={2} sx={buildFieldSx(false)} />
+                                                <TextField {...field} label="Description" fullWidth multiline rows={2} sx={buildFieldSx(false)} />
                                             )}
                                         />
                                     </Box>
@@ -367,29 +440,28 @@ const FeeStructureForm = () => {
                         {/* ── RIGHT COLUMN ── */}
                         <Box>
                             {/* Financial Details */}
-                            <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.5 }}>
-                                <FormSectionLabel icon={<AssignmentIcon sx={{ fontSize: 15 }} />} title="Financial Details" />
-                                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                            <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 3, pb: 2 }}>
+                                <FormSectionLabel icon={<AssignmentIcon sx={{ fontSize: 16 }} />} title="Financial Details" />
+                                <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
                                     <Box>
-                                        <FieldLabel required>Total Amount</FieldLabel>
                                         <Controller
                                             name="total_amount"
                                             control={control}
                                             render={({ field }) => (
-                                                <TextField {...field} type="number" fullWidth size="small" placeholder="0.00"
+                                                <TextField {...field} label="Total Amount" required type="number" fullWidth
                                                     error={Boolean(errors.total_amount)} helperText={errors.total_amount?.message}
                                                     sx={buildFieldSx(Boolean(errors.total_amount))} />
                                             )}
                                         />
                                     </Box>
-                                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+                                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2.5 }}>
                                         <Box>
-                                            <FieldLabel>Installment Type</FieldLabel>
                                             <Controller
                                                 name="installment_type"
                                                 control={control}
                                                 render={({ field: { value, onChange } }) => (
                                                     <Select
+                                                        label="Installment Type"
                                                         value={value}
                                                         onChange={(e) => {
                                                             const type = e.target.value as string;
@@ -399,7 +471,7 @@ const FeeStructureForm = () => {
                                                             onChange(type);
                                                             setValue("num_installments", count);
                                                         }}
-                                                        fullWidth size="small" sx={buildFieldSx(false)}
+                                                        fullWidth sx={buildFieldSx(false)}
                                                     >
                                                         <MenuItem value="MONTHLY">Monthly</MenuItem>
                                                         <MenuItem value="QUARTERLY">Quarterly</MenuItem>
@@ -409,12 +481,11 @@ const FeeStructureForm = () => {
                                             />
                                         </Box>
                                         <Box>
-                                            <FieldLabel>No. of Installments</FieldLabel>
                                             <Controller
                                                 name="num_installments"
                                                 control={control}
                                                 render={({ field }) => (
-                                                    <TextField {...field} type="number" fullWidth size="small"
+                                                    <TextField {...field} label="No. of Installments" type="number" fullWidth
                                                         error={Boolean(errors.num_installments)} helperText={errors.num_installments?.message}
                                                         sx={buildFieldSx(Boolean(errors.num_installments))} />
                                                 )}
@@ -432,7 +503,6 @@ const FeeStructureForm = () => {
                                 {installments.length > 0 ? (
                                     <Box sx={{ mt: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1.25, overflow: 'hidden' }}>
                                         <DataTable<any>
-                                            size="small"
                                             columns={[
                                                 { id: 'num', label: '#' , render: (row: any) => row.installment_number },
                                                 { id: 'amt', label: 'Amount', render: (row: any) => `₹${Number(row.amount).toLocaleString()}` },
