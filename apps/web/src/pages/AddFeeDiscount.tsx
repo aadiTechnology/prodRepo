@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { Box, Typography, Snackbar, Alert, Stack, Paper, Grid, Switch } from "@mui/material";
 import DiscountIcon from '@mui/icons-material/LocalOffer';

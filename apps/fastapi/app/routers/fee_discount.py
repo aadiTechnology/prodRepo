@@ -21,6 +21,7 @@ def get_tenant_id(request: Request):
         raise HTTPException(status_code=401, detail="Invalid or missing tenant_id in token")
     return payload["tenant_id"]
 
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=FeeDiscountResponse)
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=FeeDiscountResponse)
 def create_discount(
     data: FeeDiscountCreate = Body(...),
@@ -30,6 +31,7 @@ def create_discount(
     discount = fee_discount_service.create_discount(db, tenant_id, data)
     return FeeDiscountResponse.from_orm(discount)
 
+@router.get("", response_model=dict)
 @router.get("/", response_model=dict)
 def list_discounts(
     db: Session = Depends(get_db),

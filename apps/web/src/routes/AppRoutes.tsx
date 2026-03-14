@@ -125,7 +125,7 @@ export default function AppRoutes() {
           
           {/* FEES MODULE (from user request) */}
           <Route
-            path="fees/discounts"
+            path="/fees/discounts"
             element={
               <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN"]}>
                 <FeeDiscountsPage />
@@ -133,7 +133,7 @@ export default function AppRoutes() {
             }
           />
           <Route
-            path="fees/discounts/add"
+            path="/fees/discounts/add"
             element={
               <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN"]}>
                 <AddFeeDiscount />
@@ -141,7 +141,7 @@ export default function AppRoutes() {
             }
           />
           <Route
-            path="fees/discounts/:id/edit"
+            path="/fees/discounts/:id/edit"
             element={
               <ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN"]}>
                 <AddFeeDiscount />
