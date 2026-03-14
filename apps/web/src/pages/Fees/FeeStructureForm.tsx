@@ -59,8 +59,8 @@ const buildFieldSx = (hasError: boolean) => (theme: Theme) => ({
         bgcolor: theme.palette.background.paper,
         fontSize: "1rem", // Increased from 0.95rem
         fontWeight: 500,
-        "& fieldset": { 
-            borderColor: hasError ? theme.palette.error.main : theme.palette.divider, 
+        "& fieldset": {
+            borderColor: hasError ? theme.palette.error.main : theme.palette.divider,
             borderWidth: hasError ? "2px" : "1.2px",
             transition: "all 0.2s ease-in-out"
         },
@@ -70,11 +70,11 @@ const buildFieldSx = (hasError: boolean) => (theme: Theme) => ({
         },
         "& .MuiInputBase-input.Mui-disabled": { WebkitTextFillColor: theme.palette.grey[500] },
     },
-    "& .MuiInputLabel-root": { 
+    "& .MuiInputLabel-root": {
         fontSize: "1rem", // Increased from 0.9rem
         color: theme.palette.text.secondary,
         fontWeight: 500,
-        "&.Mui-focused": { 
+        "&.Mui-focused": {
             color: hasError ? theme.palette.error.main : theme.palette.primary.main,
             fontWeight: 600
         },
@@ -96,7 +96,7 @@ const FeeStructureForm = () => {
     const [fetchLoading, setFetchLoading] = useState(isEditMode);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
-    
+
     // Lookups
     const [categories, setCategories] = useState<FeeCategory[]>([]);
     const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
@@ -159,9 +159,9 @@ const FeeStructureForm = () => {
             // Actually, FeeStructureSetup.tsx uses `selectedStructure` passed from list.
             // In a real app with routes, we need a getById.
             // Let's check if the service can be extended or if I should just use the list.
-            const response = await feeService.getFeeStructures(0, 1000); 
+            const response = await feeService.getFeeStructures(0, 1000);
             const found = response.items.find(s => s.id === Number(id));
-            
+
             if (found) {
                 reset({
                     academic_year_id: found.academic_year_id,
@@ -190,11 +190,11 @@ const FeeStructureForm = () => {
     useEffect(() => {
         const count = parseInt(watchedNumInstallments.toString()) || 0;
         const total = parseFloat(watchedTotalAmount.toString()) || 0;
-        
+
         if (count > 0 && total > 0) {
             const perInstallment = Math.floor((total / count) * 100) / 100;
             const remainder = Math.round((total - (perInstallment * count)) * 100) / 100;
-            
+
             const newInstallments = Array.from({ length: count }, (_, i) => ({
                 installment_number: i + 1,
                 amount: i === count - 1 ? Math.round((perInstallment + remainder) * 100) / 100 : perInstallment,
@@ -223,7 +223,7 @@ const FeeStructureForm = () => {
             // 2. Validate installments individually
             const now = new Date();
             now.setHours(0, 0, 0, 0);
-            
+
             let lastDate = new Date(0);
             for (const inst of installments) {
                 if (Number(inst.amount) <= 0) {
@@ -231,14 +231,14 @@ const FeeStructureForm = () => {
                     setLoading(false);
                     return;
                 }
-                
+
                 const instDate = new Date(inst.due_date);
                 if (instDate < now) {
                     setError("Due date cannot be in the past");
                     setLoading(false);
                     return;
                 }
-                
+
                 if (instDate < lastDate) {
                     setError("Installment dates must be sequential");
                     setLoading(false);
@@ -270,7 +270,7 @@ const FeeStructureForm = () => {
             let msg = err?.message || "Failed to save fee structure.";
             const isConflict = err?.response?.status === 409 || msg.toLowerCase().includes("exists") || msg.toLowerCase().includes("already");
             const isInUse = msg.toLowerCase().includes("paid") || msg.toLowerCase().includes("collect") || msg.toLowerCase().includes("process");
-            
+
             if (isConflict) {
                 msg = "Fee structure already exists for this class and category";
             } else if (isInUse) {
@@ -369,7 +369,7 @@ const FeeStructureForm = () => {
                                             name="academic_year_id"
                                             control={control}
                                             render={({ field }) => (
-                                                <Select {...field} label="Academic Year" required fullWidth 
+                                                <Select {...field} label="Academic Year" required fullWidth
                                                     error={Boolean(errors.academic_year_id)}
                                                     helperText={errors.academic_year_id?.message}
                                                     sx={buildFieldSx(Boolean(errors.academic_year_id))}>
@@ -383,7 +383,7 @@ const FeeStructureForm = () => {
                                             name="class_id"
                                             control={control}
                                             render={({ field }) => (
-                                                <Select {...field} label="Class" required fullWidth 
+                                                <Select {...field} label="Class" required fullWidth
                                                     error={Boolean(errors.class_id)}
                                                     helperText={errors.class_id?.message}
                                                     sx={buildFieldSx(Boolean(errors.class_id))}>
@@ -397,7 +397,7 @@ const FeeStructureForm = () => {
                                             name="fee_category_id"
                                             control={control}
                                             render={({ field }) => (
-                                                <Select {...field} label="Fee Category" required fullWidth 
+                                                <Select {...field} label="Fee Category" required fullWidth
                                                     error={Boolean(errors.fee_category_id)}
                                                     helperText={errors.fee_category_id?.message}
                                                     sx={buildFieldSx(Boolean(errors.fee_category_id))}>
@@ -504,7 +504,7 @@ const FeeStructureForm = () => {
                                     <Box sx={{ mt: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1.25, overflow: 'hidden' }}>
                                         <DataTable<any>
                                             columns={[
-                                                { id: 'num', label: '#' , render: (row: any) => row.installment_number },
+                                                { id: 'num', label: '#', render: (row: any) => row.installment_number },
                                                 { id: 'amt', label: 'Amount', render: (row: any) => `₹${Number(row.amount).toLocaleString()}` },
                                                 { id: 'date', label: 'Due Date', render: (row: any) => row.due_date }
                                             ]}
