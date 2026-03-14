@@ -33,7 +33,11 @@ export default function TextField({ sx, label, required, ...props }: TextFieldPr
             "&.Mui-focused fieldset": { borderColor: theme.palette.primary.main },
             "&.Mui-disabled .MuiInputBase-input.Mui-disabled": {
               WebkitTextFillColor: theme.palette.grey[600],
+              bgcolor: theme.palette.background.paper ,
             },
+          },
+          "& .MuiFormLabel-asterisk": {
+            color: theme.palette.error.main,
           },
         }),
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),

@@ -15,6 +15,10 @@ import CloseIcon from '@mui/icons-material/Close';
 import HomeIcon from '@mui/icons-material/Home';
 import CancelIcon from '@mui/icons-material/Cancel';
 import CheckIcon from '@mui/icons-material/Check';
+import ConfirmDialog from "../components/semantic/ConfirmDialog";
+import CommonPageHeader from "../components/common/CommonPageHeader";
+import SaveIconButton from "../components/semantic/SaveIconButton";
+import CloseIconButton from "../components/semantic/CloseIconButton";
 
 type FormData = {
   email: string;
@@ -192,76 +196,20 @@ export default function CreateUser() {
   };
 
   return (
-    <Box sx={(theme) => ({ px: { xs: 2, md: 4 }, pb: 2, backgroundColor: theme.palette.grey[50], display: "flex", flexDirection: "column" })}>
+    <>
       {/* Header - Aligned with AddRole */}
       <Box sx={{ pt: 1.5, pb: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <IconButton onClick={() => navigate("/")} sx={(theme) => ({ backgroundColor: theme.palette.grey[800], borderRadius: 1.2, width: 44, height: 44, "&:hover": { backgroundColor: theme.palette.grey[700] } })}>
-            <HomeIcon sx={{ color: "white", fontSize: 24 }} />
-          </IconButton>
-          <Typography variant="h5" sx={(theme) => ({ fontWeight: 700, fontSize: "22px", color: theme.palette.text.primary, letterSpacing: "-1px" })}>
-            <Box component="span" onClick={() => navigate("/users")} sx={(theme) => ({ color: theme.palette.text.secondary, cursor: "pointer", "&:hover": { color: theme.palette.text.primary } })}>Users</Box>
-            <Box component="span" sx={(theme) => ({ color: theme.palette.grey[400], mx: 1.5 })}>/</Box>
-            {isEdit ? "Edit User" : "Add User"}
-          </Typography>
-        </Box>
+        <CommonPageHeader
+          parentLabel="Users"
+          parentHref="/users"
+          title={isEdit ? "Edit User" : "Add User"}
+        />
         <Stack direction="row" spacing={1.5}>
-          <Tooltip title="Cancel and Go Back">
-            <IconButton
-              onClick={() => navigate("/users")}
-              sx={{
-                color: '#fff',
-                backgroundColor: '#fee2e2',
-                borderRadius: '12px',
-                width: 48,
-                height: 48,
-                boxShadow: '0 2px 8px 0 rgba(239,68,68,0.10)',
-                border: 'none',
-                p: 0,
-                m: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'background 0.2s, color 0.2s',
-                '&:hover': {
-                  backgroundColor: '#fecaca',
-                  color: '#fff',
-                },
-              }}
-            >
-              <CloseIcon sx={{ fontSize: 24, color: '#ef4444', bgcolor: '#fff', borderRadius: '50%', p: 0.375 }} />
-            </IconButton>
-          </Tooltip>
+        <Tooltip title="Cancel and Go Back">
+         <CloseIconButton onClick={() => navigate("/users")} />
+        </Tooltip>
           <Tooltip title={isEdit ? "Update User" : "Save User"}>
-            <IconButton
-              onClick={handleSubmit}
-              disabled={false}
-              sx={(theme) => ({
-                color: theme.palette.success.contrastText,
-                backgroundColor: theme.palette.success.main,
-                borderRadius: 1.5,
-                width: 48,
-                height: 48,
-                boxShadow: theme.shadows[2],
-                border: 'none',
-                p: 0,
-                m: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'background 0.2s, color 0.2s',
-                '&:hover': {
-                  backgroundColor: theme.palette.success.light,
-                  color: theme.palette.success.contrastText,
-                },
-                '&:disabled': {
-                  backgroundColor: theme.palette.grey[400],
-                  color: theme.palette.grey[500],
-                },
-              })}
-            >
-              {loading ? <CircularProgress size={24} color="inherit" /> : <SaveIcon sx={(theme) => ({ fontSize: 24, color: theme.palette.success.contrastText })} />}
-            </IconButton>
+            <SaveIconButton onClick={handleSubmit} loading={loading} />
           </Tooltip>
         </Stack>
       </Box>
@@ -286,25 +234,22 @@ export default function CreateUser() {
                     onChange={handleChange}
                     placeholder="Enter full name"
                     variant="outlined"
-                    sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
                     required
                     inputProps={{ minLength: 2 }}
                   />
                 </Grid>
                 <Grid item xs={12}>
                   <EmailInput
-                    fullWidth
-                    label="Email Address"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="Enter email address"
-                    variant="outlined"
-                    sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
-                    required
-                    disabled={isEdit}
-                  />
-                </Grid>
+                  fullWidth
+                  label="Email Address"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="Enter email address"
+                  required
+                  disabled={isEdit}
+                />
+              </Grid>
 
                 {!isEdit && (
                   <>
@@ -317,7 +262,6 @@ export default function CreateUser() {
                         onChange={handleChange}
                         placeholder="Enter password"
                         variant="outlined"
-                        sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
                         required
                       />
                     </Grid>
@@ -328,9 +272,8 @@ export default function CreateUser() {
                         name="confirm_password"
                         value={formData.confirm_password}
                         onChange={handleChange}
-                        placeholder="Confirm password"
                         variant="outlined"
-                        sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
+                        placeholder="Confirm password"
                         required
                       />
                     </Grid>
@@ -389,57 +332,17 @@ export default function CreateUser() {
               {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 4 }}>
-                <SaveButton
-                  type="submit"
-                  variant="text"
-                  disabled={false}
-                  loading={loading}
-                  sx={(theme) => ({
-                    minWidth: 165,
-                    fontWeight: 750,
-                    borderRadius: 0,
-                    color: theme.palette.success.main,
-                    backgroundColor: 'transparent',
-                    boxShadow: 'none',
-                    border: 'none',
-                    fontSize: '1.21rem',
-                    px: 4.4,
-                    py: 1.1,
-                    '&:hover': {
-                      backgroundColor: 'transparent',
-                      textDecoration: 'underline',
-                    },
-                    '&:disabled': {
-                      color: theme.palette.grey[400],
-                    },
-                  })}
-                >
-                  {loading ? "Saving..." : "Save"}
-                </SaveButton>
-                <CancelButton
-                  variant="text"
-                  onClick={() => navigate("/users")}
-                  disabled={loading}
-                  sx={(theme) => ({
-                    minWidth: 132,
-                    fontWeight: 700,
-                    borderRadius: 0,
-                    color: theme.palette.error.main,
-                    backgroundColor: 'transparent',
-                    boxShadow: 'none',
-                    border: 'none',
-                    fontSize: '1.21rem',
-                    px: 4.4,
-                    py: 1.1,
-                    '&:hover': {
-                      backgroundColor: 'transparent',
-                      textDecoration: 'underline',
-                    },
-                    '&:disabled': {
-                      color: theme.palette.grey[400],
-                    },
-                  })}
-                >
+              <SaveButton
+                type="submit"
+                disabled={false}
+                loading={loading}
+              >
+                Save
+              </SaveButton>
+              <CancelButton
+                onClick={() => navigate("/users")}
+                disabled={loading}
+              >
                   Cancel
                 </CancelButton>
               </Box>
@@ -461,101 +364,14 @@ export default function CreateUser() {
       </Snackbar>
 
       {/* Confirmation Dialog */}
-      <Dialog
+      <ConfirmDialog
         open={confirmOpen}
         onClose={handleCancel}
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            maxWidth: 600,
-            width: '100%',
-            p: 0,
-            position: 'absolute',
-            top: '5%',
-            left: '50%',
-            transform: 'translate(-50%, 0)',
-            height: '30%',
-            minHeight: '20px',
-            overflowY: 'auto',
-          }
-        }}
-      >
-        {/* Header bar with title and close icon */}
-        <Box sx={(theme) => ({
-          bgcolor: theme.palette.grey[800],
-          borderTopLeftRadius: 12,
-          borderTopRightRadius: 12,
-          px: 2,
-          py: 0.10,
-          minHeight: 4,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          width: '100%',
-          boxShadow: theme.shadows[2],
-        })}>
-          <Box />
-          <IconButton
-            aria-label="close"
-            onClick={handleCancel}
-            disabled={loading}
-            sx={{ color: 'white', bgcolor: 'transparent', borderRadius: 2 }}
-          >
-            <CancelIcon sx={{ fontSize: 28 }} />
-          </IconButton>
-        </Box>
-        {/* Message, check icon, and buttons area */}
-        <Box sx={(theme) => ({ px: 4, pt: 4, pb: 2.5, bgcolor: theme.palette.background.paper, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, textAlign: 'left' })}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-            <CheckIcon sx={(theme) => ({ fontSize: 50, color: theme.palette.success.main, mr: 2, p: 0 })} />
-            <Typography sx={(theme) => ({ fontWeight: 175, fontSize: '1.9rem', color: theme.palette.text.primary, letterSpacing: '-1px', lineHeight: 1.1 })}>
-              Please Confirm
-            </Typography>
-          </Box>
-          <Typography sx={(theme) => ({ fontSize: '1.05rem', color: theme.palette.text.primary, fontWeight: 125, mb: 1.2, ml: 3 })}>
-            {isEdit ? 'Are you sure you want to update this user?' : 'Are you sure you want to save this user?'}
-          </Typography>
-          <Divider sx={{ my: 0.5 }} />
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, width: '100%', mt: 0.5 }}>
-            <CancelButton
-              onClick={handleCancel}
-              disabled={loading}
-              sx={(theme) => ({
-                color: theme.palette.error.main,
-                backgroundColor: 'transparent',
-                fontWeight: 'bold',
-                fontSize: '1.1rem',
-                px: 4,
-                borderRadius: 0,
-                minWidth: 120,
-                boxShadow: 'none',
-                border: 'none',
-                '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' }
-              })}
-            >
-              Cancel
-            </CancelButton>
-            <Button
-              onClick={handleConfirm}
-              disabled={loading}
-              sx={(theme) => ({
-                color: theme.palette.success.main,
-                backgroundColor: 'transparent',
-                fontWeight: 'bold',
-                fontSize: '1.1rem',
-                px: 4,
-                borderRadius: 0,
-                minWidth: 120,
-                boxShadow: 'none',
-                border: 'none',
-                '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' }
-              })}
-            >
-              {loading ? "Processing..." : "Confirm"}
-            </Button>
-          </Box>
-        </Box>
-      </Dialog>
-    </Box>
+        onConfirm={handleConfirm}
+        message={isEdit? "Are you sure you want to update this user?": "Are you sure you want to save this user?"}
+        confirmLabel="Confirm"
+        loading={loading}
+      />
+      </>
   );
 }

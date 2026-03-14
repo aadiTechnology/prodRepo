@@ -1,8 +1,4 @@
-/**
- * EmailInput — Semantic component
- * Email field with type="email" and optional validation hint. Uses TextField primitive.
- */
-
+// apps/web/src/components/semantic/EmailInput.tsx
 import { TextField, type TextFieldProps } from "../primitives";
 
 export interface EmailInputProps extends Omit<TextFieldProps, "type"> {
@@ -14,6 +10,7 @@ export default function EmailInput({
   type = "email",
   label = "Email",
   placeholder,
+  sx,
   ...props
 }: EmailInputProps) {
   return (
@@ -22,6 +19,10 @@ export default function EmailInput({
       label={label}
       placeholder={placeholder ?? "e.g. user@example.com"}
       autoComplete="email"
+      sx={[
+        { bgcolor: "background.paper" },          // semantic default
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []), // allow callers to extend/override
+      ]}
       {...props}
     />
   );
