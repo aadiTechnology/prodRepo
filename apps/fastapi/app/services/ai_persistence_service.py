@@ -246,6 +246,40 @@ def update_user_story_content(
     return us
 
 
+def add_test_cases_to_story(
+    db: Session,
+    user_story_id: int,
+    new_test_cases: list[dict],
+    created_by: int | None = None,
+) -> list[TestCase]:
+    """Append new test cases to an existing user story. Each dict: test_case_id, scenario, pre_requisite, test_data, steps, expected_result."""
+    us = get_user_story(db, user_story_id)
+    if not us or not new_test_cases:
+        return []
+    added = []
+    for tc in new_test_cases:
+        db_tc = TestCase(
+            user_story_id=us.id,
+            test_case_id=str(tc.get("test_case_id", "")).strip() or "TC_new",
+            scenario=str(tc.get("scenario", "")).strip() or "Unnamed scenario",
+            pre_requisite=tc.get("pre_requisite") if tc.get("pre_requisite") else None,
+            test_data=tc.get("test_data"),
+            steps=tc.get("steps") if tc.get("steps") else None,
+            expected_result=str(tc.get("expected_result", "")).strip() or "See steps.",
+            review_status=REVIEW_STATUS_DRAFT,
+            tenant_id=us.tenant_id,
+            is_super_admin_accessible=us.is_super_admin_accessible,
+            created_by=created_by,
+        )
+        db.add(db_tc)
+        db.flush()
+        added.append(db_tc)
+    db.commit()
+    for t in added:
+        db.refresh(t)
+    return added
+
+
 def update_test_case_content(
     db: Session,
     test_case_id: int,

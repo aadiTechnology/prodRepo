@@ -58,8 +58,13 @@ export default function StoryQualitySection({
     return null;
   }
 
-  const { quality_score, validation_checks, extracted_scenarios, improvement_suggestions } =
-    validation;
+  const {
+    quality_score,
+    validation_checks,
+    normalized_scenarios,
+    missing_test_case_scenarios,
+    improvement_suggestions,
+  } = validation;
 
   return (
     <AppCard sx={{ mt: 2 }}>
@@ -112,13 +117,13 @@ export default function StoryQualitySection({
           </Stack>
         </Box>
 
-        {extracted_scenarios.length > 0 && (
+        {normalized_scenarios.length > 0 && (
           <Box>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-              Extracted scenarios
+              Normalized scenarios
             </Typography>
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-              {extracted_scenarios.map((s) => (
+              {normalized_scenarios.map((s) => (
                 <Typography
                   key={s}
                   variant="body2"
@@ -127,6 +132,33 @@ export default function StoryQualitySection({
                     px: 1,
                     py: 0.25,
                     bgcolor: "action.selected",
+                    borderRadius: 1,
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {s}
+                </Typography>
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        {missing_test_case_scenarios.length > 0 && (
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+              Missing test case scenarios
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+              {missing_test_case_scenarios.map((s) => (
+                <Typography
+                  key={s}
+                  variant="body2"
+                  component="span"
+                  sx={{
+                    px: 1,
+                    py: 0.25,
+                    bgcolor: "error.light",
+                    color: "error.dark",
                     borderRadius: 1,
                     fontFamily: "monospace",
                   }}

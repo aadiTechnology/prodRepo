@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from pydantic import BaseModel
 
 
@@ -54,3 +55,25 @@ class RegeneratedTestCase(BaseModel):
     test_data: list[str] | None
     steps: list[str]
     expected_result: str
+
+
+# Story quality improvement (structured output)
+ImprovementAction = Literal["add_test_cases", "update_story", "update_story_and_add_tests", "no_change"]
+
+
+class NewTestCaseForImprovement(BaseModel):
+    """One new test case to append for a missing scenario."""
+
+    test_case_id: str
+    scenario: str
+    pre_requisite: list[str] = []
+    test_data: list[str] | None = None
+    steps: list[str]
+    expected_result: str
+
+
+class StoryQualityImprovementResult(BaseModel):
+    improvement_action: ImprovementAction
+    updated_story: str | None = None  # Only when action is update_story or update_story_and_add_tests
+    new_test_cases: list[NewTestCaseForImprovement] = []
+    resolved_validation_issues: list[str] = []

@@ -42,6 +42,9 @@ interface AIReviewContextValue {
   rejectStory: (storyId: number, reason: string) => Promise<boolean>;
   updateStory: (storyId: number, payload: UpdateUserStoryPayload) => Promise<boolean>;
   regenerateStory: (storyId: number, feedback: string) => Promise<boolean>;
+  improveStoryFromQuality: (
+    storyId: number
+  ) => Promise<import("../../api/services/aiService").ImproveFromQualityResult | null>;
   approveTestCase: (testCaseId: number) => Promise<void>;
   rejectTestCase: (testCaseId: number, reason: string) => Promise<boolean>;
   updateTestCase: (testCaseId: number, payload: UpdateTestCasePayload) => Promise<boolean>;
@@ -244,6 +247,26 @@ export function AIReviewProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const improveStoryFromQuality = useCallback(
+    async (storyId: number): Promise<import("../../api/services/aiService").ImproveFromQualityResult | null> => {
+      try {
+        setRegeneratingStoryId(storyId);
+        setError(null);
+        const result = await aiService.improveStoryFromQuality(storyId);
+        await refresh();
+        return result;
+      } catch (err: any) {
+        setError(
+          err?.response?.data?.detail ?? err?.message ?? "Failed to improve from quality."
+        );
+        return null;
+      } finally {
+        setRegeneratingStoryId(null);
+      }
+    },
+    [refresh]
+  );
+
   const approveTestCase = useCallback(async (testCaseId: number) => {
     try {
       setApprovingTestCaseId(testCaseId);
@@ -340,6 +363,7 @@ export function AIReviewProvider({ children }: { children: ReactNode }) {
       rejectStory,
       updateStory,
       regenerateStory,
+      improveStoryFromQuality,
       approveTestCase,
       rejectTestCase,
       updateTestCase,
@@ -353,6 +377,7 @@ export function AIReviewProvider({ children }: { children: ReactNode }) {
       approvingTestCaseId,
       error,
       getStoryRecord,
+      improveStoryFromQuality,
       items,
       loading,
       regeneratingStoryId,

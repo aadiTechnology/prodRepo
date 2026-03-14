@@ -20,6 +20,7 @@ from app.services.ai_service import (
     generate_story_and_tests,
     regenerate_user_story,
     regenerate_test_case,
+    improve_story_quality,
 )
 from app.services.cache_service import get_cached_response, cache_response, generate_requirement_hash
 from app.services.ai_persistence_service import (
@@ -32,6 +33,7 @@ from app.services.ai_persistence_service import (
     reject_test_case as service_reject_test_case,
     update_user_story_content,
     update_test_case_content,
+    add_test_cases_to_story,
     get_user_story,
     get_test_case,
 )
@@ -281,7 +283,8 @@ async def get_story_quality_validation(
     return {
         "quality_score": result.quality_score,
         "validation_checks": result.validation_checks,
-        "extracted_scenarios": result.extracted_scenarios,
+        "normalized_scenarios": result.normalized_scenarios,
+        "missing_test_case_scenarios": result.missing_test_case_scenarios,
         "improvement_suggestions": result.improvement_suggestions,
     }
 
@@ -326,6 +329,122 @@ async def reject_user_story(
     if not us:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User story not found.")
     return {"id": us.id, "review_status": us.review_status, "rejection_reason": us.rejection_reason}
+
+
+@router.post("/user-stories/{user_story_id}/improve-from-quality")
+async def improve_user_story_from_quality(
+    user_story_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Apply story quality validation improvements: fix ambiguity and/or add test cases for missing scenarios. Super Admin only."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    us = get_user_story(db, user_story_id)
+    if not us:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User story not found.")
+
+    from app.services.story_quality_service import validate_story_quality, StoryQualityResult
+
+    validation: StoryQualityResult = validate_story_quality(
+        story_text=us.story or "",
+        acceptance_criteria=us.acceptance_criteria,
+        test_cases=[{"scenario": tc.scenario or ""} for tc in (us.test_cases or [])],
+    )
+
+    if validation.quality_score >= 100 and not validation.improvement_suggestions:
+        return {
+            "improvement_action": "no_change",
+            "updated_story": None,
+            "new_test_cases": [],
+            "resolved_validation_issues": [],
+            "validation": {
+                "quality_score": validation.quality_score,
+                "validation_checks": validation.validation_checks,
+                "normalized_scenarios": validation.normalized_scenarios,
+                "missing_test_case_scenarios": validation.missing_test_case_scenarios,
+                "improvement_suggestions": validation.improvement_suggestions,
+            },
+        }
+
+    req = us.requirement
+    existing_tc = [
+        {
+            "test_case_id": tc.test_case_id,
+            "scenario": tc.scenario,
+            "pre_requisite": tc.pre_requisite or [],
+            "test_data": tc.test_data,
+            "steps": tc.steps or [],
+            "expected_result": tc.expected_result,
+        }
+        for tc in (us.test_cases or [])
+    ]
+    story_dict = {
+        "title": us.title,
+        "prerequisite": us.prerequisite or [],
+        "story": us.story or "",
+        "acceptance_criteria": us.acceptance_criteria or [],
+    }
+
+    result = improve_story_quality(
+        requirement_title=req.title,
+        requirement_description=req.description or "",
+        story=story_dict,
+        existing_test_cases=existing_tc,
+        normalized_scenarios=validation.normalized_scenarios,
+        missing_test_case_scenarios=validation.missing_test_case_scenarios,
+        validation_checks=validation.validation_checks,
+        improvement_suggestions=validation.improvement_suggestions,
+    )
+
+    action = result.get("improvement_action", "no_change")
+    updated_story_text = result.get("updated_story")
+    new_test_cases_payload = result.get("new_test_cases") or []
+    resolved = result.get("resolved_validation_issues") or []
+
+    updated_us = None
+    if action in ("update_story", "update_story_and_add_tests") and updated_story_text:
+        updated_us = update_user_story_content(
+            db,
+            user_story_id,
+            title=us.title,
+            prerequisite=us.prerequisite or [],
+            story=updated_story_text.strip(),
+            acceptance_criteria=us.acceptance_criteria or [],
+            updated_by=current_user.id,
+        )
+
+    added_tc = []
+    if action in ("add_test_cases", "update_story_and_add_tests") and new_test_cases_payload:
+        added_tc = add_test_cases_to_story(
+            db, user_story_id, new_test_cases_payload, created_by=current_user.id
+        )
+
+    # Re-run validation after applying changes so the frontend can update the Story Quality panel immediately
+    us_after = get_user_story(db, user_story_id)
+    validation_after: StoryQualityResult = validate_story_quality(
+        story_text=us_after.story or "",
+        acceptance_criteria=us_after.acceptance_criteria,
+        test_cases=[{"scenario": tc.scenario or ""} for tc in (us_after.test_cases or [])],
+    )
+    validation_payload = {
+        "quality_score": validation_after.quality_score,
+        "validation_checks": validation_after.validation_checks,
+        "normalized_scenarios": validation_after.normalized_scenarios,
+        "missing_test_case_scenarios": validation_after.missing_test_case_scenarios,
+        "improvement_suggestions": validation_after.improvement_suggestions,
+    }
+
+    return {
+        "improvement_action": action,
+        "updated_story": _serialize_user_story(updated_us) if updated_us else None,
+        "new_test_cases": [_serialize_test_case(t) for t in added_tc],
+        "resolved_validation_issues": resolved,
+        "validation": validation_payload,
+    }
 
 
 @router.patch("/user-stories/{user_story_id}")

@@ -95,8 +95,23 @@ export interface StoryQualityValidationCheck {
 export interface StoryQualityValidationResult {
   quality_score: number;
   validation_checks: StoryQualityValidationCheck[];
-  extracted_scenarios: string[];
+  normalized_scenarios: string[];
+  missing_test_case_scenarios: string[];
   improvement_suggestions: string[];
+}
+
+export type ImprovementAction =
+  | "add_test_cases"
+  | "update_story"
+  | "update_story_and_add_tests"
+  | "no_change";
+
+export interface ImproveFromQualityResult {
+  improvement_action: ImprovementAction;
+  updated_story: UserStoryItem | null;
+  new_test_cases: TestCaseItem[];
+  resolved_validation_issues: string[];
+  validation: StoryQualityValidationResult;
 }
 
 export const aiService = {
@@ -120,6 +135,15 @@ export const aiService = {
   ): Promise<StoryQualityValidationResult> => {
     const response = await apiClient.get(
       `/api/ai/user-stories/${userStoryId}/quality-validation`
+    );
+    return response.data;
+  },
+
+  improveStoryFromQuality: async (
+    userStoryId: number
+  ): Promise<ImproveFromQualityResult> => {
+    const response = await apiClient.post(
+      `/api/ai/user-stories/${userStoryId}/improve-from-quality`
     );
     return response.data;
   },

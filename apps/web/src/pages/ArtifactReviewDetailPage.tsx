@@ -1,5 +1,5 @@
 import { Alert } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../components/layout";
 import {
@@ -77,6 +77,7 @@ export default function ArtifactReviewDetailPage() {
     rejectStory,
     updateStory,
     regenerateStory,
+    improveStoryFromQuality,
     approveTestCase,
     rejectTestCase,
     updateTestCase,
@@ -124,6 +125,17 @@ export default function ArtifactReviewDetailPage() {
     useState<StoryQualityValidationResult | null>(null);
   const [qualityLoading, setQualityLoading] = useState(false);
   const [qualityDismissed, setQualityDismissed] = useState(false);
+  const [improvementAppliedMessage, setImprovementAppliedMessage] = useState<string | null>(null);
+  const prevStoryIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (record?.story?.id !== prevStoryIdRef.current) {
+      prevStoryIdRef.current = record?.story?.id ?? null;
+      setQualityValidation(null);
+      setQualityDismissed(false);
+      setImprovementAppliedMessage(null);
+    }
+  }, [record?.story?.id]);
 
   useEffect(() => {
     if (record != null) {
@@ -147,11 +159,7 @@ export default function ArtifactReviewDetailPage() {
 
   const storyIsApproved = record?.story.review_status === "approved";
   useEffect(() => {
-    if (!record?.story?.id || !storyIsApproved) {
-      setQualityValidation(null);
-      setQualityDismissed(false);
-      return;
-    }
+    if (!record?.story?.id || !storyIsApproved) return;
     let cancelled = false;
     setQualityLoading(true);
     aiService
@@ -359,24 +367,35 @@ export default function ArtifactReviewDetailPage() {
         }
       />
 
-      {storyIsApproved && (
-        <StoryQualitySection
+      {(qualityValidation != null || qualityLoading) && (
+        <>
+          {improvementAppliedMessage && (
+            <Alert severity="success" sx={{ mt: 2 }} onClose={() => setImprovementAppliedMessage(null)}>
+              {improvementAppliedMessage}
+            </Alert>
+          )}
+          <StoryQualitySection
           validation={qualityValidation}
           loading={qualityLoading}
           hasIssues={!!qualityHasIssues && !qualityDismissed}
           onImproveWithAI={
-            qualityValidation?.improvement_suggestions?.length
-              ? () =>
-                  void regenerateStory(
-                    record.story.id,
-                    qualityValidation.improvement_suggestions.join("\n")
-                  )
+            qualityHasIssues
+              ? async () => {
+                  const result = await improveStoryFromQuality(record.story.id);
+                  if (result?.validation) {
+                    setQualityValidation(result.validation);
+                    setImprovementAppliedMessage(
+                      "AI improvements applied. Quality score updated."
+                    );
+                  }
+                }
               : undefined
           }
           onEditManually={() => setStoryEditOpen(true)}
           onContinueAnyway={() => setQualityDismissed(true)}
           improving={regeneratingStoryId === record.story.id}
         />
+        </>
       )}
 
       {storyEditOpen ? (

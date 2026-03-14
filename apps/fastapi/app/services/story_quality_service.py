@@ -1,7 +1,7 @@
 """
 Story quality validation before task generation.
 Validates structure, acceptance criteria coverage, scenario coverage, and ambiguity.
-Extracts normalized scenarios for use in task generation.
+Extracts normalized scenarios (canonical identifiers) and detects missing test coverage.
 """
 
 from __future__ import annotations
@@ -10,9 +10,14 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-
-VAGUE_TERMS = ("fast", "efficient", "easy", "secure")
+VAGUE_TERMS = ("secure", "fast", "efficient", "easy", "robust")
 MIN_ACCEPTANCE_CRITERIA = 2
+WEIGHT_STORY_STRUCTURE = 20
+WEIGHT_ACCEPTANCE_CRITERIA = 20
+WEIGHT_SCENARIO_COVERAGE = 40
+WEIGHT_AMBIGUITY = 20
+SCENARIO_PREFIXES = ("test_case_", "scenario_")
+MAX_SCENARIO_LENGTH = 60
 
 
 def _has_story_structure(text: str) -> bool:
@@ -23,25 +28,117 @@ def _has_story_structure(text: str) -> bool:
     return "as a" in t and "i want" in t and "so that" in t
 
 
-def _normalize_to_scenario_id(text: str) -> str:
-    """Convert a phrase to snake_case scenario identifier."""
+def _to_snake(text: str) -> str:
+    """Convert to snake_case and collapse duplicate wording."""
     if not text or not text.strip():
         return ""
     s = text.strip().lower()
     s = re.sub(r"[^\w\s-]", " ", s)
     s = re.sub(r"[\s_-]+", " ", s)
-    s = s.strip().replace(" ", "_")
-    return s[:80] if s else ""
+    parts = s.strip().split()
+    # Remove consecutive duplicates
+    seen = set()
+    unique = []
+    for p in parts:
+        if p not in seen:
+            seen.add(p)
+            unique.append(p)
+    return "_".join(unique) if unique else ""
 
 
-def _extract_scenario_candidates(text: str) -> list[str]:
-    """From a sentence, yield candidate scenario names (e.g. 'payment success' -> payment_success)."""
+def _strip_scenario_prefixes(raw: str) -> str:
+    """Remove test_case_, scenario_ and similar prefixes."""
+    s = raw.strip().lower()
+    for prefix in SCENARIO_PREFIXES:
+        if s.startswith(prefix):
+            s = s[len(prefix) :].strip("_")
+    return s
+
+
+def _shorten_action_based(raw: str) -> str:
+    """Prefer concise action-based name; drop redundant suffixes."""
+    s = raw.strip("_")
+    # Optional: drop trailing _successfully, _correctly when we have an action
+    for suffix in ("_successfully", "_correctly", "_properly"):
+        if s.endswith(suffix) and len(s) > len(suffix):
+            s = s[: -len(suffix)]
+    return s[:MAX_SCENARIO_LENGTH] if s else ""
+
+
+def _normalize_to_canonical_id(text: str) -> str:
+    """
+    Produce a short canonical scenario identifier.
+    - Convert to snake_case, remove prefixes (test_case_, scenario_), dedupe words, shorten.
+    """
     if not text or not text.strip():
-        return []
-    normalized = _normalize_to_scenario_id(text)
-    if not normalized:
-        return []
-    return [normalized]
+        return ""
+    raw = _to_snake(text)
+    raw = _strip_scenario_prefixes(raw)
+    raw = _shorten_action_based(raw)
+    return raw if raw else ""
+
+
+def _scenario_stem(canonical_id: str) -> str:
+    """Stem for grouping similar scenarios (e.g. user_logout, user_logs_out -> same group)."""
+    if not canonical_id:
+        return ""
+    parts = canonical_id.split("_")
+    if len(parts) <= 2:
+        return canonical_id
+    # Prefer last part (action) + first part (actor) for grouping
+    return "_".join([parts[0], parts[-1]]) if parts else ""
+
+
+def _extract_canonical_from_phrase(phrase: str) -> str:
+    """From one acceptance criterion or test scenario phrase, get one canonical id."""
+    return _normalize_to_canonical_id(phrase)
+
+
+def _deduplicate_canonicals(
+    ac_ids: list[str], tc_ids: list[str]
+) -> tuple[list[str], list[str], set[str]]:
+    """
+    Merge duplicate scenarios into one canonical per group.
+    Returns (normalized_scenarios, missing_test_case_scenarios, tc_canonical_set).
+    - normalized_scenarios: sorted unique canonical ids (one per logical scenario).
+    - missing_test_case_scenarios: canonical ids that come from AC but have no TC coverage.
+    - tc_canonical_set: set of canonical ids that are covered by test cases.
+    """
+    # Group by stem: stem -> list of (canonical_id, source: 'ac'|'tc')
+    groups: dict[str, list[tuple[str, str]]] = {}
+    for cid in ac_ids:
+        if not cid:
+            continue
+        stem = _scenario_stem(cid)
+        if stem not in groups:
+            groups[stem] = []
+        groups[stem].append((cid, "ac"))
+    for cid in tc_ids:
+        if not cid:
+            continue
+        stem = _scenario_stem(cid)
+        if stem not in groups:
+            groups[stem] = []
+        groups[stem].append((cid, "tc"))
+
+    normalized: list[str] = []
+    missing: list[str] = []
+    tc_covered_stems: set[str] = set()
+
+    for stem, pairs in groups.items():
+        # Pick one canonical id for this group (shortest action-based)
+        canonical_ids = list({p[0] for p in pairs})
+        chosen = min(canonical_ids, key=lambda x: (len(x), x))
+        normalized.append(chosen)
+
+        has_ac = any(s == "ac" for _, s in pairs)
+        has_tc = any(s == "tc" for _, s in pairs)
+        if has_tc:
+            tc_covered_stems.add(stem)
+        if has_ac and not has_tc:
+            missing.append(chosen)
+
+    return sorted(set(normalized)), sorted(missing), tc_covered_stems
 
 
 def _ac_list(ac: Any) -> list[str]:
@@ -57,7 +154,11 @@ def _test_cases_list(tcs: Any) -> list[dict[str, Any]]:
         return []
     if isinstance(tcs, list):
         return [
-            {"scenario": str(getattr(t, "scenario", t) if hasattr(t, "scenario") else t).strip()}
+            {
+                "scenario": str(
+                    getattr(t, "scenario", t) if hasattr(t, "scenario") else t
+                ).strip()
+            }
             for t in tcs
         ]
     return []
@@ -74,7 +175,8 @@ class ValidationCheck:
 class StoryQualityResult:
     quality_score: int
     validation_checks: list[dict[str, Any]] = field(default_factory=list)
-    extracted_scenarios: list[str] = field(default_factory=list)
+    normalized_scenarios: list[str] = field(default_factory=list)
+    missing_test_case_scenarios: list[str] = field(default_factory=list)
     improvement_suggestions: list[str] = field(default_factory=list)
 
 
@@ -86,14 +188,15 @@ def validate_story_quality(
 ) -> StoryQualityResult:
     """
     Validate story structure, AC coverage, scenario coverage, and ambiguity.
-    Extract normalized scenarios from acceptance criteria and test cases.
+    Extract normalized (deduplicated) scenarios; report missing test case coverage.
+    Improvement suggestions: do not suggest modifying story/AC when only coverage is missing.
     """
     checks: list[ValidationCheck] = []
     suggestions: list[str] = []
     ac_list = _ac_list(acceptance_criteria)
     tc_list = _test_cases_list(test_cases)
 
-    # 1. Story structure: "As a ... I want ... so that ..."
+    # 1. Story structure
     story_clean = (story_text or "").strip()
     structure_ok = _has_story_structure(story_clean)
     checks.append(
@@ -106,9 +209,11 @@ def validate_story_quality(
         )
     )
     if not structure_ok:
-        suggestions.append("Rewrite the story in format: As a [role] I want [goal] so that [benefit].")
+        suggestions.append(
+            "Rewrite the story in format: As a [role] I want [goal] so that [benefit]."
+        )
 
-    # 2. Acceptance criteria: at least two
+    # 2. Acceptance criteria count
     ac_ok = len(ac_list) >= MIN_ACCEPTANCE_CRITERIA
     checks.append(
         ValidationCheck(
@@ -120,38 +225,46 @@ def validate_story_quality(
         )
     )
     if not ac_ok:
-        suggestions.append(f"Add at least {MIN_ACCEPTANCE_CRITERIA - len(ac_list)} more acceptance criteria.")
+        suggestions.append(
+            f"Add at least {MIN_ACCEPTANCE_CRITERIA - len(ac_list)} more acceptance criteria."
+        )
 
-    # 3. Scenario coverage: AC vs test cases
-    tc_scenario_ids = set()
+    # 3. Scenario extraction and coverage
+    ac_canonical_ids = [
+        _extract_canonical_from_phrase(ac) for ac in ac_list if ac
+    ]
+    ac_canonical_ids = [x for x in ac_canonical_ids if x]
+    tc_canonical_ids = []
     for tc in tc_list:
         sc = (tc.get("scenario") or "").strip()
         if sc:
-            tc_scenario_ids.add(_normalize_to_scenario_id(sc))
-    ac_derived_ids = set()
-    for ac in ac_list:
-        for cand in _extract_scenario_candidates(ac):
-            if cand:
-                ac_derived_ids.add(cand)
-    # Consider covered if each AC has some overlap with test scenarios or we have test scenarios
-    missing_in_tests = ac_derived_ids - tc_scenario_ids if ac_derived_ids else set()
-    coverage_ok = len(missing_in_tests) == 0 or len(tc_scenario_ids) >= len(ac_list)
+            cid = _extract_canonical_from_phrase(sc)
+            if cid:
+                tc_canonical_ids.append(cid)
+
+    normalized_scenarios, missing_test_case_scenarios, _ = _deduplicate_canonicals(
+        ac_canonical_ids, tc_canonical_ids
+    )
+
+    coverage_ok = len(missing_test_case_scenarios) == 0
     checks.append(
         ValidationCheck(
             name="scenario_coverage",
             passed=coverage_ok,
-            message="Acceptance criteria should be reflected in test case scenarios."
+            message="Some acceptance-criteria scenarios have no test case coverage."
             if not coverage_ok
             else "Test cases cover acceptance criteria scenarios.",
         )
     )
-    if not coverage_ok and missing_in_tests:
+    # Only suggest adding test cases; do not suggest modifying story or AC for coverage.
+    if not coverage_ok and missing_test_case_scenarios:
         suggestions.append(
-            f"Add test cases for scenarios: {', '.join(sorted(missing_in_tests)[:5])}"
-            + ("..." if len(missing_in_tests) > 5 else "")
+            "Add new test cases for uncovered scenarios (do not modify story or AC): "
+            + ", ".join(missing_test_case_scenarios[:10])
+            + ("..." if len(missing_test_case_scenarios) > 10 else "")
         )
 
-    # 4. Ambiguity: vague terms without explanation
+    # 4. Ambiguity
     combined_text = " ".join([story_clean] + ac_list).lower()
     found_vague = [t for t in VAGUE_TERMS if t in combined_text]
     ambiguity_ok = len(found_vague) == 0
@@ -169,23 +282,13 @@ def validate_story_quality(
             f"Replace or qualify vague terms ({', '.join(found_vague)}) with measurable criteria."
         )
 
-    # Quality score 0–100
-    passed = sum(1 for c in checks if c.passed)
-    quality_score = round((passed / len(checks)) * 100) if checks else 0
-
-    # Extract normalized scenarios: from test cases first, then AC
-    extracted = set()
-    for tc in tc_list:
-        sc = (tc.get("scenario") or "").strip()
-        if sc:
-            n = _normalize_to_scenario_id(sc)
-            if n:
-                extracted.add(n)
-    for ac in ac_list:
-        for cand in _extract_scenario_candidates(ac):
-            if cand:
-                extracted.add(cand)
-    extracted_scenarios = sorted(extracted)
+    # Weighted quality score 0–100 (story_structure=20, acceptance_criteria=20, scenario_coverage=40, ambiguity=20)
+    quality_score = (
+        (WEIGHT_STORY_STRUCTURE if structure_ok else 0)
+        + (WEIGHT_ACCEPTANCE_CRITERIA if ac_ok else 0)
+        + (WEIGHT_SCENARIO_COVERAGE if coverage_ok else 0)
+        + (WEIGHT_AMBIGUITY if ambiguity_ok else 0)
+    )
 
     return StoryQualityResult(
         quality_score=quality_score,
@@ -193,6 +296,7 @@ def validate_story_quality(
             {"name": c.name, "passed": c.passed, "message": c.message}
             for c in checks
         ],
-        extracted_scenarios=extracted_scenarios,
+        normalized_scenarios=normalized_scenarios,
+        missing_test_case_scenarios=missing_test_case_scenarios,
         improvement_suggestions=suggestions,
     )

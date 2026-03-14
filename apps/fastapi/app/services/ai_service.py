@@ -14,6 +14,7 @@ from app.services.ai_models import (
     AIResponse,
     RegeneratedTestCase,
     RegeneratedUserStory,
+    StoryQualityImprovementResult,
 )
 
 logger = get_logger(__name__)
@@ -152,4 +153,72 @@ Return these fields only:
     )
     duration_ms = (time.perf_counter() - start) * 1000
     logger.info("AI test case regeneration finished, duration_ms=%.2f", duration_ms)
+    return result
+
+
+def improve_story_quality(
+    *,
+    requirement_title: str,
+    requirement_description: str,
+    story: dict[str, Any],
+    existing_test_cases: list[dict[str, Any]],
+    normalized_scenarios: list[str],
+    missing_test_case_scenarios: list[str],
+    validation_checks: list[dict[str, Any]],
+    improvement_suggestions: list[str],
+) -> dict[str, Any]:
+    """
+    Apply validation suggestions: fix ambiguity in story and/or add test cases for missing scenarios.
+    Returns structured improvement (improvement_action, updated_story, new_test_cases, resolved_validation_issues).
+    """
+    logger.info("AI story quality improvement started")
+    start = time.perf_counter()
+    parser = PydanticOutputParser(pydantic_object=StoryQualityImprovementResult)
+    result = _invoke_structured_generation(
+        prompt_text="""Role: Product Analyst + QA. Apply story quality validation improvements only.
+
+Rules (strict):
+1. If validation reports ambiguity: improve story text by replacing vague terms with measurable system behaviour. Do not change AC or test cases.
+2. If validation reports missing test case coverage: generate NEW test cases ONLY for the missing_scenarios listed. Use normalized scenario names. Do not modify story or AC.
+3. If story structure is valid: do not modify the story.
+4. If acceptance criteria are valid: do not modify acceptance criteria.
+5. Never modify or remove existing test cases. Only append new test cases.
+6. Do not generate duplicate scenarios or duplicate test cases.
+7. Each new test case must have: test_case_id (unique, e.g. TC_new_1), scenario (from missing list), steps (list), expected_result.
+
+Inputs:
+Requirement title: {requirement_title}
+Requirement description: {requirement_description}
+Story: {story_json}
+Existing test cases (do not modify): {existing_test_cases_json}
+Normalized scenarios: {normalized_scenarios}
+Missing test case scenarios (generate test cases for these): {missing_test_case_scenarios}
+Validation checks: {validation_checks_json}
+Improvement suggestions: {improvement_suggestions_json}
+
+Choose improvement_action:
+- no_change: if nothing to do or validation passed
+- update_story: only fix ambiguity in story text (keep title, prerequisite, acceptance_criteria unchanged)
+- add_test_cases: only add new test cases for missing scenarios (do not change story)
+- update_story_and_add_tests: fix ambiguity AND add new test cases
+
+When update_story or update_story_and_add_tests: set updated_story to the improved story TEXT only (single string).
+When add_test_cases or update_story_and_add_tests: set new_test_cases to list of new test cases (test_case_id, scenario, pre_requisite, test_data, steps, expected_result).
+Always set resolved_validation_issues to the list of validation problems you fixed (e.g. "ambiguity_detection", "scenario_coverage").
+
+{format_instructions}""",
+        parser=parser,
+        values={
+            "requirement_title": requirement_title,
+            "requirement_description": requirement_description,
+            "story_json": json.dumps(story),
+            "existing_test_cases_json": json.dumps(existing_test_cases),
+            "normalized_scenarios": json.dumps(normalized_scenarios),
+            "missing_test_case_scenarios": json.dumps(missing_test_case_scenarios),
+            "validation_checks_json": json.dumps(validation_checks),
+            "improvement_suggestions_json": json.dumps(improvement_suggestions),
+        },
+    )
+    duration_ms = (time.perf_counter() - start) * 1000
+    logger.info("AI story quality improvement finished, duration_ms=%.2f", duration_ms)
     return result
