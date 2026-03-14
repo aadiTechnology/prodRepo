@@ -26,6 +26,7 @@ from app.models import (  # noqa: F401
 )
 
 from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic
+from app.routers import fee_discount, fee_category_router
 
 # Setup logging first
 setup_logging()
@@ -70,11 +71,10 @@ app.include_router(tenant.router)
 app.include_router(role.router)
 app.include_router(menu.router)
 app.include_router(feature.router)
-from app.routers import fee_discount
 app.include_router(fee_discount.router)
-from app.routers import school_class_router, fee_category_router
 app.include_router(theme_template.router)
 app.include_router(fee.router)
+app.include_router(fee_category_router.router)
 app.include_router(rbac.router)
 app.include_router(profile.router)
 app.include_router(ai.router)
