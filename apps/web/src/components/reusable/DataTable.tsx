@@ -65,7 +65,7 @@ export default function DataTable<T extends object>({
   return (
     <TableContainer sx={{ maxHeight: maxHeight ?? undefined }}>
       {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", p: 8 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
           <CircularProgress sx={(t) => ({ color: t.palette.primary.main })} />
         </Box>
       ) : (
@@ -80,8 +80,8 @@ export default function DataTable<T extends object>({
                     fontWeight: theme.typography.fontWeightBold,
                     color: theme.palette.common.white,
                     fontSize: theme.typography.body2.fontSize,
-                    px: 2,
-                    py: 1.2,
+                    px: 1.5,
+                    py: 0.8,
                     bgcolor: theme.palette.grey[800],
                   })}
                 >
@@ -90,12 +90,13 @@ export default function DataTable<T extends object>({
               ))}
               {hasActions && (
                 <TableCell
+                  align="center"
                   sx={(theme) => ({
                     fontWeight: theme.typography.fontWeightBold,
                     color: theme.palette.common.white,
                     fontSize: theme.typography.body2.fontSize,
-                    px: 2,
-                    py: 1.2,
+                    px: 1.5,
+                    py: 0.8,
                     bgcolor: theme.palette.grey[800],
                   })}
                 >
@@ -107,7 +108,7 @@ export default function DataTable<T extends object>({
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length + (hasActions ? 1 : 0)} align="center" sx={{ py: 8 }}>
+                <TableCell colSpan={columns.length + (hasActions ? 1 : 0)} align="center" sx={{ py: 4 }}>
                   {emptyMessage}
                 </TableCell>
               </TableRow>
@@ -128,8 +129,8 @@ export default function DataTable<T extends object>({
                       align={col.align}
                       sx={(theme) => ({
                         color: theme.palette.text.secondary,
-                        py: 0.8,
-                        px: 2,
+                        py: 0.6,
+                        px: 1.5,
                         fontSize: theme.typography.body2.fontSize,
                       })}
                     >
@@ -137,7 +138,7 @@ export default function DataTable<T extends object>({
                     </TableCell>
                   ))}
                   {hasActions && (
-                    <TableCell sx={{ py: 0.8, px: 2 }}>
+                    <TableCell align="center" sx={{ py: 0.6, px: 1.5 }}>
                       {renderRowActions(row)}
                     </TableCell>
                   )}

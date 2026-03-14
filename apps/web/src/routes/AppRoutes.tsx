@@ -5,9 +5,8 @@ import MainLayout from "../layout/MainLayout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import ChangePassword from "../pages/ChangePassword";
 import { AIReviewProvider } from "../features/aiReview";
-import FeeDiscountsPage from "../pages/fees/FeeDiscountsPage";
-import AddFeeDiscount from "../pages/AddFeeDiscount";
-
+import FeeCategoryManagement from '../pages/Fees/FeeCategoryManagement';
+import AddEditFeeCategory from '../pages/Fees/AddEditFeeCategory';
 // Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
 const Users = lazy(() => import("../pages/Users"));
@@ -25,8 +24,10 @@ const ThemeStudioPage = lazy(() => import("../pages/admin/ThemeStudioPage"));
 const RoleManagementPage = lazy(() => import("../pages/RoleManagementPage"));
 const AddRole = lazy(() => import("../pages/AddRole"));
 const EditRole = lazy(() => import("../pages/EditRole"));
-const FeeStructureSetup = lazy(() => import("../pages/fees/FeeStructureSetup"));
-const FeeStructureForm = lazy(() => import("../pages/fees/FeeStructureForm"));
+const FeeStructureSetup = lazy(() => import("../pages/Fees/FeeStructureSetup"));
+const FeeStructureForm = lazy(() => import("../pages/Fees/FeeStructureForm"));
+const FeeDiscountsPage = lazy(() => import("../pages/Fees/FeeDiscountsPage"));
+const AddFeeDiscount = lazy(() => import("../pages/AddFeeDiscount"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -68,6 +69,10 @@ export default function AppRoutes() {
           <Route path="/user/create" element={<ProtectedRoute><CreateUser /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
+           {/* Fee Category Management */}
+          <Route path="/fees/categories" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "admin", "ADMIN"]}><FeeCategoryManagement /></ProtectedRoute>} />
+          <Route path="/fees/categories/add" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "admin", "ADMIN"]}><AddEditFeeCategory /></ProtectedRoute>} />
+          <Route path="/fees/categories/edit/:id" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "admin", "ADMIN"]}><AddEditFeeCategory /></ProtectedRoute>} />
 
           {/* Role Management */}
           <Route path="/roles" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN"]}><RoleManagementPage /></ProtectedRoute>} />

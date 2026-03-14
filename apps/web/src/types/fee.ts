@@ -1,10 +1,27 @@
 export interface FeeCategory {
   id: string;
   name: string;
-  code: string;
-  description: string;
+  code?: string;
+  description?: string;
   status: boolean;
 }
+
+export type FeeCategoryResponse = FeeCategory;
+
+export interface FeeCategoryCreate {
+  name: string;
+  code?: string;
+  description?: string;
+  status?: boolean;
+}
+
+export interface FeeCategoryUpdate {
+  name?: string;
+  code?: string;
+  description?: string;
+  status?: boolean;
+}
+
 
 export interface AcademicYear {
   id: number;

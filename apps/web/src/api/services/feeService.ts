@@ -1,5 +1,14 @@
 import apiClient from "../client";
-import { FeeStructure, FeeStructureCreate, PaginatedResponse, FeeCategory, AcademicYear, ClassEntity } from "../../types/fee";
+import {
+  FeeStructure,
+  FeeStructureCreate,
+  PaginatedResponse,
+  FeeCategory,
+  FeeCategoryCreate,
+  FeeCategoryUpdate,
+  AcademicYear,
+  ClassEntity,
+} from "../../types/fee";
 
 const feeService = {
   getFeeStructures: async (page = 0, size = 10, search = ""): Promise<PaginatedResponse<FeeStructure>> => {
@@ -28,6 +37,25 @@ const feeService = {
     return response.data;
   },
 
+  getFeeCategory: async (id: string): Promise<FeeCategory> => {
+    const response = await apiClient.get(`/fees/categories/${id}`);
+    return response.data;
+  },
+
+  createFeeCategory: async (data: FeeCategoryCreate): Promise<FeeCategory> => {
+    const response = await apiClient.post("/fees/categories", data);
+    return response.data;
+  },
+
+  updateFeeCategory: async (id: string, data: FeeCategoryUpdate): Promise<FeeCategory> => {
+    const response = await apiClient.put(`/fees/categories/${id}`, data);
+    return response.data;
+  },
+
+  deleteFeeCategory: async (id: string): Promise<void> => {
+    await apiClient.delete(`/fees/categories/${id}`);
+  },
+
   getAcademicYears: async (): Promise<AcademicYear[]> => {
     const response = await apiClient.get("/academic/academic-years");
     return response.data;
@@ -40,5 +68,19 @@ const feeService = {
     return response.data;
   }
 };
+
+export const {
+  getFeeStructures,
+  createFeeStructure,
+  updateFeeStructure,
+  deleteFeeStructure,
+  getFeeCategories,
+  getFeeCategory,
+  createFeeCategory,
+  updateFeeCategory,
+  deleteFeeCategory,
+  getAcademicYears,
+  getClasses,
+} = feeService;
 
 export default feeService;
