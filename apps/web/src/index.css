@@ -22,21 +22,24 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f6fa;
-  color: #213547;
+  
+  /* UPDATED: Warm gradient background matching sidebar theme */
+  background: linear-gradient(135deg, #FFF9F0 0%, #FFE8CC 100%);
+  
+  color: #2D3748;
   min-width: 320px;
 }
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: #4ECDC4; /* Updated to turquoise */
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: #3AB8AF; /* Darker turquoise */
 }
 
-/* Scrollbar Styling */
+/* Scrollbar Styling - Updated to match theme */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -45,9 +48,9 @@ a:hover {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(78, 205, 196, 0.25); /* Turquoise tint */
   border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.32);
+  background: rgba(78, 205, 196, 0.45); /* Darker turquoise */
 }

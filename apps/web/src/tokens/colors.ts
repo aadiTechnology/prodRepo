@@ -43,27 +43,102 @@ export const colorTokens = {
     contrast: "#ffffff",
   },
 
-  /** Backgrounds — page, surface, elevated */
-  background: {
-    default: "#f5f6fa",
-    paper: "#ffffff",
-    subtle: "#f8fafc",
-    muted: "#f1f5f9",
+  /** Semantic UI aliases common in SaaS dashboards */
+  semantic: {
+    active: "#2e7d32",
+    inactive: "#64748b",
+    pending: "#ed6c02",
+    draft: "#94a3b8",
+    rejected: "#d32f2f",
+    archived: "#64748b",
   },
 
-  /** Surface — cards, panels, overlays */
+  /** PRESCHOOL THEME - Add these new tokens */
+  preschool: {
+    coral: {
+      main: "#FF6B6B",
+      light: "#FF8787",
+      dark: "#EE5A52",
+      contrast: "#ffffff",
+    },
+    turquoise: {
+      main: "#4ECDC4",
+      light: "#6FD9D1",
+      dark: "#3AB8AF",
+      contrast: "#ffffff",
+    },
+    sunshine: {
+      main: "#FFE66D",
+      light: "#FFF094",
+      dark: "#F5D94C",
+      contrast: "#2D3748",
+    },
+    lavender: {
+      main: "#9F7AEA",
+      light: "#B794F4",
+      dark: "#805AD5",
+      contrast: "#ffffff",
+    },
+    peach: {
+      main: "#F6AD55",
+      light: "#FBD38D",
+      dark: "#ED8936",
+      contrast: "#ffffff",
+    },
+    mint: {
+      main: "#48BB78",
+      light: "#68D391",
+      dark: "#38A169",
+      contrast: "#ffffff",
+    },
+  },
+
+  /** UPDATE BACKGROUNDS - Changed to warm, preschool-friendly colors */
+  background: {
+    default: "#FFF9F0",        // Warm cream
+    paper: "#FFFFFF",
+    subtle: "#FFF5E6",         // Lighter warm cream
+    muted: "#FFE8CC",          // Peachy cream
+  },
+
+  /** SURFACE — cards, panels, overlays */
   surface: {
-    card: "#ffffff",
-    elevated: "#ffffff",
+    card: "#FFFFFF",
+    elevated: "#FFFBF5",       // Slight warm tint
     overlay: "rgba(0, 0, 0, 0.5)",
   },
 
-  /** Borders — default, subtle, strong, focus */
+  /** UPDATE BORDERS - Warmer tones */
   border: {
-    default: "#e2e8f0",
-    subtle: "#f1f5f9",
-    strong: "#cbd5e1",
-    focus: "#1976d2",
+    default: "#F4E4D7",        // Warm beige border
+    subtle: "#FAF0E6",         // Very light warm
+    strong: "#E8D5C4",         // Stronger warm border
+    focus: "#4ECDC4",          // Turquoise focus
+  },
+
+  /** SIDEBAR SPECIFIC COLORS */
+  sidebar: {
+    background: "linear-gradient(180deg, #FFF9F0 0%, #FAFAFA 100%)",
+    backgroundSolid: "#FAFAFA",
+    hover: "#F7FAFC",
+    active: "#FFF9F0",
+    border: "#F4E4D7",         // Warm border
+    text: {
+      primary: "#2D3748",
+      secondary: "#718096",
+      muted: "#A0AEC0",
+    },
+  },
+
+  /** MENU ITEM COLORS */
+  menuColors: {
+    dashboard: "#4ECDC4",      // Turquoise
+    students: "#FF6B6B",       // Coral
+    academics: "#9F7AEA",      // Lavender
+    fees: "#F6AD55",           // Peach
+    staff: "#4299E1",          // Blue
+    finance: "#48BB78",        // Mint
+    settings: "#718096",       // Gray
   },
 
   /** Text — primary, secondary, disabled, hint, inverse */
@@ -92,16 +167,6 @@ export const colorTokens = {
     800: "#1e293b",
     900: "#0f172a",
     950: "#020617",
-  },
-
-  /** Semantic UI aliases common in SaaS dashboards */
-  semantic: {
-    active: "#2e7d32",
-    inactive: "#64748b",
-    pending: "#ed6c02",
-    draft: "#94a3b8",
-    rejected: "#d32f2f",
-    archived: "#64748b",
   },
 } as const;
 

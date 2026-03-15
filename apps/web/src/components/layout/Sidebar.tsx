@@ -26,6 +26,7 @@ import {
   Search as SearchIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
+import { colorTokens } from "../../tokens/colors";
 
 // Import Icons from assets
 import userIcon from "../../assets/icons/user.png";
@@ -39,44 +40,27 @@ import feesIcon from "../../assets/icons/fees.png";
 const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 88;
 
-// COLOR PALETTE
-const COLORS = {
-  coral: "#FF6B6B",
-  turquoise: "#4ECDC4",
-  sunnyYellow: "#FFE66D",
-  softPurple: "#9F7AEA",
-  orange: "#F6AD55",
-  green: "#48BB78",
-  blue: "#4299E1",
-  cream: "#FFF9F0",
-  white: "#FFFFFF",
-  lightGray: "#FAFAFA",
-  textDark: "#2D3748",
-  textMedium: "#718096",
-  textLight: "#A0AEC0",
-};
-
 const SidebarContainer = styled(Box)(({ theme }) => ({
   height: "100%",
   display: "flex",
   flexDirection: "column",
-  backgroundColor: COLORS.cream,
-  color: COLORS.textDark,
+  background: colorTokens.sidebar.background,
+  color: colorTokens.sidebar.text.primary,
   overflow: "hidden",
-  borderRight: "none",
+  borderRight: `1px solid ${colorTokens.sidebar.border}`,
   boxShadow: "4px 0 24px rgba(0, 0, 0, 0.04)",
 }));
 
 const HeaderGradient = styled(Box)(({ theme }) => ({
   padding: theme.spacing(3, 2),
-  background: `linear-gradient(135deg, ${COLORS.turquoise} 0%, ${COLORS.blue} 100%)`,
+  background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
   borderRadius: "0 0 40px 40px",
   marginBottom: theme.spacing(1),
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  color: COLORS.white,
-  boxShadow: "0 8px 20px rgba(78, 205, 196, 0.2)",
+  color: "#ffffff",
+  boxShadow: `0 8px 20px ${alpha(colorTokens.preschool.turquoise.main, 0.25)}`,
   transition: "all 0.3s ease",
 }));
 
@@ -87,15 +71,15 @@ const SearchWrapper = styled(Box)(({ theme }) => ({
 const SearchInput = styled(Box)(({ theme }) => ({
   display: "flex",
   alignItems: "center",
-  backgroundColor: alpha(COLORS.white, 0.8),
+  backgroundColor: alpha("#ffffff", 0.8),
   borderRadius: "15px",
   padding: "6px 12px",
-  border: `1px solid ${alpha(COLORS.turquoise, 0.2)}`,
+  border: `1px solid ${alpha(colorTokens.preschool.turquoise.main, 0.2)}`,
   transition: "all 0.3s ease",
   "&:focus-within": {
-    borderColor: COLORS.turquoise,
-    backgroundColor: COLORS.white,
-    boxShadow: `0 0 0 3px ${alpha(COLORS.turquoise, 0.1)}`,
+    borderColor: colorTokens.preschool.turquoise.main,
+    backgroundColor: "#ffffff",
+    boxShadow: `0 0 0 3px ${alpha(colorTokens.preschool.turquoise.main, 0.1)}`,
   },
 }));
 
@@ -107,11 +91,11 @@ const NavItem = styled(ListItemButton, {
   padding: collapsed ? "12px" : "12px 16px",
   justifyContent: collapsed ? "center" : "flex-start",
   transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-  backgroundColor: active ? alpha(itemColor || COLORS.turquoise, 0.12) : "transparent",
-  color: active ? (itemColor || COLORS.textDark) : COLORS.textMedium,
-  borderLeft: active ? `6px solid ${itemColor || COLORS.turquoise}` : "0px solid transparent",
+  backgroundColor: active ? alpha(itemColor || colorTokens.preschool.turquoise.main, 0.12) : "transparent",
+  color: active ? (itemColor || colorTokens.sidebar.text.primary) : colorTokens.sidebar.text.secondary,
+  borderLeft: active ? `6px solid ${itemColor || colorTokens.preschool.turquoise.main}` : "0px solid transparent",
   "&:hover": {
-    backgroundColor: alpha(itemColor || COLORS.turquoise, 0.08),
+    backgroundColor: alpha(itemColor || colorTokens.preschool.turquoise.main, 0.08),
     transform: "translateX(4px)",
     "& .MuiListItemIcon-root img": {
       filter: "grayscale(0%) brightness(100%)",
@@ -137,12 +121,12 @@ const SubNavItem = styled(ListItemButton, {
   borderRadius: "15px",
   margin: "2px 16px 2px 58px",
   padding: "8px 16px",
-  color: active ? COLORS.blue : COLORS.textMedium,
-  backgroundColor: active ? alpha(COLORS.blue, 0.08) : "transparent",
+  color: active ? colorTokens.primary.main : colorTokens.sidebar.text.secondary,
+  backgroundColor: active ? alpha(colorTokens.primary.main, 0.08) : "transparent",
   transition: "all 0.2s ease",
   "&:hover": {
-    backgroundColor: alpha(COLORS.blue, 0.05),
-    color: COLORS.textDark,
+    backgroundColor: alpha(colorTokens.primary.main, 0.05),
+    color: colorTokens.sidebar.text.primary,
   },
 }));
 
@@ -151,19 +135,20 @@ const ProfileCard = styled(Box, {
 })<{ collapsed?: boolean }>(({ theme, collapsed }) => ({
   margin: theme.spacing(2),
   padding: collapsed ? theme.spacing(1) : theme.spacing(1.5, 2),
-  backgroundColor: COLORS.white,
+  backgroundColor: "#ffffff",
   borderRadius: "24px",
   display: "flex",
   alignItems: "center",
   gap: theme.spacing(1.5),
   boxShadow: "0 10px 30px rgba(0, 0, 0, 0.03)",
-  border: `1px solid ${alpha(COLORS.textLight, 0.1)}`,
+  border: `1px solid ${alpha(colorTokens.sidebar.text.muted, 0.1)}`,
   marginTop: "auto",
   marginBottom: theme.spacing(3),
   transition: "all 0.3s ease",
   "&:hover": {
     transform: "translateY(-4px)",
     boxShadow: "0 15px 35px rgba(0, 0, 0, 0.08)",
+    borderColor: colorTokens.preschool.turquoise.light,
   },
 }));
 
@@ -202,16 +187,15 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
     // Role Definitions
     const isSuperAdmin = role === "SUPER_ADMIN" || role === "SYSTEM_ADMIN";
     const isTenantAdmin = ["TENANT_ADMIN", "ADMIN"].includes(role);
-    const isUser = !isSuperAdmin && !isTenantAdmin;
 
     if (isSuperAdmin) {
       return [
-        { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: COLORS.turquoise },
+        { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: colorTokens.menuColors.dashboard },
         { 
           id: "tenants", 
           label: "Tenants", 
           icon: schoolIcon, 
-          color: COLORS.coral,
+          color: colorTokens.menuColors.students,
           children: [
             { id: "tenant-mgmt", label: "Tenant Management", path: "/tenants" },
           ]
@@ -220,7 +204,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
           id: "users", 
           label: "Users", 
           icon: userIcon, 
-          color: COLORS.softPurple,
+          color: colorTokens.menuColors.academics,
           children: [
             { id: "user-mgmt", label: "User Management", path: "/users" },
           ]
@@ -229,7 +213,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
           id: "config",
           label: "System Config",
           icon: assetsIcon,
-          color: COLORS.textMedium,
+          color: colorTokens.menuColors.settings,
           children: [
             { id: "roles", label: "Role Management", path: "/roles" },
             { id: "theme", label: "Theme Studio", path: "/admin/theme-studio" },
@@ -242,14 +226,14 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
 
     if (isTenantAdmin) {
       return [
-        { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: COLORS.turquoise },
-        { id: "students", label: "Students", icon: userIcon, path: "/students", color: COLORS.coral },
-        { id: "academics", label: "Academics", icon: schoolIcon, path: "/academics", color: COLORS.softPurple },
+        { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: colorTokens.menuColors.dashboard },
+        { id: "students", label: "Students", icon: userIcon, path: "/students", color: colorTokens.menuColors.students },
+        { id: "academics", label: "Academics", icon: schoolIcon, path: "/academics", color: colorTokens.menuColors.academics },
         {
           id: "fees",
           label: "Fees",
           icon: feesIcon,
-          color: COLORS.orange,
+          color: colorTokens.menuColors.fees,
           children: [
             { id: "fee-cat", label: "Fee Category", path: "/fees/categories" },
             { id: "fee-struct", label: "Fee Structure", path: "/fees/setup" },
@@ -257,16 +241,16 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
             { id: "fee-assign", label: "Assign Fee to Class", path: "/fees" },
           ]
         },
-        { id: "staff", label: "Staff", icon: teamworkIcon, path: "/staff", color: COLORS.blue },
-        { id: "finance", label: "Finance", icon: moneyIcon, path: "/finance", color: COLORS.green },
-        { id: "settings", label: "Settings", icon: assetsIcon, path: "/settings", color: COLORS.textMedium },
+        { id: "staff", label: "Staff", icon: teamworkIcon, path: "/staff", color: colorTokens.menuColors.staff },
+        { id: "finance", label: "Finance", icon: moneyIcon, path: "/finance", color: colorTokens.menuColors.finance },
+        { id: "settings", label: "Settings", icon: assetsIcon, path: "/settings", color: colorTokens.menuColors.settings },
       ];
     }
 
     // Default User Menu
     return [
-      { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: COLORS.turquoise },
-      { id: "profile", label: "My Profile", icon: userIcon, path: "/profile", color: COLORS.coral },
+      { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: colorTokens.menuColors.dashboard },
+      { id: "profile", label: "My Profile", icon: userIcon, path: "/profile", color: colorTokens.menuColors.students },
     ];
   }, [user?.role]);
 
@@ -295,7 +279,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
               sx={{
                 width: 36,
                 height: 36,
-                bgcolor: COLORS.white,
+                bgcolor: "#ffffff",
                 borderRadius: "10px",
                 padding: "6px",
                 display: "flex",
@@ -306,17 +290,17 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
             >
               <img src={schoolIcon} alt="Logo" style={{ width: "100%", height: "100%" }} />
             </Box>
-            <Typography variant="h6" sx={{ fontWeight: 900, fontSize: "1rem", color: COLORS.white }}>
-              Campus Axis
+            <Typography variant="h6" sx={{ fontWeight: 900, fontSize: "1rem", color: "#ffffff" }}>
+              {user?.tenant?.name || "Campus Axis"}
             </Typography>
           </Box>
         )}
         <IconButton
           onClick={onToggleCollapse}
           sx={{
-            color: COLORS.white,
-            bgcolor: alpha(COLORS.white, 0.15),
-            "&:hover": { bgcolor: alpha(COLORS.white, 0.25) }
+            color: "#ffffff",
+            bgcolor: alpha("#ffffff", 0.15),
+            "&:hover": { bgcolor: alpha("#ffffff", 0.25) }
           }}
           size="small"
         >
@@ -327,12 +311,12 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
       {!collapsed && (
         <SearchWrapper>
           <SearchInput>
-            <SearchIcon sx={{ color: alpha(COLORS.turquoise, 0.6), fontSize: 18, mr: 1 }} />
+            <SearchIcon sx={{ color: alpha(colorTokens.preschool.turquoise.main, 0.6), fontSize: 18, mr: 1 }} />
             <InputBase
               placeholder="Quick Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{ fontSize: "0.85rem", width: "100%", fontWeight: 500, color: COLORS.textDark }}
+              sx={{ fontSize: "0.85rem", width: "100%", fontWeight: 500, color: colorTokens.sidebar.text.primary }}
             />
           </SearchInput>
         </SearchWrapper>
@@ -344,7 +328,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         overflowX: "hidden", 
         px: 1,
         "&::-webkit-scrollbar": { width: "4px" }, 
-        "&::-webkit-scrollbar-thumb": { backgroundColor: alpha(COLORS.turquoise, 0.2), borderRadius: "2px" } 
+        "&::-webkit-scrollbar-thumb": { backgroundColor: alpha(colorTokens.preschool.turquoise.main, 0.2), borderRadius: "2px" } 
       }}>
         <List sx={{ pt: 1 }}>
           {filteredItems.map((item) => {
@@ -382,7 +366,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                               fontSize: 18,
                               transition: "transform 0.3s ease",
                               transform: isSectionExpanded ? "rotate(0deg)" : "rotate(-90deg)",
-                              color: alpha(COLORS.textMedium, 0.4)
+                              color: alpha(colorTokens.sidebar.text.secondary, 0.4)
                             }}
                           />
                         )}
@@ -423,15 +407,16 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
 
       <ProfileCard collapsed={collapsed}>
         <Avatar
+          src={(user?.profile_image_path as string | undefined)}
           sx={{
             width: collapsed ? 44 : 46,
             height: collapsed ? 44 : 46,
-            bgcolor: COLORS.turquoise,
-            border: `3px solid ${COLORS.white}`,
-            boxShadow: `0 8px 20px ${alpha(COLORS.turquoise, 0.15)}`,
+            bgcolor: colorTokens.preschool.turquoise.main,
+            border: `3px solid #ffffff`,
+            boxShadow: `0 8px 20px ${alpha(colorTokens.preschool.turquoise.main, 0.15)}`,
             fontWeight: 900,
             fontSize: "1.1rem",
-            color: COLORS.white
+            color: "#ffffff"
           }}
         >
           {(user?.full_name || 'U').charAt(0).toUpperCase()}
@@ -442,7 +427,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
               variant="body2"
               sx={{
                 fontWeight: 900,
-                color: COLORS.textDark,
+                color: colorTokens.sidebar.text.primary,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -455,7 +440,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
             <Typography
               variant="caption"
               sx={{
-                color: COLORS.textLight,
+                color: colorTokens.sidebar.text.secondary,
                 fontWeight: 700,
                 display: "block",
                 mt: 0.2,

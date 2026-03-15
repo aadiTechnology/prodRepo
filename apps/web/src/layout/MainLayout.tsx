@@ -3,7 +3,7 @@
  * Main application layout with navigation and responsive design
  */
 
-import { AppBar, Toolbar, Typography, Box, Container, IconButton, useMediaQuery, useTheme, Menu, MenuItem, Avatar, Chip, ListItemIcon, Divider, Button, Tooltip } from "@mui/material";
+import { AppBar, Toolbar, Typography, Box, Container, IconButton, useMediaQuery, useTheme, Menu, MenuItem, Avatar, Chip, ListItemIcon, Divider, Button, Tooltip, alpha } from "@mui/material";
 import { Menu as MenuIcon, Logout as LogoutIcon, Person as PersonIcon, Lock as LockIcon, ArrowBack as ArrowBackIcon, Home as HomeIcon } from "@mui/icons-material";
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { useState, useCallback, memo, useEffect } from "react";
@@ -15,6 +15,7 @@ import Sidebar from "../components/layout/Sidebar";
 import AIAssistant from "../components/AIAssistant";
 import profileService from "../api/services/profileService";
 import { apiBaseUrl } from "../config";
+import { colorTokens } from "../tokens/colors";
 
 function MainLayout() {
   const theme = useTheme();
@@ -165,6 +166,7 @@ function MainLayout() {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
           }),
+          background: `linear-gradient(135deg, ${colorTokens.background.default} 0%, ${colorTokens.background.muted} 100%)`,
         }}
       >
         <AppBar
@@ -172,12 +174,12 @@ function MainLayout() {
           elevation={0}
           sx={{
             zIndex: (theme) => theme.zIndex.drawer + 1,
-            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+            backgroundColor: alpha(colorTokens.background.paper, 0.7),
             backdropFilter: 'blur(16px) saturate(180%)',
             WebkitBackdropFilter: 'blur(16px) saturate(180%)',
-            color: 'text.primary',
+            color: colorTokens.text.primary,
             borderBottom: '1px solid',
-            borderColor: 'rgba(0, 0, 0, 0.06)',
+            borderColor: colorTokens.border.subtle,
             transition: theme.transitions.create(['width', 'margin', 'background-color'], {
               easing: theme.transitions.easing.sharp,
               duration: theme.transitions.duration.enteringScreen,
@@ -469,9 +471,9 @@ function MainLayout() {
             py: 1, // Reduced padding for a more compact footer
             px: 2,
             mt: "auto",
-            backgroundColor: "white",
+            backgroundColor: colorTokens.background.paper,
             borderTop: "1px solid",
-            borderColor: "divider",
+            borderColor: colorTokens.border.subtle,
             position: "sticky",
             bottom: 0,
             zIndex: (theme) => theme.zIndex.drawer + 2,

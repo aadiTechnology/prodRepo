@@ -4,9 +4,10 @@
  * For use inside PageLayout header slot.
  */
 
-import { Box, Typography, IconButton, Stack, TypographyProps } from "@mui/material";
+import { Box, Typography, IconButton, Stack, TypographyProps, alpha } from "@mui/material";
 import { ReactNode } from "react";
 import { ArrowBack as BackIcon } from "@mui/icons-material";
+import { colorTokens } from "../../tokens/colors";
 
 export interface LayoutPageHeaderProps {
   title: string | ReactNode;
@@ -43,13 +44,16 @@ export default function PageHeader({
             onClick={onBack}
             aria-label="Go back"
             sx={(theme) => ({
-              backgroundColor: theme.palette.grey[800],
+              background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
               borderRadius: 1.2,
               width: 44,
               height: 44,
-              color: theme.palette.common.white,
+              color: "#ffffff",
+              boxShadow: `0 4px 12px ${alpha(colorTokens.preschool.turquoise.main, 0.2)}`,
+              transition: "all 0.2s",
               "&:hover": {
-                backgroundColor: theme.palette.grey[700],
+                transform: "scale(1.1)",
+                boxShadow: `0 6px 16px ${alpha(colorTokens.preschool.turquoise.main, 0.3)}`,
               },
             })}
           >
