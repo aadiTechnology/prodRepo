@@ -111,3 +111,18 @@ class APIContract(BaseModel):
     request_schema: dict[str, Any] = {}
     response_schema: dict[str, Any] = {}
     status_codes: dict[str, str] = {}
+
+
+# Data model extraction from API contract (backend SQLAlchemy-style models)
+class ExtractedDataModel(BaseModel):
+    """Single backend data model derived from an API contract."""
+
+    model_name: str = ""
+    fields: dict[str, str] = {}  # field_name -> type string (e.g. "integer", "datetime", "string")
+    relationships: dict[str, str] | None = None  # optional: relationship_name -> target_model or description
+
+
+class DataModelExtractionResult(BaseModel):
+    """Result of extracting backend data models from an API contract."""
+
+    models: list[ExtractedDataModel] = []

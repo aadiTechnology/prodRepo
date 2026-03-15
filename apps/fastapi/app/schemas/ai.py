@@ -2,6 +2,21 @@ from typing import Literal, Any
 from pydantic import BaseModel, Field
 
 
+class ApiContractPayload(BaseModel):
+    """API contract payload for data model extraction."""
+
+    endpoint: str = ""
+    method: str = "GET"
+    request_schema: dict[str, Any] = Field(default_factory=dict)
+    response_schema: dict[str, Any] = Field(default_factory=dict)
+
+
+class DataModelExtractionRequest(BaseModel):
+    """Request body for extracting data models from an API contract."""
+
+    api_contract: ApiContractPayload = Field(..., description="API contract with endpoint, method, request_schema, response_schema")
+
+
 class GenerateStoryAndTestsRequest(BaseModel):
     requirement: str = Field(..., min_length=1, max_length=50000)
 

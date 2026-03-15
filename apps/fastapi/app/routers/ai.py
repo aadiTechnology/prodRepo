@@ -14,12 +14,14 @@ from app.schemas.ai import (
     UpdateUserStoryRequest,
     UpdateTestCaseRequest,
     RegenerateArtifactRequest,
+    DataModelExtractionRequest,
 )
 from app.services.intent_service import interpret
 from app.services.ai_service import (
     generate_story_and_tests,
     generate_development_tasks,
     generate_api_contract_for_task,
+    extract_data_models_from_api_contract,
     regenerate_user_story,
     regenerate_test_case,
     improve_story_quality,
@@ -455,6 +457,41 @@ async def generate_task_api_contract(
         test_cases=test_cases_payload,
     )
     return contract
+
+
+@router.post("/user-stories/{user_story_id}/tasks/{task_id}/data-models")
+async def extract_task_data_models(
+    user_story_id: int,
+    task_id: str,
+    body: DataModelExtractionRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """
+    Extract backend data models from an API contract.
+    Returns normalized SQLAlchemy-style models (id, created_at, and fields from request/response schema).
+    """
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    us = get_user_story(db, user_story_id)
+    if not us:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User story not found.")
+    task = get_development_task_for_story(db, user_story_id, task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Development task not found.")
+    api_contract = {
+        "endpoint": body.api_contract.endpoint,
+        "method": body.api_contract.method,
+        "request_schema": body.api_contract.request_schema,
+        "response_schema": body.api_contract.response_schema,
+    }
+    return extract_data_models_from_api_contract(
+        task_id=task.task_id,
+        api_contract=api_contract,
+    )
 
 
 @router.patch("/user-stories/{user_story_id}/approve")

@@ -13,6 +13,7 @@ from app.core.logging_config import get_logger
 from app.services.ai_models import (
     AIResponse,
     APIContract,
+    DataModelExtractionResult,
     DevelopmentTasksResponse,
     RegeneratedTestCase,
     RegeneratedUserStory,
@@ -348,4 +349,62 @@ Output JSON only. No explanation.
     })
     duration_ms = (time.perf_counter() - start) * 1000
     logger.info("API contract generation finished, duration_ms=%.2f", duration_ms)
+    return result.model_dump(mode="json")
+
+
+def extract_data_models_from_api_contract(
+    *,
+    task_id: str,
+    api_contract: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Extract backend data models required to support the API contract.
+    Identifies entities from request_schema and response_schema, produces normalized
+    SQLAlchemy-style models with id (integer), created_at (datetime), and derived fields.
+    Returns JSON: {"models": [{"model_name": str, "fields": {...}, "relationships": optional}]}.
+    """
+    logger.info("Data model extraction started for task_id=%s", task_id)
+    start = time.perf_counter()
+    parser = PydanticOutputParser(pydantic_object=DataModelExtractionResult)
+    endpoint = api_contract.get("endpoint", "")
+    method = api_contract.get("method", "")
+    request_schema = api_contract.get("request_schema") or {}
+    response_schema = api_contract.get("response_schema") or {}
+
+    prompt = PromptTemplate.from_template(
+        """Role: Backend Architect. Generate backend data models (SQLAlchemy-style) required to support the given API contract.
+Framework: FastAPI. ORM: SQLAlchemy. Follow normalized entity design.
+
+Rules:
+- Identify entities required for the API from request_schema and response_schema.
+- Generate normalized backend data models. Avoid duplicate models if the same entity would appear (reuse one model).
+- Each model MUST include: id (type "integer", primary key), created_at (type "datetime").
+- All other fields must be derived from request_schema or response_schema. Use type names: "integer", "string", "date", "datetime", "boolean", "float", "text" as appropriate.
+- Map response IDs like attendance_id to a foreign key field (e.g. id in Attendance model; in related payloads use attendance_id as "integer").
+- Model names: PascalCase (e.g. Attendance, User, FeeStructure). Field names: snake_case.
+- Include optional "relationships" only when there are clear foreign key references to another extracted model (e.g. {"user": "User"}).
+
+API contract:
+task_id: {task_id}
+endpoint: {endpoint}
+method: {method}
+request_schema: {request_schema_json}
+response_schema: {response_schema_json}
+
+Output JSON only. Return exactly the structure: {{"models": [{{"model_name": "...", "fields": {{"id": "integer", "created_at": "datetime", ...}}, "relationships": {{}} or null}}]}}.
+No explanation.
+
+{format_instructions}"""
+    )
+    chain = prompt | _build_llm(max_tokens=1200, temperature=0) | parser
+    result = chain.invoke({
+        "task_id": task_id,
+        "endpoint": endpoint,
+        "method": method,
+        "request_schema_json": json.dumps(request_schema),
+        "response_schema_json": json.dumps(response_schema),
+        "format_instructions": parser.get_format_instructions(),
+    })
+    duration_ms = (time.perf_counter() - start) * 1000
+    logger.info("Data model extraction finished, duration_ms=%.2f", duration_ms)
     return result.model_dump(mode="json")
