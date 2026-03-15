@@ -16,15 +16,21 @@ import {
   ApproveButton,
   ArtifactRejectDialog,
   CancelButton,
+  DevelopmentTasksDisplay,
   RejectButton,
   SaveButton,
   StoryQualitySection,
+  TaskGenerationValidationPanel,
   TestCaseTable,
   UserStoryDetail,
 } from "../components/semantic";
 import { useAIReview, type ReviewStoryRecord } from "../features/aiReview";
 import aiService from "../api/services/aiService";
-import type { StoryQualityValidationResult, TestCaseItem } from "../api/services/aiService";
+import type {
+  GenerateDevelopmentTasksResult,
+  StoryQualityValidationResult,
+  TestCaseItem,
+} from "../api/services/aiService";
 
 function normalizeList(value: string[] | string | null | undefined): string[] {
   if (value == null) {
@@ -126,6 +132,12 @@ export default function ArtifactReviewDetailPage() {
   const [qualityLoading, setQualityLoading] = useState(false);
   const [qualityDismissed, setQualityDismissed] = useState(false);
   const [improvementAppliedMessage, setImprovementAppliedMessage] = useState<string | null>(null);
+  const [generatedTasks, setGeneratedTasks] = useState<GenerateDevelopmentTasksResult | null>(null);
+  const [generatingTasks, setGeneratingTasks] = useState(false);
+  const [taskGenerationError, setTaskGenerationError] = useState<string | null>(null);
+  const [tasksExist, setTasksExist] = useState(false);
+  const [taskCount, setTaskCount] = useState(0);
+  const tasksSectionRef = useRef<HTMLDivElement>(null);
   const prevStoryIdRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -134,6 +146,8 @@ export default function ArtifactReviewDetailPage() {
       setQualityValidation(null);
       setQualityDismissed(false);
       setImprovementAppliedMessage(null);
+      setGeneratedTasks(null);
+      setTaskGenerationError(null);
     }
   }, [record?.story?.id]);
 
@@ -170,6 +184,47 @@ export default function ArtifactReviewDetailPage() {
       .finally(() => {
         if (!cancelled) setQualityLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [record?.story?.id, storyIsApproved]);
+
+  useEffect(() => {
+    if (!record?.story?.id || !storyIsApproved) return;
+    let cancelled = false;
+    aiService
+      .getStoryTasksCheck(record.story.id)
+      .then((check) => {
+        if (!cancelled) {
+          setTasksExist(check.tasks_exist);
+          setTaskCount(check.task_count);
+        }
+      })
+      .catch(() => { /* ignore */ });
+    return () => {
+      cancelled = true;
+    };
+  }, [record?.story?.id, storyIsApproved]);
+
+  useEffect(() => {
+    if (!record?.story?.id || !storyIsApproved) return;
+    let cancelled = false;
+    aiService
+      .getStoryDevelopmentTasks(record.story.id)
+      .then((data) => {
+        if (cancelled) return;
+        const total =
+          (data.frontend_tasks?.length ?? 0) +
+          (data.backend_tasks?.length ?? 0) +
+          (data.database_tasks?.length ?? 0) +
+          (data.testing_tasks?.length ?? 0);
+        if (total > 0) {
+          setGeneratedTasks(data);
+          setTasksExist(true);
+          setTaskCount(total);
+        }
+      })
+      .catch(() => { /* ignore; tasks may not exist yet */ });
     return () => {
       cancelled = true;
     };
@@ -273,6 +328,27 @@ export default function ArtifactReviewDetailPage() {
     if (success) {
       setTestCaseFeedback("");
       setTestCaseFeedbackId(null);
+    }
+  };
+
+  const handleGenerateDevelopmentTasks = async () => {
+    if (record == null) return;
+    setTaskGenerationError(null);
+    setGeneratingTasks(true);
+    try {
+      const result = await aiService.generateDevelopmentTasks(record.story.id);
+      setGeneratedTasks(result);
+    } catch (e) {
+      const message =
+        e &&
+        typeof e === "object" &&
+        "response" in e &&
+        (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          ? String((e as { response: { data: { detail: string } } }).response.data.detail)
+          : "Failed to generate development tasks.";
+      setTaskGenerationError(message);
+    } finally {
+      setGeneratingTasks(false);
     }
   };
 
@@ -395,6 +471,25 @@ export default function ArtifactReviewDetailPage() {
           onContinueAnyway={() => setQualityDismissed(true)}
           improving={regeneratingStoryId === record.story.id}
         />
+        {storyIsApproved && qualityValidation != null && (
+          <TaskGenerationValidationPanel
+            validation={qualityValidation}
+            testCasesCount={record.testCases.length}
+            onGenerate={handleGenerateDevelopmentTasks}
+            generating={generatingTasks}
+            tasksExist={tasksExist}
+            taskCount={taskCount}
+            onViewTasks={() => tasksSectionRef.current?.scrollIntoView({ behavior: "smooth" })}
+          />
+        )}
+        {taskGenerationError != null && (
+          <Alert severity="error" sx={{ mt: 2 }} onClose={() => setTaskGenerationError(null)}>
+            {taskGenerationError}
+          </Alert>
+        )}
+        <div ref={tasksSectionRef}>
+          {generatedTasks != null && <DevelopmentTasksDisplay tasks={generatedTasks} />}
+        </div>
         </>
       )}
 

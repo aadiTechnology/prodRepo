@@ -50,3 +50,9 @@ export type { TestCaseTableProps } from "./TestCaseTable";
 
 export { default as StoryQualitySection } from "./StoryQualitySection";
 export type { StoryQualitySectionProps } from "./StoryQualitySection";
+
+export { default as TaskGenerationValidationPanel } from "./TaskGenerationValidationPanel";
+export type { TaskGenerationValidationPanelProps } from "./TaskGenerationValidationPanel";
+
+export { default as DevelopmentTasksDisplay } from "./DevelopmentTasksDisplay";
+export type { DevelopmentTasksDisplayProps } from "./DevelopmentTasksDisplay";

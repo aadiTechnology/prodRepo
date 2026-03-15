@@ -9,6 +9,7 @@ from app.models.ai_entities import (
     Requirement,
     UserStory,
     TestCase,
+    DevelopmentTask,
     REVIEW_STATUS_DRAFT,
     REVIEW_STATUS_APPROVED,
     REVIEW_STATUS_REJECTED,
@@ -305,3 +306,142 @@ def update_test_case_content(
     db.commit()
     db.refresh(tc)
     return tc
+
+
+# ----- Development tasks (repository layer) -----
+
+TASK_ID_PREFIXES = {"frontend_tasks": "FRONT", "backend_tasks": "BACK", "database_tasks": "DB", "testing_tasks": "TEST"}
+
+
+def _next_task_ids_for_story(
+    db: Session, user_story_id: int, category_keys: list[str]
+) -> dict[str, int]:
+    """Return next number per prefix for this story (e.g. FRONT -> 101)."""
+    existing = (
+        db.query(DevelopmentTask.task_id)
+        .filter(DevelopmentTask.user_story_id == user_story_id)
+        .all()
+    )
+    max_per_prefix: dict[str, int] = {}
+    for (task_id,) in existing:
+        if not task_id or "-" not in task_id:
+            continue
+        prefix, _, num_str = task_id.partition("-")
+        try:
+            num = int(num_str)
+            max_per_prefix[prefix] = max(max_per_prefix.get(prefix, 0), num)
+        except ValueError:
+            continue
+    next_ids: dict[str, int] = {}
+    for key in category_keys:
+        prefix = TASK_ID_PREFIXES.get(key, "TASK")
+        next_ids[key] = max_per_prefix.get(prefix, 0) + 1
+    return next_ids
+
+
+def check_development_tasks_for_story(db: Session, user_story_id: int) -> tuple[bool, int]:
+    """Return (tasks_exist, task_count) for the given user story."""
+    count = (
+        db.query(DevelopmentTask)
+        .filter(DevelopmentTask.user_story_id == user_story_id)
+        .count()
+    )
+    return (count > 0, count)
+
+
+def get_development_tasks_by_story(
+    db: Session, user_story_id: int
+) -> dict[str, list[dict]]:
+    """
+    Load development tasks for a story, grouped by category.
+    Returns { frontend_tasks, backend_tasks, database_tasks, testing_tasks } with list of task dicts.
+    """
+    rows = (
+        db.query(DevelopmentTask)
+        .filter(DevelopmentTask.user_story_id == user_story_id)
+        .order_by(DevelopmentTask.id)
+        .all()
+    )
+    result: dict[str, list[dict]] = {
+        "frontend_tasks": [],
+        "backend_tasks": [],
+        "database_tasks": [],
+        "testing_tasks": [],
+    }
+    category_to_key = {"frontend": "frontend_tasks", "backend": "backend_tasks", "database": "database_tasks", "testing": "testing_tasks"}
+    for t in rows:
+        item = {
+            "task_id": t.task_id,
+            "title": t.title,
+            "description": t.description,
+            "related_scenario": t.related_scenario,
+            "component": t.component,
+            "priority": t.priority,
+            "estimated_effort": t.estimated_effort,
+            "depends_on_task_id": t.depends_on_task_id,
+        }
+        key = category_to_key.get(t.category)
+        if key and key in result:
+            result[key].append(item)
+    return result
+
+
+def save_development_tasks(
+    db: Session,
+    user_story_id: int,
+    tasks_response: dict[str, list[dict]],
+    *,
+    tenant_id: int | None = None,
+    created_by: int | None = None,
+) -> dict[str, list[dict]]:
+    """
+    Assign Jira-style task IDs, persist tasks in dependency order, return grouped structure.
+    Dependency order: database -> backend -> frontend; testing depends on backend or frontend.
+    """
+    category_keys_ordered = ["database_tasks", "backend_tasks", "frontend_tasks", "testing_tasks"]
+    next_ids = _next_task_ids_for_story(db, user_story_id, category_keys_ordered)
+
+    last_db_task_id: str | None = None
+    last_backend_task_id: str | None = None
+    last_frontend_task_id: str | None = None
+
+    for key in category_keys_ordered:
+        tasks = tasks_response.get(key) or []
+        prefix = TASK_ID_PREFIXES.get(key, "TASK")
+        if key == "database_tasks":
+            depends_on = None
+        elif key == "backend_tasks":
+            depends_on = last_db_task_id
+        elif key == "frontend_tasks":
+            depends_on = last_backend_task_id or last_db_task_id
+        else:  # testing_tasks: after backend or frontend
+            depends_on = last_backend_task_id or last_frontend_task_id or last_db_task_id
+
+        for t in tasks:
+            task_id = f"{prefix}-{next_ids[key]}"
+            next_ids[key] += 1
+            db.add(
+                DevelopmentTask(
+                    user_story_id=user_story_id,
+                    task_id=task_id,
+                    category=key.replace("_tasks", ""),
+                    title=str(t.get("title", "")).strip() or "Untitled",
+                    description=str(t.get("description", "")).strip() or "",
+                    related_scenario=str(t.get("related_scenario", "")).strip() or "",
+                    component=str(t.get("component", "")).strip() or "",
+                    priority=str(t.get("priority", "")).strip() or "medium",
+                    estimated_effort=str(t.get("estimated_effort", "")).strip() or "",
+                    depends_on_task_id=depends_on,
+                    tenant_id=tenant_id,
+                    created_by=created_by,
+                )
+            )
+            if key == "database_tasks":
+                last_db_task_id = task_id
+            elif key == "backend_tasks":
+                last_backend_task_id = task_id
+            elif key == "frontend_tasks":
+                last_frontend_task_id = task_id
+
+    db.commit()
+    return get_development_tasks_by_story(db, user_story_id)

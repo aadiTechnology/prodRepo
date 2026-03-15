@@ -77,3 +77,25 @@ class StoryQualityImprovementResult(BaseModel):
     updated_story: str | None = None  # Only when action is update_story or update_story_and_add_tests
     new_test_cases: list[NewTestCaseForImprovement] = []
     resolved_validation_issues: list[str] = []
+
+
+# Development task generation (from approved user stories)
+class DevelopmentTask(BaseModel):
+    """Single developer implementation task with architecture-aware location."""
+
+    task_id: str = ""  # assigned by backend, e.g. FRONT-101, BACK-102
+    title: str
+    description: str
+    related_scenario: str  # normalized scenario or acceptance criterion reference
+    component: str  # e.g. "React component", "FastAPI controller", "SQL migration"
+    priority: str  # e.g. "high", "medium", "low"
+    estimated_effort: str  # e.g. "2h", "1d", "0.5d"
+
+
+class DevelopmentTasksResponse(BaseModel):
+    """Generated development tasks grouped by category. Max 3–5 per category."""
+
+    frontend_tasks: list[DevelopmentTask] = []
+    backend_tasks: list[DevelopmentTask] = []
+    database_tasks: list[DevelopmentTask] = []
+    testing_tasks: list[DevelopmentTask] = []

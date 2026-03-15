@@ -12,6 +12,7 @@ from langchain_openai import ChatOpenAI
 from app.core.logging_config import get_logger
 from app.services.ai_models import (
     AIResponse,
+    DevelopmentTasksResponse,
     RegeneratedTestCase,
     RegeneratedUserStory,
     StoryQualityImprovementResult,
@@ -20,12 +21,12 @@ from app.services.ai_models import (
 logger = get_logger(__name__)
 
 
-def _build_llm() -> ChatOpenAI:
+def _build_llm(max_tokens: int = 1200) -> ChatOpenAI:
     return ChatOpenAI(
         model="gpt-4o-mini",
         temperature=0.2,
         api_key=os.environ.get("OPENAI_API_KEY"),
-        max_tokens=1200,
+        max_tokens=max_tokens,
     )
 
 
@@ -222,3 +223,69 @@ Always set resolved_validation_issues to the list of validation problems you fix
     duration_ms = (time.perf_counter() - start) * 1000
     logger.info("AI story quality improvement finished, duration_ms=%.2f", duration_ms)
     return result
+
+
+def generate_development_tasks(
+    *,
+    requirement_title: str,
+    requirement_description: str,
+    story: dict[str, Any],
+    acceptance_criteria: list[str],
+    test_cases: list[dict[str, Any]],
+    normalized_scenarios: list[str],
+    quality_score: int,
+) -> dict[str, Any]:
+    """
+    Generate developer implementation tasks from an approved user story.
+    Tasks are grouped by frontend, backend, database, testing; 3–5 per category.
+    Scenario-driven: normalized scenarios trigger tasks; avoid duplicates.
+    Each task has title, description, related_scenario, component, priority, estimated_effort.
+    """
+    logger.info("AI development task generation started")
+    start = time.perf_counter()
+    parser = PydanticOutputParser(pydantic_object=DevelopmentTasksResponse)
+    prompt = PromptTemplate.from_template(
+        """Role: Senior Developer / Tech Lead. Generate actionable development tasks from a validated user story.
+
+Architecture (follow strictly):
+- Frontend: React + TypeScript. Components: React component, React hook, API service.
+- Backend: FastAPI. Components: FastAPI controller, service layer, middleware.
+- Database: SQL Server. Components: SQL table, migration.
+- Testing: API test, integration test, UI test.
+
+Rules:
+1. Use the normalized scenarios as task triggers. A scenario may generate tasks across frontend, backend, and testing.
+2. Map every task to a related_scenario (use normalized scenario id) or to an acceptance criterion.
+3. Generate 3–5 tasks per category (frontend_tasks, backend_tasks, database_tasks, testing_tasks). Omit a category if not needed.
+4. Avoid duplicate tasks (same intent in same layer).
+5. Each task must have: title, description, related_scenario, component, priority, estimated_effort.
+6. component must be one of: React component, React hook, API service, FastAPI controller, service layer, middleware, SQL table, migration, API test, integration test, UI test (or very similar).
+7. priority: high, medium, or low. estimated_effort: e.g. "1h", "2h", "0.5d", "1d".
+
+Inputs:
+Requirement title: {requirement_title}
+Requirement description: {requirement_description}
+Story: {story_json}
+Acceptance criteria: {acceptance_criteria_json}
+Test cases (scenario, steps, expected_result): {test_cases_json}
+Normalized scenarios (use these as related_scenario where applicable): {normalized_scenarios}
+Quality score: {quality_score}%
+
+Output: JSON only. frontend_tasks, backend_tasks, database_tasks, testing_tasks. Each task: title, description, related_scenario, component, priority, estimated_effort.
+
+{format_instructions}"""
+    )
+    chain = prompt | _build_llm(max_tokens=2400) | parser
+    result = chain.invoke({
+        "requirement_title": requirement_title,
+        "requirement_description": requirement_description,
+        "story_json": json.dumps(story),
+        "acceptance_criteria_json": json.dumps(acceptance_criteria),
+        "test_cases_json": json.dumps(test_cases),
+        "normalized_scenarios": json.dumps(normalized_scenarios),
+        "quality_score": quality_score,
+        "format_instructions": parser.get_format_instructions(),
+    })
+    duration_ms = (time.perf_counter() - start) * 1000
+    logger.info("AI development task generation finished, duration_ms=%.2f", duration_ms)
+    return result.model_dump(mode="json")

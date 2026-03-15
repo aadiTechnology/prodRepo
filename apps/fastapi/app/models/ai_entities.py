@@ -59,6 +59,9 @@ class UserStory(Base):
 
     requirement = relationship("Requirement", back_populates="user_stories")
     test_cases = relationship("TestCase", back_populates="user_story", cascade="all, delete-orphan")
+    development_tasks = relationship(
+        "DevelopmentTask", back_populates="user_story", cascade="all, delete-orphan"
+    )
 
 
 class TestCase(Base):
@@ -82,3 +85,24 @@ class TestCase(Base):
     updated_by = Column(Integer, nullable=True)
 
     user_story = relationship("UserStory", back_populates="test_cases")
+
+
+class DevelopmentTask(Base):
+    __tablename__ = "development_tasks"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_story_id = Column(Integer, ForeignKey("user_stories.id", ondelete="CASCADE"), nullable=False)
+    task_id = Column(String(50), nullable=False)  # e.g. FRONT-101, BACK-102
+    category = Column(String(20), nullable=False)  # frontend, backend, database, testing
+    title = Column(String(500), nullable=False)
+    description = Column(Text, nullable=False)
+    related_scenario = Column(String(500), nullable=False)
+    component = Column(String(200), nullable=False)
+    priority = Column(String(20), nullable=False)
+    estimated_effort = Column(String(50), nullable=False)
+    depends_on_task_id = Column(String(50), nullable=True)  # task_id of predecessor (e.g. DB-101)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_by = Column(Integer, nullable=True)
+
+    user_story = relationship("UserStory", back_populates="development_tasks")

@@ -12,7 +12,7 @@ from app.models.feature import Feature
 from app.models.menu import Menu
 from app.models.user_profile import UserProfile
 from app.models.revoked_token import RevokedToken
-from app.models.ai_entities import Requirement, UserStory, TestCase
+from app.models.ai_entities import Requirement, UserStory, TestCase, DevelopmentTask
 from app.models.theme_template import ThemeTemplate
 from app.models.class_fee_structure_assignment import ClassFeeStructureAssignment, AssignmentStatus
 from app.models.academic import AcademicYear
@@ -33,6 +33,7 @@ __all__ = [
     "Requirement",
     "UserStory",
     "TestCase",
+    "DevelopmentTask",
     "ThemeTemplate",
      "SchoolClass",
     "FeeStructure",

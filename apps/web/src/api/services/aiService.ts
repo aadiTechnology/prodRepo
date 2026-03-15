@@ -114,6 +114,29 @@ export interface ImproveFromQualityResult {
   validation: StoryQualityValidationResult;
 }
 
+export interface DevelopmentTaskItem {
+  task_id: string;
+  title: string;
+  description: string;
+  related_scenario: string;
+  component: string;
+  priority: string;
+  estimated_effort: string;
+  depends_on_task_id?: string | null;
+}
+
+export interface StoryTasksCheckResult {
+  tasks_exist: boolean;
+  task_count: number;
+}
+
+export interface GenerateDevelopmentTasksResult {
+  frontend_tasks: DevelopmentTaskItem[];
+  backend_tasks: DevelopmentTaskItem[];
+  database_tasks: DevelopmentTaskItem[];
+  testing_tasks: DevelopmentTaskItem[];
+}
+
 export const aiService = {
   generateStoryAndTests: async (
     requirement: string
@@ -208,6 +231,33 @@ export const aiService = {
     const response = await apiClient.post(
       `/api/ai/test-cases/${testCaseId}/regenerate`,
       payload
+    );
+    return response.data;
+  },
+
+  getStoryTasksCheck: async (
+    userStoryId: number
+  ): Promise<StoryTasksCheckResult> => {
+    const response = await apiClient.get(
+      `/api/ai/user-stories/${userStoryId}/tasks/check`
+    );
+    return response.data;
+  },
+
+  getStoryDevelopmentTasks: async (
+    userStoryId: number
+  ): Promise<GenerateDevelopmentTasksResult> => {
+    const response = await apiClient.get(
+      `/api/ai/user-stories/${userStoryId}/tasks`
+    );
+    return response.data;
+  },
+
+  generateDevelopmentTasks: async (
+    userStoryId: number
+  ): Promise<GenerateDevelopmentTasksResult> => {
+    const response = await apiClient.post(
+      `/api/ai/user-stories/${userStoryId}/tasks`
     );
     return response.data;
   },

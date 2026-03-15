@@ -18,6 +18,7 @@ from app.schemas.ai import (
 from app.services.intent_service import interpret
 from app.services.ai_service import (
     generate_story_and_tests,
+    generate_development_tasks,
     regenerate_user_story,
     regenerate_test_case,
     improve_story_quality,
@@ -36,6 +37,9 @@ from app.services.ai_persistence_service import (
     add_test_cases_to_story,
     get_user_story,
     get_test_case,
+    check_development_tasks_for_story,
+    get_development_tasks_by_story,
+    save_development_tasks,
 )
 from app.services.story_quality_service import (
     validate_story_quality,
@@ -287,6 +291,120 @@ async def get_story_quality_validation(
         "missing_test_case_scenarios": result.missing_test_case_scenarios,
         "improvement_suggestions": result.improvement_suggestions,
     }
+
+
+def _has_any_tasks(tasks_by_category: dict) -> bool:
+    for v in tasks_by_category.values():
+        if v:
+            return True
+    return False
+
+
+@router.get("/user-stories/{user_story_id}/tasks/check")
+async def check_story_tasks(
+    user_story_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Return whether tasks exist for the story and total count. Super Admin only."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    us = get_user_story(db, user_story_id)
+    if not us:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User story not found.")
+    tasks_exist, task_count = check_development_tasks_for_story(db, user_story_id)
+    return {"tasks_exist": tasks_exist, "task_count": task_count}
+
+
+@router.get("/user-stories/{user_story_id}/tasks")
+async def get_story_development_tasks(
+    user_story_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Get development tasks for a story. Returns grouped tasks or empty groups. Super Admin only."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    us = get_user_story(db, user_story_id)
+    if not us:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User story not found.")
+    return get_development_tasks_by_story(db, user_story_id)
+
+
+@router.post("/user-stories/{user_story_id}/tasks")
+async def generate_or_get_development_tasks(
+    user_story_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """
+    Duplicate protection: if tasks already exist for story_id, return them.
+    Otherwise generate via AI, assign task IDs, persist, return stored tasks.
+    Super Admin only. Story must be approved.
+    """
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    us = get_user_story(db, user_story_id)
+    if not us:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User story not found.")
+    if getattr(us, "review_status", "draft") != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Story must be approved before generating development tasks.",
+        )
+
+    existing = get_development_tasks_by_story(db, user_story_id)
+    if _has_any_tasks(existing):
+        return existing
+
+    validation: StoryQualityResult = validate_story_quality(
+        story_text=us.story or "",
+        acceptance_criteria=us.acceptance_criteria,
+        test_cases=[{"scenario": tc.scenario or ""} for tc in (us.test_cases or [])],
+    )
+    req = us.requirement
+    story_dict = {
+        "title": us.title,
+        "prerequisite": us.prerequisite or [],
+        "story": us.story or "",
+        "acceptance_criteria": us.acceptance_criteria or [],
+    }
+    acceptance_criteria_list = us.acceptance_criteria if isinstance(us.acceptance_criteria, list) else []
+    test_cases_payload = [
+        {
+            "scenario": tc.scenario,
+            "steps": tc.steps or [],
+            "expected_result": tc.expected_result or "",
+        }
+        for tc in (us.test_cases or [])
+    ]
+
+    ai_result = generate_development_tasks(
+        requirement_title=req.title,
+        requirement_description=req.description or "",
+        story=story_dict,
+        acceptance_criteria=acceptance_criteria_list,
+        test_cases=test_cases_payload,
+        normalized_scenarios=validation.normalized_scenarios,
+        quality_score=validation.quality_score,
+    )
+    stored = save_development_tasks(
+        db,
+        user_story_id,
+        ai_result,
+        tenant_id=us.tenant_id,
+        created_by=current_user.id,
+    )
+    return stored
 
 
 @router.patch("/user-stories/{user_story_id}/approve")
