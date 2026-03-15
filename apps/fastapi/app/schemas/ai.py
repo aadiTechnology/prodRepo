@@ -17,6 +17,20 @@ class DataModelExtractionRequest(BaseModel):
     api_contract: ApiContractPayload = Field(..., description="API contract with endpoint, method, request_schema, response_schema")
 
 
+class SchemaGenerationModelInput(BaseModel):
+    """Single model input for schema generation."""
+
+    model_name: str = Field(..., min_length=1)
+    fields: dict[str, str] = Field(default_factory=dict)
+
+
+class SchemaGenerationRequest(BaseModel):
+    """Request body for generating ORM and migrations from data models."""
+
+    task_id: str = Field(..., description="Task identifier")
+    models: list[SchemaGenerationModelInput] = Field(..., min_length=1)
+
+
 class GenerateStoryAndTestsRequest(BaseModel):
     requirement: str = Field(..., min_length=1, max_length=50000)
 

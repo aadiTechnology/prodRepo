@@ -15,6 +15,7 @@ from app.schemas.ai import (
     UpdateTestCaseRequest,
     RegenerateArtifactRequest,
     DataModelExtractionRequest,
+    SchemaGenerationRequest,
 )
 from app.services.intent_service import interpret
 from app.services.ai_service import (
@@ -27,6 +28,7 @@ from app.services.ai_service import (
     improve_story_quality,
 )
 from app.services.cache_service import get_cached_response, cache_response, generate_requirement_hash
+from app.services.schema_generation_service import generate_schema_for_models
 from app.services.ai_persistence_service import (
     save_ai_response,
     get_requirement_by_hash,
@@ -491,6 +493,29 @@ async def extract_task_data_models(
     return extract_data_models_from_api_contract(
         task_id=task.task_id,
         api_contract=api_contract,
+    )
+
+
+@router.post("/generate-schema")
+async def generate_schema(
+    body: SchemaGenerationRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """
+    Generate SQLAlchemy ORM model files and Alembic migrations from extracted data models.
+    Writes app/models/<table>.py and alembic/versions/create_<table>_table_*.py.
+    Skips models whose table already exists. Returns paths for each generated file.
+    """
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    models_payload = [{"model_name": m.model_name, "fields": m.fields} for m in body.models]
+    return generate_schema_for_models(
+        task_id=body.task_id,
+        models=models_payload,
+        write_files=True,
     )
 
 
