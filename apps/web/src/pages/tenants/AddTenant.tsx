@@ -12,6 +12,7 @@ import {
     Tabs,
     Tab,
     Divider,
+    alpha,
 } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
 import { Button, TextField, Select, MenuItem } from "../../components/primitives";
@@ -32,7 +33,7 @@ import {
     LocationOn as LocationIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
-import { PageHeader } from "../../components/common";
+import { PageHeader } from "../../components/layout";
 import tenantService from "../../api/services/tenantService";
 import themeTemplateService from "../../api/services/themeTemplateService";
 import { ListPageLayout, FormSectionLabel, FieldLabel } from "../../components/reusable";
@@ -185,8 +186,30 @@ const AddTenant = () => {
             }
             setTimeout(() => navigate("/tenants"), 1000);
         } catch (err: any) {
-            const msg = err?.message || "";
-            if (msg.toLowerCase().includes("email already exists")) setErrors(p => ({ ...p, email: "Email already exists." }));
+            console.error("Provisioning error:", err);
+            const errorData = err?.response?.data;
+            let msg = err?.message || "";
+
+            // Handle FastAPI validation error list
+            if (errorData?.detail && Array.isArray(errorData.detail)) {
+                const newFieldErrors: Record<string, string> = {};
+                errorData.detail.forEach((issue: any) => {
+                    const field = issue.loc?.[issue.loc.length - 1];
+                    if (field) newFieldErrors[field] = issue.msg;
+                });
+                if (Object.keys(newFieldErrors).length > 0) {
+                    setErrors(p => ({ ...p, ...newFieldErrors }));
+                    msg = "Please fix the highlighted errors.";
+                } else {
+                    msg = errorData.detail[0]?.msg || msg;
+                }
+            } else if (typeof errorData?.detail === "string") {
+                msg = errorData.detail;
+            }
+
+            if (msg.toLowerCase().includes("email already exists")) {
+                setErrors(p => ({ ...p, email: "Email already exists." }));
+            }
             setError(msg || (isEditMode ? "Failed to update tenant." : "Failed to provision tenant."));
         } finally {
             setLoading(false);
@@ -206,12 +229,15 @@ const AddTenant = () => {
             header={
                 <>
                     <PageHeader
-                        onBack={() => navigate("/")}
-                        backIcon={<HomeIcon sx={{ color: "white", fontSize: 24 }} />}
+                        onBack={() => navigate("/tenants")}
                         title={
                             <>
                                 <Box component="span" onClick={() => navigate("/tenants")}
-                                    sx={(theme) => ({ color: theme.palette.text.secondary, cursor: "pointer", "&:hover": { color: theme.palette.text.primary } })}>
+                                    sx={(theme) => ({
+                                        color: alpha(theme.palette.text.primary, 0.6),
+                                        cursor: "pointer",
+                                        "&:hover": { color: theme.palette.text.primary }
+                                    })}>
                                     Tenants
                                 </Box>
                                 <Box component="span" sx={{ color: "#cbd5e1", mx: 1.5 }}>/</Box>
@@ -222,7 +248,15 @@ const AddTenant = () => {
                             <>
                                 <Tooltip title="Cancel">
                                     <IconButton onClick={() => navigate("/tenants")}
-                                        sx={(theme) => ({ color: theme.palette.error.main, backgroundColor: theme.palette.error.light, borderRadius: 1.2, width: 40, height: 40, "&:hover": { backgroundColor: theme.palette.error.light } })}>
+                                        sx={(theme) => ({
+                                            color: theme.palette.error.main,
+                                            backgroundColor: alpha(theme.palette.error.main, 0.08),
+                                            borderRadius: 1.5,
+                                            width: 44,
+                                            height: 44,
+                                            border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                                            "&:hover": { backgroundColor: alpha(theme.palette.error.main, 0.12) }
+                                        })}>
                                         <CancelIcon sx={{ fontSize: 22 }} />
                                     </IconButton>
                                 </Tooltip>
@@ -230,8 +264,17 @@ const AddTenant = () => {
                                     <span>
                                         <IconButton onClick={handleSubmit} disabled={loading}
                                             sx={(theme) => ({
-                                                backgroundColor: theme.palette.success.main, color: theme.palette.success.contrastText, borderRadius: 1.2, width: 40, height: 40,
-                                                "&:hover": { backgroundColor: theme.palette.success.dark }, "&.Mui-disabled": { backgroundColor: theme.palette.grey[400], color: "white" }
+                                                background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, #2e7d32 100%)`,
+                                                color: "#ffffff",
+                                                borderRadius: 1.5,
+                                                width: 44,
+                                                height: 44,
+                                                boxShadow: `0 4px 12px ${alpha(theme.palette.success.main, 0.3)}`,
+                                                "&:hover": {
+                                                    transform: "scale(1.05)",
+                                                    boxShadow: `0 6px 16px ${alpha(theme.palette.success.main, 0.4)}`
+                                                },
+                                                "&.Mui-disabled": { backgroundColor: theme.palette.grey[300], background: 'none' }
                                             })}>
                                             {loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon sx={{ fontSize: 20 }} />}
                                         </IconButton>

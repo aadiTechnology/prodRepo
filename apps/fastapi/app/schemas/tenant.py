@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, EmailStr
 
 
 class TenantBase(BaseModel):
-    code: str
+    code: Optional[str] = None
     name: str
     owner_name: Optional[str] = None
     email: Optional[EmailStr] = None
@@ -61,6 +61,7 @@ class TenantResponse(TenantBase):
     """Tenant data returned to clients."""
 
     id: int
+    code: str
     created_at: datetime
 
     class Config:
