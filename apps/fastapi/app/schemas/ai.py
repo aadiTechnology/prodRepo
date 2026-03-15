@@ -46,6 +46,16 @@ class FileMappingRequest(BaseModel):
     models: list[FileMappingModelInput] = Field(default_factory=list, description="Data models (model_name) for entity detection")
 
 
+class SkeletonGenerationRequest(BaseModel):
+    """Request body for generating code skeletons for backend files."""
+
+    task_id: str = Field(..., description="Task identifier")
+    task_title: str = Field("", description="Task title")
+    api_contract: dict[str, Any] = Field(default_factory=dict, description="endpoint, method, request_schema, response_schema")
+    models: list[FileMappingModelInput] = Field(default_factory=list, description="Data models (model_name)")
+    files: list[str] = Field(..., min_length=1, description="File paths from file mapping")
+
+
 class GenerateStoryAndTestsRequest(BaseModel):
     requirement: str = Field(..., min_length=1, max_length=50000)
 

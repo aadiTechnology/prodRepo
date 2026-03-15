@@ -17,6 +17,7 @@ from app.schemas.ai import (
     DataModelExtractionRequest,
     SchemaGenerationRequest,
     FileMappingRequest,
+    SkeletonGenerationRequest,
 )
 from app.services.intent_service import interpret
 from app.services.ai_service import (
@@ -31,6 +32,7 @@ from app.services.ai_service import (
 from app.services.cache_service import get_cached_response, cache_response, generate_requirement_hash
 from app.services.schema_generation_service import generate_schema_for_models
 from app.services.file_mapping_service import generate_file_mapping
+from app.services.skeleton_generation_service import generate_skeleton
 from app.services.ai_persistence_service import (
     save_ai_response,
     get_requirement_by_hash,
@@ -542,6 +544,31 @@ async def get_file_mapping(
         task_title=body.task_title or "",
         api_contract=api_contract,
         models=models_payload,
+    )
+
+
+@router.post("/code-skeleton")
+async def get_code_skeleton(
+    body: SkeletonGenerationRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """
+    Generate minimal code skeletons for backend files using API contract, data models, and file mapping.
+    Returns path and code for each file (controller, service, repository, schema, test).
+    """
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    api_contract = body.api_contract or {}
+    models_payload = [{"model_name": m.model_name} for m in body.models]
+    return generate_skeleton(
+        task_id=body.task_id,
+        task_title=body.task_title or "",
+        api_contract=api_contract,
+        models=models_payload,
+        files=body.files,
     )
 
 
