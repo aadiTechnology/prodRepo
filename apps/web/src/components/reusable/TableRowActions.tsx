@@ -1,10 +1,6 @@
-/**
- * TableRowActions — Reusable (Phase 7)
- * Edit / Delete / View icon buttons for table rows. Theme-driven.
- */
-
-import { IconButton, Tooltip } from "@mui/material";
+import { IconButton, Tooltip, alpha } from "@mui/material";
 import { Edit as EditIcon, Delete as DeleteIcon, Visibility as ViewIcon } from "@mui/icons-material";
+import { colorTokens } from "../../tokens/colors";
 
 export interface TableRowActionsProps {
   onEdit?: () => void;
@@ -25,21 +21,57 @@ export default function TableRowActions({
     <>
       {onView != null && (
         <Tooltip title="View">
-          <IconButton size={size} aria-label="View" onClick={onView} disabled={disabled}>
+          <IconButton 
+            size={size} 
+            onClick={onView} 
+            disabled={disabled}
+            sx={{ 
+              color: colorTokens.preschool.lavender.main,
+              "&:hover": { 
+                bgcolor: alpha(colorTokens.preschool.lavender.main, 0.1),
+                transform: "scale(1.15) rotate(5deg)"
+              },
+              transition: "all 0.2s"
+            }}
+          >
             <ViewIcon fontSize={size} />
           </IconButton>
         </Tooltip>
       )}
       {onEdit != null && (
         <Tooltip title="Edit">
-          <IconButton size={size} aria-label="Edit" onClick={onEdit} disabled={disabled}>
+          <IconButton 
+            size={size} 
+            onClick={onEdit} 
+            disabled={disabled}
+            sx={{ 
+              color: colorTokens.preschool.turquoise.main,
+              "&:hover": { 
+                bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.1),
+                transform: "scale(1.15) rotate(-5deg)"
+              },
+              transition: "all 0.2s"
+            }}
+          >
             <EditIcon fontSize={size} />
           </IconButton>
         </Tooltip>
       )}
       {onDelete != null && (
         <Tooltip title="Delete">
-          <IconButton size={size} aria-label="Delete" onClick={onDelete} disabled={disabled}>
+          <IconButton 
+            size={size} 
+            onClick={onDelete} 
+            disabled={disabled}
+            sx={{ 
+              color: colorTokens.preschool.coral.main,
+              "&:hover": { 
+                bgcolor: alpha(colorTokens.preschool.coral.main, 0.1),
+                transform: "scale(1.15) rotate(5deg)"
+              },
+              transition: "all 0.2s"
+            }}
+          >
             <DeleteIcon fontSize={size} />
           </IconButton>
         </Tooltip>

@@ -12,8 +12,10 @@ import {
   TableRow,
   CircularProgress,
   Box,
+  alpha
 } from "@mui/material";
 import { type Key, ReactNode } from "react";
+import { colorTokens } from "../../tokens/colors";
 
 export interface DataTableColumn<T> {
   id: string;
@@ -70,7 +72,7 @@ export default function DataTable<T extends object>({
           <CircularProgress sx={(t) => ({ color: t.palette.primary.main })} />
         </Box>
       ) : (
-        <Table size={size} stickyHeader={stickyHeader}>
+        <Table size={size} stickyHeader={stickyHeader} sx={{ borderCollapse: 'separate', borderSpacing: 0 }}>
           <TableHead>
             <TableRow>
               {columns.map((col) => (
@@ -78,12 +80,16 @@ export default function DataTable<T extends object>({
                   key={col.id}
                   align={col.align}
                   sx={(theme) => ({
-                    fontWeight: theme.typography.fontWeightBold,
-                    color: theme.palette.common.white,
-                    fontSize: theme.typography.body2.fontSize,
-                    px: 1.5,
-                    py: 0.8,
-                    bgcolor: theme.palette.grey[800],
+                    fontWeight: 800,
+                    color: "#ffffff",
+                    fontSize: "0.85rem",
+                    px: 2,
+                    py: 1.5,
+                    background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
+                    borderBottom: `1px solid ${colorTokens.border.default}`,
+                    whiteSpace: 'nowrap',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
                   })}
                 >
                   {col.label}
@@ -93,12 +99,15 @@ export default function DataTable<T extends object>({
                 <TableCell
                   align="center"
                   sx={(theme) => ({
-                    fontWeight: theme.typography.fontWeightBold,
-                    color: theme.palette.common.white,
-                    fontSize: theme.typography.body2.fontSize,
-                    px: 1.5,
-                    py: 0.8,
-                    bgcolor: theme.palette.grey[800],
+                    fontWeight: 800,
+                    color: "#ffffff",
+                    fontSize: "0.85rem",
+                    px: 2,
+                    py: 1.5,
+                    background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
+                    borderBottom: `1px solid ${colorTokens.border.default}`,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
                   })}
                 >
                   Actions
@@ -119,8 +128,11 @@ export default function DataTable<T extends object>({
                   key={getRowKey ? getRowKey(row, idx) : idx}
                   hover
                   sx={(theme) => ({
-                    "&.MuiTableRow-hover:hover": { bgcolor: theme.palette.action.hover },
+                    "&.MuiTableRow-hover:hover": { 
+                      bgcolor: alpha(colorTokens.background.default, 0.6),
+                    },
                     cursor: onRowClick ? "pointer" : "default",
+                    transition: "background-color 0.2s ease",
                   })}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >
@@ -129,17 +141,19 @@ export default function DataTable<T extends object>({
                       key={col.id}
                       align={col.align}
                       sx={(theme) => ({
-                        color: theme.palette.text.secondary,
-                        py: 0.6,
-                        px: 1.5,
-                        fontSize: theme.typography.body2.fontSize,
+                        color: colorTokens.text.secondary,
+                        py: 1.5,
+                        px: 2,
+                        fontSize: "0.875rem",
+                        borderBottom: `1px solid ${colorTokens.border.subtle}`,
+                        fontWeight: 500,
                       })}
                     >
                       {col.render ? col.render(row) : getCellValue(row, (col.field as string) ?? col.id)}
                     </TableCell>
                   ))}
                   {hasActions && (
-                    <TableCell align="center" sx={{ py: 0.6, px: 1.5 }}>
+                    <TableCell align="center" sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${colorTokens.border.subtle}` }}>
                       {renderRowActions(row)}
                     </TableCell>
                   )}

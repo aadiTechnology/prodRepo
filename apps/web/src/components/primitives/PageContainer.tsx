@@ -32,7 +32,6 @@ export default function PageContainer({
           width: "100%",
         },
         pageBackground && {
-          bgcolor: "background.default",
           minHeight: "100%",
           display: "flex",
           flexDirection: "column",

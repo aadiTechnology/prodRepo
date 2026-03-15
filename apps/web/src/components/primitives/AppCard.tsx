@@ -5,6 +5,7 @@
  */
 
 import { Card, CardProps, CardContent } from "@mui/material";
+import { colorTokens } from "../../tokens/colors";
 
 export type AppCardPaddingSize = "normal" | "dense" | "none";
 
@@ -33,6 +34,9 @@ export default function AppCard({
       variant="outlined"
       sx={{
         overflow: "hidden",
+        borderColor: colorTokens.border.subtle,
+        borderRadius: '24px',
+        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.03)',
         ...sx,
       }}
       {...props}

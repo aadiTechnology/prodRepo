@@ -4,6 +4,7 @@
  */
 
 import { Box, Typography } from "@mui/material";
+import { colorTokens } from "../../tokens/colors";
 
 export interface DirectoryInfoBarProps {
   label: string;
@@ -16,14 +17,13 @@ export default function DirectoryInfoBar({ label, rangeStart, rangeEnd, total }:
   return (
     <Box
       sx={(theme) => ({
-        py: 1.2,
+        py: 1.5,
         px: 3,
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        borderBottom: 1,
-        borderColor: theme.palette.divider,
-        bgcolor: theme.palette.background.default,
+        borderBottom: `1px solid ${colorTokens.border.subtle}`,
+        bgcolor: colorTokens.background.default,
       })}
     >
       <Typography

@@ -8,6 +8,8 @@ import { ReactNode } from "react";
 import { Search as SearchIcon, Add as AddIcon } from "@mui/icons-material";
 import { Stack } from "../primitives";
 import PrimaryActionButton from "./PrimaryActionButton";
+import { colorTokens } from "../../tokens/colors";
+import { alpha } from "@mui/material";
 
 export interface ListPageToolbarProps {
   searchValue: string;
@@ -48,13 +50,13 @@ export default function ListPageToolbar({
         sx={(theme) => ({
           width: { xs: "100%", sm: 280 },
           "& .MuiOutlinedInput-root": {
-            bgcolor: theme.palette.background.paper,
-            borderRadius: theme.shape.borderRadius,
-            fontSize: theme.typography.body2.fontSize,
-            fontWeight: theme.typography.fontWeightMedium,
-            "& fieldset": { borderColor: theme.palette.divider },
-            "&:hover fieldset": { borderColor: theme.palette.grey[400] },
-            "&.Mui-focused fieldset": { borderColor: theme.palette.primary.main },
+            bgcolor: "#ffffff",
+            borderRadius: '15px',
+            fontSize: "0.85rem",
+            fontWeight: 600,
+            "& fieldset": { borderColor: colorTokens.border.subtle },
+            "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
+            "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
           },
         })}
       />

@@ -3,8 +3,9 @@
  * Dark circular icon button for primary actions (e.g. Add). Theme-driven.
  */
 
-import { IconButton, Tooltip } from "@mui/material";
+import { IconButton, Tooltip, alpha } from "@mui/material";
 import { ReactNode } from "react";
+import { colorTokens } from "../../tokens/colors";
 
 export interface PrimaryActionButtonProps {
   onClick: () => void;
@@ -25,14 +26,16 @@ export default function PrimaryActionButton({
         onClick={onClick}
         aria-label={ariaLabel}
         sx={(theme) => ({
-          backgroundColor: theme.palette.grey[800],
-          color: theme.palette.common.white,
-          borderRadius: 1.2,
+          background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
+          color: colorTokens.primary.contrast,
+          borderRadius: '15px',
           width: 44,
           height: 44,
-          boxShadow: theme.shadows[2],
+          boxShadow: `0 8px 16px ${alpha(colorTokens.preschool.turquoise.main, 0.25)}`,
+          transition: "all 0.3s ease",
           "&:hover": {
-            backgroundColor: theme.palette.grey[700],
+            transform: "scale(1.1) rotate(5deg)",
+            boxShadow: `0 12px 20px ${alpha(colorTokens.preschool.turquoise.main, 0.35)}`,
           },
         })}
       >
