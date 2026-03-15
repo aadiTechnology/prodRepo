@@ -173,7 +173,7 @@ const FeeDiscountList = () => {
                 emptyMessage="No discounts available."
                 renderRowActions={(row) => (
                     <TableRowActions
-                        onEdit={() => { /* open edit modal */ }}
+                        onEdit={() => navigate(`/fees/discounts/edit/${row.id}`)}
                         onDelete={() => handleDeleteClick(row)}
                     />
                 )}

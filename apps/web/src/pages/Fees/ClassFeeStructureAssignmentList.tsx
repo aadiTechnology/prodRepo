@@ -189,20 +189,10 @@ const ClassFeeStructureAssignmentList = () => {
                 id: "actions",
                 label: "Actions",
                 render: (row: ClassFeeStructureAssignment) => (
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Tooltip title="Edit">
-                            <IconButton size="small" sx={{ color: '#757575' }} onClick={() => navigate(`/fees/edit/${row.id}`)}>
-                                <EditIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                            <IconButton size="small" sx={{ color: '#757575' }} onClick={() => handleDeactivateClick(row)}>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM19 4H15.5L14.79 3.29C14.42 2.9 13.89 2.9 13.5 3.29L12.5 4.29C12.11 4.68 11.58 4.68 11.21 4.29L10.21 3.29C9.82 2.9 9.29 2.9 8.91 3.29L8.21 4H5C4.45 4 4 4.45 4 5C4 5.55 4.45 6 5 6H19C19.55 6 20 5.55 20 5C20 4.45 19.55 4 19 4Z" fill="currentColor"/>
-                                </svg>
-                            </IconButton>
-                        </Tooltip>
-                    </Box>
+                    <TableRowActions
+                        onEdit={() => navigate(`/fees/edit/${row.id}`)}
+                        onDelete={() => handleDeactivateClick(row)}
+                    />
                 )
             }
         ],
