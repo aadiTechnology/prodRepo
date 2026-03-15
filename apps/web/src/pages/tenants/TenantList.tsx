@@ -7,6 +7,7 @@ import {
     Snackbar,
     IconButton,
     Tooltip,
+    alpha
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import {
@@ -29,6 +30,7 @@ import {
 import { PageHeader } from "../../components/layout";
 import StatusChip from "../../components/roles/StatusChip";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { colorTokens } from "../../tokens/colors";
 
 const TenantList = () => {
     const navigate = useNavigate();
@@ -219,12 +221,20 @@ const TenantList = () => {
                             <Tooltip title="Login as this tenant">
                                 <IconButton
                                     size="small"
-                                    color="primary"
                                     onClick={() => handleLoginAsTenant(row.id)}
                                     disabled={impersonationLoading === row.id || !row.is_active}
+                                    sx={{ 
+                                        color: colorTokens.menuColors.staff,
+                                        ml: 1,
+                                        "&:hover": { 
+                                            bgcolor: alpha(colorTokens.menuColors.staff, 0.1),
+                                            transform: "scale(1.15)"
+                                        },
+                                        transition: "all 0.2s"
+                                    }}
                                 >
                                     {impersonationLoading === row.id ? (
-                                        <CircularProgress size={16} />
+                                        <CircularProgress size={16} color="inherit" />
                                     ) : (
                                         <LoginIcon fontSize="small" />
                                     )}
