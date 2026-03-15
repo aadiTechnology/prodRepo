@@ -31,6 +31,21 @@ class SchemaGenerationRequest(BaseModel):
     models: list[SchemaGenerationModelInput] = Field(..., min_length=1)
 
 
+class FileMappingModelInput(BaseModel):
+    """Single model reference for file mapping (model_name only)."""
+
+    model_name: str = Field(..., min_length=1)
+
+
+class FileMappingRequest(BaseModel):
+    """Request body for generating file mapping for a development task."""
+
+    task_id: str = Field(..., description="Task identifier")
+    task_title: str = Field("", description="Task title (e.g. Create attendance API)")
+    api_contract: dict[str, Any] = Field(default_factory=dict, description="endpoint, method, request_schema, response_schema")
+    models: list[FileMappingModelInput] = Field(default_factory=list, description="Data models (model_name) for entity detection")
+
+
 class GenerateStoryAndTestsRequest(BaseModel):
     requirement: str = Field(..., min_length=1, max_length=50000)
 
