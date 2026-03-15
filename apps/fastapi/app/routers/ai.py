@@ -19,6 +19,7 @@ from app.services.intent_service import interpret
 from app.services.ai_service import (
     generate_story_and_tests,
     generate_development_tasks,
+    generate_api_contract_for_task,
     regenerate_user_story,
     regenerate_test_case,
     improve_story_quality,
@@ -38,6 +39,7 @@ from app.services.ai_persistence_service import (
     get_user_story,
     get_test_case,
     check_development_tasks_for_story,
+    get_development_task_for_story,
     get_development_tasks_by_story,
     save_development_tasks,
 )
@@ -405,6 +407,54 @@ async def generate_or_get_development_tasks(
         created_by=current_user.id,
     )
     return stored
+
+
+@router.post("/user-stories/{user_story_id}/tasks/{task_id}/api-contract")
+async def generate_task_api_contract(
+    user_story_id: int,
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """
+    Generate a structured REST API contract for a backend development task.
+    Only backend tasks are supported. Returns endpoint, method, description,
+    request_schema, response_schema, status_codes.
+    """
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can use this endpoint.",
+        )
+    us = get_user_story(db, user_story_id)
+    if not us:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User story not found.")
+    task = get_development_task_for_story(db, user_story_id, task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Development task not found.")
+    if task.category != "backend":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="API contract can only be generated for backend tasks.",
+        )
+    acceptance_criteria = us.acceptance_criteria if isinstance(us.acceptance_criteria, list) else []
+    test_cases_payload = [
+        {
+            "scenario": tc.scenario or "",
+            "steps": tc.steps or [],
+            "expected_result": tc.expected_result or "",
+        }
+        for tc in (us.test_cases or [])
+    ]
+    contract = generate_api_contract_for_task(
+        task_id=task.task_id,
+        task_title=task.title or "",
+        task_description=task.description or "",
+        related_scenario=task.related_scenario or "",
+        acceptance_criteria=acceptance_criteria,
+        test_cases=test_cases_payload,
+    )
+    return contract
 
 
 @router.patch("/user-stories/{user_story_id}/approve")

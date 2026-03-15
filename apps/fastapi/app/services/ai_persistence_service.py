@@ -349,6 +349,20 @@ def check_development_tasks_for_story(db: Session, user_story_id: int) -> tuple[
     return (count > 0, count)
 
 
+def get_development_task_for_story(
+    db: Session, user_story_id: int, task_id: str
+) -> DevelopmentTask | None:
+    """Return the development task for the given story and task_id, or None."""
+    return (
+        db.query(DevelopmentTask)
+        .filter(
+            DevelopmentTask.user_story_id == user_story_id,
+            DevelopmentTask.task_id == task_id.strip(),
+        )
+        .first()
+    )
+
+
 def get_development_tasks_by_story(
     db: Session, user_story_id: int
 ) -> dict[str, list[dict]]:

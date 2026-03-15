@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from pydantic import BaseModel
 
 
@@ -99,3 +99,15 @@ class DevelopmentTasksResponse(BaseModel):
     backend_tasks: list[DevelopmentTask] = []
     database_tasks: list[DevelopmentTask] = []
     testing_tasks: list[DevelopmentTask] = []
+
+
+# API contract generation (from backend development tasks)
+class APIContract(BaseModel):
+    """Structured REST API contract for a backend development task."""
+
+    endpoint: str = ""
+    method: str = "GET"
+    description: str = ""
+    request_schema: dict[str, Any] = {}
+    response_schema: dict[str, Any] = {}
+    status_codes: dict[str, str] = {}

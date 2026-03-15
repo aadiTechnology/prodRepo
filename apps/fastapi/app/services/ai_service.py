@@ -12,6 +12,7 @@ from langchain_openai import ChatOpenAI
 from app.core.logging_config import get_logger
 from app.services.ai_models import (
     AIResponse,
+    APIContract,
     DevelopmentTasksResponse,
     RegeneratedTestCase,
     RegeneratedUserStory,
@@ -21,10 +22,10 @@ from app.services.ai_models import (
 logger = get_logger(__name__)
 
 
-def _build_llm(max_tokens: int = 1200) -> ChatOpenAI:
+def _build_llm(max_tokens: int = 1200, temperature: float = 0.2) -> ChatOpenAI:
     return ChatOpenAI(
         model="gpt-4o-mini",
-        temperature=0.2,
+        temperature=temperature,
         api_key=os.environ.get("OPENAI_API_KEY"),
         max_tokens=max_tokens,
     )
@@ -288,4 +289,63 @@ Output: JSON only. frontend_tasks, backend_tasks, database_tasks, testing_tasks.
     })
     duration_ms = (time.perf_counter() - start) * 1000
     logger.info("AI development task generation finished, duration_ms=%.2f", duration_ms)
+    return result.model_dump(mode="json")
+
+
+def generate_api_contract_for_task(
+    *,
+    task_id: str,
+    task_title: str,
+    task_description: str,
+    related_scenario: str,
+    acceptance_criteria: list[str],
+    test_cases: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """
+    Generate a deterministic, developer-ready REST API contract from a backend development task.
+    Output: endpoint, method, description, request_schema, response_schema, status_codes.
+    """
+    logger.info("API contract generation started for task_id=%s", task_id)
+    start = time.perf_counter()
+    parser = PydanticOutputParser(pydantic_object=APIContract)
+    prompt = PromptTemplate.from_template(
+        """Role: API Designer. Generate a REST API contract for a FastAPI backend task.
+Output must be deterministic and developer-ready. Use REST conventions.
+
+Contract structure:
+- endpoint: path (e.g. /api/logout). Use leading slash.
+- method: HTTP method (GET, POST, PUT, PATCH, DELETE)
+- description: one-line description
+- request_schema: object with field names and types (e.g. {{"token": "string"}}, {{"body": "object"}})
+- response_schema: object describing returned data (e.g. {{"message": "string"}}, {{"id": "integer"}})
+- status_codes: map of HTTP status code (string key) to short description. Must include:
+  "200": success description
+  "400": validation error
+  "401": unauthorized (include if the API requires authentication)
+  "500": server error
+
+Inputs:
+task_id: {task_id}
+task_title: {task_title}
+task_description: {task_description}
+related_scenario: {related_scenario}
+acceptance_criteria: {acceptance_criteria_json}
+test_cases: {test_cases_json}
+
+Output JSON only. No explanation.
+
+{format_instructions}"""
+    )
+    chain = prompt | _build_llm(max_tokens=800, temperature=0) | parser
+    result = chain.invoke({
+        "task_id": task_id,
+        "task_title": task_title,
+        "task_description": task_description,
+        "related_scenario": related_scenario,
+        "acceptance_criteria_json": json.dumps(acceptance_criteria),
+        "test_cases_json": json.dumps(test_cases),
+        "format_instructions": parser.get_format_instructions(),
+    })
+    duration_ms = (time.perf_counter() - start) * 1000
+    logger.info("API contract generation finished, duration_ms=%.2f", duration_ms)
     return result.model_dump(mode="json")
