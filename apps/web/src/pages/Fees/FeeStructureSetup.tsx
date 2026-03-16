@@ -46,6 +46,15 @@ const FeeStructureSetup = () => {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(0);
+  };
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  const [classes, setClasses] = useState<ClassEntity[]>([]);
+  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string>("");
+  const [selectedClassId, setSelectedClassId] = useState<string>("");
   
   // Confirm Dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -59,7 +68,13 @@ const FeeStructureSetup = () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await feeService.getFeeStructures(page, rowsPerPage, search);
+      const res = await feeService.getFeeStructures(
+        page,
+        rowsPerPage,
+        search,
+        selectedAcademicYearId ? Number(selectedAcademicYearId) : undefined,
+        selectedClassId ? Number(selectedClassId) : undefined
+      );
       setStructures(res.items);
       setTotalRecords(res.total);
     } catch (err: any) {
@@ -71,12 +86,38 @@ const FeeStructureSetup = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, search]);
+  }, [page, rowsPerPage, search, selectedAcademicYearId, selectedClassId]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
+  // Fetch filter lookups
+  useEffect(() => {
+    const loadLookups = async () => {
+      try {
+        const [years, cls] = await Promise.all([
+          feeService.getAcademicYears(),
+          feeService.getClasses(),
+        ]);
+        setAcademicYears(years);
+        setClasses(cls);
+      } catch (err) {
+        // silent failure – main list will still load
+      }
+    };
+    loadLookups();
+  }, []);
+
+  const handleAcademicYearChange = (value: string) => {
+    setSelectedAcademicYearId(value);
+    setPage(0);
+  };
+
+  const handleClassChange = (value: string) => {
+    setSelectedClassId(value);
+    setPage(0);
+  };
 
 
   // -- Handlers --
@@ -137,7 +178,61 @@ const FeeStructureSetup = () => {
           actions={
             <ListPageToolbar
               searchValue={search}
-              onSearchChange={setSearch}
+              onSearchChange={handleSearchChange}
+              renderActions={
+                <>
+                  <Select
+                    value={selectedClassId}
+                    onChange={(e) => handleClassChange(e.target.value as string)}
+                    displayEmpty
+                    size="small"
+                    sx={{
+                      minWidth: { xs: "100%", sm: 180 },
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: "15px",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                      },
+                    }}
+                  >
+                    <MenuItem value="">
+                      <Typography variant="body2" color="text.secondary">
+                        Name
+                      </Typography>
+                    </MenuItem>
+                    {classes.map((cls) => (
+                      <MenuItem key={cls.id} value={cls.id.toString()}>
+                        {cls.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <Select
+                    value={selectedAcademicYearId}
+                    onChange={(e) => handleAcademicYearChange(e.target.value as string)}
+                    displayEmpty
+                    size="small"
+                    sx={{
+                      minWidth: { xs: "100%", sm: 180 },
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: "15px",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                      },
+                    }}
+                  >
+                    <MenuItem value="">
+                      <Typography variant="body2" color="text.secondary">
+                        Academic Year
+                      </Typography>
+                    </MenuItem>
+                    {academicYears.map((ay) => (
+                      <MenuItem key={ay.id} value={ay.id.toString()}>
+                        {ay.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </>
+              }
               onAddClick={handleAddClick}
               addLabel="Setup Fee"
               searchPlaceholder="Search by class..."

@@ -32,7 +32,20 @@ export default function ListPageToolbar({
   renderActions,
 }: ListPageToolbarProps) {
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: { xs: "100%", sm: "auto" }, flexWrap: "wrap" }}>
+    <Box sx={{ 
+      display: "flex", 
+      alignItems: { xs: "stretch", sm: "center" }, 
+      flexDirection: { xs: "column", sm: "row" },
+      gap: 2, 
+      width: { xs: "100%", sm: "auto" }, 
+      flexWrap: "wrap",
+      justifyContent: "flex-end"
+    }}>
+      {renderActions != null && (
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
+          {renderActions}
+        </Stack>
+      )}
       <TextField
         placeholder={searchPlaceholder}
         value={searchValue}
@@ -66,11 +79,6 @@ export default function ListPageToolbar({
           icon={addIcon ?? <AddIcon sx={{ fontSize: 24 }} />}
           label={addLabel}
         />
-      )}
-      {renderActions != null && (
-        <Stack direction="row" spacing={2} alignItems="center">
-          {renderActions}
-        </Stack>
       )}
     </Box>
   );
