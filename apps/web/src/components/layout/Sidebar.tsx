@@ -238,7 +238,6 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
             { id: "fee-cat", label: "Fee Category", path: "/fees/categories" },
             { id: "fee-struct", label: "Fee Structure", path: "/fees/setup" },
             { id: "fee-discount", label: "Fee Discount", path: "/fees/discounts" },
-            { id: "fee-assign", label: "Assign Fee to Class", path: "/fees" },
           ]
         },
         { id: "staff", label: "Staff", icon: teamworkIcon, path: "/staff", color: colorTokens.menuColors.staff },

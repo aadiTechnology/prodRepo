@@ -30,10 +30,6 @@ const EditRole = lazy(() => import("../pages/EditRole"));
 const FeeStructureSetup = lazy(() => import("../pages/Fees/FeeStructureSetup"));
 const FeeStructureForm = lazy(() => import("../pages/Fees/FeeStructureForm"));
 
-// New additions from branch
-const ClassFeeStructureAssignmentList = lazy(() => import("../pages/Fees"));
-const AddClassFeeStructureAssignment = lazy(() => import("../pages/AddClassFeeStructureAssignment"));
-
 // Loading fallback component
 const PageLoader = () => (
   <Box
@@ -112,12 +108,6 @@ export default function AppRoutes() {
           <Route path="/tenants/add" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><AddTenant /></ProtectedRoute>} />
           <Route path="/tenants/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><AddTenant /></ProtectedRoute>} />
           
-          {/* Fee Assignment Routes (from branch) */}
-          <Route path="/fees" element={<ProtectedRoute requiredRoles={[ "ADMIN", "TENANT_ADMIN", "ACCOUNT_ADMIN"]}><ClassFeeStructureAssignmentList /></ProtectedRoute>} />
-          <Route path="/fees/create" element={<ProtectedRoute requiredRoles={[ "ADMIN", "TENANT_ADMIN", "ACCOUNT_ADMIN"]}><AddClassFeeStructureAssignment /></ProtectedRoute>} />
-          <Route path="/fees/edit" element={<ProtectedRoute requiredRoles={[ "ADMIN", "TENANT_ADMIN", "ACCOUNT_ADMIN"]}><AddClassFeeStructureAssignment /></ProtectedRoute>} />
-          <Route path="/fees/edit/:id" element={<ProtectedRoute requiredRoles={[ "ADMIN", "TENANT_ADMIN", "ACCOUNT_ADMIN"]}><AddClassFeeStructureAssignment /></ProtectedRoute>} />
-
           {/* Fee Management */}
           <Route path="/fees/setup" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureSetup /></ProtectedRoute>} />
           <Route path="/fees/setup/add" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
