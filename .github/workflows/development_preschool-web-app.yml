@@ -1,4 +1,4 @@
-name: Build and deploy React app to Azure Web App
+name: Deploy React App to Azure
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
       - development
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Node
@@ -20,31 +20,13 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-        working-directory: apps/web
 
       - name: Build React app
         run: npm run build
-        working-directory: apps/web
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: react-build
-          path: apps/web/build
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: react-build
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: preschool-web-app
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: .
+          package: build
