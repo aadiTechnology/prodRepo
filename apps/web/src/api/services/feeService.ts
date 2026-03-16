@@ -11,9 +11,21 @@ import {
 } from "../../types/fee";
 
 const feeService = {
-  getFeeStructures: async (page = 0, size = 10, search = ""): Promise<PaginatedResponse<FeeStructure>> => {
+  getFeeStructures: async (
+    page = 0,
+    size = 10,
+    search = "",
+    academicYearId?: number,
+    classId?: number
+  ): Promise<PaginatedResponse<FeeStructure>> => {
     const response = await apiClient.get("/fees/structures", {
-      params: { page, size, search },
+      params: {
+        page,
+        size,
+        search,
+        academic_year_id: academicYearId,
+        class_id: classId,
+      },
     });
     return response.data;
   },
