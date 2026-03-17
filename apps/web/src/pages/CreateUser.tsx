@@ -1,25 +1,19 @@
 import { useState, useEffect } from "react";
-import { Button, TextField, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, InputAdornment, CircularProgress, Stack, Typography } from "../components/primitives";
+import { Button, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, InputAdornment, CircularProgress, Stack, Typography } from "../components/primitives";
 import { SaveButton, CancelButton, EmailInput, PasswordInput } from "../components/semantic";
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate, useLocation } from "react-router-dom";
 import userService from "../api/services/userService";
 import { UserCreate } from "../types/user";
 import { User } from "../types/auth";
 import roleService from "../api/services/roleService";
 import PersonIcon from '@mui/icons-material/Person';
-import SaveIcon from '@mui/icons-material/Save';
-import CloseIcon from '@mui/icons-material/Close';
-import HomeIcon from '@mui/icons-material/Home';
-import CancelIcon from '@mui/icons-material/Cancel';
-import CheckIcon from '@mui/icons-material/Check';
 import ConfirmDialog from "../components/semantic/ConfirmDialog";
 import CommonPageHeader from "../components/common/CommonPageHeader";
 import SaveIconButton from "../components/semantic/SaveIconButton";
 import CloseIconButton from "../components/semantic/CloseIconButton";
 import { Box, Paper, Switch, Alert, Snackbar, Tooltip, Divider } from "@mui/material";
 import Grid from "@mui/material/Grid2";
+import TextFieldInput from "../components/semantic/TextFieldInput";
 
 type FormData = {
   email: string;
@@ -227,7 +221,8 @@ export default function CreateUser() {
             <form onSubmit={handleSubmit} autoComplete="off">
               <Grid container spacing={3}>
                 <Grid size={12}>
-                  <TextField fullWidth label="Full Name" name="full_name" value={formData.full_name} onChange={handleChange} placeholder="Enter full name" variant="outlined" required inputProps={{ minLength: 2 }} />
+                <TextFieldInput label="Full Name"placeholder="Enter full name"
+                value={formData.full_name}onChange={handleChange}required htmlInput={{ minLength: 2 }}/>
                 </Grid>
                 <Grid size={12}>
                   <EmailInput 
