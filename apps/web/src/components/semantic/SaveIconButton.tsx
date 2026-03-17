@@ -1,12 +1,14 @@
 /**
  * SaveIconButton — Semantic component
- * Icon-only save action (green, 48x48). Uses IconButton primitive; supports loading state.
+ * Icon-only save action (AddTenant-style gradient, 44×44). Uses IconButton primitive; supports loading.
  */
 
 import { IconButton } from "../primitives";
 import { CircularProgress } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
 import type { IconButtonProps } from "@mui/material/IconButton";
+import { alpha } from "@mui/material/styles";
+import { colorTokens } from "../../tokens/colors";
 
 export interface SaveIconButtonProps extends Omit<IconButtonProps, "children"> {
   loading?: boolean;
@@ -18,32 +20,36 @@ export default function SaveIconButton({
   sx,
   ...props
 }: SaveIconButtonProps) {
+  const baseDisabled = disabled ?? loading;
+
   return (
     <IconButton
       aria-label="Save"
-      disabled={disabled ?? loading}
+      disabled={baseDisabled}
       sx={[
         (theme) => ({
-          color: theme.palette.success.contrastText,
-          backgroundColor: theme.palette.success.main,
-          borderRadius: 1.5,
-          width: 48,
-          height: 48,
-          boxShadow: theme.shadows[2],
+          background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
+          color: "white",
+          borderRadius: "12px",
+          width: 44,
+          height: 44,
+          boxShadow: `0 4px 12px ${alpha(colorTokens.preschool.turquoise.main, 0.3)}`,
           border: "none",
           p: 0,
           m: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          transition: "background 0.2s, color 0.2s",
+          transition: "all 0.2s",
           "&:hover": {
-            backgroundColor: theme.palette.success.light,
-            color: theme.palette.success.contrastText,
+            transform: "translateY(-2px)",
+            boxShadow: `0 6px 16px ${alpha(colorTokens.preschool.turquoise.main, 0.4)}`,
           },
-          "&:disabled": {
-            backgroundColor: theme.palette.grey[400],
-            color: theme.palette.grey[500],
+          "&.Mui-disabled": {
+            background: "#e2e8f0",
+            color: "#94a3b8",
+            boxShadow: "none",
+            transform: "none",
           },
         }),
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
@@ -51,9 +57,9 @@ export default function SaveIconButton({
       {...props}
     >
       {loading ? (
-        <CircularProgress size={24} color="inherit" />
+        <CircularProgress size={20} color="inherit" />
       ) : (
-        <SaveIcon sx={(theme) => ({ fontSize: 24, color: theme.palette.success.contrastText })} />
+        <SaveIcon sx={{ fontSize: 20 }} />
       )}
     </IconButton>
   );

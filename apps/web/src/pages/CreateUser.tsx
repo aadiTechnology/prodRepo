@@ -194,38 +194,30 @@ export default function CreateUser() {
   return (
     <>
       {/* Header - Aligned with AddRole */}
-      <Box sx={{ pt: 1.5, pb: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <CommonPageHeader
-          parentLabel="Users"
-          parentHref="/users"
-          title={isEdit ? "Edit User" : "Add User"}
-        />
-        <Stack direction="row" spacing={1.5}>
-        <Tooltip title="Cancel and Go Back">
-         <CloseIconButton onClick={() => navigate("/users")} />
-        </Tooltip>
-          <Tooltip title={isEdit ? "Update User" : "Save User"}>
-            <SaveIconButton onClick={handleSubmit} loading={loading} />
-          </Tooltip>
-        </Stack>
-      </Box>
+  <Box>
+  <CommonPageHeader
+    links={[
+      { title: "Users", path: "/users" },
+      { title: isEdit ? "Edit User" : "Add User", path: "#" },
+    ]}
+    actions={[
+      { id: 1, component: <CloseIconButton onClick={() => navigate("/users")} />, type: 1 },
+      { id: 2, component: <SaveIconButton onClick={handleSubmit} loading={loading} />, type: 1 },
+    ]}
+  />
+</Box>
 
       {/* Form content - match AddRole style */}
-      <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
-        <Paper sx={(theme) => ({ p: 0, borderRadius: 2, border: `1px solid ${theme.palette.divider}`, boxShadow: theme.shadows[1], overflow: "hidden", minWidth: 420, width: 520, maxWidth: '100%' })}>
-          {/* Header */}
-          <Box sx={(theme) => ({ display: "flex", alignItems: "center", gap: 1.5, p: 2, bgcolor: theme.palette.grey[800] })}>
-            <PersonIcon sx={{ color: "white", fontSize: 22 }} />
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "white", textTransform: "uppercase", letterSpacing: "1px" }}>User Information</Typography>
-          </Box>
-          <Box sx={{ p: 3 }}>
+      <Box>
+        <Paper sx={(theme) => ({ p: 0, borderRadius: 2, border: `1px solid ${theme.palette.divider}`, boxShadow: theme.shadows[1]})}>
+          <Box sx={{ p: 5}}>
             <form onSubmit={handleSubmit} autoComplete="off">
               <Grid container spacing={3}>
-                <Grid size={12}>
+                <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
                 <TextFieldInput label="Full Name"placeholder="Enter full name" name="full_name"
                 value={formData.full_name}onChange={handleChange}required htmlInput={{ minLength: 2 }}/>
                 </Grid>
-                <Grid size={12}>
+                <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
                 <EmailInput value={formData.email} onChange={handleChange} 
                 required disabled={isEdit}/>
               </Grid>
