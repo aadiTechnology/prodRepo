@@ -14,6 +14,7 @@ import CloseIconButton from "../components/semantic/CloseIconButton";
 import { Box, Paper, Switch, Alert, Snackbar, Tooltip, Divider } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import TextFieldInput from "../components/semantic/TextFieldInput";
+import SelectItem from "../components/semantic/SelectItem";
 
 type FormData = {
   email: string;
@@ -239,37 +240,12 @@ export default function CreateUser() {
                     </Grid>
                   </>
                 )}
-
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <Select
-                    fullWidth
-                    label="Role"
-                    name="role_code"
-                    value={formData.role_code}
-                    onChange={(event) => {
-                      const { value } = event.target;
-                      setFormData((prev) => ({
-                        ...prev,
-                        role_code: typeof value === "string" ? value : String(value ?? ""),
-                      }));
-                      setError(null);
-                    }}
-                    required
-                    disabled={loadingRoles || roles.length === 0}
-                    sx={(theme) => ({ bgcolor: theme.palette.background.paper })}
-                  >
-                    {loadingRoles ? (
-                      <MenuItem value="" disabled>Loading roles...</MenuItem>
-                    ) : roles.length === 0 ? (
-                      <MenuItem value="" disabled>No roles found</MenuItem>
-                    ) : (
-                      roles.map((role) => (
-                        <MenuItem key={role.id} value={role.code}>{role.name}</MenuItem>
-                      ))
-                    )}
-                  </Select>
+                  <SelectItem value={formData.role_code} roles={roles} loadingRoles={loadingRoles}
+                    onValueChange={(role_code) => {setFormData((prev) => ({ ...prev, role_code }));
+                    setError(null);
+                  }} required />
                 </Grid>
-
                 {isEdit && (
                   <Grid size={12}>
                     <Box sx={(theme) => ({ p: 2, bgcolor: theme.palette.grey[100], borderRadius: 2, border: `1px solid ${theme.palette.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between" })}>
@@ -288,7 +264,6 @@ export default function CreateUser() {
                   </Grid>
                 )}
               </Grid>
-
               {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 4 }}>
