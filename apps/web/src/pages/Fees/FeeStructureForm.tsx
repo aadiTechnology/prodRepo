@@ -195,13 +195,23 @@ const FeeStructureForm = () => {
             const perInstallment = Math.floor((total / count) * 100) / 100;
             const remainder = Math.round((total - (perInstallment * count)) * 100) / 100;
 
-            const newInstallments = Array.from({ length: count }, (_, i) => ({
-                installment_number: i + 1,
-                amount: i === count - 1 ? Math.round((perInstallment + remainder) * 100) / 100 : perInstallment,
-                due_date: new Date(new Date().setMonth(new Date().getMonth() + i)).toISOString().split('T')[0],
-                late_fee_applicable: true,
-                late_fee_amount: 100
-            }));
+            // Calculate month step based on installment type
+            const monthStep =
+                watchedInstallmentType === 'MONTHLY' ? 1 :
+                watchedInstallmentType === 'QUARTERLY' ? 3 :
+                12; // YEARLY
+
+            const newInstallments = Array.from({ length: count }, (_, i) => {
+                const dueDate = new Date();
+                dueDate.setMonth(dueDate.getMonth() + (i * monthStep));
+                return {
+                    installment_number: i + 1,
+                    amount: i === count - 1 ? Math.round((perInstallment + remainder) * 100) / 100 : perInstallment,
+                    due_date: dueDate.toISOString().split('T')[0],
+                    late_fee_applicable: true,
+                    late_fee_amount: 100
+                };
+            });
             setInstallments(newInstallments);
         } else {
             setInstallments([]);
