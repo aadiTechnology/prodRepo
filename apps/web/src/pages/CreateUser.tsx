@@ -192,7 +192,7 @@ export default function CreateUser() {
   };
 
   return (
-    <>
+    <Box sx={{ overflowX: "hidden", minWidth: 0 }}>
       {/* Header - Aligned with AddRole */}
   <Box>
   <CommonPageHeader
@@ -208,14 +208,14 @@ export default function CreateUser() {
 </Box>
 
       {/* Form content - match AddRole style */}
-      <Box>
-        <Paper sx={(theme) => ({ p: 0, borderRadius: 2, border: `1px solid ${theme.palette.divider}`, boxShadow: theme.shadows[1]})}>
-          <Box sx={{ p: 5}}>
+      <Box sx={{ width: "100%", minWidth: 0 }}>
+        <Paper sx={(theme) => ({ p: 0, borderRadius: 2, border: `1px solid ${theme.palette.divider}`, boxShadow: theme.shadows[1], overflow: "hidden", maxWidth: "100%" })}>
+          <Box sx={{ p: { xs: 2, sm: 3, md: 5 } }}>
             <form onSubmit={handleSubmit} autoComplete="off">
               <Grid container spacing={3}>
                 <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
-                <TextFieldInput label="Full Name"placeholder="Enter full name" name="full_name"
-                value={formData.full_name}onChange={handleChange}required htmlInput={{ minLength: 2 }}/>
+                <TextFieldInput label="Full Name" placeholder="Enter full name" name="full_name"
+                value={formData.full_name} onChange={handleChange} required htmlInput={{ minLength: 2 }}/>
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
                 <EmailInput value={formData.email} onChange={handleChange} 
@@ -224,7 +224,7 @@ export default function CreateUser() {
                 {!isEdit && (
                   <>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                    <PasswordInput value={formData.password} onChange={handleChange}required/>
+                    <PasswordInput value={formData.password} onChange={handleChange} required />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                     <PasswordInput label="Confirm Password" placeholder="Confirm password" name="confirm_password"
@@ -240,8 +240,8 @@ export default function CreateUser() {
                 </Grid>
                 {isEdit && (
                   <Grid size={12}>
-                    <Box sx={(theme) => ({ p: 2, bgcolor: theme.palette.grey[100], borderRadius: 2, border: `1px solid ${theme.palette.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between" })}>
-                      <Box>
+                    <Box sx={(theme) => ({ p: 2, bgcolor: theme.palette.grey[100], borderRadius: 2, border: `1px solid ${theme.palette.divider}`, display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between", gap: 1 })}>
+                      <Box sx={{ minWidth: 0 }}>
                         <Typography sx={(theme) => ({ fontSize: "0.9rem", fontWeight: 700, color: theme.palette.text.primary })}>Account Active</Typography>
                         <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, fontSize: "0.75rem" })}>Control system access for this user</Typography>
                       </Box>
@@ -258,7 +258,7 @@ export default function CreateUser() {
               </Grid>
               {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 4 }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', mt: 4 }}>
               <SaveButton
                 type="submit"
                 disabled={false}
@@ -299,6 +299,6 @@ export default function CreateUser() {
         confirmLabel="Confirm"
         loading={loading}
       />
-      </>
+    </Box>
   );
 }
