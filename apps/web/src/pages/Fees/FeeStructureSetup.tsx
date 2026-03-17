@@ -47,6 +47,7 @@ const FeeStructureSetup = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
+  // Handle search input change and reset to first page to ensure sync with entire data
   const handleSearchChange = (value: string) => {
     setSearch(value);
     setPage(0);
@@ -178,9 +179,9 @@ const FeeStructureSetup = () => {
           actions={
             <ListPageToolbar
               searchValue={search}
-              onSearchChange={handleSearchChange}
+              onSearchChange={handleSearchChange} // Trigger search with pagination reset
               renderActions={
-                <>
+                <> {/* Custom filters rendered here (Filter > Search > Add) */}
                   <Select
                     value={selectedClassId}
                     onChange={(e) => handleClassChange(e.target.value as string)}

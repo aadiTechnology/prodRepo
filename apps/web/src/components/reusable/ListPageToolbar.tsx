@@ -32,6 +32,10 @@ export default function ListPageToolbar({
   renderActions,
 }: ListPageToolbarProps) {
   return (
+    /* 
+      Arrangement: Filter (renderActions) > Search (Field) > Add (PrimaryActionButton)
+      Responsive: Column on xs, Row on sm; Stretch on xs for full-width touch targets
+    */
     <Box sx={{ 
       display: "flex", 
       alignItems: { xs: "stretch", sm: "center" }, 
