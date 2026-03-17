@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Box, Paper, Grid, Switch, Alert, Snackbar, Tooltip, Divider } from "@mui/material";
 import { Button, TextField, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, InputAdornment, CircularProgress, Stack, Typography } from "../components/primitives";
 import { SaveButton, CancelButton, EmailInput, PasswordInput } from "../components/semantic";
 import Visibility from '@mui/icons-material/Visibility';
@@ -19,6 +18,8 @@ import ConfirmDialog from "../components/semantic/ConfirmDialog";
 import CommonPageHeader from "../components/common/CommonPageHeader";
 import SaveIconButton from "../components/semantic/SaveIconButton";
 import CloseIconButton from "../components/semantic/CloseIconButton";
+import { Box, Paper, Switch, Alert, Snackbar, Tooltip, Divider } from "@mui/material";
+import Grid from "@mui/material/Grid2";
 
 type FormData = {
   email: string;
@@ -225,21 +226,11 @@ export default function CreateUser() {
           <Box sx={{ p: 3 }}>
             <form onSubmit={handleSubmit} autoComplete="off">
               <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Full Name"
-                    name="full_name"
-                    value={formData.full_name}
-                    onChange={handleChange}
-                    placeholder="Enter full name"
-                    variant="outlined"
-                    required
-                    inputProps={{ minLength: 2 }}
-                  />
+                <Grid size={12}>
+                  <TextField fullWidth label="Full Name" name="full_name" value={formData.full_name} onChange={handleChange} placeholder="Enter full name" variant="outlined" required inputProps={{ minLength: 2 }} />
                 </Grid>
-                <Grid item xs={12}>
-                  <EmailInput
+                <Grid size={12}>
+                  <EmailInput 
                   fullWidth
                   label="Email Address"
                   name="email"
@@ -253,7 +244,7 @@ export default function CreateUser() {
 
                 {!isEdit && (
                   <>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
                       <PasswordInput
                         fullWidth
                         label="Password"
@@ -265,7 +256,7 @@ export default function CreateUser() {
                         required
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
                       <PasswordInput
                         fullWidth
                         label="Confirm Password"
@@ -280,7 +271,7 @@ export default function CreateUser() {
                   </>
                 )}
 
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Select
                     fullWidth
                     label="Role"
@@ -311,7 +302,7 @@ export default function CreateUser() {
                 </Grid>
 
                 {isEdit && (
-                  <Grid item xs={12}>
+                  <Grid size={12}>
                     <Box sx={(theme) => ({ p: 2, bgcolor: theme.palette.grey[100], borderRadius: 2, border: `1px solid ${theme.palette.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between" })}>
                       <Box>
                         <Typography sx={(theme) => ({ fontSize: "0.9rem", fontWeight: 700, color: theme.palette.text.primary })}>Account Active</Typography>
