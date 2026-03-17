@@ -1,6 +1,6 @@
 /**
  * PasswordInput — Semantic component
- * Password field with optional show/hide toggle. Uses TextField primitive.
+ * Password field with optional show/hide toggle. fullWidth, variant, label, placeholder, name included.
  */
 
 import { useState } from "react";
@@ -10,12 +10,15 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 export interface PasswordInputProps extends Omit<TextFieldProps, "type"> {
   label?: string;
-  /** Show visibility toggle. Default true. */
   showToggle?: boolean;
 }
 
 export default function PasswordInput({
   label = "Password",
+  placeholder = "Enter password",
+  name = "password",
+  fullWidth = true,
+  variant = "outlined",
   showToggle = true,
   ...props
 }: PasswordInputProps) {
@@ -26,6 +29,10 @@ export default function PasswordInput({
     <TextField
       type={type}
       label={label}
+      placeholder={placeholder}
+      name={name}
+      fullWidth={fullWidth}
+      variant={variant}
       autoComplete="current-password"
       InputProps={
         showToggle

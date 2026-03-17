@@ -221,47 +221,21 @@ export default function CreateUser() {
             <form onSubmit={handleSubmit} autoComplete="off">
               <Grid container spacing={3}>
                 <Grid size={12}>
-                <TextFieldInput label="Full Name"placeholder="Enter full name"
+                <TextFieldInput label="Full Name"placeholder="Enter full name" name="full_name"
                 value={formData.full_name}onChange={handleChange}required htmlInput={{ minLength: 2 }}/>
                 </Grid>
                 <Grid size={12}>
-                  <EmailInput 
-                  fullWidth
-                  label="Email Address"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="Enter email address"
-                  required
-                  disabled={isEdit}
-                />
+                <EmailInput value={formData.email} onChange={handleChange} 
+                required disabled={isEdit}/>
               </Grid>
-
                 {!isEdit && (
                   <>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                      <PasswordInput
-                        fullWidth
-                        label="Password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        placeholder="Enter password"
-                        variant="outlined"
-                        required
-                      />
+                    <PasswordInput value={formData.password} onChange={handleChange}required/>
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                      <PasswordInput
-                        fullWidth
-                        label="Confirm Password"
-                        name="confirm_password"
-                        value={formData.confirm_password}
-                        onChange={handleChange}
-                        variant="outlined"
-                        placeholder="Confirm password"
-                        required
-                      />
+                    <PasswordInput label="Confirm Password" placeholder="Confirm password" name="confirm_password"
+                        value={formData.confirm_password} onChange={handleChange} required />
                     </Grid>
                   </>
                 )}
