@@ -239,11 +239,10 @@ export default function CreateUser() {
                   }} required />
                 </Grid>
                 {isEdit && (
-                  <Grid size={12}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <Box sx={(theme) => ({ p: 2, bgcolor: theme.palette.grey[100], borderRadius: 2, border: `1px solid ${theme.palette.divider}`, display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between", gap: 1 })}>
                       <Box sx={{ minWidth: 0 }}>
                         <Typography sx={(theme) => ({ fontSize: "0.9rem", fontWeight: 700, color: theme.palette.text.primary })}>Account Active</Typography>
-                        <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, fontSize: "0.75rem" })}>Control system access for this user</Typography>
                       </Box>
                       <Switch
                         checked={formData.is_active}
