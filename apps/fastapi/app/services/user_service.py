@@ -18,15 +18,14 @@ def create_user(
     user: UserCreate,
     role: UserRole = UserRole.USER,
     created_by: int | None = None,
+    tenant_id: int | None = None,
 ) -> User:
-    """Create a new user."""
+    """Create a new user, automatically inheriting the creating admin's tenant."""
     try:
-        # Check email uniqueness
         if get_user_by_email(db, user.email):
             logger.warning(f"Attempt to create user with existing email: {user.email}")
             raise ConflictException(f"User with email {user.email} already exists")
 
-        # Validate role
         role_obj = db.query(Role).filter(Role.code == user.role).first()
         if not role_obj:
             raise ConflictException("Role does not exist.")
@@ -38,19 +37,17 @@ def create_user(
             role=user.role,
             is_active=True,
             created_by=created_by,
+            tenant_id=tenant_id,
         )
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
-        # Assign role to user_roles relationship
-        if not role_obj:
-            logger.error(f"Role object not found for code: {user.role}")
-        else:
-            db_user.roles.append(role_obj)
-            db.commit()
-            db.refresh(db_user)
-            logger.info(f"Assigned roles to user {db_user.id}: {[role.code for role in db_user.roles]}")
-        logger.info(f"User created successfully: {db_user.email} with role {db_user.role}")
+        
+        db_user.roles.append(role_obj)
+        db.commit()
+        db.refresh(db_user)
+        logger.info(f"Assigned roles to user {db_user.id}: {[r.code for r in db_user.roles]}")
+        logger.info(f"User created successfully: {db_user.email} with role {db_user.role}, tenant_id={tenant_id}")
         return db_user
     except IntegrityError:
         db.rollback()
