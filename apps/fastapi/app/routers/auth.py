@@ -51,15 +51,14 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> Toke
     logger.info(f"Login attempt for email: {login_data.email}")
     
     user = user_service.get_user_by_email(db, login_data.email)
-    if not user or not verify_password(login_data.password, user.hashed_password):
+    if user is None or not verify_password(login_data.password, user.hashed_password):
         logger.warning(f"Invalid credentials for email: {login_data.email}")
         raise UnauthorizedException("Invalid email or password")
     
     if not user.is_active:
         raise UnauthorizedException("Your account is deactivated. Contact system administrator.")
     
-    if user.tenant_id:
-        from app.models.tenant import Tenant
+    if user.tenant_id is not None:
         tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
         if not tenant or not tenant.is_active or tenant.is_deleted:
             logger.warning(f"Login blocked: Tenant {user.tenant_id} is inactive or deleted (User: {user.email})")
@@ -88,7 +87,7 @@ async def login_with_context(
     logger.info(f"[RBAC] Login-with-context attempt for email: {login_data.email}")
 
     user = user_service.get_user_by_email(db, login_data.email)
-    if not user or not verify_password(login_data.password, user.hashed_password):
+    if user is None or not verify_password(login_data.password, user.hashed_password):
         logger.warning(f"[RBAC] Invalid credentials for email: {login_data.email}")
         raise UnauthorizedException("Invalid email or password")
 
@@ -102,13 +101,13 @@ async def get_current_user_info(
 ) -> UserWithRole:
     """Get current authenticated user information."""
     tenant_info = None
-    if current_user.tenant_id:
-        from app.models.tenant import Tenant
+    if current_user.tenant_id is not None:
         tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
         if tenant and tenant.is_active and not tenant.is_deleted:
             theme_config = None
-            if getattr(tenant, "theme_template_id", None):
-                theme_config = theme_template_service.get_template_config(db, tenant.theme_template_id)
+            theme_template_id = getattr(tenant, "theme_template_id", None)
+            if theme_template_id is not None:
+                theme_config = theme_template_service.get_template_config(db, theme_template_id)
             tenant_info = TenantInfo(
                 id=tenant.id,
                 name=tenant.name,
@@ -192,6 +191,9 @@ async def exit_impersonation(
     """Exit impersonation and return to original system admin session."""
     if not hasattr(current_user, 'is_impersonation') or not current_user.is_impersonation:
         raise ForbiddenException("Not currently in impersonation mode")
+    
+    if current_user.original_user_id is None:
+        raise ForbiddenException("Original user ID not available")
     
     original_user = user_service.get_user_by_id(db, current_user.original_user_id)
     if not original_user:
