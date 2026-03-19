@@ -120,7 +120,7 @@ export default function RequirementGeneratePage() {
 
   return (
     <ListPageLayout
-      header={<PageHeader title="Generate story and tests" />}
+      header={<PageHeader links={[{ title: "Generate story and tests", path: "#" }]} homePath="/" />}
       contentPaddingSize="normal"
     >
       <Paper

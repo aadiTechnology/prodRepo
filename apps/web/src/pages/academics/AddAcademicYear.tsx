@@ -166,24 +166,11 @@ const AddAcademicYear = () => {
             header={
                 <Box sx={{ mb: 2 }}>
                     <PageHeader
-                        onBack={() => navigate("/academic-years")}
-                        title={
-                            <>
-                                <Box
-                                    component="span"
-                                    onClick={() => navigate("/academic-years")}
-                                    sx={(theme) => ({
-                                        color: alpha(theme.palette.text.primary, 0.6),
-                                        cursor: "pointer",
-                                        "&:hover": { color: theme.palette.text.primary },
-                                    })}
-                                >
-                                    Academic Years
-                                </Box>
-                                <Box component="span" sx={{ color: "#cbd5e1", mx: 1.5 }}>/</Box>
-                                {isEditMode ? "Edit Academic Year" : "Add Academic Year"}
-                            </>
-                        }
+                        links={[
+                            { title: "Academic Years", path: "/academic-years" },
+                            { title: isEditMode ? "Edit Academic Year" : "Add Academic Year", path: "#" },
+                        ]}
+                        homePath="/"
                         actions={
                             <Box sx={{ display: "flex", gap: 1.5 }}>
                                 <Tooltip title="Discard Changes">

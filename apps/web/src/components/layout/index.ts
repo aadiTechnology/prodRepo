@@ -9,7 +9,7 @@ export { default as PageLayout } from "./PageLayout";
 export type { PageLayoutProps } from "./PageLayout";
 
 export { default as PageHeader } from "./PageHeader";
-export type { LayoutPageHeaderProps } from "./PageHeader";
+export type { LayoutPageHeaderProps, NavLink } from "./PageHeader";
 
 export { default as ContentContainer } from "./ContentContainer";
 export type { ContentContainerProps } from "./ContentContainer";

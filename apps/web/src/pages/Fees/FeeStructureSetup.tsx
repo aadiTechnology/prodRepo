@@ -31,7 +31,6 @@ import {
 } from "../../types/fee";
 import feeService from "../../api/services/feeService";
 import StatusChip from "../../components/roles/StatusChip";
-import { Home as HomeIcon } from "@mui/icons-material";
 
 const FeeStructureSetup = () => {
   const navigate = useNavigate();
@@ -173,9 +172,8 @@ const FeeStructureSetup = () => {
     <ListPageLayout
       header={
         <PageHeader
-          title="Fee Structure Setup"
-          onBack={() => navigate("/")}
-          backIcon={<HomeIcon sx={(theme) => ({ fontSize: theme.typography.h6.fontSize })} />}
+          links={[{ title: "Fee Structure Setup", path: "#" }]}
+          homePath="/"
           actions={
             <ListPageToolbar
               searchValue={search}

@@ -6,7 +6,7 @@ import {
   CircularProgress,
   Snackbar,
 } from "@mui/material";
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Home as HomeIcon } from "@mui/icons-material";
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { Role } from "../types/role.types";
 import roleService from "../api/services/roleService";
@@ -127,9 +127,8 @@ const RoleManagementPage = () => {
       contentPaddingSize="none"
       header={
         <PageHeader
-          title="Role Management"
-          onBack={() => navigate("/")}
-          backIcon={<HomeIcon sx={{ color: "white", fontSize: 24 }} />}
+          links={[{ title: "Role Management", path: "#" }]}
+          homePath="/"
           actions={
             <ListPageToolbar
               searchValue={search}

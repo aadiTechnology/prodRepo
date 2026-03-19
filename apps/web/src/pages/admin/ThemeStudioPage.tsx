@@ -350,10 +350,7 @@ function TokenEditor({
 function LivePreview() {
   return (
     <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 3 }}>
-      <PageHeader
-        title="Theme Preview"
-        subtitle="Representative UI under the current token overrides"
-      />
+      <PageHeader links={[{ title: "Theme Preview", path: "#" }]} homePath="/" />
       <AppCard>
         <Typography variant="h6" gutterBottom>Stat-style card</Typography>
         <Typography variant="body2" color="text.secondary">Value: 1,234</Typography>
@@ -493,8 +490,8 @@ export default function ThemeStudioPage() {
       }}
     >
       <PageHeader
-        title="Theme Studio"
-        subtitle="Create and edit theme templates; export tenant theme configuration"
+        links={[{ title: "Theme Studio", path: "#" }]}
+        homePath="/"
         actions={
           <Button
             variant="contained"

@@ -10,7 +10,6 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import {
-    Home as HomeIcon,
     Edit as EditIcon,
 } from "@mui/icons-material";
 import { classFeeStructureAssignmentService } from "../../api/services/classFeeStructureAssignmentService";
@@ -207,9 +206,8 @@ const ClassFeeStructureAssignmentList = () => {
             header={
                 <>
                     <PageHeader
-                        title="Assign Fee Structure to Class"
-                        onBack={() => navigate("/")}
-                        backIcon={<HomeIcon sx={{ fontSize: 24 }} />}
+                        links={[{ title: "Assign Fee Structure to Class", path: "#" }]}
+                        homePath="/"
                         actions={
                             <ListPageToolbar
                                 searchValue={search}

@@ -10,7 +10,6 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import {
-    Home as HomeIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
 } from "@mui/icons-material";
@@ -137,9 +136,8 @@ const FeeDiscountList = () => {
             header={
                 <>
                     <PageHeader
-                        title="Fee Discounts"
-                        onBack={() => navigate("/")}
-                        backIcon={<HomeIcon sx={{ fontSize: 24 }} />}
+                        links={[{ title: "Fee Discounts", path: "#" }]}
+                        homePath="/"
                         actions={
                             <ListPageToolbar
                                 searchValue={search}

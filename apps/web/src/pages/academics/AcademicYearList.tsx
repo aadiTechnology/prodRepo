@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Home as HomeIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
 import {
@@ -134,9 +133,8 @@ const AcademicYearList = () => {
         <ListPageLayout
             header={
                 <PageHeader
-                    title="Academic Years"
-                    onBack={() => navigate("/")}
-                    backIcon={<HomeIcon sx={(theme) => ({ fontSize: theme.typography.h6.fontSize })} />}
+                    links={[{ title: "Academic Years", path: "#" }]}
+                    homePath="/"
                     actions={
                         <ListPageToolbar
                             searchValue={search}

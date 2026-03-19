@@ -14,8 +14,8 @@ export default function ArtifactReviewPage() {
     <ListPageLayout
       header={
         <PageHeader
-          title="AI Review"
-          subtitle="Review generated user stories and revise rejected artifacts before approval."
+          links={[{ title: "AI Review", path: "#" }]}
+          homePath="/"
           actions={
             <Button onClick={() => void refresh()} disabled={loading}>
               Refresh

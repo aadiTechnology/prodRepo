@@ -8,7 +8,6 @@ import { ListPageLayout, ListPageToolbar, DirectoryInfoBar, DataTable, TableRowA
 import type { DataTableColumn } from '../../components/reusable';
 import PageHeader from '../../components/layout/PageHeader';
 import StatusChip from '../../components/roles/StatusChip';
-import { Home as HomeIcon } from '@mui/icons-material';
 // ...existing code...
 
 const FeeCategoryManagement = () => {
@@ -119,9 +118,8 @@ const FeeCategoryManagement = () => {
       header={
         <>
           <PageHeader
-            title="Fee Category Management"
-            onBack={() => navigate("/")}
-            backIcon={<HomeIcon sx={{ fontSize: 24 }} />}
+            links={[{ title: "Fee Category Management", path: "#" }]}
+            homePath="/"
             actions={
               <ListPageToolbar
                 searchValue={search}

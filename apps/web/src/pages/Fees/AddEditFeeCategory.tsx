@@ -13,14 +13,13 @@ import type { Theme } from "@mui/material/styles";
 import { TextField } from "../../components/primitives";
 import { SaveButton, CancelButton } from "../../components/semantic";
 import {
-    Home as HomeIcon,
     Category as CategoryIcon,
     ErrorOutline as ErrorIcon,
     Save as SaveIcon,
     Cancel as CancelIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
-import { PageHeader } from "../../components/common";
+import { PageHeader } from "../../components/layout";
 import { createFeeCategory, updateFeeCategory, getFeeCategory } from "../../api/services/feeService";
 import type { FeeCategoryCreate, FeeCategoryResponse } from "../../types/fee";
 import { ListPageLayout, FormSectionLabel, FieldLabel } from "../../components/reusable";
@@ -132,27 +131,11 @@ const AddEditFeeCategory = () => {
             header={
                 <>
                     <PageHeader
-                        onBack={() => navigate("/fees/categories")}
-                        backIcon={<HomeIcon sx={{ color: "white", fontSize: 24 }} />}
-                        title={
-                            <>
-                                <Box
-                                    component="span"
-                                    onClick={() => navigate("/fees/categories")}
-                                    sx={(theme) => ({
-                                        color: theme.palette.text.secondary,
-                                        cursor: "pointer",
-                                        "&:hover": { color: theme.palette.text.primary },
-                                    })}
-                                >
-                                    Categories
-                                </Box>
-                                <Box component="span" sx={{ color: "#cbd5e1", mx: 1.5 }}>
-                                    /
-                                </Box>
-                                {isEditMode ? "Edit Fee Category" : "Add Fee Category"}
-                            </>
-                        }
+                        links={[
+                            { title: "Fee Categories", path: "/fees/categories" },
+                            { title: isEditMode ? "Edit Fee Category" : "Add Fee Category", path: "#" },
+                        ]}
+                        homePath="/fees/categories"
                         actions={
                             <>
                                 <Tooltip title="Cancel">

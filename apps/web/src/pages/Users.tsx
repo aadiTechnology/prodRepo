@@ -7,7 +7,6 @@ import ConfirmDialog from "../components/common/ConfirmDialog";
 import { ListPageLayout, ListPageToolbar, DirectoryInfoBar, DataTable, TableRowActions, TablePaginationBar } from "../components/reusable";
 import { PageHeader } from "../components/layout";
 import StatusChip from "../components/roles/StatusChip";
-import { Home as HomeIcon } from "@mui/icons-material";
 import { Box, Typography, Button, Select, MenuItem } from "../components/primitives";
 
 const Users = () => {
@@ -165,9 +164,8 @@ const Users = () => {
       header={
         <>
           <PageHeader
-            title="User Management"
-            onBack={() => navigate("/")}
-            backIcon={<HomeIcon sx={(theme) => ({ fontSize: theme.typography.h6.fontSize })} />}
+            links={[{ title: "User Management", path: "#" }]}
+            homePath="/"
             actions={
               <ListPageToolbar
                 searchValue={search}

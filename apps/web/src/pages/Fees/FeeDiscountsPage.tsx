@@ -19,7 +19,6 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import feeDiscountService from "../../api/services/feeDiscountService";
 import { FeeDiscount } from "../../types/feeDiscount";
 import CreateDiscountDialog from "./CreateDiscountDialog";
-import { Home as HomeIcon } from "@mui/icons-material";
 
 const FeeDiscountsPage = () => {
     const navigate = useNavigate();
@@ -121,9 +120,8 @@ const FeeDiscountsPage = () => {
             header={
                 <>
                     <PageHeader
-                        title="Fee Discounts"
-                        onBack={() => navigate("/")}
-                        backIcon={<HomeIcon sx={{ fontSize: 24 }} />}
+                        links={[{ title: "Fee Discounts", path: "#" }]}
+                        homePath="/"
                         actions={
                             <ListPageToolbar
                                 searchValue={search}

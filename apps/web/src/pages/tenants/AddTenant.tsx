@@ -18,7 +18,6 @@ import type { Theme } from "@mui/material/styles";
 import { Button, TextField, Select, MenuItem } from "../../components/primitives";
 import { SaveButton, CancelButton, EmailInput, PhoneInput, PasswordInput } from "../../components/semantic";
 import {
-    Home as HomeIcon,
     Business as BusinessIcon,
     Person as PersonIcon,
     Security as SecurityIcon,
@@ -252,21 +251,11 @@ const AddTenant = () => {
             header={
                 <Box sx={{ mb: 2 }}>
                     <PageHeader
-                        onBack={() => navigate("/tenants")}
-                        title={
-                            <>
-                                <Box component="span" onClick={() => navigate("/tenants")}
-                                    sx={(theme) => ({
-                                        color: alpha(theme.palette.text.primary, 0.6),
-                                        cursor: "pointer",
-                                        "&:hover": { color: theme.palette.text.primary }
-                                    })}>
-                                    Tenants
-                                </Box>
-                                <Box component="span" sx={{ color: "#cbd5e1", mx: 1.5 }}>/</Box>
-                                {isEditMode ? "Edit Tenant" : "Add Tenant"}
-                            </>
-                        }
+                        links={[
+                            { title: "Tenants", path: "/tenants" },
+                            { title: isEditMode ? "Edit Tenant" : "Add Tenant", path: "#" },
+                        ]}
+                        homePath="/"
                         actions={
                             <Box sx={{ display: "flex", gap: 1.5 }}>
                                 <Tooltip title="Discard Changes">

@@ -15,7 +15,6 @@ import type { Theme } from "@mui/material/styles";
 import { Button, TextField, Select, MenuItem } from "../../components/primitives";
 import { SaveButton, CancelButton } from "../../components/semantic";
 import {
-    Home as HomeIcon,
     Business as BusinessIcon,
     Person as PersonIcon,
     ErrorOutline as ErrorIcon,
@@ -309,18 +308,11 @@ const FeeStructureForm = () => {
             header={
                 <>
                     <PageHeader
-                        onBack={() => navigate("/fees/setup")}
-                        backIcon={<HomeIcon sx={{ color: "white", fontSize: 24 }} />}
-                        title={
-                            <>
-                                <Box component="span" onClick={() => navigate("/fees/setup")}
-                                    sx={(theme) => ({ color: theme.palette.text.secondary, cursor: "pointer", "&:hover": { color: theme.palette.text.primary } })}>
-                                    Fee Setup
-                                </Box>
-                                <Box component="span" sx={{ color: "#cbd5e1", mx: 1.5 }}>/</Box>
-                                {isEditMode ? "Edit Structure" : "New Structure"}
-                            </>
-                        }
+                        links={[
+                            { title: "Fee Setup", path: "/fees/setup" },
+                            { title: isEditMode ? "Edit Structure" : "New Structure", path: "#" },
+                        ]}
+                        homePath="/"
                         actions={
                             <>
                                 <Tooltip title="Cancel">

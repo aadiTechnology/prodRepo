@@ -240,8 +240,11 @@ export default function ArtifactReviewDetailPage() {
       <ListPageLayout
         header={
           <PageHeader
-            title="User Story Review"
-            onBack={() => navigate("/ai/review")}
+            links={[
+              { title: "AI Review", path: "/ai/review" },
+              { title: "User Story Review", path: "#" },
+            ]}
+            homePath="/"
           />
         }
         contentPaddingSize="normal"
@@ -258,8 +261,11 @@ export default function ArtifactReviewDetailPage() {
       <ListPageLayout
         header={
           <PageHeader
-            title="User Story Review"
-            onBack={() => navigate("/ai/review")}
+            links={[
+              { title: "AI Review", path: "/ai/review" },
+              { title: "User Story Review", path: "#" },
+            ]}
+            homePath="/"
           />
         }
         contentPaddingSize="normal"
@@ -373,9 +379,11 @@ export default function ArtifactReviewDetailPage() {
     <ListPageLayout
       header={
         <PageHeader
-          title="User Story Review"
-          subtitle={record.requirement.title}
-          onBack={() => navigate("/ai/review")}
+          links={[
+            { title: "AI Review", path: "/ai/review" },
+            { title: "User Story Review", path: "#" },
+          ]}
+          homePath="/"
         />
       }
       contentPaddingSize="normal"

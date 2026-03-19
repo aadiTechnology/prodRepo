@@ -8,7 +8,7 @@ import { User } from "../types/auth";
 import roleService from "../api/services/roleService";
 import PersonIcon from '@mui/icons-material/Person';
 import ConfirmDialog from "../components/semantic/ConfirmDialog";
-import CommonPageHeader from "../components/common/CommonPageHeader";
+import { PageHeader } from "../components/layout";
 import SaveIconButton from "../components/semantic/SaveIconButton";
 import CloseIconButton from "../components/semantic/CloseIconButton";
 import { Box, Paper, Alert, Snackbar, Tooltip, Divider } from "@mui/material";
@@ -195,19 +195,20 @@ export default function CreateUser() {
     <Box sx={{ overflowX: "hidden", minWidth: 0 }}>
       {/* Header - Aligned with AddRole */}
   <Box>
-  <CommonPageHeader
+  <PageHeader
     links={[
       { title: "Users", path: "/users" },
       { title: isEdit ? "Edit User" : "Add User", path: "#" },
     ]}
-    actions={[
-      { id: 1, component: <CloseIconButton onClick={() => navigate("/users")} />, type: 1 },
-      { id: 2, component: <SaveIconButton onClick={handleSubmit} loading={loading} />, type: 1 },
-    ]}
+    actions={
+      <>
+        <CloseIconButton onClick={() => navigate("/users")} />
+        <SaveIconButton onClick={handleSubmit} loading={loading} />
+      </>
+    }
   />
 </Box>
 
-      {/* Form content - match AddRole style */}
       <Box sx={{ width: "100%", minWidth: 0 }}>
         <Paper sx={(theme) => ({ p: 0, borderRadius: 2, border: `1px solid ${theme.palette.divider}`, boxShadow: theme.shadows[1], overflow: "hidden", maxWidth: "100%" })}>
           <Box sx={{ p: { xs: 2, sm: 3, md: 5 } }}>

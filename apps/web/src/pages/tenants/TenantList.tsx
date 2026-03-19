@@ -11,7 +11,6 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import {
-    Home as HomeIcon,
     Login as LoginIcon,
 } from "@mui/icons-material";
 import { Tenant } from "../../types/tenant";
@@ -177,9 +176,8 @@ const TenantList = () => {
             header={
                 <>
                     <PageHeader
-                        title="Tenant Management"
-                        onBack={() => navigate("/")}
-                        backIcon={<HomeIcon sx={{ fontSize: 24 }} />}
+                        links={[{ title: "Tenant Management", path: "#" }]}
+                        homePath="/"
                         actions={
                             <ListPageToolbar
                                 searchValue={search}
