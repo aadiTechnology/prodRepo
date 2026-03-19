@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, InputAdornment, CircularProgress, Stack, Typography } from "../components/primitives";
-import { SaveButton, CancelButton, EmailInput, PasswordInput } from "../components/semantic";
+import { SaveButton, CancelButton, EmailInput, PasswordInput, LabeledSwitch } from "../components/semantic";
 import { useNavigate, useLocation } from "react-router-dom";
 import userService from "../api/services/userService";
 import { UserCreate } from "../types/user";
@@ -11,7 +11,7 @@ import ConfirmDialog from "../components/semantic/ConfirmDialog";
 import CommonPageHeader from "../components/common/CommonPageHeader";
 import SaveIconButton from "../components/semantic/SaveIconButton";
 import CloseIconButton from "../components/semantic/CloseIconButton";
-import { Box, Paper, Switch, Alert, Snackbar, Tooltip, Divider } from "@mui/material";
+import { Box, Paper, Alert, Snackbar, Tooltip, Divider } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import TextFieldInput from "../components/semantic/TextFieldInput";
 import SelectItem from "../components/semantic/SelectItem";
@@ -240,18 +240,12 @@ export default function CreateUser() {
                 </Grid>
                 {isEdit && (
                   <Grid size={{ xs: 12, sm: 6 }}>
-                    <Box sx={(theme) => ({ p: 2, bgcolor: theme.palette.grey[100], borderRadius: 2, border: `1px solid ${theme.palette.divider}`, display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between", gap: 1 })}>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography sx={(theme) => ({ fontSize: "0.9rem", fontWeight: 700, color: theme.palette.text.primary })}>Account Active</Typography>
-                      </Box>
-                      <Switch
-                        checked={formData.is_active}
-                        onChange={e => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                        name="is_active"
-                        size="small"
-                        color="primary"
-                      />
-                    </Box>
+                    <LabeledSwitch
+                      label="Account Active"
+                      checked={formData.is_active}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, is_active: e.target.checked }))}
+                      name="is_active"
+                    />
                   </Grid>
                 )}
               </Grid>

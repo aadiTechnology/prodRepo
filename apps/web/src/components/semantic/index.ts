@@ -56,3 +56,6 @@ export type { TaskGenerationValidationPanelProps } from "./TaskGenerationValidat
 
 export { default as DevelopmentTasksDisplay } from "./DevelopmentTasksDisplay";
 export type { DevelopmentTasksDisplayProps } from "./DevelopmentTasksDisplay";
+
+export { default as LabeledSwitch } from "./LabeledSwitch";
+export type { LabeledSwitchProps } from "./LabeledSwitch";
