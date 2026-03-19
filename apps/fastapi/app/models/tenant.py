@@ -1,9 +1,15 @@
 from datetime import datetime
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, UnicodeText, ForeignKey
 from sqlalchemy.dialects.mssql import NVARCHAR
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from enum import Enum
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.role import Role
+    from app.models.menu import Menu
 
 class TenantStatus(str, Enum):
     ACTIVE = "ACTIVE"

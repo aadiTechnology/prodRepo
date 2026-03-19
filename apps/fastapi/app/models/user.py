@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional, TYPE_CHECKING
 import enum
 
 from sqlalchemy import (
@@ -14,6 +15,10 @@ from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 from app.models.role import user_roles
+
+if TYPE_CHECKING:
+    from app.models.tenant import Tenant
+    from app.models.role import Role
 
 
 class UserRole(str, enum.Enum):

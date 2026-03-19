@@ -25,7 +25,7 @@ from app.models import (  # noqa: F401
     ThemeTemplate,
 )
 
-from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, class_fee_structure_assignment
+from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, academic_year, class_fee_structure_assignment
 
 from app.routers import fee_discount, fee_category_router
 
@@ -80,6 +80,7 @@ app.include_router(rbac.router)
 app.include_router(profile.router)
 app.include_router(ai.router)
 app.include_router(academic.router)
+app.include_router(academic_year.router)
 app.include_router(class_fee_structure_assignment.router)
 
 # Mount static files for profile images
@@ -144,7 +145,8 @@ async def readiness_check():
     from sqlalchemy import text
     from app.core.database import SessionLocal
     
-    health_status = {
+    from typing import Dict, Any
+    health_status: Dict[str, Any] = {
         "status": "ready",
         "checks": {
             "database": "unknown",
