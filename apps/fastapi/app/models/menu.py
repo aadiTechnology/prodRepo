@@ -28,6 +28,7 @@ class Menu(Base):
     sort_order = Column(Integer, nullable=False, default=0)
     level = Column(Integer, nullable=False)  # 1 or 2
     is_active = Column(Boolean, nullable=False, default=True)
+    feature_id = Column(Integer, ForeignKey("features.id", ondelete="SET NULL"), nullable=True)
 
     # Audit fields
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -43,5 +44,6 @@ class Menu(Base):
     # Relationships
     tenant = relationship("Tenant", back_populates="menus")
     parent = relationship("Menu", remote_side=[id], backref="children")
+    feature = relationship("Feature", backref="menus")
     roles = relationship("Role", secondary="role_menus", back_populates="menus")
 

@@ -82,6 +82,7 @@ class Role(Base):
     features = relationship("Feature", secondary=role_features, back_populates="roles")
     menus = relationship("Menu", secondary=role_menus, back_populates="roles")
     permissions = relationship("Permission", secondary=role_permissions, back_populates="roles")
+    menu_permissions = relationship("RoleMenuPermission", back_populates="role", cascade="all, delete-orphan")
 
     __table_args__ = (
         # Ensure role code is unique within a tenant; allow global roles (tenant_id NULL)
