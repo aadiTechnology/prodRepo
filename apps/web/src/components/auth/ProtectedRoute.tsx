@@ -9,6 +9,8 @@ import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
 import { ReactNode } from "react";
 
+const normalizeRole = (value: string | undefined | null): string => (value || "").trim().toLowerCase();
+
 interface ProtectedRouteProps {
   children: ReactNode;
   /**
@@ -111,6 +113,7 @@ export default function ProtectedRoute({
     hasAllRoles,
   } = useRBAC();
   const location = useLocation();
+  const userRole = normalizeRole(user?.role);
 
   // Show loading spinner while checking authentication
   if (isLoading) {
@@ -134,21 +137,22 @@ export default function ProtectedRoute({
   }
 
   // Legacy: Check admin role (backward compatibility)
-  if (requireAdmin && user?.role !== "admin") {
+  if (requireAdmin && userRole !== "admin") {
     return <Navigate to={redirectTo} replace />;
   }
 
   // Check required roles
   if (requiredRoles) {
     let hasRequiredRole = false;
+    const normalizedRequiredRoles = (typeof requiredRoles === "string" ? [requiredRoles] : requiredRoles).map(normalizeRole);
 
     if (typeof requiredRoles === "string") {
-      hasRequiredRole = hasRole(requiredRoles) || user?.role === requiredRoles;
+      hasRequiredRole = hasRole(requiredRoles) || normalizedRequiredRoles.includes(userRole);
     } else if (Array.isArray(requiredRoles)) {
       if (requireAllRoles) {
-        hasRequiredRole = hasAllRoles(requiredRoles);
+        hasRequiredRole = hasAllRoles(requiredRoles) || normalizedRequiredRoles.every((r) => r === userRole);
       } else {
-        hasRequiredRole = hasAnyRole(requiredRoles) || Boolean(user?.role && requiredRoles.includes(user.role));
+        hasRequiredRole = hasAnyRole(requiredRoles) || normalizedRequiredRoles.includes(userRole);
       }
     }
 

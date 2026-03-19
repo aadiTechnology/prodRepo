@@ -8,4 +8,17 @@ export default defineConfig({
       '/api': 'http://localhost:8022',
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("@mui")) return "mui";
+            if (id.includes("react-router")) return "router";
+            return "vendor";
+          }
+        },
+      },
+    },
+  },
 });

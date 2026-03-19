@@ -29,6 +29,8 @@ const AddRole = lazy(() => import("../pages/AddRole"));
 const EditRole = lazy(() => import("../pages/EditRole"));
 const FeeStructureSetup = lazy(() => import("../pages/Fees/FeeStructureSetup"));
 const FeeStructureForm = lazy(() => import("../pages/Fees/FeeStructureForm"));
+const AcademicYearList = lazy(() => import("../pages/academics/AcademicYearList"));
+const AddAcademicYear = lazy(() => import("../pages/academics/AddAcademicYear"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -140,6 +142,11 @@ export default function AppRoutes() {
           />
           
           <Route path="/admin/theme-studio" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><ThemeStudioPage /></ProtectedRoute>} />
+          
+          {/* Academic Year Management */}
+          <Route path="/academic-years" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "admin"]}><AcademicYearList /></ProtectedRoute>} />
+          <Route path="/academic-years/new" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "admin"]}><AddAcademicYear /></ProtectedRoute>} />
+          <Route path="/academic-years/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "admin"]}><AddAcademicYear /></ProtectedRoute>} />
         </Route>
       </Routes>
     </Suspense>

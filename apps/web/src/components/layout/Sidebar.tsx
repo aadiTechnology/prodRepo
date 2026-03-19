@@ -229,6 +229,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: colorTokens.menuColors.dashboard },
         { id: "students", label: "Students", icon: userIcon, path: "/students", color: colorTokens.menuColors.students },
         { id: "academics", label: "Academics", icon: schoolIcon, path: "/academics", color: colorTokens.menuColors.academics },
+        { id: "academic-years", label: "Academic Years", icon: schoolIcon, path: "/academic-years", color: colorTokens.menuColors.academics },
         {
           id: "fees",
           label: "Fees",

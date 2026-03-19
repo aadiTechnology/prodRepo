@@ -31,13 +31,26 @@ const RBACContext = createContext<RBACContextType | undefined>(undefined);
 
 const RBAC_STORAGE_KEY = "rbac_data";
 
+const normalizeRole = (value: string): string => value.trim().toLowerCase();
+
+const normalizeRoles = (roles: string[] | undefined | null): string[] => {
+  if (!Array.isArray(roles)) return [];
+  // de-dupe after normalization
+  return Array.from(new Set(roles.map(normalizeRole).filter(Boolean)));
+};
+
 /**
  * Get RBAC data from localStorage
  */
 const getStoredRBACData = (): Pick<RBACState, "roles" | "menus"> | null => {
   try {
     const rbacStr = localStorage.getItem(RBAC_STORAGE_KEY);
-    return rbacStr ? JSON.parse(rbacStr) : null;
+    const parsed = rbacStr ? JSON.parse(rbacStr) : null;
+    if (!parsed) return null;
+    return {
+      ...parsed,
+      roles: normalizeRoles(parsed.roles),
+    };
   } catch {
     return null;
   }
@@ -98,7 +111,7 @@ interface RBACProviderProps {
 export function RBACProvider({ children }: RBACProviderProps) {
   const storedData = getStoredRBACData();
   
-  const [roles, setRoles] = useState<string[]>(storedData?.roles || []);
+  const [roles, setRoles] = useState<string[]>(normalizeRoles(storedData?.roles));
   const [menus, setMenus] = useState<MenuNode[]>(storedData?.menus || []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,9 +123,10 @@ export function RBACProvider({ children }: RBACProviderProps) {
    * Set RBAC data (called after login)
    */
   const setRBACData = useCallback((data: Pick<LoginContextResponse, "roles" | "menus">) => {
-    setRoles(data.roles);
+    const normalized = normalizeRoles(data.roles);
+    setRoles(normalized);
     setMenus(data.menus);
-    saveRBACData({ roles: data.roles, menus: data.menus });
+    saveRBACData({ roles: normalized, menus: data.menus });
     setError(null);
   }, []);
 
@@ -161,7 +175,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
    */
   const hasRole = useCallback(
     (role: string): boolean => {
-      return roles.includes(role);
+      return roles.includes(normalizeRole(role));
     },
     [roles]
   );
@@ -171,7 +185,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
    */
   const hasAnyRole = useCallback(
     (roleList: string[]): boolean => {
-      return roleList.some((role) => roles.includes(role));
+      return roleList.some((role) => roles.includes(normalizeRole(role)));
     },
     [roles]
   );
@@ -181,7 +195,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
    */
   const hasAllRoles = useCallback(
     (roleList: string[]): boolean => {
-      return roleList.every((role) => roles.includes(role));
+      return roleList.every((role) => roles.includes(normalizeRole(role)));
     },
     [roles]
   );
