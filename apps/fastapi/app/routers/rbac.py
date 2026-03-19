@@ -3,10 +3,10 @@
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from typing import List, Dict
+from typing import List
 
 from app.core.database import get_db
-from app.core.dependencies import require_admin, CurrentUser
+from app.core.dependencies import require_admin, require_permission, CurrentUser
 from app.core.exceptions import NotFoundException
 from app.models.user import User
 from app.models.role import Role
@@ -20,11 +20,90 @@ from app.services import rbac_service, role_service, menu_service, feature_servi
 from app.models.permission import Permission
 
 from app.schemas.permission import PermissionResponse
+from app.schemas.rbac_mgmt import RolePermissionMatrixResponse, PermissionMatrixRow, PermissionBulkUpdateRequest
+from app.models.role_menu_permission import RoleMenuPermission
 
 router = APIRouter(prefix="/rbac", tags=["RBAC"])
 
+@router.get("/roles/{role_id}/matrix", response_model=RolePermissionMatrixResponse)
+def get_role_permission_matrix(
+    role_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_permission("Roles", "view"))
+):
+    """Fetch the full menu/permission grid for a role."""
+    role = role_service.get_role(db, role_id)
+    
+    tenant_id = role.tenant_id if role.tenant_id is not None else current_user.tenant_id
+    
+    all_menus = db.query(Menu).filter(
+        Menu.is_active == True,  # noqa: E712
+        Menu.is_deleted == False,  # noqa: E712
+    ).filter(
+        (Menu.tenant_id == None) | (Menu.tenant_id == tenant_id)  # noqa: E712
+    ).all()
+    
+    # 2. Get current permissions for this role
+    current_perms = db.query(RoleMenuPermission).filter(
+        RoleMenuPermission.role_id == role_id
+    ).all()
+    
+    perm_map = {p.menu_id: p for p in current_perms}
+    
+    # 3. Build response rows (ordered hierarchically)
+    items = []
+    parent_menus = sorted([m for m in all_menus if m.level == 1], key=lambda x: (x.sort_order, x.id))
+    child_menus = [m for m in all_menus if m.level == 2]
+    
+    for pm in parent_menus:
+        # Add parent
+        p = perm_map.get(pm.id)
+        items.append(PermissionMatrixRow(
+            menu_id=pm.id,
+            menu_name=pm.name,
+            parent_id=pm.parent_id,
+            level=pm.level,
+            can_view=p.can_view if p else False,
+            can_create=p.can_create if p else False,
+            can_edit=p.can_edit if p else False,
+            can_delete=p.can_delete if p else False
+        ))
+        
+        # Add children for this parent
+        my_children = sorted([cm for cm in child_menus if cm.parent_id == pm.id], key=lambda x: (x.sort_order, x.id))
+        for cm in my_children:
+            p = perm_map.get(cm.id)
+            items.append(PermissionMatrixRow(
+                menu_id=cm.id,
+                menu_name=cm.name,
+                parent_id=cm.parent_id,
+                level=cm.level,
+                can_view=p.can_view if p else False,
+                can_create=p.can_create if p else False,
+                can_edit=p.can_edit if p else False,
+                can_delete=p.can_delete if p else False
+            ))
+    
+    return RolePermissionMatrixResponse(
+        role_id=role.id,
+        role_name=role.name,
+        items=items
+    )
+
+@router.post("/roles/{role_id}/matrix", status_code=status.HTTP_204_NO_CONTENT)
+def update_role_permission_matrix(
+    role_id: int,
+    data: PermissionBulkUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_permission("Roles", "edit"))
+):
+    """Bulk update the shared menu/permission mapping for a role."""
+    role = role_service.get_role(db, role_id)
+    rbac_service.set_role_menu_permissions(db, role, data, acting_user_id=current_user.id)
+    return None
+
 @router.get("/permissions/groups")
-def get_permission_groups(db: Session = Depends(get_db), current_user: CurrentUser = Depends(require_admin)):
+def get_permission_groups(db: Session = Depends(get_db), current_user: CurrentUser = Depends(require_permission("Roles", "view"))):
     """Return permissions grouped by module_name."""
     permissions = db.query(Permission).filter(Permission.is_active == True).all()
     groups: Dict[str, list] = {}
@@ -44,7 +123,7 @@ def get_permission_groups(db: Session = Depends(get_db), current_user: CurrentUs
 async def get_user_roles(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "view")),
 ) -> List[RoleResponse]:
     """Get roles assigned to a user."""
     # Ensure user exists
@@ -58,7 +137,7 @@ async def set_user_roles(
     user_id: int,
     role_ids: List[int],
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "edit")),
 ) -> None:
     """Replace roles assigned to a user."""
     user = user_service.get_user(db, user_id)
@@ -70,11 +149,12 @@ async def set_user_roles(
 async def get_role_menus(
     role_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "view")),
 ) -> List[MenuResponse]:
-    """Get menus assigned to a role."""
     role = role_service.get_role(db, role_id)
-    return role.menus  # type: ignore[return-value]
+    from app.models.role import role_menus
+    menus = db.query(Menu).join(role_menus).filter(role_menus.c.role_id == role.id).all()
+    return menus
 
 
 @router.post("/roles/{role_id}/menus", status_code=status.HTTP_204_NO_CONTENT)
@@ -82,7 +162,7 @@ async def set_role_menus(
     role_id: int,
     menu_ids: List[int],
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "edit")),
 ) -> None:
     """Replace menus assigned to a role."""
     role = role_service.get_role(db, role_id)
@@ -97,7 +177,7 @@ async def set_role_menus(
 async def get_role_features(
     role_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "view")),
 ) -> List[FeatureResponse]:
     """Get features assigned to a role."""
     role = role_service.get_role(db, role_id)
@@ -109,7 +189,7 @@ async def set_role_features(
     role_id: int,
     feature_ids: List[int],
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "edit")),
 ) -> None:
     """Replace features assigned to a role."""
     role = role_service.get_role(db, role_id)
