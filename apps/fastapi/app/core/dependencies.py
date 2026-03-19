@@ -1,18 +1,16 @@
 """FastAPI dependencies for authentication and authorization."""
+from enum import Enum
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.models.user import User, UserRole
 from app.schemas.auth import CurrentUser
 from app.utils.security import decode_access_token
 from app.core.exceptions import UnauthorizedException, ForbiddenException
 from app.core.logging_config import get_logger
 from app.models.revoked_token import RevokedToken
-from fastapi import Depends
-from sqlalchemy.orm import Session
-from app.core.database import SessionLocal
 from app.core.config import settings
 
 logger = get_logger(__name__)
@@ -20,18 +18,14 @@ logger = get_logger(__name__)
 # HTTP Bearer token scheme - set auto_error=False to handle errors ourselves
 security = HTTPBearer(auto_error=False)
 
-# Dependency to get DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
-# Dependency to get current tenant (stub, replace with real logic)
-def get_current_tenant():
-    # In a real app, extract tenant_id from user/session/token
-    return 1  # Default tenant_id for testing
+class PermissionAction(str, Enum):
+    VIEW = "view"
+    CREATE = "create"
+    EDIT = "edit"
+    DELETE = "delete"
+
+
 
 def get_current_user(
     request: Request,
@@ -74,7 +68,7 @@ def get_current_user(
         logger.warning("Empty token provided")
         raise UnauthorizedException("Missing authentication token")
     
-    logger.info(f"Attempting to decode token (length: {len(token)}, first 20 chars: {token[:20]}...)")
+    logger.debug(f"Attempting to decode token (length: {len(token)})")
     
     # Decode token
     payload = decode_access_token(token)
@@ -214,7 +208,94 @@ def require_system_admin(
     raise ForbiddenException("Insufficient permissions")
 
 
-# Convenience dependencies////
-#---
+# Convenience dependencies
 require_admin = require_role([UserRole.ADMIN])
 require_user = require_role([UserRole.USER, UserRole.ADMIN])
+
+
+def require_permission(menu_name: str, action: str):
+    """
+    Dependency factory that enforces role_menu_permissions.
+
+    Works for ALL users:
+      - SUPER_ADMIN / platform ADMIN → always allowed
+      - Tenant ADMIN with tenant_id → allowed for tenant-scoped menus only
+      - Everyone else → must have a role with can_{action}=True on the named menu
+        in role_menu_permissions (set via the Permission Mapping screen).
+
+    Args:
+        menu_name:  The `menus.name` value (e.g. "Fee Category", "Fee Structure")
+        action:     One of: view, create, edit, delete
+    """
+    if action not in [a.value for a in PermissionAction]:
+        raise ValueError(f"Invalid action '{action}'. Must be one of: {[a.value for a in PermissionAction]}")
+    
+    def checker(
+        current_user: CurrentUser = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> CurrentUser:
+        from app.models.role import user_roles as user_roles_table
+        from app.models.role_menu_permission import RoleMenuPermission
+        from app.models.menu import Menu
+        
+        action_col_map = {
+            PermissionAction.VIEW.value: "can_view",
+            PermissionAction.CREATE.value: "can_create",
+            PermissionAction.EDIT.value: "can_edit",
+            PermissionAction.DELETE.value: "can_delete",
+        }
+        action_col_name = action_col_map.get(action)
+        
+        if not action_col_name:
+            raise ForbiddenException(f"Invalid action '{action}'. Must be one of: {[a.value for a in PermissionAction]}")
+
+        if current_user.role == UserRole.SUPER_ADMIN:
+            return current_user
+        
+        if current_user.role == UserRole.ADMIN and current_user.tenant_id is None:
+            return current_user
+
+        rbac_roles = get_rbac_role_codes(db, current_user.id)
+        if SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_roles:
+            return current_user
+
+        role_id_rows = (
+            db.query(user_roles_table.c.role_id)
+            .filter(user_roles_table.c.user_id == current_user.id)
+            .all()
+        )
+        role_id_list = [r[0] for r in role_id_rows]
+
+        if not role_id_list:
+            logger.warning(
+                f"User {current_user.email} has no roles assigned — denied '{action}' on '{menu_name}'"
+            )
+            raise ForbiddenException(
+                f"Access denied: No roles assigned. Required: '{action}' permission on '{menu_name}'."
+            )
+
+        perm = (
+            db.query(RoleMenuPermission)
+            .join(Menu, RoleMenuPermission.menu_id == Menu.id)
+            .filter(
+                RoleMenuPermission.role_id.in_(role_id_list),
+                Menu.name == menu_name,
+                Menu.is_active == True,
+                Menu.is_deleted == False,
+                getattr(RoleMenuPermission, action_col_name) == True,
+            )
+            .first()
+        )
+
+        if not perm:
+            logger.warning(
+                f"User {current_user.email} (roles={role_id_list}) denied: "
+                f"no '{action}' permission on menu '{menu_name}'"
+            )
+            raise ForbiddenException(
+                f"Access denied: Missing '{action}' permission on '{menu_name}'."
+            )
+
+        return current_user
+
+    return checker
