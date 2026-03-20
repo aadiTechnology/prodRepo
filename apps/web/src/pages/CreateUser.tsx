@@ -229,7 +229,7 @@ export default function CreateUser() {
       >
         <form onSubmit={handleSubmit} autoComplete="off">
             <Grid container spacing={3}>
-              <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
+              <Grid size={{ xs: 12, sm: 6}}>
                 <TextFieldInput
                   label="Full Name"
                   placeholder="Enter full name"
@@ -240,7 +240,7 @@ export default function CreateUser() {
                   htmlInput={{ minLength: 2 }}
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
+              <Grid size={{ xs: 12, sm: 6}}>
                 <EmailInput value={formData.email} onChange={handleChange} required disabled={isEdit} />
               </Grid>
               {!isEdit && (
