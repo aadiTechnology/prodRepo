@@ -10,6 +10,7 @@ class UserCreate(BaseModel):
     full_name: str
     password: str
     role: str
+    tenant_id: Optional[int] = None
 
     @classmethod
     def validate_full_name(cls, value):

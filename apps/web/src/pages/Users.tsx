@@ -8,9 +8,11 @@ import { ListPageLayout, ListPageToolbar, DirectoryInfoBar, DataTable, TableRowA
 import { PageHeader } from "../components/layout";
 import StatusChip from "../components/roles/StatusChip";
 import { Box, Typography, Button, Select, MenuItem } from "../components/primitives";
+import { useAuth } from "../context/AuthContext";
 
 const Users = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,8 +95,12 @@ const Users = () => {
   // Get unique roles for filter dropdown
   const uniqueRoles = Array.from(new Set(users.map((u) => u.role).filter(Boolean)));
 
-  // Filter users by search, role, and status
+  const isSystemAdmin = user?.tenant_id == null && !!user;
+  const currentTenantId = user?.tenant_id ?? null;
+
+  // Filter users by tenant, search, role, and status
   const filteredUsers = users.filter((u) => {
+    const matchesTenant = isSystemAdmin || (currentTenantId !== null && u.tenant_id === currentTenantId);
     const matchesSearch =
       u.full_name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
@@ -107,7 +113,7 @@ const Users = () => {
       (statusFilter === "Active" && u.is_active) ||
       (statusFilter === "Inactive" && !u.is_active);
 
-    return matchesSearch && matchesRole && matchesStatus;
+    return matchesTenant && matchesSearch && matchesRole && matchesStatus;
   });
 
   // Sort all filtered users
