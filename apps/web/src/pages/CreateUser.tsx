@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Button, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, InputAdornment, CircularProgress, Stack, Typography } from "../components/primitives";
+import { Button, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, InputAdornment, CircularProgress, Stack, Typography, CancelIcon, SaveIcon } from "../components/primitives";
 import { SaveButton, CancelButton, EmailInput, PasswordInput, LabeledSwitch } from "../components/semantic";
 import { useNavigate, useLocation } from "react-router-dom";
 import userService from "../api/services/userService";
@@ -9,9 +9,7 @@ import roleService from "../api/services/roleService";
 import PersonIcon from '@mui/icons-material/Person';
 import ConfirmDialog from "../components/semantic/ConfirmDialog";
 import { PageHeader } from "../components/layout";
-import SaveIconButton from "../components/semantic/SaveIconButton";
-import CloseIconButton from "../components/semantic/CloseIconButton";
-import { Box, Paper, Alert, Snackbar, Tooltip, Divider } from "@mui/material";
+import { Box, Paper, Alert, Snackbar, Divider } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import TextFieldInput from "../components/semantic/TextFieldInput";
 import SelectItem from "../components/semantic/SelectItem";
@@ -200,10 +198,14 @@ export default function CreateUser() {
       { title: isEdit ? "Edit User" : "Add User", path: "#" },
     ]}
     actions={
-      <>
-        <Tooltip title="Cancel"><span><CloseIconButton onClick={() => navigate("/users")} /></span></Tooltip>
-        <Tooltip title={isEdit ? "Update Users" : "Save Users"}><span><SaveIconButton onClick={handleSubmit} loading={loading} /></span></Tooltip>
-      </>
+      <Box sx={{ display: "flex", gap: 1.5 }}>
+        <CancelIcon onClick={() => navigate("/users")} tooltipTitle="Cancel" />
+        <SaveIcon
+          onClick={handleSubmit}
+          loading={loading}
+          tooltipTitle={isEdit ? "Update Users" : "Save Users"}
+        />
+      </Box>
     }
   />
 
