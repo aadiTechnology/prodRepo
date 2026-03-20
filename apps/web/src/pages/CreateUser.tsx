@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CancelIcon, SaveIcon } from "../components/primitives";
+import { FormHeaderIconAction } from "../components/primitives";
 import { SaveButton, CancelButton, EmailInput, PasswordInput, LabeledSwitch } from "../components/semantic";
 import { useNavigate, useLocation } from "react-router-dom";
 import userService from "../api/services/userService";
@@ -205,8 +205,9 @@ export default function CreateUser() {
               homePath="/"
               actions={
                 <Box sx={{ display: "flex", gap: 1.5 }}>
-                  <CancelIcon onClick={() => navigate("/users")} tooltipTitle="Cancel" />
-                  <SaveIcon
+                  <FormHeaderIconAction variant="cancel" onClick={() => navigate("/users")} tooltipTitle="Cancel" />
+                  <FormHeaderIconAction
+                    variant="save"
                     onClick={handleSubmit}
                     loading={loading}
                     tooltipTitle={isEdit ? "Update Users" : "Save Users"}

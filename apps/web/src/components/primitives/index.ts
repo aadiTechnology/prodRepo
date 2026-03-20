@@ -59,11 +59,8 @@ export type { TabsProps, TabProps } from "./Tabs";
 export { default as IconButton } from "./IconButton";
 export type { IconButtonProps } from "./IconButton";
 
-export { default as CancelIcon } from "./CancelIcon";
-export type { CancelIconProps } from "./CancelIcon";
-
-export { default as SaveIcon } from "./SaveIcon";
-export type { SaveIconProps } from "./SaveIcon";
+export { default as FormHeaderIconAction } from "./FormHeaderIconAction";
+export type { FormHeaderIconActionProps } from "./FormHeaderIconAction";
 
 export { InputAdornment } from "./InputAdornment";
 export type { InputAdornmentProps } from "./InputAdornment";

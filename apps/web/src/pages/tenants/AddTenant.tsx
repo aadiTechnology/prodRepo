@@ -14,7 +14,7 @@ import {
     alpha,
 } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
-import { Button, TextField, Select, MenuItem, CancelIcon, SaveIcon } from "../../components/primitives";
+import { Button, TextField, Select, MenuItem, FormHeaderIconAction } from "../../components/primitives";
 import { SaveButton, CancelButton, EmailInput, PhoneInput, PasswordInput } from "../../components/semantic";
 import {
     Business as BusinessIcon,
@@ -255,8 +255,9 @@ const AddTenant = () => {
                         homePath="/"
                         actions={
                             <Box sx={{ display: "flex", gap: 1.5 }}>
-                                <CancelIcon onClick={() => navigate("/tenants")} />
-                                <SaveIcon
+                                <FormHeaderIconAction variant="cancel" onClick={() => navigate("/tenants")} />
+                                <FormHeaderIconAction
+                                    variant="save"
                                     onClick={handleSubmit}
                                     loading={loading}
                                     tooltipTitle={isEditMode ? "Update Changes" : "Finish & Create"}
