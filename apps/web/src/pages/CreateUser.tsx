@@ -194,7 +194,6 @@ export default function CreateUser() {
   return (
     <Box sx={{ overflowX: "hidden", minWidth: 0 }}>
       {/* Header - Aligned with AddRole */}
-  <Box>
   <PageHeader
     links={[
       { title: "Users", path: "/users" },
@@ -202,12 +201,11 @@ export default function CreateUser() {
     ]}
     actions={
       <>
-        <CloseIconButton onClick={() => navigate("/users")} />
-        <SaveIconButton onClick={handleSubmit} loading={loading} />
+        <Tooltip title="Cancel"><span><CloseIconButton onClick={() => navigate("/users")} /></span></Tooltip>
+        <Tooltip title={isEdit ? "Update Users" : "Save Users"}><span><SaveIconButton onClick={handleSubmit} loading={loading} /></span></Tooltip>
       </>
     }
   />
-</Box>
 
       <Box sx={{ width: "100%", minWidth: 0 }}>
         <Paper sx={(theme) => ({ p: 0, borderRadius: 2, border: `1px solid ${theme.palette.divider}`, boxShadow: theme.shadows[1], overflow: "hidden", maxWidth: "100%" })}>

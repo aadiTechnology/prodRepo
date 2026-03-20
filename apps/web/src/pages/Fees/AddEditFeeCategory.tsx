@@ -23,6 +23,8 @@ import { PageHeader } from "../../components/layout";
 import { createFeeCategory, updateFeeCategory, getFeeCategory } from "../../api/services/feeService";
 import type { FeeCategoryCreate, FeeCategoryResponse } from "../../types/fee";
 import { ListPageLayout, FormSectionLabel, FieldLabel } from "../../components/reusable";
+import SaveIconButton from "../../components/semantic/SaveIconButton";
+import CloseIconButton from "../../components/semantic/CloseIconButton";
 
 const buildFieldSx = (hasError: boolean) => (theme: Theme) => ({
     "& .MuiOutlinedInput-root": {
@@ -125,11 +127,8 @@ const AddEditFeeCategory = () => {
         );
 
     return (
-        <ListPageLayout
-            pageBackground={true}
-            contentPaddingSize="none"
-            header={
-                <>
+        <Box sx={{ flex: 1, overflowY: "auto", pb: 2, pr: 0.5 }}>
+        
                     <PageHeader
                         links={[
                             { title: "Fee Categories", path: "/fees/categories" },
@@ -138,68 +137,28 @@ const AddEditFeeCategory = () => {
                         homePath="/fees/categories"
                         actions={
                             <>
-                                <Tooltip title="Cancel">
-                                    <IconButton
-                                        onClick={() => navigate("/fees/categories")}
-                                        sx={(theme) => ({
-                                            color: theme.palette.error.main,
-                                            backgroundColor: theme.palette.error.light,
-                                            borderRadius: 1.2,
-                                            width: 40,
-                                            height: 40,
-                                            "&:hover": { backgroundColor: theme.palette.error.light },
-                                        })}
-                                    >
-                                        <CancelIcon sx={{ fontSize: 22 }} />
-                                    </IconButton>
-                                </Tooltip>
-                                <Tooltip title={isEditMode ? "Update Category" : "Save Category"}>
-                                    <span>
-                                        <IconButton
-                                            onClick={handleSubmit}
-                                            disabled={loading}
-                                            sx={(theme) => ({
-                                                backgroundColor: theme.palette.success.main,
-                                                color: theme.palette.success.contrastText,
-                                                borderRadius: 1.2,
-                                                width: 40,
-                                                height: 40,
-                                                "&:hover": { backgroundColor: theme.palette.success.dark },
-                                                "&.Mui-disabled": {
-                                                    backgroundColor: theme.palette.grey[400],
-                                                    color: "white",
-                                                },
-                                            })}
-                                        >
-                                            {loading ? (
-                                                <CircularProgress size={20} color="inherit" />
-                                            ) : (
-                                                <SaveIcon sx={{ fontSize: 20 }} />
-                                            )}
-                                        </IconButton>
-                                    </span>
-                                </Tooltip>
+                              <Tooltip title="Cancel"><span><CloseIconButton onClick={() => navigate("/fees/categories")} /></span></Tooltip>
+                              <Tooltip title={isEditMode ? "Update category" : "Save category"}><span><SaveIconButton onClick={handleSubmit} loading={loading} /></span></Tooltip>
                             </>
-                        }
+                          }
                     />
-                    {error && (
-                        <Alert
-                            severity="error"
-                            icon={<ErrorIcon />}
-                            sx={{ mb: 1, borderRadius: "8px", py: 0.3 }}
-                            onClose={() => setError(null)}
-                        >
-                            {error}
-                        </Alert>
-                    )}
-                    {success && (
-                        <Alert severity="success" sx={{ mb: 1, borderRadius: "8px", py: 0.3 }}>
-                            {success}
-                        </Alert>
-                    )}
-                </>
-            }
-        >
+            
+        
+            {error && (
+                <Alert 
+                severity="error"
+                icon={<ErrorIcon />}
+                sx={{ mb: 1, borderRadius: "8px", py: 0.3 }}
+                onClose={() => setError(null)}
+                >
+                    {error}
+                </Alert>
+            )}
+            {success && (
+                <Alert severity="success" sx={{ mb: 1, borderRadius: "8px", py: 0.3 }}>
+                    {success}
+                </Alert>
+                )}
             <Box sx={{ flex: 1, overflowY: "auto", pb: 2, pr: 0.5 }}>
                 <Paper
                     elevation={0}
@@ -366,7 +325,8 @@ const AddEditFeeCategory = () => {
                     </Box>
                 </Paper>
             </Box>
-        </ListPageLayout>
+        {/* </ListPageLayout> */}
+        </Box>
     );
 };
 

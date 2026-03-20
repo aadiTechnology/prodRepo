@@ -1,15 +1,11 @@
 /**
  * CloseIconButton — Semantic component
- * Discard/cancel icon action (coral tint, 44×44). Matches AddTenant discard style.
+ * Discard/cancel icon action for page headers (flat red, 40x40).
  */
 
 import { IconButton } from "../primitives";
 import CancelIcon from "@mui/icons-material/Cancel";
-import { alpha } from "@mui/material";
 import type { IconButtonProps } from "@mui/material/IconButton";
-import { colorTokens } from "../../tokens/colors";
-
-const coral = colorTokens.preschool.coral.main;
 
 export interface CloseIconButtonProps extends Omit<IconButtonProps, "children"> {}
 
@@ -18,28 +14,28 @@ export default function CloseIconButton({ sx, ...props }: CloseIconButtonProps) 
     <IconButton
       aria-label="Close"
       sx={[
-        {
-          color: coral,
-          backgroundColor: alpha(coral, 0.08),
-          borderRadius: "12px",
-          width: 44,
-          height: 44,
-          border: `1.5px solid ${alpha(coral, 0.2)}`,
+        (theme) => ({
+          color: theme.palette.error.main,
+          backgroundColor: theme.palette.error.light,
+          borderRadius: 1.2,
+          width: 40,
+          height: 40,
           p: 0,
           m: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          transition: "background 0.2s, color 0.2s, border-color 0.2s",
+          boxShadow: "none",
+          transition: "background-color 0.2s ease",
           "&:hover": {
-            backgroundColor: alpha(coral, 0.15),
+            backgroundColor: theme.palette.error.light,
           },
-        },
+        }),
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
       ]}
       {...props}
     >
-      <CancelIcon sx={{ fontSize: 22 }} />
+      <CancelIcon sx={{ fontSize: 21 }} />
     </IconButton>
   );
 }

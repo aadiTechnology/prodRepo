@@ -1,14 +1,12 @@
 /**
  * SaveIconButton — Semantic component
- * Icon-only save action (AddTenant-style gradient, 44×44). Uses IconButton primitive; supports loading.
+ * Icon-only save action for page headers (flat green, 40x40). Supports loading.
  */
 
 import { IconButton } from "../primitives";
 import { CircularProgress } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
 import type { IconButtonProps } from "@mui/material/IconButton";
-import { alpha } from "@mui/material/styles";
-import { colorTokens } from "../../tokens/colors";
 
 export interface SaveIconButtonProps extends Omit<IconButtonProps, "children"> {
   loading?: boolean;
@@ -28,28 +26,26 @@ export default function SaveIconButton({
       disabled={baseDisabled}
       sx={[
         (theme) => ({
-          background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
-          color: "white",
-          borderRadius: "12px",
-          width: 44,
-          height: 44,
-          boxShadow: `0 4px 12px ${alpha(colorTokens.preschool.turquoise.main, 0.3)}`,
+          backgroundColor: theme.palette.success.main,
+          color: theme.palette.success.contrastText,
+          borderRadius: 1.2,
+          width: 40,
+          height: 40,
+          boxShadow: "none",
           border: "none",
           p: 0,
           m: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          transition: "all 0.2s",
+          transition: "background-color 0.2s ease",
           "&:hover": {
-            transform: "translateY(-2px)",
-            boxShadow: `0 6px 16px ${alpha(colorTokens.preschool.turquoise.main, 0.4)}`,
+            backgroundColor: theme.palette.success.dark,
           },
           "&.Mui-disabled": {
-            background: "#e2e8f0",
-            color: "#94a3b8",
+            backgroundColor: theme.palette.grey[400],
+            color: theme.palette.common.white,
             boxShadow: "none",
-            transform: "none",
           },
         }),
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
@@ -59,7 +55,7 @@ export default function SaveIconButton({
       {loading ? (
         <CircularProgress size={20} color="inherit" />
       ) : (
-        <SaveIcon sx={{ fontSize: 20 }} />
+        <SaveIcon sx={{ fontSize: 19 }} />
       )}
     </IconButton>
   );

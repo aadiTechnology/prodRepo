@@ -5,7 +5,6 @@
  */
 
 import { Box, Typography, IconButton, Stack } from "@mui/material";
-import Grid from "@mui/material/Grid2";
 import { ReactNode } from "react";
 import { ChevronRightTwoTone, HomeTwoTone } from "@mui/icons-material";
 import { Link, useNavigate } from "react-router-dom";
@@ -61,70 +60,75 @@ export default function PageHeader({
       sx={{
         pt: 1.5,
         pb: 1.5,
+        width: "100%",
         display: "flex",
+        flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
+        gap: 2,
         overflowX: "hidden",
       }}
     >
-      <Grid container spacing={2} alignItems="center">
-        <Grid size={{ xs: 12, sm: 12, md: 7, lg: 7 }} sx={{ minWidth: 0, flex: "1 1 0" }}>
-          <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.5} useFlexGap>
-            <Link to={homePath} style={{ textDecoration: "none" }}>
-              <IconButton aria-label="Home" sx={homeButtonSx}>
-                <HomeTwoTone sx={{ fontSize: 24 }} />
-              </IconButton>
-            </Link>
-            {links.slice(0, -1).map((link, index) => (
-              <Box key={index} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <ChevronRightTwoTone sx={{ fontSize: "small", color: "text.secondary" }} />
-                <Typography
-                  variant="body1"
-                  fontSize={{ xs: "12px", sm: "14px", md: "16px", lg: "18px" }}
-                  sx={(theme) => ({
-                    fontWeight: theme.typography.fontWeightMedium,
-                    color: theme.palette.text.primary,
-                    cursor: "pointer",
-                    "&:hover": { fontWeight: theme.typography.fontWeightBold },
-                  })}
-                  onClick={(e) =>
-                    link.onClick ? link.onClick(e) : handleNav(link.path)
-                  }
-                >
-                  {link.title}
-                </Typography>
-              </Box>
-            ))}
-            {links.length > 0 && (
-              <>
-                <ChevronRightTwoTone sx={{ fontSize: "small", color: "text.secondary" }} />
-                <Typography
-                  variant="body1"
-                  fontSize={{ xs: "12px", sm: "14px", md: "16px", lg: "18px" }}
-                  sx={(theme) => ({
-                    fontWeight: theme.typography.fontWeightBold,
-                    color: theme.palette.text.primary,
-                  })}
-                >
-                  {links[links.length - 1].title}
-                </Typography>
-              </>
-            )}
-          </Stack>
-        </Grid>
-        <Grid
-          size={{ xs: 12, sm: 12, md: 5, lg: 5 }}
-          display="flex"
-          justifyContent={{ xs: "flex-start", sm: "flex-end" }}
-          sx={{ flexShrink: 0 }}
+      <Stack
+        direction="row"
+        alignItems="center"
+        gap={0.5}
+        useFlexGap
+        sx={{ minWidth: 0, flex: "1 1 auto", justifyContent: "flex-start" }}
+      >
+        <Link to={homePath} style={{ textDecoration: "none" }}>
+          <IconButton aria-label="Home" sx={homeButtonSx}>
+            <HomeTwoTone sx={{ fontSize: 24 }} />
+          </IconButton>
+        </Link>
+        {links.slice(0, -1).map((link, index) => (
+          <Box key={index} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <ChevronRightTwoTone sx={{ fontSize: "small", color: "text.secondary" }} />
+            <Typography
+              variant="body1"
+              fontSize={{ xs: "12px", sm: "13px", md: "14px", lg: "15px" }}
+              sx={(theme) => ({
+                fontWeight: theme.typography.fontWeightMedium,
+                color: theme.palette.text.primary,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                "&:hover": { fontWeight: theme.typography.fontWeightBold },
+              })}
+              onClick={(e) =>
+                link.onClick ? link.onClick(e) : handleNav(link.path)
+              }
+            >
+              {link.title}
+            </Typography>
+          </Box>
+        ))}
+        {links.length > 0 && (
+          <>
+            <ChevronRightTwoTone sx={{ fontSize: "small", color: "text.secondary" }} />
+            <Typography
+              variant="body1"
+              fontSize={{ xs: "12px", sm: "13px", md: "14px", lg: "15px" }}
+              sx={(theme) => ({
+                fontWeight: theme.typography.fontWeightBold,
+                color: theme.palette.text.primary,
+                whiteSpace: "nowrap",
+              })}
+            >
+              {links[links.length - 1].title}
+            </Typography>
+          </>
+        )}
+      </Stack>
+      {actions != null && (
+        <Stack
+          direction="row"
+          gap={1}
+          alignItems="center"
+          sx={{ flexShrink: 0, marginLeft: "auto" }}
         >
-          {actions != null && (
-            <Stack direction="row" gap={2} alignItems="center">
-              {actions}
-            </Stack>
-          )}
-        </Grid>
-      </Grid>
+          {actions}
+        </Stack>
+      )}
     </Box>
   );
 }
