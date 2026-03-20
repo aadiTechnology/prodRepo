@@ -33,7 +33,6 @@ import { PageHeader } from "../../components/layout";
 import tenantService from "../../api/services/tenantService";
 import themeTemplateService from "../../api/services/themeTemplateService";
 import { ListPageLayout } from "../../components/reusable";
-import { AppCard } from "../../components/primitives";
 import { colorTokens } from "../../tokens/colors";
 import type { ThemeTemplate } from "../../types/themeTemplate";
 
@@ -245,6 +244,7 @@ const AddTenant = () => {
         <ListPageLayout
             pageBackground={true}
             contentPaddingSize="none"
+            contentSx={{ height: "calc(100vh - 180px)" }}
             header={
                 <Box sx={{ mb: 2 }}>
                     <PageHeader
@@ -269,14 +269,6 @@ const AddTenant = () => {
                 </Box>
             }
         >
-            <AppCard sx={{ 
-                p: 0, 
-                overflow: "hidden", 
-                border: `1px solid ${colorTokens.border.default}`,
-                display: "flex", 
-                flexDirection: "column",
-                height: "calc(100vh - 180px)", // Adjusted for header and spacing
-            }}>
                 {/* Turquoise Header */}
                 <Box sx={{ 
                     py: 1.5, px: 3, 
@@ -522,7 +514,6 @@ const AddTenant = () => {
                         {loading ? "Processing…" : isEditMode ? "Save Changes" : "Finish & Create"}
                     </Button>
                 </Box>
-            </AppCard>
         </ListPageLayout>
     );
 };

@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
-import { Button, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, InputAdornment, CircularProgress, Stack, Typography, CancelIcon, SaveIcon } from "../components/primitives";
+import { CancelIcon, SaveIcon } from "../components/primitives";
 import { SaveButton, CancelButton, EmailInput, PasswordInput, LabeledSwitch } from "../components/semantic";
 import { useNavigate, useLocation } from "react-router-dom";
 import userService from "../api/services/userService";
 import { UserCreate } from "../types/user";
 import { User } from "../types/auth";
 import roleService from "../api/services/roleService";
-import PersonIcon from '@mui/icons-material/Person';
 import ConfirmDialog from "../components/semantic/ConfirmDialog";
 import { PageHeader } from "../components/layout";
-import { Box, Paper, Alert, Snackbar, Divider } from "@mui/material";
+import { ListPageLayout } from "../components/reusable";
+import { Box, Alert, Snackbar } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import TextFieldInput from "../components/semantic/TextFieldInput";
 import SelectItem from "../components/semantic/SelectItem";
@@ -190,109 +190,132 @@ export default function CreateUser() {
   };
 
   return (
-    <Box sx={{ overflowX: "hidden", minWidth: 0 }}>
-      {/* Header - Aligned with AddRole */}
-  <PageHeader
-    links={[
-      { title: "Users", path: "/users" },
-      { title: isEdit ? "Edit User" : "Add User", path: "#" },
-    ]}
-    actions={
-      <Box sx={{ display: "flex", gap: 1.5 }}>
-        <CancelIcon onClick={() => navigate("/users")} tooltipTitle="Cancel" />
-        <SaveIcon
-          onClick={handleSubmit}
-          loading={loading}
-          tooltipTitle={isEdit ? "Update Users" : "Save Users"}
-        />
-      </Box>
-    }
-  />
-
-      <Box sx={{ width: "100%", minWidth: 0 }}>
-        <Paper sx={(theme) => ({ p: 0, borderRadius: 2, border: `1px solid ${theme.palette.divider}`, boxShadow: theme.shadows[1], overflow: "hidden", maxWidth: "100%" })}>
-          <Box sx={{ p: { xs: 2, sm: 3, md: 5 } }}>
-            <form onSubmit={handleSubmit} autoComplete="off">
-              <Grid container spacing={3}>
-                <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
-                <TextFieldInput label="Full Name" placeholder="Enter full name" name="full_name"
-                value={formData.full_name} onChange={handleChange} required htmlInput={{ minLength: 2 }}/>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
-                <EmailInput value={formData.email} onChange={handleChange} 
-                required disabled={isEdit}/>
+    <>
+      <ListPageLayout
+        pageBackground={true}
+        contentPaddingSize="none"
+        scrollableFormContent
+        header={
+          <Box sx={{ mb: 2 }}>
+            <PageHeader
+              links={[
+                { title: "Users", path: "/users" },
+                { title: isEdit ? "Edit User" : "Add User", path: "#" },
+              ]}
+              homePath="/"
+              actions={
+                <Box sx={{ display: "flex", gap: 1.5 }}>
+                  <CancelIcon onClick={() => navigate("/users")} tooltipTitle="Cancel" />
+                  <SaveIcon
+                    onClick={handleSubmit}
+                    loading={loading}
+                    tooltipTitle={isEdit ? "Update Users" : "Save Users"}
+                  />
+                </Box>
+              }
+            />
+            {error && (
+              <Alert
+                severity="error"
+                variant="filled"
+                sx={{ mt: 2, borderRadius: "12px" }}
+                onClose={() => setError(null)}
+              >
+                {error}
+              </Alert>
+            )}
+          </Box>
+        }
+      >
+        <form onSubmit={handleSubmit} autoComplete="off">
+            <Grid container spacing={3}>
+              <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
+                <TextFieldInput
+                  label="Full Name"
+                  placeholder="Enter full name"
+                  name="full_name"
+                  value={formData.full_name}
+                  onChange={handleChange}
+                  required
+                  htmlInput={{ minLength: 2 }}
+                />
               </Grid>
-                {!isEdit && (
-                  <>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                    <PasswordInput value={formData.password} onChange={handleChange} required />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                    <PasswordInput label="Confirm Password" placeholder="Confirm password" name="confirm_password"
-                        value={formData.confirm_password} onChange={handleChange} required />
-                    </Grid>
-                  </>
-                )}
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <SelectItem value={formData.role_code} roles={roles} loadingRoles={loadingRoles}
-                    onValueChange={(role_code) => {setFormData((prev) => ({ ...prev, role_code }));
-                    setError(null);
-                  }} required />
-                </Grid>
-                {isEdit && (
+              <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
+                <EmailInput value={formData.email} onChange={handleChange} required disabled={isEdit} />
+              </Grid>
+              {!isEdit && (
+                <>
                   <Grid size={{ xs: 12, sm: 6 }}>
-                    <LabeledSwitch
-                      label="Account Active"
-                      checked={formData.is_active}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, is_active: e.target.checked }))}
-                      name="is_active"
+                    <PasswordInput value={formData.password} onChange={handleChange} required />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <PasswordInput
+                      label="Confirm Password"
+                      placeholder="Confirm password"
+                      name="confirm_password"
+                      value={formData.confirm_password}
+                      onChange={handleChange}
+                      required
                     />
                   </Grid>
-                )}
+                </>
+              )}
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <SelectItem
+                  value={formData.role_code}
+                  roles={roles}
+                  loadingRoles={loadingRoles}
+                  onValueChange={(role_code) => {
+                    setFormData((prev) => ({ ...prev, role_code }));
+                    setError(null);
+                  }}
+                  required
+                />
               </Grid>
-              {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+              {isEdit && (
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <LabeledSwitch
+                    label="Account Active"
+                    checked={formData.is_active}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, is_active: e.target.checked }))}
+                    name="is_active"
+                  />
+                </Grid>
+              )}
+            </Grid>
 
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', mt: 4 }}>
-              <SaveButton
-                type="submit"
-                disabled={false}
-                loading={loading}
-              >
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, justifyContent: "center", mt: 4 }}>
+              <SaveButton type="submit" disabled={false} loading={loading}>
                 Save
               </SaveButton>
-              <CancelButton
-                onClick={() => navigate("/users")}
-                disabled={loading}
-              >
-                  Cancel
-                </CancelButton>
-              </Box>
-            </form>
-          </Box>
-        </Paper>
-      </Box>
+              <CancelButton onClick={() => navigate("/users")} disabled={loading}>
+                Cancel
+              </CancelButton>
+            </Box>
+        </form>
+      </ListPageLayout>
 
-      {/* Success Snackbar */}
       <Snackbar
         open={!!snackbar}
         autoHideDuration={3000}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
         onClose={() => setSnackbar(null)}
       >
-        <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: '100%' }}>
+        <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: "100%" }}>
           {snackbar}
         </Alert>
       </Snackbar>
 
-      {/* Confirmation Dialog */}
       <ConfirmDialog
         open={confirmOpen}
         onClose={handleCancel}
         onConfirm={handleConfirm}
-        message={isEdit? "Are you sure you want to update this user?": "Are you sure you want to save this user?"}
+        message={
+          isEdit ? "Are you sure you want to update this user?" : "Are you sure you want to save this user?"
+        }
         confirmLabel="Confirm"
         loading={loading}
       />
-    </Box>
+    </>
   );
 }

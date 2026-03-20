@@ -5,7 +5,7 @@ import { Save as SaveIcon, Cancel as CancelIcon } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout } from "../../components/reusable";
-import { AppCard, TextField, Button } from "../../components/primitives";
+import { TextField, Button } from "../../components/primitives";
 import academicYearService, { AcademicYear } from "../../api/services/academicYearService";
 import { colorTokens } from "../../tokens/colors";
 
@@ -163,6 +163,7 @@ const AddAcademicYear = () => {
         <ListPageLayout
             pageBackground={true}
             contentPaddingSize="none"
+            contentSx={{ maxWidth: 1100, mx: "auto", width: "100%", height: "auto" }}
             header={
                 <Box sx={{ mb: 2 }}>
                     <PageHeader
@@ -226,19 +227,6 @@ const AddAcademicYear = () => {
                 </Box>
             }
         >
-            <AppCard
-                sx={{
-                    p: 0,
-                    overflow: "hidden",
-                    border: `1px solid ${colorTokens.border.default}`,
-                    display: "flex",
-                    flexDirection: "column",
-                    height: "auto",
-                    width: "100%",
-                    maxWidth: 1100,
-                    mx: "auto",
-                }}
-            >
                 <Box
                     sx={{
                         py: 1.5,
@@ -454,7 +442,6 @@ const AddAcademicYear = () => {
                         {loading ? "Processing…" : isEditMode ? "Save Changes" : "Finish & Create"}
                     </Button>
                 </Box>
-            </AppCard>
         </ListPageLayout>
     );
 };
