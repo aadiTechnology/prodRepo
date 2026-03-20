@@ -7,7 +7,6 @@ import {
     CircularProgress,
     IconButton,
     InputAdornment,
-    Tooltip,
     Switch,
     Tabs,
     Tab,
@@ -15,7 +14,7 @@ import {
     alpha,
 } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
-import { Button, TextField, Select, MenuItem } from "../../components/primitives";
+import { Button, TextField, Select, MenuItem, CancelIcon, SaveIcon } from "../../components/primitives";
 import { SaveButton, CancelButton, EmailInput, PhoneInput, PasswordInput } from "../../components/semantic";
 import {
     Business as BusinessIcon,
@@ -24,8 +23,6 @@ import {
     Visibility,
     VisibilityOff,
     ErrorOutline as ErrorIcon,
-    Save as SaveIcon,
-    Cancel as CancelIcon,
     CloudUpload as UploadIcon,
     Delete as DeleteIcon,
     Link as LinkIcon,
@@ -258,33 +255,12 @@ const AddTenant = () => {
                         homePath="/"
                         actions={
                             <Box sx={{ display: "flex", gap: 1.5 }}>
-                                <Tooltip title="Discard Changes">
-                                    <IconButton onClick={() => navigate("/tenants")}
-                                        sx={{
-                                            color: colorTokens.preschool.coral.main,
-                                            backgroundColor: alpha(colorTokens.preschool.coral.main, 0.08),
-                                            borderRadius: "12px",
-                                            width: 44, height: 44,
-                                            border: `1.5px solid ${alpha(colorTokens.preschool.coral.main, 0.2)}`,
-                                            "&:hover": { backgroundColor: alpha(colorTokens.preschool.coral.main, 0.15) }
-                                        }}>
-                                        <CancelIcon sx={{ fontSize: 22 }} />
-                                    </IconButton>
-                                </Tooltip>
-                                <Tooltip title={isEditMode ? "Update Changes" : "Finish & Create"}>
-                                    <IconButton onClick={handleSubmit} disabled={loading}
-                                        sx={{
-                                            background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
-                                            color: "white",
-                                            borderRadius: "12px",
-                                            width: 44, height: 44,
-                                            boxShadow: `0 4px 12px ${alpha(colorTokens.preschool.turquoise.main, 0.3)}`,
-                                            "&:hover": { transform: "translateY(-2px)", boxShadow: `0 6px 16px ${alpha(colorTokens.preschool.turquoise.main, 0.4)}` },
-                                            "&.Mui-disabled": { background: "#e2e8f0", color: "#94a3b8" }
-                                        }}>
-                                        {loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon sx={{ fontSize: 20 }} />}
-                                    </IconButton>
-                                </Tooltip>
+                                <CancelIcon onClick={() => navigate("/tenants")} />
+                                <SaveIcon
+                                    onClick={handleSubmit}
+                                    loading={loading}
+                                    tooltipTitle={isEditMode ? "Update Changes" : "Finish & Create"}
+                                />
                             </Box>
                         }
                     />
