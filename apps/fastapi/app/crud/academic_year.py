@@ -9,6 +9,9 @@ def get_all(db: Session, tenant_id: int) -> List[AcademicYear]:
     return db.query(AcademicYear).filter(
         AcademicYear.tenant_id == tenant_id,
         AcademicYear.is_deleted == False  # noqa: E712 (SQL Server BIT needs '= 0', not 'IS 0')
+    ).order_by(
+        AcademicYear.start_date.desc(),
+        AcademicYear.id.desc(),
     ).all()
 
 def get_by_id(db: Session, id: int, tenant_id: int) -> Optional[AcademicYear]:

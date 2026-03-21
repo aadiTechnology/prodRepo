@@ -14,6 +14,7 @@ from app.models.user_profile import UserProfile
 from app.models.revoked_token import RevokedToken
 from app.models.ai_entities import Requirement, UserStory, TestCase, DevelopmentTask
 from app.models.theme_template import ThemeTemplate
+from app.models.school_class import SchoolClass
 from app.models.class_fee_structure_assignment import ClassFeeStructureAssignment, AssignmentStatus
 from app.models.academic import AcademicYear
 # Export all models for convenience

@@ -30,6 +30,7 @@ class AcademicYear(Base):
 
 class ClassModel(Base):
     __tablename__ = "classes"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
