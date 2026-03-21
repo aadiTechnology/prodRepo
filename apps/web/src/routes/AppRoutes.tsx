@@ -31,6 +31,8 @@ const FeeStructureSetup = lazy(() => import("../pages/Fees/FeeStructureSetup"));
 const FeeStructureForm = lazy(() => import("../pages/Fees/FeeStructureForm"));
 const AcademicYearList = lazy(() => import("../pages/academics/AcademicYearList"));
 const AddAcademicYear = lazy(() => import("../pages/academics/AddAcademicYear"));
+const ClassList = lazy(() => import("../pages/academics/ClassList"));
+const AddClass = lazy(() => import("../pages/academics/AddClass"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -147,6 +149,9 @@ export default function AppRoutes() {
           <Route path="/academic-years" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "admin"]}><AcademicYearList /></ProtectedRoute>} />
           <Route path="/academic-years/new" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "admin"]}><AddAcademicYear /></ProtectedRoute>} />
           <Route path="/academic-years/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "admin"]}><AddAcademicYear /></ProtectedRoute>} />
+          <Route path="/classes" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "admin"]}><ClassList /></ProtectedRoute>} />
+          <Route path="/classes/new" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "admin"]}><AddClass /></ProtectedRoute>} />
+          <Route path="/classes/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "admin"]}><AddClass /></ProtectedRoute>} />
         </Route>
       </Routes>
     </Suspense>
