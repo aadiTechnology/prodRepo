@@ -1,522 +1,539 @@
 import { useState, useEffect, useCallback } from "react";
+import { FormHeaderIconAction, Box, CircularProgress } from "../../components/primitives";
 import {
-    Box,
-    Paper,
-    Typography,
-    Alert,
-    CircularProgress,
-    IconButton,
-    InputAdornment,
-    Switch,
-    Tabs,
-    Tab,
-    Divider,
-    alpha,
-} from "@mui/material";
-import type { Theme } from "@mui/material/styles";
-import { Button, TextField, Select, MenuItem, FormHeaderIconAction } from "../../components/primitives";
-import { SaveButton, CancelButton, EmailInput, PhoneInput, PasswordInput } from "../../components/semantic";
-import {
-    Business as BusinessIcon,
-    Person as PersonIcon,
-    Security as SecurityIcon,
-    Visibility,
-    VisibilityOff,
-    ErrorOutline as ErrorIcon,
-    CloudUpload as UploadIcon,
-    Delete as DeleteIcon,
-    Link as LinkIcon,
-    LocationOn as LocationIcon,
-} from "@mui/icons-material";
+  SaveButton,
+  CancelButton,
+  EmailInput,
+  PhoneInput,
+  PasswordInput,
+  LabeledSwitch,
+} from "../../components/semantic";
+import { Alert, Snackbar } from "@mui/material";
+import Grid from "@mui/material/Grid2";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
+import { ListPageLayout } from "../../components/reusable";
 import tenantService from "../../api/services/tenantService";
 import themeTemplateService from "../../api/services/themeTemplateService";
-import { ListPageLayout } from "../../components/reusable";
-import { colorTokens } from "../../tokens/colors";
+import ConfirmDialog from "../../components/semantic/ConfirmDialog";
+import TextFieldInput from "../../components/semantic/TextFieldInput";
+import ThemeTemplateSelect from "../../components/semantic/ThemeTemplateSelect";
+import TenantLogoField from "../../components/semantic/TenantLogoField";
 import type { ThemeTemplate } from "../../types/themeTemplate";
 
-// ─── TextField sx (theme-driven) ───────────────────────────────────────────────
-const buildFieldSx = (hasError: boolean) => (theme: Theme) => ({
-    "& .MuiOutlinedInput-root": {
-        borderRadius: "12px",
-        bgcolor: "#ffffff",
-        fontSize: "0.875rem",
-        fontWeight: 500,
-        transition: "all 0.2s ease-in-out",
-        "& fieldset": { 
-            borderColor: hasError ? colorTokens.preschool.coral.main : colorTokens.border.subtle, 
-            borderWidth: "1.5px" 
-        },
-        "&:hover fieldset": { 
-            borderColor: hasError ? colorTokens.preschool.coral.main : colorTokens.preschool.turquoise.main 
-        },
-        "&.Mui-focused": {
-            boxShadow: `0 0 0 3px ${alpha(colorTokens.preschool.turquoise.main, 0.1)}`,
-            "& fieldset": { 
-                borderColor: colorTokens.preschool.turquoise.main, 
-                borderWidth: "2px" 
-            },
-        },
-        "& .MuiInputBase-input.Mui-disabled": { WebkitTextFillColor: theme.palette.grey[500] },
-    },
-    "& .MuiInputLabel-root": {
-        fontSize: "0.875rem",
-        fontWeight: 500,
-        color: alpha(colorTokens.text.primary, 0.6),
-        "&.Mui-focused": {
-            color: colorTokens.preschool.turquoise.dark,
-        },
-    },
-    "& .MuiFormLabel-asterisk": {
-        color: `${colorTokens.preschool.coral.main} !important`,
-    },
-    "& .MuiFormHelperText-root": { fontSize: "0.75rem", mt: 0.5, ml: 1, fontWeight: 500 },
-});
-
-// ─── AddTenant ─────────────────────────────────────────────────────────────────
-const AddTenant = () => {
-    const navigate = useNavigate();
-    const { id } = useParams<{ id?: string }>();
-    const isEditMode = Boolean(id);
-
-    const [loading, setLoading] = useState(false);
-    const [fetchLoading, setFetchLoading] = useState(isEditMode);
-    const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [logoTab, setLogoTab] = useState(0);
-
-    const [formData, setFormData] = useState({
-        name: "", owner_name: "", email: "",
-        admin_password: "", confirm_password: "",
-        phone: "", description: "", is_active: true,
-        logo_url: "",
-        theme_template_id: null as number | null,
-        address_line1: "", address_line2: "", city: "", state: "", pin_code: "",
-    });
-    const [initialFormData, setInitialFormData] = useState<typeof formData | null>(null);
-    const [templates, setTemplates] = useState<ThemeTemplate[]>([]);
-
-    const fetchTenant = useCallback(async () => {
-        if (!id) return;
-        try {
-            setFetchLoading(true);
-            const data = await tenantService.get(Number(id));
-            const d = {
-                name: data.name || "", owner_name: data.owner_name || "",
-                email: data.email || "", admin_password: "", confirm_password: "",
-                phone: data.phone || "", description: data.description || "",
-                is_active: data.is_active, logo_url: data.logo_url || "",
-                theme_template_id: data.theme_template_id ?? null,
-                address_line1: data.address_line1 || "", address_line2: data.address_line2 || "",
-                city: data.city || "", state: data.state || "", pin_code: data.pin_code || "",
-            };
-            setFormData(d);
-            setInitialFormData(d);
-            if (d.logo_url) setLogoTab(d.logo_url.startsWith("data:") ? 0 : 1);
-        } catch (err: any) {
-            setError(err?.message || "Failed to load tenant.");
-        } finally {
-            setFetchLoading(false);
-        }
-    }, [id]);
-
-    useEffect(() => { if (isEditMode) fetchTenant(); }, [fetchTenant, isEditMode]);
-
-    useEffect(() => {
-        themeTemplateService.list({ page_size: 500 }).then((r: any) => setTemplates(r.items || [])).catch(() => setTemplates([]));
-    }, []);
-
-    const validateField = (name: string, value: any) => {
-        let e = "";
-        if (name === "name") {
-            if (!value) e = "Required.";
-            else if (value.length < 3) e = "Min 3 characters.";
-        } else if (name === "owner_name") {
-            if (!value) e = "Required.";
-        } else if (name === "email") {
-            if (!value) e = "Required.";
-            else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) e = "Invalid email.";
-        } else if (name === "phone" && value) {
-            if (!/^\d+$/.test(value)) e = "Numeric only.";
-            else if (value.length < 10 || value.length > 15) e = "10–15 digits.";
-        } else if (!isEditMode) {
-            if (name === "admin_password") {
-                if (!value) e = "Required.";
-                else if (value.length < 8) e = "Min 8 characters.";
-            } else if (name === "confirm_password") {
-                if (!value) e = "Required.";
-                else if (value !== formData.admin_password) e = "Passwords don't match.";
-            }
-        }
-        return e;
-    };
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value, checked, type } = e.target;
-        const v = type === "checkbox" || name === "is_active" ? checked : value;
-        setFormData(prev => ({ ...prev, [name]: v }));
-        setErrors(prev => ({ ...prev, [name]: validateField(name, v) }));
-    };
-
-    const validateForm = () => {
-        const fields = ["name", "owner_name", "email", "phone"];
-        if (!isEditMode) fields.push("admin_password", "confirm_password");
-        const newErrors: Record<string, string> = {};
-        fields.forEach(f => { const e = validateField(f, formData[f as keyof typeof formData]); if (e) newErrors[f] = e; });
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) { setError("Image size should be less than 2MB"); return; }
-        const reader = new FileReader();
-        reader.onloadend = () => setFormData(prev => ({ ...prev, logo_url: reader.result as string }));
-        reader.readAsDataURL(file);
-    };
-
-    const handleClearLogo = () => setFormData(prev => ({ ...prev, logo_url: "" }));
-
-    const handleSubmit = async () => {
-        if (!validateForm()) return;
-        setLoading(true);
-        setError(null);
-        try {
-            const common = {
-                name: formData.name, owner_name: formData.owner_name,
-                phone: formData.phone, description: formData.description,
-                is_active: formData.is_active, logo_url: formData.logo_url || null,
-                theme_template_id: formData.theme_template_id ?? null,
-                address_line1: formData.address_line1 || null, address_line2: formData.address_line2 || null,
-                city: formData.city || null, state: formData.state || null, pin_code: formData.pin_code || null,
-            };
-            if (isEditMode && id) {
-                await tenantService.update(Number(id), common);
-                setSuccess("Tenant updated successfully!");
-            } else {
-                const r = await tenantService.provision({ ...common, email: formData.email, admin_password: formData.admin_password });
-                setSuccess(r.message || "Tenant created successfully!");
-            }
-            setTimeout(() => navigate("/tenants"), 1000);
-        } catch (err: any) {
-            console.error("Provisioning error:", err);
-            const errorData = err?.response?.data;
-            let msg = err?.message || "";
-
-            // Handle FastAPI validation error list
-            if (errorData?.detail && Array.isArray(errorData.detail)) {
-                const newFieldErrors: Record<string, string> = {};
-                errorData.detail.forEach((issue: any) => {
-                    const field = issue.loc?.[issue.loc.length - 1];
-                    if (field) newFieldErrors[field] = issue.msg;
-                });
-                if (Object.keys(newFieldErrors).length > 0) {
-                    setErrors(p => ({ ...p, ...newFieldErrors }));
-                    msg = "Please fix the highlighted errors.";
-                } else {
-                    msg = errorData.detail[0]?.msg || msg;
-                }
-            } else if (typeof errorData?.detail === "string") {
-                msg = errorData.detail;
-            }
-
-            if (msg.toLowerCase().includes("email already exists")) {
-                setErrors(p => ({ ...p, email: "Email already exists." }));
-            }
-            setError(msg || (isEditMode ? "Failed to update tenant." : "Failed to provision tenant."));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (fetchLoading) return (
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
-            <CircularProgress sx={{ color: "#1a1a2e" }} />
-        </Box>
-    );
-
-    return (
-        <ListPageLayout
-            pageBackground={true}
-            contentPaddingSize="none"
-            contentSx={{ height: "calc(100vh - 180px)" }}
-            header={
-                <Box sx={{ mb: 2 }}>
-                    <PageHeader
-                        links={[
-                            { title: "Tenants", path: "/tenants" },
-                            { title: isEditMode ? "Edit Tenant" : "Add Tenant", path: "#" },
-                        ]}
-                        homePath="/"
-                        actions={
-                            <Box sx={{ display: "flex", gap: 1.5 }}>
-                                <FormHeaderIconAction variant="cancel" onClick={() => navigate("/tenants")} />
-                                <FormHeaderIconAction
-                                    variant="save"
-                                    onClick={handleSubmit}
-                                    loading={loading}
-                                    tooltipTitle={isEditMode ? "Update Changes" : "Finish & Create"}
-                                />
-                            </Box>
-                        }
-                    />
-                    {error && <Alert severity="error" variant="filled" sx={{ mt: 2, borderRadius: "12px" }} onClose={() => setError(null)}>{error}</Alert>}
-                    {success && <Alert severity="success" variant="filled" sx={{ mt: 2, borderRadius: "12px" }}>{success}</Alert>}
-                </Box>
-            }
-        >
-                {/* Turquoise Header */}
-                <Box sx={{ 
-                    py: 1.5, px: 3, 
-                    background: `linear-gradient(90deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    flexShrink: 0
-                }}>
-                    <Typography sx={{ fontSize: "0.85rem", color: "white", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1px" }}>
-                        {isEditMode ? "Modify Tenant Settings" : "Create New Tenant"}
-                    </Typography>
-                    <Typography sx={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>
-                        <Box component="span" sx={{ color: colorTokens.preschool.coral.main, mr: 0.5 }}>*</Box> Mandatory Fields
-                    </Typography>
-                </Box>
-
-                {/* Scrollable Content Area */}
-                <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
-                    <Box sx={{
-                        display: "grid",
-                        gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-                        gap: 0,
-                    }}>
-                    {/* ── LEFT COLUMN ── */}
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, p: { xs: 2, md: 4 }, borderRight: { md: `1px solid ${colorTokens.border.subtle}` } }}>
-                        <TextField 
-                            label="Tenant Name" required fullWidth
-                            name="name" value={formData.name} onChange={handleChange}
-                            error={Boolean(errors.name)} helperText={errors.name}
-                            placeholder="e.g. Little Stars Academy"
-                            sx={buildFieldSx(Boolean(errors.name))}
-                        />
-
-                        <TextField 
-                            label="Owner Name" required fullWidth
-                            name="owner_name" value={formData.owner_name} onChange={handleChange}
-                            error={Boolean(errors.owner_name)} helperText={errors.owner_name}
-                            placeholder="Full name of the principal/owner"
-                            sx={buildFieldSx(Boolean(errors.owner_name))}
-                        />
-
-                        <EmailInput 
-                            label="Email Address" required fullWidth
-                            name="email" value={formData.email} onChange={handleChange}
-                            error={Boolean(errors.email)} helperText={isEditMode ? "Account identifier cannot be changed" : errors.email}
-                            disabled={isEditMode}
-                            placeholder="admin@school.com"
-                            sx={buildFieldSx(Boolean(errors.email))}
-                        />
-
-                        <PhoneInput 
-                            label="Phone Number" fullWidth
-                            name="phone" value={formData.phone} onChange={handleChange}
-                            error={Boolean(errors.phone)} helperText={errors.phone}
-                            placeholder="Official contact number"
-                            sx={buildFieldSx(Boolean(errors.phone))}
-                        />
-
-                        {!isEditMode && (
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                                <PasswordInput 
-                                    label="Password" required fullWidth
-                                    name="admin_password" value={formData.admin_password} onChange={handleChange}
-                                    error={Boolean(errors.admin_password)} helperText={errors.admin_password}
-                                    placeholder="Enter secure password"
-                                    sx={buildFieldSx(Boolean(errors.admin_password))}
-                                />
-                                <PasswordInput 
-                                    label="Confirm Password" required fullWidth
-                                    name="confirm_password" value={formData.confirm_password} onChange={handleChange}
-                                    error={Boolean(errors.confirm_password)} helperText={errors.confirm_password}
-                                    placeholder="Repeat password"
-                                    sx={buildFieldSx(Boolean(errors.confirm_password))}
-                                />
-                            </Box>
-                        )}
-
-                        <Box sx={{
-                            display: "flex", alignItems: "center", justifyContent: "space-between",
-                            p: 2, borderRadius: "12px", bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.04),
-                            border: `1.5px solid ${alpha(colorTokens.preschool.turquoise.main, 0.1)}`
-                        }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                                <Box sx={{ 
-                                    width: 10, height: 10, borderRadius: "50%", 
-                                    bgcolor: formData.is_active ? colorTokens.preschool.mint.main : colorTokens.preschool.coral.main,
-                                    boxShadow: `0 0 8px ${formData.is_active ? colorTokens.preschool.mint.main : colorTokens.preschool.coral.main}`
-                                }} />
-                                <Box>
-                                    <Typography sx={{ fontSize: "0.85rem", fontWeight: 700, color: colorTokens.preschool.turquoise.dark }}>Status</Typography>
-                                    <Typography sx={{ fontSize: "0.72rem", color: colorTokens.text.secondary }}>{formData.is_active ? "Account is Active" : "Account is Inactive"}</Typography>
-                                </Box>
-                            </Box>
-                            <Switch checked={formData.is_active} onChange={handleChange} name="is_active" 
-                                sx={{
-                                    "& .MuiSwitch-switchBase.Mui-checked": { color: colorTokens.preschool.mint.main },
-                                    "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: colorTokens.preschool.mint.main }
-                                }}
-                            />
-                        </Box>
-                    </Box>
-
-                    {/* ── RIGHT COLUMN ── */}
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, p: { xs: 2, md: 4 } }}>
-                        {/* Logo Identity with Tabs */}
-                        <Box sx={{
-                            p: 3, borderRadius: "16px", border: `2px dashed ${colorTokens.border.subtle}`,
-                            bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.02),
-                            display: "flex", flexDirection: "column", gap: 2,
-                            transition: "all 0.3s ease",
-                            "&:hover": { borderColor: colorTokens.preschool.turquoise.main, bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.04) }
-                        }}>
-                            <Typography sx={{ fontSize: "0.75rem", fontWeight: 800, color: colorTokens.preschool.turquoise.dark, mb: -1 }}>LOGO IDENTITY</Typography>
-                            
-                            <Tabs 
-                                value={logoTab} 
-                                onChange={(_, v) => setLogoTab(v)}
-                                sx={{
-                                    minHeight: 32, mb: 1,
-                                    "& .MuiTab-root": { minHeight: 32, fontSize: "0.7rem", fontWeight: 700, p: 0, minWidth: 80 },
-                                    "& .MuiTabs-indicator": { bgcolor: colorTokens.preschool.turquoise.main }
-                                }}
-                            >
-                                <Tab label="UPLOAD" />
-                                <Tab label="LINK" />
-                            </Tabs>
-
-                            {logoTab === 0 ? (
-                                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                    {formData.logo_url && formData.logo_url.startsWith("data:") ? (
-                                        <Box sx={{ position: "relative" }}>
-                                            <img src={formData.logo_url} alt="Logo" style={{ height: 60, maxWidth: 200, objectFit: "contain", borderRadius: 8 }} />
-                                            <IconButton size="small" onClick={handleClearLogo} sx={{ position: "absolute", top: -10, right: -10, bgcolor: colorTokens.preschool.coral.main, color: "white", "&:hover": { bgcolor: colorTokens.preschool.coral.dark } }}>
-                                                <DeleteIcon sx={{ fontSize: 14 }} />
-                                            </IconButton>
-                                        </Box>
-                                    ) : (
-                                        <UploadIcon sx={{ fontSize: 40, color: colorTokens.preschool.turquoise.main, opacity: 0.5 }} />
-                                    )}
-                                    <input accept="image/*" id="logo-input" type="file" hidden onChange={handleLogoUpload} />
-                                    <label htmlFor="logo-input">
-                                        <Button component="span" variant="outlined" size="small" sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 700 }}>
-                                            {(formData.logo_url && formData.logo_url.startsWith("data:")) ? "Replace File" : "Choose School Logo"}
-                                        </Button>
-                                    </label>
-                                </Box>
-                            ) : (
-                                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                                    <TextField 
-                                        label="Logo External URL" fullWidth
-                                        name="logo_url" 
-                                        value={formData.logo_url.startsWith("data:") ? "" : formData.logo_url} 
-                                        onChange={handleChange}
-                                        placeholder="https://example.com/logo.png"
-                                        error={Boolean(errors.logo_url)} helperText={errors.logo_url}
-                                        InputProps={{
-                                            startAdornment: <InputAdornment position="start"><LinkIcon sx={{ color: colorTokens.preschool.turquoise.main, fontSize: 18 }} /></InputAdornment>,
-                                        }}
-                                        sx={buildFieldSx(Boolean(errors.logo_url))}
-                                    />
-                                    {formData.logo_url && !formData.logo_url.startsWith("data:") && (
-                                        <Box sx={{ display: "flex", justifyContent: "center", p: 1, bgcolor: "#f8fafc", borderRadius: "8px" }}>
-                                            <img src={formData.logo_url} alt="Logo Preview" style={{ height: 40, maxWidth: 150, objectFit: "contain" }} />
-                                        </Box>
-                                    )}
-                                </Box>
-                            )}
-                        </Box>
-
-                        <TextField 
-                            label="Address Line 1" fullWidth
-                            name="address_line1" value={formData.address_line1} onChange={handleChange}
-                            placeholder="e.g. 123 Education Lane"
-                            sx={buildFieldSx(false)}
-                        />
-
-                        <TextField 
-                            label="Address Line 2" fullWidth
-                            name="address_line2" value={formData.address_line2} onChange={handleChange}
-                            placeholder="Building, Floor or Suite"
-                            sx={buildFieldSx(false)}
-                        />
-
-                        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
-                            <TextField 
-                                label="State" fullWidth
-                                name="state" value={formData.state} onChange={handleChange}
-                                placeholder="Maharashtra"
-                                sx={buildFieldSx(false)}
-                            />
-                            <TextField 
-                                label="City" fullWidth
-                                name="city" value={formData.city} onChange={handleChange}
-                                placeholder="Mumbai"
-                                sx={buildFieldSx(false)}
-                            />
-                        </Box>
-
-                        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
-                            <TextField 
-                                label="Pin Code" fullWidth
-                                name="pin_code" value={formData.pin_code} onChange={handleChange}
-                                placeholder="400001"
-                                inputProps={{ maxLength: 20 }}
-                                sx={buildFieldSx(false)}
-                            />
-                            <Select
-                                label="Branding Template" fullWidth
-                                value={formData.theme_template_id ?? ""}
-                                onChange={(e) => setFormData(p => ({ ...p, theme_template_id: e.target.value === "" ? null : Number(e.target.value) }))}
-                                sx={{ 
-                                    borderRadius: "12px", bgcolor: "#ffffff",
-                                    "& .MuiOutlinedInput-notchedOutline": { borderColor: colorTokens.border.subtle, borderWidth: "1.5px" },
-                                    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: colorTokens.preschool.turquoise.main },
-                                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: colorTokens.preschool.turquoise.main, borderWidth: "2px" }
-                                }}
-                            >
-                                <MenuItem value=""><em>Default Theme</em></MenuItem>
-                                {templates.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
-                            </Select>
-                        </Box>
-                        </Box>
-                    </Box>
-                </Box>
-
-                {/* Footer Actions */}
-                <Box sx={{ 
-                    p: 2.5, display: "flex", justifyContent: "flex-end", gap: 2, 
-                    bgcolor: alpha(colorTokens.background.default, 0.5),
-                    borderTop: `1px solid ${colorTokens.border.subtle}`,
-                    flexShrink: 0
-                }}>
-                    <Button variant="text" onClick={() => navigate("/tenants")}
-                        sx={{ color: colorTokens.preschool.coral.main, fontWeight: 700, px: 4, "&:hover": { bgcolor: alpha(colorTokens.preschool.coral.main, 0.05) } }}>
-                        Discard
-                    </Button>
-                    <Button variant="contained" onClick={handleSubmit} disabled={loading}
-                        sx={{ 
-                            background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
-                            color: "white", fontWeight: 800, px: 5, borderRadius: "10px",
-                            boxShadow: `0 4px 12px ${alpha(colorTokens.preschool.turquoise.main, 0.2)}`,
-                            "&:hover": { transform: "translateY(-1px)", boxShadow: `0 6px 16px ${alpha(colorTokens.preschool.turquoise.main, 0.3)}` }
-                        }}>
-                        {loading ? "Processing…" : isEditMode ? "Save Changes" : "Finish & Create"}
-                    </Button>
-                </Box>
-        </ListPageLayout>
-    );
+type FormData = {
+  name: string;
+  owner_name: string;
+  email: string;
+  admin_password: string;
+  confirm_password: string;
+  phone: string;
+  description: string;
+  is_active: boolean;
+  logo_url: string;
+  theme_template_id: number | null;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  state: string;
+  pin_code: string;
 };
 
-export default AddTenant;
+type FieldErrors = Partial<Record<keyof FormData, string>>;
+
+const emptyForm = (): FormData => ({
+  name: "",
+  owner_name: "",
+  email: "",
+  admin_password: "",
+  confirm_password: "",
+  phone: "",
+  description: "",
+  is_active: true,
+  logo_url: "",
+  theme_template_id: null,
+  address_line1: "",
+  address_line2: "",
+  city: "",
+  state: "",
+  pin_code: "",
+});
+
+function mapProvisionError(err: unknown, isEditMode: boolean): { fieldPatch: FieldErrors; message: string } {
+  const e = err as { message?: string; response?: { data?: { detail?: unknown } } };
+  const fieldPatch: FieldErrors = {};
+  let msg = e?.message || "";
+  const errorData = e?.response?.data;
+  const detail = errorData?.detail;
+
+  if (detail && Array.isArray(detail)) {
+    detail.forEach((issue: { loc?: unknown[]; msg?: string }) => {
+      const field = issue.loc?.[issue.loc.length - 1];
+      if (field && typeof field === "string") {
+        fieldPatch[field as keyof FormData] = issue.msg ?? "";
+      }
+    });
+    if (Object.keys(fieldPatch).length > 0) {
+      msg = "Please fix the highlighted errors.";
+    } else {
+      const first = detail[0] as { msg?: string } | undefined;
+      msg = first?.msg || msg;
+    }
+  } else if (typeof detail === "string") {
+    msg = detail;
+  }
+
+  if (msg.toLowerCase().includes("email already exists")) {
+    fieldPatch.email = "Email already exists.";
+  }
+
+  return {
+    fieldPatch,
+    message: msg || (isEditMode ? "Failed to update tenant." : "Failed to provision tenant."),
+  };
+}
+
+export default function AddTenant() {
+  const navigate = useNavigate();
+  const { id } = useParams<{ id?: string }>();
+  const isEditMode = Boolean(id);
+
+  const [loading, setLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(isEditMode);
+  const [error, setError] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [logoTab, setLogoTab] = useState(0);
+
+  const [formData, setFormData] = useState<FormData>(emptyForm);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [templates, setTemplates] = useState<ThemeTemplate[]>([]);
+
+  const fetchTenant = useCallback(async () => {
+    if (!id) return;
+    try {
+      setFetchLoading(true);
+      const data = await tenantService.get(Number(id));
+      const d: FormData = {
+        name: data.name || "",
+        owner_name: data.owner_name || "",
+        email: data.email || "",
+        admin_password: "",
+        confirm_password: "",
+        phone: data.phone || "",
+        description: data.description || "",
+        is_active: data.is_active,
+        logo_url: data.logo_url || "",
+        theme_template_id: data.theme_template_id ?? null,
+        address_line1: data.address_line1 || "",
+        address_line2: data.address_line2 || "",
+        city: data.city || "",
+        state: data.state || "",
+        pin_code: data.pin_code || "",
+      };
+      setFormData(d);
+      if (d.logo_url) setLogoTab(d.logo_url.startsWith("data:") ? 0 : 1);
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || "Failed to load tenant.";
+      setError(msg);
+    } finally {
+      setFetchLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (isEditMode) fetchTenant();
+  }, [fetchTenant, isEditMode]);
+
+  useEffect(() => {
+    themeTemplateService
+      .list({ page_size: 500 })
+      .then((r: { items?: ThemeTemplate[] }) => setTemplates(r.items || []))
+      .catch(() => setTemplates([]));
+  }, []);
+
+  const validateField = (name: keyof FormData, data: FormData): string => {
+    let e = "";
+    if (name === "name") {
+      if (!data.name) e = "Required.";
+      else if (data.name.length < 3) e = "Min 3 characters.";
+    } else if (name === "owner_name") {
+      if (!data.owner_name) e = "Required.";
+    } else if (name === "email") {
+      if (!data.email) e = "Required.";
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e = "Invalid email.";
+    } else if (name === "phone" && data.phone) {
+      if (!/^\d+$/.test(data.phone)) e = "Numeric only.";
+      else if (data.phone.length < 10 || data.phone.length > 15) e = "10–15 digits.";
+    } else if (!isEditMode) {
+      if (name === "admin_password") {
+        if (!data.admin_password) e = "Required.";
+        else if (data.admin_password.length < 8) e = "Min 8 characters.";
+      } else if (name === "confirm_password") {
+        if (!data.confirm_password) e = "Required.";
+        else if (data.confirm_password !== data.admin_password) e = "Passwords don't match.";
+      }
+    }
+    return e;
+  };
+
+  const validateForm = (): boolean => {
+    const keys: (keyof FormData)[] = ["name", "owner_name", "email", "phone"];
+    if (!isEditMode) keys.push("admin_password", "confirm_password");
+    const next: FieldErrors = {};
+    keys.forEach((k) => {
+      const err = validateField(k, formData);
+      if (err) next[k] = err;
+    });
+    setFieldErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const applyFieldErrorsAfterChange = (name: keyof FormData, data: FormData) => {
+    setFieldErrors((fe) => {
+      const updated = { ...fe, [name]: validateField(name, data) };
+      if (name === "admin_password" || name === "confirm_password") {
+        updated.admin_password = validateField("admin_password", data);
+        updated.confirm_password = validateField("confirm_password", data);
+      }
+      return updated;
+    });
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+    const n = name as keyof FormData;
+    const v = type === "checkbox" ? checked : value;
+    setFormData((prev) => {
+      const next = { ...prev, [n]: v } as FormData;
+      applyFieldErrorsAfterChange(n, next);
+      return next;
+    });
+    setError(null);
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Image size should be less than 2MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData((prev) => ({ ...prev, logo_url: reader.result as string }));
+      setError(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearLogo = () => {
+    setFormData((prev) => ({ ...prev, logo_url: "" }));
+    setError(null);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!validateForm()) return;
+    setConfirmOpen(true);
+  };
+
+  const handleConfirm = async () => {
+    setConfirmOpen(false);
+    setLoading(true);
+    setError(null);
+    try {
+      const common = {
+        name: formData.name,
+        owner_name: formData.owner_name,
+        phone: formData.phone,
+        description: formData.description,
+        is_active: formData.is_active,
+        logo_url: formData.logo_url || null,
+        theme_template_id: formData.theme_template_id ?? null,
+        address_line1: formData.address_line1 || null,
+        address_line2: formData.address_line2 || null,
+        city: formData.city || null,
+        state: formData.state || null,
+        pin_code: formData.pin_code || null,
+      };
+      if (isEditMode && id) {
+        await tenantService.update(Number(id), common);
+        setSnackbar("Tenant updated successfully!");
+      } else {
+        const r = await tenantService.provision({
+          ...common,
+          email: formData.email,
+          admin_password: formData.admin_password,
+        });
+        setSnackbar(r.message || "Tenant created successfully!");
+      }
+      setTimeout(() => navigate("/tenants"), 1000);
+    } catch (err: unknown) {
+      console.error("Provisioning error:", err);
+      const { fieldPatch, message } = mapProvisionError(err, isEditMode);
+      setFieldErrors((p) => ({ ...p, ...fieldPatch }));
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelDialog = () => {
+    setConfirmOpen(false);
+  };
+
+  if (fetchLoading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <>
+      <ListPageLayout
+        pageBackground={true}
+        contentPaddingSize="none"
+        scrollableFormContent
+        header={
+          <Box sx={{ mb: 2 }}>
+            <PageHeader
+              links={[
+                { title: "Tenants", path: "/tenants" },
+                { title: isEditMode ? "Edit Tenant" : "Add Tenant", path: "#" },
+              ]}
+              homePath="/"
+              actions={
+                <Box sx={{ display: "flex", gap: 1.5 }}>
+                  <FormHeaderIconAction
+                    variant="cancel"
+                    onClick={() => navigate("/tenants")}
+                    tooltipTitle="Cancel"
+                  />
+                  <FormHeaderIconAction
+                    variant="save"
+                    onClick={handleSubmit}
+                    loading={loading}
+                    tooltipTitle={isEditMode ? "Update Changes" : "Finish & Create"}
+                  />
+                </Box>
+              }
+            />
+            {error && (
+              <Alert
+                severity="error"
+                variant="filled"
+                sx={{ mt: 2, borderRadius: "12px" }}
+                onClose={() => setError(null)}
+              >
+                {error}
+              </Alert>
+            )}
+          </Box>
+        }
+      >
+        <form onSubmit={handleSubmit} autoComplete="off">
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextFieldInput
+                label="Tenant name"
+                placeholder="e.g. Little Stars Academy"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+                error={Boolean(fieldErrors.name)}
+                helperText={fieldErrors.name}
+                htmlInput={{ minLength: 3 }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextFieldInput
+                label="Owner name"
+                placeholder="Full name of the principal or owner"
+                name="owner_name"
+                value={formData.owner_name}
+                onChange={handleChange}
+                required
+                error={Boolean(fieldErrors.owner_name)}
+                helperText={fieldErrors.owner_name}
+                htmlInput={{ minLength: 1 }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <EmailInput
+                label="Email address"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                disabled={isEditMode}
+                placeholder="admin@school.com"
+                error={Boolean(fieldErrors.email)}
+                helperText={isEditMode ? "Account identifier cannot be changed" : fieldErrors.email}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <PhoneInput
+                label="Phone number"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="Official contact number"
+                error={Boolean(fieldErrors.phone)}
+                helperText={fieldErrors.phone}
+              />
+            </Grid>
+            {!isEditMode && (
+              <>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <PasswordInput
+                    label="Password"
+                    name="admin_password"
+                    value={formData.admin_password}
+                    onChange={handleChange}
+                    required
+                    placeholder="Enter secure password"
+                    error={Boolean(fieldErrors.admin_password)}
+                    helperText={fieldErrors.admin_password}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <PasswordInput
+                    label="Confirm password"
+                    placeholder="Repeat password"
+                    name="confirm_password"
+                    value={formData.confirm_password}
+                    onChange={handleChange}
+                    required
+                    error={Boolean(fieldErrors.confirm_password)}
+                    helperText={fieldErrors.confirm_password}
+                  />
+                </Grid>
+              </>
+            )}
+            <Grid size={{ xs: 12 }}>
+              <LabeledSwitch
+                label="Account active"
+                checked={formData.is_active}
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, is_active: e.target.checked }));
+                  setError(null);
+                }}
+                name="is_active"
+              />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TenantLogoField
+                logoUrl={formData.logo_url}
+                tabIndex={logoTab}
+                onTabChange={setLogoTab}
+                onLogoUrlChange={handleChange}
+                onFileInputChange={handleLogoUpload}
+                onClearLogo={handleClearLogo}
+                logoUrlError={fieldErrors.logo_url}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextFieldInput
+                label="Address line 1"
+                placeholder="e.g. 123 Education Lane"
+                name="address_line1"
+                value={formData.address_line1}
+                onChange={handleChange}
+                htmlInput={{ minLength: 0 }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextFieldInput
+                label="Address line 2"
+                placeholder="Building, floor or suite"
+                name="address_line2"
+                value={formData.address_line2}
+                onChange={handleChange}
+                htmlInput={{ minLength: 0 }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextFieldInput
+                label="State"
+                placeholder="Maharashtra"
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                htmlInput={{ minLength: 0 }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextFieldInput
+                label="City"
+                placeholder="Mumbai"
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                htmlInput={{ minLength: 0 }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextFieldInput
+                label="Pin code"
+                placeholder="400001"
+                name="pin_code"
+                value={formData.pin_code}
+                onChange={handleChange}
+                htmlInput={{ maxLength: 20, minLength: 0 }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <ThemeTemplateSelect
+                templates={templates}
+                value={formData.theme_template_id}
+                onValueChange={(theme_template_id) => {
+                  setFormData((prev) => ({ ...prev, theme_template_id }));
+                  setError(null);
+                }}
+              />
+            </Grid>
+          </Grid>
+
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, justifyContent: "center", mt: 4 }}>
+            <SaveButton type="submit" disabled={false} loading={loading}>
+              {isEditMode ? "Save changes" : "Finish & create"}
+            </SaveButton>
+            <CancelButton onClick={() => navigate("/tenants")} disabled={loading}>
+              Cancel
+            </CancelButton>
+          </Box>
+        </form>
+      </ListPageLayout>
+
+      <Snackbar
+        open={!!snackbar}
+        autoHideDuration={3000}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        onClose={() => setSnackbar(null)}
+      >
+        <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: "100%" }}>
+          {snackbar}
+        </Alert>
+      </Snackbar>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={handleCancelDialog}
+        onConfirm={handleConfirm}
+        message={
+          isEditMode
+            ? "Are you sure you want to update this tenant?"
+            : "Are you sure you want to create this tenant?"
+        }
+        confirmLabel="Confirm"
+        loading={loading}
+      />
+    </>
+  );
+}
