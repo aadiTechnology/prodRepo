@@ -33,8 +33,10 @@ export default function Select({
   id,
   ...props
 }: SelectProps) {
-  const resolvedId = id ?? labelId ?? (label ? `select-${label.replace(/\s/g, "-")}` : undefined);
-  
+  const baseId = id ?? labelId ?? (label ? `select-${label.replace(/\s/g, "-")}` : undefined);
+  const inputLabelId = labelId ?? (baseId ? `${baseId}-label` : undefined);
+  const selectInputId = id ?? (baseId ? `${baseId}-select` : undefined);
+
   const displayLabel = label && required ? (
     <span>
       {label}
@@ -44,11 +46,11 @@ export default function Select({
 
   return (
     <FormControl variant="outlined" fullWidth error={error} {...formControlProps}>
-      {label != null && <InputLabel id={resolvedId}>{displayLabel}</InputLabel>}
+      {label != null && <InputLabel id={inputLabelId}>{displayLabel}</InputLabel>}
       <MuiSelect
         label={label} // String label for perfect notch
-        labelId={resolvedId}
-        id={resolvedId}
+        labelId={inputLabelId}
+        id={selectInputId}
         sx={[
           (theme) => ({
             "& .MuiOutlinedInput-notchedOutline": {

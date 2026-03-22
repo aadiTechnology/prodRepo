@@ -65,18 +65,20 @@ export default function SelectItem({
           {emptyListLabel}
         </MenuItem>
       ) : (
-        <>
-          {emptyOptionLabel ? (
-            <MenuItem value="">
-              <em>{emptyOptionLabel}</em>
-            </MenuItem>
-          ) : null}
-          {options.map((option) => (
-            <MenuItem key={option.id} value={option.value}>
+        [
+          ...(emptyOptionLabel
+            ? [
+                <MenuItem key="__empty" value="">
+                  <em>{emptyOptionLabel}</em>
+                </MenuItem>,
+              ]
+            : []),
+          ...options.map((option) => (
+            <MenuItem key={option.id} value={String(option.value)}>
               {option.label}
             </MenuItem>
-          ))}
-        </>
+          )),
+        ]
       )}
     </Select>
   );
