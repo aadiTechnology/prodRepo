@@ -90,7 +90,7 @@ export default function CreateUser() {
         const res = await roleService.getRoles({});
         const mappedRoles = (res.items || []).map((role: { id: unknown; code?: string; name?: string; scope?: string }) => ({
           id: String(role.id),
-          value: role.code || role.name || role.scope || String(role.id),
+          value: role.code || role.name || (role.scope != null ? String(role.scope) : "") || String(role.id),
           label: role.name ?? "",
         }));
         setRoleOptions(mappedRoles);
@@ -106,18 +106,21 @@ export default function CreateUser() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     const n = name as keyof FormData;
+    let nextSnapshot: FormData | null = null;
     setFormData((prev) => {
-      const next = { ...prev, [n]: value } as FormData;
+      nextSnapshot = { ...prev, [n]: value } as FormData;
+      return nextSnapshot;
+    });
+    if (nextSnapshot) {
       setFieldErrors((fe) => {
-        const updated = { ...fe, [n]: validateField(validationConfig, n, next) };
+        const updated = { ...fe, [n]: validateField(validationConfig, n, nextSnapshot!) };
         if (n === "password" || n === "confirm_password") {
-          updated.password = validateField(validationConfig, "password", next);
-          updated.confirm_password = validateField(validationConfig, "confirm_password", next);
+          updated.password = validateField(validationConfig, "password", nextSnapshot!);
+          updated.confirm_password = validateField(validationConfig, "confirm_password", nextSnapshot!);
         }
         return updated;
       });
-      return next;
-    });
+    }
     setError(null);
   };
 
@@ -266,19 +269,22 @@ export default function CreateUser() {
                   loadingLabel="Loading roles..."
                   emptyListLabel="No roles found"
                   onValueChange={(role_code) => {
-                    setFormData((prev) => ({ ...prev, role_code }));
-                    setFieldErrors((fe) => ({
-                      ...fe,
-                      role_code: validateField(validationConfig, "role_code", {
-                        ...formData,
-                        role_code,
-                      }),
-                    }));
+                    let nextSnapshot: FormData | null = null;
+                    setFormData((prev) => {
+                      nextSnapshot = { ...prev, role_code };
+                      return nextSnapshot;
+                    });
+                    if (nextSnapshot) {
+                      setFieldErrors((fe) => ({
+                        ...fe,
+                        role_code: validateField(validationConfig, "role_code", nextSnapshot!),
+                      }));
+                    }
                     setError(null);
                   }}
                   required
                   error={Boolean(fieldErrors.role_code)}
-                  helperText={fieldErrors.role_code}
+                  helperText={fieldErrors.role_code || undefined}
                 />
               </Grid>
               {isEdit && (
