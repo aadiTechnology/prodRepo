@@ -7,6 +7,7 @@ import {
   PhoneInput,
   PasswordInput,
   LabeledSwitch,
+  SelectItem,
 } from "../../components/semantic";
 import { Alert, Snackbar } from "@mui/material";
 import Grid from "@mui/material/Grid2";
@@ -17,7 +18,6 @@ import tenantService from "../../api/services/tenantService";
 import themeTemplateService from "../../api/services/themeTemplateService";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import TextFieldInput from "../../components/semantic/TextFieldInput";
-import ThemeTemplateSelect from "../../components/semantic/ThemeTemplateSelect";
 import TenantLogoField from "../../components/semantic/TenantLogoField";
 import type { ThemeTemplate } from "../../types/themeTemplate";
 
@@ -489,11 +489,23 @@ export default function AddTenant() {
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <ThemeTemplateSelect
-                templates={templates}
-                value={formData.theme_template_id}
-                onValueChange={(theme_template_id) => {
-                  setFormData((prev) => ({ ...prev, theme_template_id }));
+              <SelectItem
+                label="Branding template"
+                name="theme_template_id"
+                required={false}
+                disableWhenEmpty={false}
+                emptyOptionLabel="Default theme"
+                options={templates.map((t) => ({
+                  id: String(t.id),
+                  value: String(t.id),
+                  label: t.name,
+                }))}
+                value={formData.theme_template_id === null ? "" : String(formData.theme_template_id)}
+                onValueChange={(v) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    theme_template_id: v === "" ? null : Number(v),
+                  }));
                   setError(null);
                 }}
               />

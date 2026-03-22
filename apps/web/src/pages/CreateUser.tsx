@@ -12,7 +12,7 @@ import { ListPageLayout } from "../components/reusable";
 import { Box, Alert, Snackbar } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import TextFieldInput from "../components/semantic/TextFieldInput";
-import SelectItem from "../components/semantic/SelectItem";
+import SelectItem, { type SelectItemOption } from "../components/semantic/SelectItem";
 
 type FormData = {
   email: string;
@@ -50,8 +50,8 @@ export default function CreateUser() {
     is_active: editUser?.is_active ?? true,
   });
 
-  const [roles, setRoles] = useState<{ id: string; code: string; name: string }[]>([]);
-  const [loadingRoles, setLoadingRoles] = useState(false);
+  const [roleOptions, setRoleOptions] = useState<SelectItemOption[]>([]);
+  const [roleOptionsLoading, setRoleOptionsLoading] = useState(false);
 
   // Store original values for edit mode
   const [originalValues, setOriginalValues] = useState<FormData>({
@@ -69,19 +69,19 @@ export default function CreateUser() {
   // Fetch roles
   useEffect(() => {
     async function fetchRoles() {
-      setLoadingRoles(true);
+      setRoleOptionsLoading(true);
       try {
         const res = await roleService.getRoles({});
-        const mappedRoles = (res.items || []).map((role: any) => ({
-          id: role.id,
-          code: role.code || role.name || role.scope || String(role.id),
-          name: role.name,
+        const mappedRoles = (res.items || []).map((role: { id: unknown; code?: string; name?: string; scope?: string }) => ({
+          id: String(role.id),
+          value: role.code || role.name || role.scope || String(role.id),
+          label: role.name ?? "",
         }));
-        setRoles(mappedRoles);
+        setRoleOptions(mappedRoles);
       } catch (e) {
         setError("Failed to fetch roles");
       } finally {
-        setLoadingRoles(false);
+        setRoleOptionsLoading(false);
       }
     }
     fetchRoles();
@@ -263,9 +263,13 @@ export default function CreateUser() {
               )}
               <Grid size={{ xs: 12, sm: 6 }}>
                 <SelectItem
+                  label="Role"
+                  name="role_code"
                   value={formData.role_code}
-                  roles={roles}
-                  loadingRoles={loadingRoles}
+                  options={roleOptions}
+                  loading={roleOptionsLoading}
+                  loadingLabel="Loading roles..."
+                  emptyListLabel="No roles found"
                   onValueChange={(role_code) => {
                     setFormData((prev) => ({ ...prev, role_code }));
                     setError(null);

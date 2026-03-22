@@ -1,35 +1,48 @@
-/**
- * RoleSelect — Semantic component
- * Role dropdown with loading/empty states and consistent styling.
- */
+import MenuItem from "../primitives/MenuItem";
+import Select, { type SelectProps } from "../primitives/Select";
 
-import { MenuItem } from "@mui/material";
-import { Select, type SelectProps } from "../primitives"; // adjust import path to your primitives barrel if needed
+export type SelectItemOption = {
+  id: string;
+  value: string;
+  label: string;
+};
 
-export type RoleOption = { id: string; code: string; name: string };
-
-export interface RoleSelectProps extends Omit<SelectProps, "children" | "label" | "name" | "onChange"> {
-  roles: RoleOption[];
-  loadingRoles?: boolean;
-  onValueChange: (value: string) => void; // page gets the string directly
+export interface SelectItemProps extends Omit<SelectProps, "children" | "label" | "name" | "onChange"> {
+  options: SelectItemOption[];
+  loading?: boolean;
+  onValueChange: (value: string) => void;
+  label?: string;
+  name?: string;
+  emptyOptionLabel?: string;
+  disableWhenEmpty?: boolean;
+  loadingLabel?: string;
+  emptyListLabel?: string;
 }
 
 export default function SelectItem({
-  roles,
-  loadingRoles = false,
+  options,
+  loading = false,
   value,
   onValueChange,
   disabled,
   sx,
   required = true,
+  label = "Select",
+  name = "select",
+  emptyOptionLabel,
+  disableWhenEmpty = true,
+  loadingLabel = "Loading...",
+  emptyListLabel = "No options available",
   ...props
-}: RoleSelectProps) {
-    const computedDisabled = disabled ?? (loadingRoles || roles.length === 0);
+}: SelectItemProps) {
+  const computedDisabled =
+    disabled ?? (loading || (disableWhenEmpty && options.length === 0));
+
   return (
     <Select
       fullWidth
-      label="Role"
-      name="role_code"
+      label={label}
+      name={name}
       value={value}
       required={required}
       disabled={computedDisabled}
@@ -43,20 +56,27 @@ export default function SelectItem({
       ]}
       {...props}
     >
-      {loadingRoles ? (
+      {loading ? (
         <MenuItem value="" disabled>
-          Loading roles...
+          {loadingLabel}
         </MenuItem>
-      ) : roles.length === 0 ? (
+      ) : options.length === 0 && disableWhenEmpty ? (
         <MenuItem value="" disabled>
-          No roles found
+          {emptyListLabel}
         </MenuItem>
       ) : (
-        roles.map((role) => (
-          <MenuItem key={role.id} value={role.code}>
-            {role.name}
-          </MenuItem>
-        ))
+        <>
+          {emptyOptionLabel ? (
+            <MenuItem value="">
+              <em>{emptyOptionLabel}</em>
+            </MenuItem>
+          ) : null}
+          {options.map((option) => (
+            <MenuItem key={option.id} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </>
       )}
     </Select>
   );

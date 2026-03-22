@@ -21,6 +21,9 @@ export type { PhoneInputProps } from "./PhoneInput";
 export { default as PasswordInput } from "./PasswordInput";
 export type { PasswordInputProps } from "./PasswordInput";
 
+export { default as SelectItem } from "./SelectItem";
+export type { SelectItemOption, SelectItemProps } from "./SelectItem";
+
 export { default as ReviewStatusBadge } from "./ReviewStatusBadge";
 export type { ReviewStatusBadgeProps, ReviewStatus } from "./ReviewStatusBadge";
 
@@ -59,9 +62,6 @@ export type { DevelopmentTasksDisplayProps } from "./DevelopmentTasksDisplay";
 
 export { default as LabeledSwitch } from "./LabeledSwitch";
 export type { LabeledSwitchProps } from "./LabeledSwitch";
-
-export { default as ThemeTemplateSelect } from "./ThemeTemplateSelect";
-export type { ThemeTemplateSelectProps } from "./ThemeTemplateSelect";
 
 export { default as TenantLogoField } from "./TenantLogoField";
 export type { TenantLogoFieldProps } from "./TenantLogoField";
