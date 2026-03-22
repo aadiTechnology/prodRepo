@@ -1,32 +1,19 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { FormHeaderIconAction, Box, CircularProgress } from "../../components/primitives";
 import {
-  SaveButton,
-  CancelButton,
-  EmailInput,
-  PhoneInput,
-  PasswordInput,
-  LabeledSwitch,
-  SelectItem,
   MediaUploadUrlField,
   type MediaUploadSlotItem,
 } from "../../components/semantic";
-import { Alert, Snackbar } from "@mui/material";
-import Grid from "@mui/material/Grid2";
 import { useNavigate, useParams } from "react-router-dom";
-import { PageHeader } from "../../components/layout";
-import { ListPageLayout } from "../../components/reusable";
 import tenantService from "../../api/services/tenantService";
 import themeTemplateService from "../../api/services/themeTemplateService";
-import ConfirmDialog from "../../components/semantic/ConfirmDialog";
-import TextFieldInput from "../../components/semantic/TextFieldInput";
 import type { ThemeTemplate } from "../../types/themeTemplate";
 import {
-  validateField,
-  validateForm,
   mapApiErrorsToFields,
   type FormValidationConfig,
 } from "../../utils/formValidation";
+import { useFormManager } from "../../hooks/useFormManager";
+import BaseForm from "../../components/reusable/BaseForm";
+import type { FormConfig } from "../../components/reusable/formFramework.types";
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -54,8 +41,6 @@ type FormData = {
   state: string;
   pin_code: string;
 };
-
-type FieldErrors = Partial<Record<keyof FormData, string>>;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -86,13 +71,11 @@ export default function AddTenant() {
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [mediaTab, setMediaTab] = useState(0);
   const [uploadItems, setUploadItems] = useState<MediaUploadSlotItem[]>([]);
-
-  const [formData, setFormData] = useState<FormData>(emptyForm);
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [templates, setTemplates] = useState<ThemeTemplate[]>([]);
+
+  const initialValues = useMemo(() => emptyForm(), []);
 
   const validationConfig = useMemo<FormValidationConfig<FormData>>(() => {
     const cfg: FormValidationConfig<FormData> = {
@@ -131,6 +114,257 @@ export default function AddTenant() {
     return cfg;
   }, [isEditMode]);
 
+  const dependentFieldPairs = useMemo(
+    () => (!isEditMode ? ([["admin_password", "confirm_password"]] as const) : []),
+    [isEditMode]
+  );
+
+  const {
+    formData,
+    setFormData,
+    fieldErrors,
+    setFieldErrors,
+    handleChange,
+    handleFieldValueChange,
+    handleSubmit,
+  } = useFormManager<FormData>({
+    initialValues,
+    validationConfig,
+    dependentFieldPairs,
+    onClearError: () => setError(null),
+  });
+
+  const handleRemoveMediaItem = useCallback((itemId: string) => {
+    setUploadItems((prev) => prev.filter((x) => x.id !== itemId));
+  }, []);
+
+  const handleAddMediaFiles = useCallback(async (files: FileList | File[]) => {
+    const arr = Array.from(files).slice(0, 1);
+    const newItems: MediaUploadSlotItem[] = [];
+    for (const file of arr) {
+      if (file.size > 2 * 1024 * 1024) {
+        setError("Image size should be less than 2MB");
+        continue;
+      }
+      try {
+        const previewUrl = await readFileAsDataUrl(file);
+        newItems.push({ id: crypto.randomUUID(), previewUrl });
+      } catch {
+        setError("Failed to read file.");
+      }
+    }
+    if (newItems.length) {
+      setUploadItems(newItems);
+      setMediaTab(0);
+      setError(null);
+    }
+  }, []);
+
+  const formConfig = useMemo<FormConfig<FormData>>(
+    () => ({
+      fields: {
+        name: {
+          name: "name",
+          label: "Tenant name",
+          type: "text",
+          placeholder: "e.g. Little Stars Academy",
+          required: true,
+          props: { htmlInput: { minLength: 3 } },
+        },
+        owner_name: {
+          name: "owner_name",
+          label: "Owner name",
+          type: "text",
+          placeholder: "Full name of the principal or owner",
+          required: true,
+          props: { htmlInput: { minLength: 1 } },
+        },
+        email: {
+          name: "email",
+          label: "Email address",
+          type: "email",
+          placeholder: "admin@school.com",
+          required: true,
+          props: { disabled: isEditMode },
+          helperText: (ctx) =>
+            ctx.isEditMode ? "Account identifier cannot be changed" : undefined,
+        },
+        phone: {
+          name: "phone",
+          label: "Phone number",
+          type: "phone",
+          placeholder: "Official contact number",
+        },
+        admin_password: {
+          name: "admin_password",
+          label: "Password",
+          type: "password",
+          placeholder: "Enter secure password",
+          required: true,
+          conditionalRender: () => !isEditMode,
+        },
+        confirm_password: {
+          name: "confirm_password",
+          label: "Confirm password",
+          type: "password",
+          placeholder: "Repeat password",
+          required: true,
+          conditionalRender: () => !isEditMode,
+        },
+        address_line1: {
+          name: "address_line1",
+          label: "Address line 1",
+          type: "text",
+          placeholder: "e.g. 123 Education Lane",
+          props: { htmlInput: { minLength: 0 } },
+        },
+        address_line2: {
+          name: "address_line2",
+          label: "Address line 2",
+          type: "text",
+          placeholder: "Building, floor or suite",
+          props: { htmlInput: { minLength: 0 } },
+        },
+        state: {
+          name: "state",
+          label: "State",
+          type: "text",
+          placeholder: "Maharashtra",
+          props: { htmlInput: { minLength: 0 } },
+        },
+        city: {
+          name: "city",
+          label: "City",
+          type: "text",
+          placeholder: "Mumbai",
+          props: { htmlInput: { minLength: 0 } },
+        },
+        pin_code: {
+          name: "pin_code",
+          label: "Pin code",
+          type: "text",
+          placeholder: "400001",
+          props: { htmlInput: { maxLength: 20, minLength: 0 } },
+        },
+        theme_template_id: {
+          name: "theme_template_id",
+          label: "Branding template",
+          type: "select",
+          required: false,
+          props: {
+            coerceToNumber: true,
+            disableWhenEmpty: false,
+            emptyOptionLabel: "Default theme",
+            required: false,
+            options: templates.map((t) => ({
+              id: String(t.id),
+              value: String(t.id),
+              label: t.name,
+            })),
+          },
+        },
+        is_active: {
+          name: "is_active",
+          label: "Account active",
+          type: "switch",
+          conditionalRender: () => isEditMode,
+        },
+      },
+      layoutRows: [
+        {
+          kind: "fields",
+          grid: { xs: 12, md: 6 },
+          fieldNames: ["name", "owner_name"],
+        },
+        {
+          kind: "custom",
+          grid: { xs: 12, md: 6 },
+          show: () => true,
+          render: (ctx) => (
+            <MediaUploadUrlField
+              label="Logo"
+              tabIndex={mediaTab}
+              onTabChange={setMediaTab}
+              urlValue={ctx.formData.logo_url.startsWith("data:") ? "" : ctx.formData.logo_url}
+              urlFieldName="logo_url"
+              onUrlChange={ctx.handleChange}
+              urlError={ctx.fieldErrors.logo_url}
+              urlInputLabel="Image URL"
+              urlPlaceholder="https://example.com/logo.png"
+              items={uploadItems}
+              onAddFiles={handleAddMediaFiles}
+              onRemoveItem={handleRemoveMediaItem}
+              accept="image/*"
+              multiple={false}
+              maxFiles={1}
+              tooltipChoose="Choose logo"
+              tooltipAdd="Replace logo"
+            />
+          ),
+        },
+        {
+          kind: "fields",
+          grid: { xs: 12, sm: 6 },
+          fieldNames: ["email"],
+        },
+        {
+          kind: "fields",
+          grid: { xs: 12, sm: 6 },
+          fieldNames: ["phone"],
+        },
+        {
+          kind: "fields",
+          grid: { xs: 12, sm: 6 },
+          fieldNames: ["admin_password"],
+          show: (c) => !c.isEditMode,
+        },
+        {
+          kind: "fields",
+          grid: { xs: 12, sm: 6 },
+          fieldNames: ["confirm_password"],
+          show: (c) => !c.isEditMode,
+        },
+        {
+          kind: "fields",
+          grid: { xs: 12, sm: 6 },
+          fieldNames: ["address_line1"],
+        },
+        {
+          kind: "fields",
+          grid: { xs: 12, sm: 6 },
+          fieldNames: ["address_line2"],
+        },
+        {
+          kind: "fields",
+          grid: { xs: 12, sm: 6 },
+          fieldNames: ["state"],
+        },
+        {
+          kind: "fields",
+          grid: { xs: 12, sm: 6 },
+          fieldNames: ["city"],
+        },
+        {
+          kind: "fields",
+          grid: { xs: 12, sm: 6 },
+          fieldNames: ["pin_code"],
+        },
+        {
+          kind: "fields",
+          grid: { xs: 12, sm: 6 },
+          fieldNames: ["theme_template_id"],
+        },
+        {
+          kind: "fields",
+          grid: { xs: 12, sm: 6 },
+          fieldNames: ["is_active"],
+          show: (c) => c.isEditMode,
+        },
+      ],
+    }),
+    [isEditMode, mediaTab, uploadItems, templates, handleAddMediaFiles, handleRemoveMediaItem]
+  );
+
   const fetchTenant = useCallback(async () => {
     if (!id) return;
     try {
@@ -168,7 +402,7 @@ export default function AddTenant() {
     } finally {
       setFetchLoading(false);
     }
-  }, [id]);
+  }, [id, setFormData]);
 
   useEffect(() => {
     if (isEditMode) fetchTenant();
@@ -193,65 +427,9 @@ export default function AddTenant() {
       }
       return prev;
     });
-  }, [mediaTab, uploadItems]);
+  }, [mediaTab, uploadItems, setFormData]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    const checked = (e.target as HTMLInputElement).checked;
-    const n = name as keyof FormData;
-    const v = type === "checkbox" ? checked : value;
-    setFormData((prev) => {
-      const next = { ...prev, [n]: v } as FormData;
-      setFieldErrors((fe) => {
-        const updated = { ...fe, [n]: validateField(validationConfig, n, next) };
-        if (n === "admin_password" || n === "confirm_password") {
-          updated.admin_password = validateField(validationConfig, "admin_password", next);
-          updated.confirm_password = validateField(validationConfig, "confirm_password", next);
-        }
-        return updated;
-      });
-      return next;
-    });
-    setError(null);
-  };
-
-  const handleAddMediaFiles = async (files: FileList | File[]) => {
-    const arr = Array.from(files).slice(0, 1);
-    const newItems: MediaUploadSlotItem[] = [];
-    for (const file of arr) {
-      if (file.size > 2 * 1024 * 1024) {
-        setError("Image size should be less than 2MB");
-        continue;
-      }
-      try {
-        const previewUrl = await readFileAsDataUrl(file);
-        newItems.push({ id: crypto.randomUUID(), previewUrl });
-      } catch {
-        setError("Failed to read file.");
-      }
-    }
-    if (newItems.length) {
-      setUploadItems(newItems);
-      setMediaTab(0);
-      setError(null);
-    }
-  };
-
-  const handleRemoveMediaItem = (itemId: string) => {
-    setUploadItems((prev) => prev.filter((x) => x.id !== itemId));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    const errors = validateForm(validationConfig, formData);
-    setFieldErrors(errors);
-    if (Object.keys(errors).length > 0) return;
-    setConfirmOpen(true);
-  };
-
-  const handleConfirm = async () => {
-    setConfirmOpen(false);
+  const handleConfirmSubmit = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -293,283 +471,40 @@ export default function AddTenant() {
     }
   };
 
-  const handleCancelDialog = () => {
-    setConfirmOpen(false);
-  };
-
-  if (fetchLoading) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   return (
-    <>
-      <ListPageLayout
-        pageBackground={true}
-        contentPaddingSize="none"
-        scrollableFormContent
-        header={
-          <Box sx={{ mb: 2 }}>
-            <PageHeader
-              links={[
-                { title: "Tenants", path: "/tenants" },
-                { title: isEditMode ? "Edit Tenant" : "Add Tenant", path: "#" },
-              ]}
-              homePath="/"
-              actions={
-                <Box sx={{ display: "flex", gap: 1.5 }}>
-                  <FormHeaderIconAction
-                    variant="cancel"
-                    onClick={() => navigate("/tenants")}
-                    tooltipTitle="Cancel"
-                  />
-                  <FormHeaderIconAction
-                    variant="save"
-                    onClick={handleSubmit}
-                    loading={loading}
-                    tooltipTitle={isEditMode ? "Update Changes" : "Finish & Create"}
-                  />
-                </Box>
-              }
-            />
-            {error && (
-              <Alert
-                severity="error"
-                variant="filled"
-                sx={{ mt: 2, borderRadius: "12px" }}
-                onClose={() => setError(null)}
-              >
-                {error}
-              </Alert>
-            )}
-          </Box>
-        }
-      >
-        <form onSubmit={handleSubmit} autoComplete="off">
-          <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <TextFieldInput
-                  label="Tenant name"
-                  placeholder="e.g. Little Stars Academy"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  error={Boolean(fieldErrors.name)}
-                  helperText={fieldErrors.name}
-                  htmlInput={{ minLength: 3 }}
-                />
-                <TextFieldInput
-                  label="Owner name"
-                  placeholder="Full name of the principal or owner"
-                  name="owner_name"
-                  value={formData.owner_name}
-                  onChange={handleChange}
-                  required
-                  error={Boolean(fieldErrors.owner_name)}
-                  helperText={fieldErrors.owner_name}
-                  htmlInput={{ minLength: 1 }}
-                />
-              </Box>
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <MediaUploadUrlField
-                label="Logo"
-                tabIndex={mediaTab}
-                onTabChange={setMediaTab}
-                urlValue={formData.logo_url.startsWith("data:") ? "" : formData.logo_url}
-                urlFieldName="logo_url"
-                onUrlChange={handleChange}
-                urlError={fieldErrors.logo_url}
-                urlInputLabel="Image URL"
-                urlPlaceholder="https://example.com/logo.png"
-                items={uploadItems}
-                onAddFiles={handleAddMediaFiles}
-                onRemoveItem={handleRemoveMediaItem}
-                accept="image/*"
-                multiple={false}
-                maxFiles={1}
-                tooltipChoose="Choose logo"
-                tooltipAdd="Replace logo"
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <EmailInput
-                label="Email address"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                disabled={isEditMode}
-                placeholder="admin@school.com"
-                error={Boolean(fieldErrors.email)}
-                helperText={isEditMode ? "Account identifier cannot be changed" : fieldErrors.email}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <PhoneInput
-                label="Phone number"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="Official contact number"
-                error={Boolean(fieldErrors.phone)}
-                helperText={fieldErrors.phone}
-              />
-            </Grid>
-            {!isEditMode && (
-              <>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <PasswordInput
-                    label="Password"
-                    name="admin_password"
-                    value={formData.admin_password}
-                    onChange={handleChange}
-                    required
-                    placeholder="Enter secure password"
-                    error={Boolean(fieldErrors.admin_password)}
-                    helperText={fieldErrors.admin_password}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <PasswordInput
-                    label="Confirm password"
-                    placeholder="Repeat password"
-                    name="confirm_password"
-                    value={formData.confirm_password}
-                    onChange={handleChange}
-                    required
-                    error={Boolean(fieldErrors.confirm_password)}
-                    helperText={fieldErrors.confirm_password}
-                  />
-                </Grid>
-              </>
-            )}
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextFieldInput
-                label="Address line 1"
-                placeholder="e.g. 123 Education Lane"
-                name="address_line1"
-                value={formData.address_line1}
-                onChange={handleChange}
-                htmlInput={{ minLength: 0 }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextFieldInput
-                label="Address line 2"
-                placeholder="Building, floor or suite"
-                name="address_line2"
-                value={formData.address_line2}
-                onChange={handleChange}
-                htmlInput={{ minLength: 0 }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextFieldInput
-                label="State"
-                placeholder="Maharashtra"
-                name="state"
-                value={formData.state}
-                onChange={handleChange}
-                htmlInput={{ minLength: 0 }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextFieldInput
-                label="City"
-                placeholder="Mumbai"
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                htmlInput={{ minLength: 0 }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextFieldInput
-                label="Pin code"
-                placeholder="400001"
-                name="pin_code"
-                value={formData.pin_code}
-                onChange={handleChange}
-                htmlInput={{ maxLength: 20, minLength: 0 }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <SelectItem
-                label="Branding template"
-                name="theme_template_id"
-                required={false}
-                disableWhenEmpty={false}
-                emptyOptionLabel="Default theme"
-                options={templates.map((t) => ({
-                  id: String(t.id),
-                  value: String(t.id),
-                  label: t.name,
-                }))}
-                value={formData.theme_template_id === null ? "" : String(formData.theme_template_id)}
-                onValueChange={(v) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    theme_template_id: v === "" ? null : Number(v),
-                  }));
-                  setError(null);
-                }}
-              />
-            </Grid>
-            {isEditMode &&
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <LabeledSwitch
-                label="Account active"
-                checked={formData.is_active}
-                onChange={(e) => {
-                  setFormData((prev) => ({ ...prev, is_active: e.target.checked }));
-                  setError(null);
-                }}
-                name="is_active"
-              />
-            </Grid>
-            }
-          </Grid>
-
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, justifyContent: "center", mt: 4 }}>
-            <SaveButton type="submit" disabled={false} loading={loading}>
-              {isEditMode ? "Save changes" : "Finish & create"}
-            </SaveButton>
-            <CancelButton onClick={() => navigate("/tenants")} disabled={loading}>
-              Cancel
-            </CancelButton>
-          </Box>
-        </form>
-      </ListPageLayout>
-
-      <Snackbar
-        open={!!snackbar}
-        autoHideDuration={3000}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        onClose={() => setSnackbar(null)}
-      >
-        <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: "100%" }}>
-          {snackbar}
-        </Alert>
-      </Snackbar>
-
-      <ConfirmDialog
-        open={confirmOpen}
-        onClose={handleCancelDialog}
-        onConfirm={handleConfirm}
-        message={
-          isEditMode
-            ? "Are you sure you want to update this tenant?"
-            : "Are you sure you want to create this tenant?"
-        }
-        confirmLabel="Confirm"
-        loading={loading}
-      />
-    </>
+    <BaseForm<FormData>
+      formConfig={formConfig}
+      formData={formData}
+      setFormData={setFormData}
+      fieldErrors={fieldErrors}
+      handleChange={handleChange}
+      handleFieldValueChange={handleFieldValueChange}
+      handleSubmit={handleSubmit}
+      setFormError={setError}
+      onConfirmSubmit={handleConfirmSubmit}
+      isEditMode={isEditMode}
+      loading={loading}
+      fetchLoading={fetchLoading}
+      error={error}
+      onErrorDismiss={() => setError(null)}
+      snackbar={snackbar}
+      onSnackbarClose={() => setSnackbar(null)}
+      headerConfig={{
+        links: [
+          { title: "Tenants", path: "/tenants" },
+          { title: isEditMode ? "Edit Tenant" : "Add Tenant", path: "#" },
+        ],
+        homePath: "/",
+        cancelTooltip: "Cancel",
+        saveTooltipCreate: "Finish & Create",
+        saveTooltipEdit: "Update Changes",
+      }}
+      onCancelNavigate={() => navigate("/tenants")}
+      confirmMessage={(ctx) =>
+        ctx.isEditMode
+          ? "Are you sure you want to update this tenant?"
+          : "Are you sure you want to create this tenant?"
+      }
+    />
   );
 }

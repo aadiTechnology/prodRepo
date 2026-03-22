@@ -1,0 +1,204 @@
+import { useId, useState, type FormEvent } from "react";
+import { Alert, Snackbar } from "@mui/material";
+import Grid from "@mui/material/Grid2";
+import { FormHeaderIconAction, Box, CircularProgress } from "../primitives";
+import { SaveButton, CancelButton } from "../semantic";
+import { PageHeader } from "../layout";
+import ConfirmDialog from "../semantic/ConfirmDialog";
+import ListPageLayout from "./ListPageLayout";
+import FormFieldRenderer from "./FormFieldRenderer";
+import type {
+  BaseFormProps,
+  FormLayoutContext,
+  FormRenderContext,
+} from "./formFramework.types";
+
+function runSubmit<T extends Record<string, unknown>>(
+  e: FormEvent | React.MouseEvent,
+  handleSubmit: BaseFormProps<T>["handleSubmit"],
+  onValid: () => void
+) {
+  e.preventDefault();
+  handleSubmit(e as FormEvent, onValid);
+}
+
+export default function BaseForm<T extends Record<string, unknown>>({
+  formConfig,
+  formData,
+  setFormData,
+  fieldErrors,
+  handleChange,
+  handleFieldValueChange,
+  handleSubmit,
+  setFormError,
+  onConfirmSubmit,
+  isEditMode,
+  loading,
+  fetchLoading = false,
+  error,
+  onErrorDismiss,
+  snackbar,
+  onSnackbarClose,
+  headerConfig,
+  onCancelNavigate,
+  confirmMessage,
+  submitLabelCreate = "Finish & create",
+  submitLabelEdit = "Save changes",
+}: BaseFormProps<T>) {
+  const formId = useId();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const layoutCtx: FormLayoutContext = { isEditMode };
+
+  const renderCtx: FormRenderContext<T> = {
+    formData,
+    fieldErrors,
+    isEditMode,
+    handleChange,
+    handleFieldValueChange,
+    setFormData,
+    setError: setFormError,
+  };
+
+  const saveTooltip = isEditMode
+    ? headerConfig.saveTooltipEdit ?? "Update Changes"
+    : headerConfig.saveTooltipCreate ?? "Finish & Create";
+
+  const cancelTooltip = headerConfig.cancelTooltip ?? "Cancel";
+
+  const confirmText =
+    typeof confirmMessage === "function" ? confirmMessage(layoutCtx) : confirmMessage;
+
+  const onValid = () => setConfirmOpen(true);
+
+  const handleFormSubmit = (e: FormEvent) => runSubmit(e, handleSubmit, onValid);
+
+  const handleConfirm = async () => {
+    setConfirmOpen(false);
+    await onConfirmSubmit();
+  };
+
+  if (fetchLoading) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "60vh",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <>
+      <ListPageLayout
+        pageBackground={true}
+        contentPaddingSize="none"
+        scrollableFormContent
+        header={
+          <Box sx={{ mb: 2 }}>
+            <PageHeader
+              links={headerConfig.links}
+              homePath={headerConfig.homePath ?? "/"}
+              actions={
+                <Box sx={{ display: "flex", gap: 1.5 }}>
+                  <FormHeaderIconAction
+                    variant="cancel"
+                    onClick={onCancelNavigate}
+                    tooltipTitle={cancelTooltip}
+                  />
+                  <FormHeaderIconAction
+                    variant="save"
+                    onClick={(e) => runSubmit(e, handleSubmit, onValid)}
+                    loading={loading}
+                    tooltipTitle={saveTooltip}
+                  />
+                </Box>
+              }
+            />
+            {error && (
+              <Alert
+                severity="error"
+                variant="filled"
+                sx={{ mt: 2, borderRadius: "12px" }}
+                onClose={onErrorDismiss}
+              >
+                {error}
+              </Alert>
+            )}
+          </Box>
+        }
+      >
+        <form id={formId} onSubmit={handleFormSubmit} autoComplete="off">
+          <Grid container spacing={3}>
+            {formConfig.layoutRows.map((row, idx) => {
+              const show = row.show?.(layoutCtx) ?? true;
+              if (!show) return null;
+              if (row.kind === "custom") {
+                return (
+                  <Grid key={`custom-${idx}`} size={row.grid}>
+                    {row.render(renderCtx)}
+                  </Grid>
+                );
+              }
+              return (
+                <Grid key={`fields-${idx}`} size={row.grid}>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    {row.fieldNames.map((fieldName) => {
+                      const field = formConfig.fields[fieldName];
+                      if (!field) return null;
+                      return (
+                        <FormFieldRenderer<T> key={String(fieldName)} field={field} ctx={renderCtx} />
+                      );
+                    })}
+                  </Box>
+                </Grid>
+              );
+            })}
+          </Grid>
+
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 2,
+              justifyContent: "center",
+              mt: 4,
+            }}
+          >
+            <SaveButton type="submit" disabled={false} loading={loading}>
+              {isEditMode ? submitLabelEdit : submitLabelCreate}
+            </SaveButton>
+            <CancelButton onClick={onCancelNavigate} disabled={loading}>
+              Cancel
+            </CancelButton>
+          </Box>
+        </form>
+      </ListPageLayout>
+
+      <Snackbar
+        open={!!snackbar}
+        autoHideDuration={3000}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        onClose={onSnackbarClose}
+      >
+        <Alert onClose={onSnackbarClose} severity="success" sx={{ width: "100%" }}>
+          {snackbar}
+        </Alert>
+      </Snackbar>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleConfirm}
+        message={confirmText}
+        confirmLabel="Confirm"
+        loading={loading}
+      />
+    </>
+  );
+}
