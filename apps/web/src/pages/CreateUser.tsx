@@ -1,6 +1,14 @@
-import { useState, useEffect, useMemo } from "react";
-import { FormHeaderIconAction } from "../components/primitives";
-import { SaveButton, CancelButton, EmailInput, PasswordInput, LabeledSwitch } from "../components/semantic";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { FormHeaderIconAction, Box } from "../components/primitives";
+import {
+  SaveButton,
+  CancelButton,
+  EmailInput,
+  PasswordInput,
+  LabeledSwitch,
+  SelectItem,
+  type SelectItemOption,
+} from "../components/semantic";
 import { useNavigate, useLocation } from "react-router-dom";
 import userService from "../api/services/userService";
 import { UserCreate } from "../types/user";
@@ -9,10 +17,9 @@ import roleService from "../api/services/roleService";
 import ConfirmDialog from "../components/semantic/ConfirmDialog";
 import { PageHeader } from "../components/layout";
 import { ListPageLayout } from "../components/reusable";
-import { Box, Alert, Snackbar } from "@mui/material";
+import { Alert, Snackbar } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import TextFieldInput from "../components/semantic/TextFieldInput";
-import SelectItem, { type SelectItemOption } from "../components/semantic/SelectItem";
 import {
   validateField,
   validateForm,
@@ -33,10 +40,29 @@ type FieldErrors = Partial<Record<keyof FormData, string>>;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const emptyForm = (): FormData => ({
+  email: "",
+  full_name: "",
+  password: "",
+  confirm_password: "",
+  role_code: "",
+  is_active: true,
+});
+
+function formFromUser(user: User): FormData {
+  return {
+    ...emptyForm(),
+    email: user.email ?? "",
+    full_name: user.full_name ?? "",
+    role_code: user.role ?? "",
+    is_active: user.is_active ?? true,
+  };
+}
+
 export default function CreateUser() {
   const location = useLocation();
   const locationState = location.state as { user?: User; isEdit?: boolean } | null;
-  const isEdit = locationState?.isEdit === true;
+  const isEditMode = locationState?.isEdit === true;
   const editUser = locationState?.user ?? null;
   const navigate = useNavigate();
 
@@ -45,14 +71,9 @@ export default function CreateUser() {
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const [formData, setFormData] = useState<FormData>({
-    email: editUser?.email ?? "",
-    full_name: editUser?.full_name ?? "",
-    password: "",
-    confirm_password: "",
-    role_code: editUser?.role ?? "",
-    is_active: editUser?.is_active ?? true,
-  });
+  const [formData, setFormData] = useState<FormData>(() =>
+    isEditMode && editUser ? formFromUser(editUser) : emptyForm()
+  );
 
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
@@ -67,60 +88,67 @@ export default function CreateUser() {
       ],
       role_code: [{ type: "required", message: "Required." }],
     };
-    if (!isEdit) {
+    if (!isEditMode) {
       cfg.email = [
         { type: "required", message: "Required." },
         { type: "pattern", regex: EMAIL_PATTERN, message: "Invalid email." },
       ];
-      cfg.password = [{ type: "required", message: "Required." }];
+      cfg.password = [
+        { type: "required", message: "Required." },
+        { type: "minLength", value: 8, message: "Min 8 characters." },
+      ];
       cfg.confirm_password = [
         { type: "required", message: "Required." },
         { type: "matchField", field: "password", message: "Passwords don't match." },
       ];
     }
     return cfg;
-  }, [isEdit]);
+  }, [isEditMode]);
 
-  const showSuccessToast = (message: string) => setSnackbar(message);
-
-  useEffect(() => {
-    async function fetchRoles() {
-      setRoleOptionsLoading(true);
-      try {
-        const res = await roleService.getRoles({});
-        const mappedRoles = (res.items || []).map((role: { id: unknown; code?: string; name?: string; scope?: string }) => ({
+  const fetchRoles = useCallback(async () => {
+    setRoleOptionsLoading(true);
+    try {
+      const res = await roleService.getRoles({});
+      const mappedRoles = (res.items || []).map(
+        (role: { id: unknown; code?: string; name?: string; scope?: string }) => ({
           id: String(role.id),
-          value: role.code || role.name || (role.scope != null ? String(role.scope) : "") || String(role.id),
+          value:
+            role.code ||
+            role.name ||
+            (role.scope != null ? String(role.scope) : "") ||
+            String(role.id),
           label: role.name ?? "",
-        }));
-        setRoleOptions(mappedRoles);
-      } catch (e) {
-        setError("Failed to fetch roles");
-      } finally {
-        setRoleOptionsLoading(false);
-      }
+        })
+      );
+      setRoleOptions(mappedRoles);
+    } catch {
+      setError("Failed to fetch roles");
+    } finally {
+      setRoleOptionsLoading(false);
     }
-    fetchRoles();
   }, []);
 
+  useEffect(() => {
+    fetchRoles();
+  }, [fetchRoles]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
     const n = name as keyof FormData;
-    let nextSnapshot: FormData | null = null;
+    const v = type === "checkbox" ? checked : value;
     setFormData((prev) => {
-      nextSnapshot = { ...prev, [n]: value } as FormData;
-      return nextSnapshot;
-    });
-    if (nextSnapshot) {
+      const next = { ...prev, [n]: v } as FormData;
       setFieldErrors((fe) => {
-        const updated = { ...fe, [n]: validateField(validationConfig, n, nextSnapshot!) };
+        const updated = { ...fe, [n]: validateField(validationConfig, n, next) };
         if (n === "password" || n === "confirm_password") {
-          updated.password = validateField(validationConfig, "password", nextSnapshot!);
-          updated.confirm_password = validateField(validationConfig, "confirm_password", nextSnapshot!);
+          updated.password = validateField(validationConfig, "password", next);
+          updated.confirm_password = validateField(validationConfig, "confirm_password", next);
         }
         return updated;
       });
-    }
+      return next;
+    });
     setError(null);
   };
 
@@ -138,37 +166,65 @@ export default function CreateUser() {
     setLoading(true);
     setError(null);
     try {
-      if (isEdit && editUser) {
+      const common = {
+        full_name: formData.full_name,
+        role: formData.role_code,
+      };
+      if (isEditMode && editUser) {
         await userService.updateUser(editUser.id, {
-          full_name: formData.full_name,
-          role: formData.role_code,
+          ...common,
           is_active: formData.is_active,
         });
-        showSuccessToast("User updated successfully.");
+        setSnackbar("User updated successfully.");
       } else {
         const payload: UserCreate = {
+          ...common,
           email: formData.email,
-          full_name: formData.full_name,
           password: formData.password,
-          role: formData.role_code,
         };
         await userService.createUser(payload);
-        showSuccessToast("User saved successfully.");
+        setSnackbar("User saved successfully.");
       }
       setTimeout(() => navigate("/users"), 1200);
     } catch (err: unknown) {
       console.error("User save error:", err);
       const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
       setFieldErrors((p) => ({ ...p, ...apiFieldErrors }));
-      setError(message || (isEdit ? "Failed to update user." : "Failed to create user."));
+      setError(message || (isEditMode ? "Failed to update user." : "Failed to create user."));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCancel = () => {
+  const handleCancelDialog = () => {
     setConfirmOpen(false);
   };
+
+  const renderRoleSelect = () => (
+    <SelectItem
+      label="Role"
+      name="role_code"
+      value={formData.role_code}
+      options={roleOptions}
+      loading={roleOptionsLoading}
+      loadingLabel="Loading roles..."
+      emptyListLabel="No roles found"
+      onValueChange={(v) => {
+        setFormData((prev) => {
+          const next = { ...prev, role_code: v };
+          setFieldErrors((fe) => ({
+            ...fe,
+            role_code: validateField(validationConfig, "role_code", next),
+          }));
+          return next;
+        });
+        setError(null);
+      }}
+      required
+      error={Boolean(fieldErrors.role_code)}
+      helperText={fieldErrors.role_code || undefined}
+    />
+  );
 
   return (
     <>
@@ -181,17 +237,21 @@ export default function CreateUser() {
             <PageHeader
               links={[
                 { title: "Users", path: "/users" },
-                { title: isEdit ? "Edit User" : "Add User", path: "#" },
+                { title: isEditMode ? "Edit User" : "Add User", path: "#" },
               ]}
               homePath="/"
               actions={
                 <Box sx={{ display: "flex", gap: 1.5 }}>
-                  <FormHeaderIconAction variant="cancel" onClick={() => navigate("/users")} tooltipTitle="Cancel" />
+                  <FormHeaderIconAction
+                    variant="cancel"
+                    onClick={() => navigate("/users")}
+                    tooltipTitle="Cancel"
+                  />
                   <FormHeaderIconAction
                     variant="save"
                     onClick={handleSubmit}
                     loading={loading}
-                    tooltipTitle={isEdit ? "Update Users" : "Save Users"}
+                    tooltipTitle={isEditMode ? "Update Changes" : "Finish & Create"}
                   />
                 </Box>
               }
@@ -210,10 +270,11 @@ export default function CreateUser() {
         }
       >
         <form onSubmit={handleSubmit} autoComplete="off">
-            <Grid container spacing={3}>
-              <Grid size={{ xs: 12, sm: 6}}>
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
                 <TextFieldInput
-                  label="Full Name"
+                  label="Full name"
                   placeholder="Enter full name"
                   name="full_name"
                   value={formData.full_name}
@@ -223,74 +284,50 @@ export default function CreateUser() {
                   error={Boolean(fieldErrors.full_name)}
                   helperText={fieldErrors.full_name}
                 />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6}}>
                 <EmailInput
+                  label="Email address"
+                  name="email"
                   value={formData.email}
                   onChange={handleChange}
                   required
-                  disabled={isEdit}
+                  disabled={isEditMode}
+                  placeholder="user@example.com"
                   error={Boolean(fieldErrors.email)}
-                  helperText={fieldErrors.email}
+                  helperText={
+                    isEditMode ? "Account identifier cannot be changed" : fieldErrors.email
+                  }
                 />
-              </Grid>
-              {!isEdit && (
-                <>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <PasswordInput
-                      value={formData.password}
-                      onChange={handleChange}
-                      required
-                      error={Boolean(fieldErrors.password)}
-                      helperText={fieldErrors.password}
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <PasswordInput
-                      label="Confirm Password"
-                      placeholder="Confirm password"
-                      name="confirm_password"
-                      value={formData.confirm_password}
-                      onChange={handleChange}
-                      required
-                      error={Boolean(fieldErrors.confirm_password)}
-                      helperText={fieldErrors.confirm_password}
-                    />
-                  </Grid>
-                </>
-              )}
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <SelectItem
-                  label="Role"
-                  name="role_code"
-                  value={formData.role_code}
-                  options={roleOptions}
-                  loading={roleOptionsLoading}
-                  loadingLabel="Loading roles..."
-                  emptyListLabel="No roles found"
-                  onValueChange={(role_code) => {
-                    let nextSnapshot: FormData | null = null;
-                    setFormData((prev) => {
-                      nextSnapshot = { ...prev, role_code };
-                      return nextSnapshot;
-                    });
-                    if (nextSnapshot) {
-                      setFieldErrors((fe) => ({
-                        ...fe,
-                        role_code: validateField(validationConfig, "role_code", nextSnapshot!),
-                      }));
-                    }
-                    setError(null);
-                  }}
-                  required
-                  error={Boolean(fieldErrors.role_code)}
-                  helperText={fieldErrors.role_code || undefined}
-                />
-              </Grid>
-              {isEdit && (
-                <Grid size={{ xs: 12, sm: 6 }}>
+              </Box>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              {!isEditMode ? (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <PasswordInput
+                    label="Password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                    placeholder="Enter secure password"
+                    error={Boolean(fieldErrors.password)}
+                    helperText={fieldErrors.password}
+                  />
+                  <PasswordInput
+                    label="Confirm password"
+                    name="confirm_password"
+                    placeholder="Repeat password"
+                    value={formData.confirm_password}
+                    onChange={handleChange}
+                    required
+                    error={Boolean(fieldErrors.confirm_password)}
+                    helperText={fieldErrors.confirm_password}
+                  />
+                </Box>
+              ) : (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  {renderRoleSelect()}
                   <LabeledSwitch
-                    label="Account Active"
+                    label="Account active"
                     checked={formData.is_active}
                     onChange={(e) => {
                       setFormData((prev) => ({ ...prev, is_active: e.target.checked }));
@@ -298,18 +335,22 @@ export default function CreateUser() {
                     }}
                     name="is_active"
                   />
-                </Grid>
+                </Box>
               )}
             </Grid>
+            {!isEditMode && (
+              <Grid size={{ xs: 12, sm: 6 }}>{renderRoleSelect()}</Grid>
+            )}
+          </Grid>
 
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, justifyContent: "center", mt: 4 }}>
-              <SaveButton type="submit" disabled={false} loading={loading}>
-                Save
-              </SaveButton>
-              <CancelButton onClick={() => navigate("/users")} disabled={loading}>
-                Cancel
-              </CancelButton>
-            </Box>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, justifyContent: "center", mt: 4 }}>
+            <SaveButton type="submit" disabled={false} loading={loading}>
+              {isEditMode ? "Save changes" : "Finish & create"}
+            </SaveButton>
+            <CancelButton onClick={() => navigate("/users")} disabled={loading}>
+              Cancel
+            </CancelButton>
+          </Box>
         </form>
       </ListPageLayout>
 
@@ -326,10 +367,12 @@ export default function CreateUser() {
 
       <ConfirmDialog
         open={confirmOpen}
-        onClose={handleCancel}
+        onClose={handleCancelDialog}
         onConfirm={handleConfirm}
         message={
-          isEdit ? "Are you sure you want to update this user?" : "Are you sure you want to save this user?"
+          isEditMode
+            ? "Are you sure you want to update this user?"
+            : "Are you sure you want to create this user?"
         }
         confirmLabel="Confirm"
         loading={loading}
