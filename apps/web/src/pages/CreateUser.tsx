@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { FormHeaderIconAction } from "../components/primitives";
 import { SaveButton, CancelButton, EmailInput, PasswordInput, LabeledSwitch } from "../components/semantic";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -13,6 +13,12 @@ import { Box, Alert, Snackbar } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import TextFieldInput from "../components/semantic/TextFieldInput";
 import SelectItem, { type SelectItemOption } from "../components/semantic/SelectItem";
+import {
+  validateField,
+  validateForm,
+  mapApiErrorsToFields,
+  type FormValidationConfig,
+} from "../utils/formValidation";
 
 type FormData = {
   email: string;
@@ -23,6 +29,10 @@ type FormData = {
   is_active: boolean;
 };
 
+type FieldErrors = Partial<Record<keyof FormData, string>>;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function CreateUser() {
   const location = useLocation();
   const locationState = location.state as { user?: User; isEdit?: boolean } | null;
@@ -30,17 +40,11 @@ export default function CreateUser() {
   const editUser = locationState?.user ?? null;
   const navigate = useNavigate();
 
-  // UI States
   const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingSubmit, setPendingSubmit] = useState<React.FormEvent | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Form states
   const [formData, setFormData] = useState<FormData>({
     email: editUser?.email ?? "",
     full_name: editUser?.full_name ?? "",
@@ -50,23 +54,35 @@ export default function CreateUser() {
     is_active: editUser?.is_active ?? true,
   });
 
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
   const [roleOptions, setRoleOptions] = useState<SelectItemOption[]>([]);
   const [roleOptionsLoading, setRoleOptionsLoading] = useState(false);
 
-  // Store original values for edit mode
-  const [originalValues, setOriginalValues] = useState<FormData>({
-    email: editUser?.email ?? "",
-    full_name: editUser?.full_name ?? "",
-    password: "",
-    confirm_password: "",
-    role_code: editUser?.role ?? "",
-    is_active: editUser?.is_active ?? true,
-  });
+  const validationConfig = useMemo<FormValidationConfig<FormData>>(() => {
+    const cfg: FormValidationConfig<FormData> = {
+      full_name: [
+        { type: "required", message: "Required." },
+        { type: "minLength", value: 2, message: "Min 2 characters." },
+      ],
+      role_code: [{ type: "required", message: "Required." }],
+    };
+    if (!isEdit) {
+      cfg.email = [
+        { type: "required", message: "Required." },
+        { type: "pattern", regex: EMAIL_PATTERN, message: "Invalid email." },
+      ];
+      cfg.password = [{ type: "required", message: "Required." }];
+      cfg.confirm_password = [
+        { type: "required", message: "Required." },
+        { type: "matchField", field: "password", message: "Passwords don't match." },
+      ];
+    }
+    return cfg;
+  }, [isEdit]);
 
-  // --- Success Toast Handler ---
   const showSuccessToast = (message: string) => setSnackbar(message);
 
-  // Fetch roles
   useEffect(() => {
     async function fetchRoles() {
       setRoleOptionsLoading(true);
@@ -87,76 +103,37 @@ export default function CreateUser() {
     fetchRoles();
   }, []);
 
-  const handleClickShowPassword = () => setShowPassword((show) => !show);
-  const handleClickShowConfirmPassword = () => setShowConfirmPassword((show) => !show);
-  const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value
-    }));
+    const n = name as keyof FormData;
+    setFormData((prev) => {
+      const next = { ...prev, [n]: value } as FormData;
+      setFieldErrors((fe) => {
+        const updated = { ...fe, [n]: validateField(validationConfig, n, next) };
+        if (n === "password" || n === "confirm_password") {
+          updated.password = validateField(validationConfig, "password", next);
+          updated.confirm_password = validateField(validationConfig, "confirm_password", next);
+        }
+        return updated;
+      });
+      return next;
+    });
     setError(null);
   };
 
-  // Check if form is changed in edit mode
-  const isFormChanged = isEdit
-    ? (
-        formData.full_name !== originalValues.full_name ||
-        formData.role_code !== originalValues.role_code ||
-        formData.is_active !== originalValues.is_active
-      )
-    : true;
-
-  // Validation
-  const isFullNameValid = formData.full_name.trim().length >= 2;
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email);
-  const isRoleValid = formData.role_code.trim().length > 0;
-
-  const isFormValid = isEdit
-    ? (isFullNameValid && isRoleValid)
-    : (isFullNameValid && isEmailValid && formData.password && formData.password === formData.confirm_password && isRoleValid);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    // Validation
-    if (!isFullNameValid) {
-      setError("Full Name is required (min 2 characters)");
-      return;
-    }
-
-    if (!isEdit) {
-      if (!isEmailValid) {
-        setError("Valid email address is required");
-        return;
-      }
-      if (!formData.password) {
-        setError("Password is required");
-        return;
-      }
-      if (formData.password !== formData.confirm_password) {
-        setError("Passwords do not match");
-        return;
-      }
-    }
-
-    if (!isRoleValid) {
-      setError("Role is required");
-      return;
-    }
-
+    const errors = validateForm(validationConfig, formData);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
     setConfirmOpen(true);
-    setPendingSubmit(e);
   };
 
   const handleConfirm = async () => {
     setConfirmOpen(false);
     setLoading(true);
+    setError(null);
     try {
       if (isEdit && editUser) {
         await userService.updateUser(editUser.id, {
@@ -176,17 +153,18 @@ export default function CreateUser() {
         showSuccessToast("User saved successfully.");
       }
       setTimeout(() => navigate("/users"), 1200);
-    } catch (err: any) {
-      setError(err?.message || err?.detail || (isEdit ? "Failed to update user." : "Failed to create user."));
+    } catch (err: unknown) {
+      console.error("User save error:", err);
+      const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
+      setFieldErrors((p) => ({ ...p, ...apiFieldErrors }));
+      setError(message || (isEdit ? "Failed to update user." : "Failed to create user."));
     } finally {
       setLoading(false);
-      setPendingSubmit(null);
     }
   };
 
   const handleCancel = () => {
     setConfirmOpen(false);
-    setPendingSubmit(null);
   };
 
   return (
@@ -239,15 +217,30 @@ export default function CreateUser() {
                   onChange={handleChange}
                   required
                   htmlInput={{ minLength: 2 }}
+                  error={Boolean(fieldErrors.full_name)}
+                  helperText={fieldErrors.full_name}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6}}>
-                <EmailInput value={formData.email} onChange={handleChange} required disabled={isEdit} />
+                <EmailInput
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  disabled={isEdit}
+                  error={Boolean(fieldErrors.email)}
+                  helperText={fieldErrors.email}
+                />
               </Grid>
               {!isEdit && (
                 <>
                   <Grid size={{ xs: 12, sm: 6 }}>
-                    <PasswordInput value={formData.password} onChange={handleChange} required />
+                    <PasswordInput
+                      value={formData.password}
+                      onChange={handleChange}
+                      required
+                      error={Boolean(fieldErrors.password)}
+                      helperText={fieldErrors.password}
+                    />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <PasswordInput
@@ -257,6 +250,8 @@ export default function CreateUser() {
                       value={formData.confirm_password}
                       onChange={handleChange}
                       required
+                      error={Boolean(fieldErrors.confirm_password)}
+                      helperText={fieldErrors.confirm_password}
                     />
                   </Grid>
                 </>
@@ -272,9 +267,18 @@ export default function CreateUser() {
                   emptyListLabel="No roles found"
                   onValueChange={(role_code) => {
                     setFormData((prev) => ({ ...prev, role_code }));
+                    setFieldErrors((fe) => ({
+                      ...fe,
+                      role_code: validateField(validationConfig, "role_code", {
+                        ...formData,
+                        role_code,
+                      }),
+                    }));
                     setError(null);
                   }}
                   required
+                  error={Boolean(fieldErrors.role_code)}
+                  helperText={fieldErrors.role_code}
                 />
               </Grid>
               {isEdit && (
@@ -282,7 +286,10 @@ export default function CreateUser() {
                   <LabeledSwitch
                     label="Account Active"
                     checked={formData.is_active}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, is_active: e.target.checked }))}
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, is_active: e.target.checked }));
+                      setError(null);
+                    }}
                     name="is_active"
                   />
                 </Grid>
