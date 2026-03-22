@@ -63,5 +63,5 @@ export type { DevelopmentTasksDisplayProps } from "./DevelopmentTasksDisplay";
 export { default as LabeledSwitch } from "./LabeledSwitch";
 export type { LabeledSwitchProps } from "./LabeledSwitch";
 
-export { default as TenantLogoField } from "./TenantLogoField";
-export type { TenantLogoFieldProps } from "./TenantLogoField";
+export { default as MediaUploadUrlField } from "./MediaUploadUrlField";
+export type { MediaUploadSlotItem, MediaUploadUrlFieldProps } from "./MediaUploadUrlField";

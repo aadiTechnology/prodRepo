@@ -8,6 +8,8 @@ import {
   PasswordInput,
   LabeledSwitch,
   SelectItem,
+  MediaUploadUrlField,
+  type MediaUploadSlotItem,
 } from "../../components/semantic";
 import { Alert, Snackbar } from "@mui/material";
 import Grid from "@mui/material/Grid2";
@@ -18,8 +20,16 @@ import tenantService from "../../api/services/tenantService";
 import themeTemplateService from "../../api/services/themeTemplateService";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import TextFieldInput from "../../components/semantic/TextFieldInput";
-import TenantLogoField from "../../components/semantic/TenantLogoField";
 import type { ThemeTemplate } from "../../types/themeTemplate";
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 type FormData = {
   name: string;
@@ -103,7 +113,8 @@ export default function AddTenant() {
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [logoTab, setLogoTab] = useState(0);
+  const [mediaTab, setMediaTab] = useState(0);
+  const [uploadItems, setUploadItems] = useState<MediaUploadSlotItem[]>([]);
 
   const [formData, setFormData] = useState<FormData>(emptyForm);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -132,7 +143,14 @@ export default function AddTenant() {
         pin_code: data.pin_code || "",
       };
       setFormData(d);
-      if (d.logo_url) setLogoTab(d.logo_url.startsWith("data:") ? 0 : 1);
+      if (d.logo_url?.startsWith("data:")) {
+        setUploadItems([{ id: crypto.randomUUID(), previewUrl: d.logo_url }]);
+        setMediaTab(0);
+      } else {
+        setUploadItems([]);
+        if (d.logo_url) setMediaTab(1);
+        else setMediaTab(0);
+      }
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message || "Failed to load tenant.";
       setError(msg);
@@ -151,6 +169,20 @@ export default function AddTenant() {
       .then((r: { items?: ThemeTemplate[] }) => setTemplates(r.items || []))
       .catch(() => setTemplates([]));
   }, []);
+
+  useEffect(() => {
+    if (mediaTab !== 0) return;
+    setFormData((prev) => {
+      const first = uploadItems[0]?.previewUrl;
+      if (first) {
+        return { ...prev, logo_url: first };
+      }
+      if (prev.logo_url.startsWith("data:")) {
+        return { ...prev, logo_url: "" };
+      }
+      return prev;
+    });
+  }, [mediaTab, uploadItems]);
 
   const validateField = (name: keyof FormData, data: FormData): string => {
     let e = "";
@@ -213,24 +245,30 @@ export default function AddTenant() {
     setError(null);
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setError("Image size should be less than 2MB");
-      return;
+  const handleAddMediaFiles = async (files: FileList | File[]) => {
+    const arr = Array.from(files).slice(0, 1);
+    const newItems: MediaUploadSlotItem[] = [];
+    for (const file of arr) {
+      if (file.size > 2 * 1024 * 1024) {
+        setError("Image size should be less than 2MB");
+        continue;
+      }
+      try {
+        const previewUrl = await readFileAsDataUrl(file);
+        newItems.push({ id: crypto.randomUUID(), previewUrl });
+      } catch {
+        setError("Failed to read file.");
+      }
     }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData((prev) => ({ ...prev, logo_url: reader.result as string }));
+    if (newItems.length) {
+      setUploadItems(newItems);
+      setMediaTab(0);
       setError(null);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
-  const handleClearLogo = () => {
-    setFormData((prev) => ({ ...prev, logo_url: "" }));
-    setError(null);
+  const handleRemoveMediaItem = (itemId: string) => {
+    setUploadItems((prev) => prev.filter((x) => x.id !== itemId));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -365,14 +403,24 @@ export default function AddTenant() {
               </Box>
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
-              <TenantLogoField
-                logoUrl={formData.logo_url}
-                tabIndex={logoTab}
-                onTabChange={setLogoTab}
-                onLogoUrlChange={handleChange}
-                onFileInputChange={handleLogoUpload}
-                onClearLogo={handleClearLogo}
-                logoUrlError={fieldErrors.logo_url}
+              <MediaUploadUrlField
+                label="Logo"
+                tabIndex={mediaTab}
+                onTabChange={setMediaTab}
+                urlValue={formData.logo_url.startsWith("data:") ? "" : formData.logo_url}
+                urlFieldName="logo_url"
+                onUrlChange={handleChange}
+                urlError={fieldErrors.logo_url}
+                urlInputLabel="Image URL"
+                urlPlaceholder="https://example.com/logo.png"
+                items={uploadItems}
+                onAddFiles={handleAddMediaFiles}
+                onRemoveItem={handleRemoveMediaItem}
+                accept="image/*"
+                multiple={false}
+                maxFiles={1}
+                tooltipChoose="Choose logo"
+                tooltipAdd="Replace logo"
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
