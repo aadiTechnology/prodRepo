@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { FormHeaderIconAction, Box, CircularProgress } from "../../components/primitives";
 import {
   SaveButton,
@@ -21,6 +21,12 @@ import themeTemplateService from "../../api/services/themeTemplateService";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import TextFieldInput from "../../components/semantic/TextFieldInput";
 import type { ThemeTemplate } from "../../types/themeTemplate";
+import {
+  validateField,
+  validateForm,
+  mapApiErrorsToFields,
+  type FormValidationConfig,
+} from "../../utils/formValidation";
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -51,6 +57,8 @@ type FormData = {
 
 type FieldErrors = Partial<Record<keyof FormData, string>>;
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const emptyForm = (): FormData => ({
   name: "",
   owner_name: "",
@@ -69,40 +77,6 @@ const emptyForm = (): FormData => ({
   pin_code: "",
 });
 
-function mapProvisionError(err: unknown, isEditMode: boolean): { fieldPatch: FieldErrors; message: string } {
-  const e = err as { message?: string; response?: { data?: { detail?: unknown } } };
-  const fieldPatch: FieldErrors = {};
-  let msg = e?.message || "";
-  const errorData = e?.response?.data;
-  const detail = errorData?.detail;
-
-  if (detail && Array.isArray(detail)) {
-    detail.forEach((issue: { loc?: unknown[]; msg?: string }) => {
-      const field = issue.loc?.[issue.loc.length - 1];
-      if (field && typeof field === "string") {
-        fieldPatch[field as keyof FormData] = issue.msg ?? "";
-      }
-    });
-    if (Object.keys(fieldPatch).length > 0) {
-      msg = "Please fix the highlighted errors.";
-    } else {
-      const first = detail[0] as { msg?: string } | undefined;
-      msg = first?.msg || msg;
-    }
-  } else if (typeof detail === "string") {
-    msg = detail;
-  }
-
-  if (msg.toLowerCase().includes("email already exists")) {
-    fieldPatch.email = "Email already exists.";
-  }
-
-  return {
-    fieldPatch,
-    message: msg || (isEditMode ? "Failed to update tenant." : "Failed to provision tenant."),
-  };
-}
-
 export default function AddTenant() {
   const navigate = useNavigate();
   const { id } = useParams<{ id?: string }>();
@@ -119,6 +93,43 @@ export default function AddTenant() {
   const [formData, setFormData] = useState<FormData>(emptyForm);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [templates, setTemplates] = useState<ThemeTemplate[]>([]);
+
+  const validationConfig = useMemo<FormValidationConfig<FormData>>(() => {
+    const cfg: FormValidationConfig<FormData> = {
+      name: [
+        { type: "required", message: "Required." },
+        { type: "minLength", value: 3, message: "Min 3 characters." },
+      ],
+      owner_name: [{ type: "required", message: "Required." }],
+      email: [
+        { type: "required", message: "Required." },
+        { type: "pattern", regex: EMAIL_PATTERN, message: "Invalid email." },
+      ],
+      phone: [
+        {
+          type: "custom",
+          validate: (fd) => {
+            const phone = fd.phone as string;
+            if (!phone) return "";
+            if (!/^\d+$/.test(phone)) return "Numeric only.";
+            if (phone.length < 10 || phone.length > 15) return "10–15 digits.";
+            return "";
+          },
+        },
+      ],
+    };
+    if (!isEditMode) {
+      cfg.admin_password = [
+        { type: "required", message: "Required." },
+        { type: "minLength", value: 8, message: "Min 8 characters." },
+      ];
+      cfg.confirm_password = [
+        { type: "required", message: "Required." },
+        { type: "matchField", field: "admin_password", message: "Passwords don't match." },
+      ];
+    }
+    return cfg;
+  }, [isEditMode]);
 
   const fetchTenant = useCallback(async () => {
     if (!id) return;
@@ -184,54 +195,6 @@ export default function AddTenant() {
     });
   }, [mediaTab, uploadItems]);
 
-  const validateField = (name: keyof FormData, data: FormData): string => {
-    let e = "";
-    if (name === "name") {
-      if (!data.name) e = "Required.";
-      else if (data.name.length < 3) e = "Min 3 characters.";
-    } else if (name === "owner_name") {
-      if (!data.owner_name) e = "Required.";
-    } else if (name === "email") {
-      if (!data.email) e = "Required.";
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e = "Invalid email.";
-    } else if (name === "phone" && data.phone) {
-      if (!/^\d+$/.test(data.phone)) e = "Numeric only.";
-      else if (data.phone.length < 10 || data.phone.length > 15) e = "10–15 digits.";
-    } else if (!isEditMode) {
-      if (name === "admin_password") {
-        if (!data.admin_password) e = "Required.";
-        else if (data.admin_password.length < 8) e = "Min 8 characters.";
-      } else if (name === "confirm_password") {
-        if (!data.confirm_password) e = "Required.";
-        else if (data.confirm_password !== data.admin_password) e = "Passwords don't match.";
-      }
-    }
-    return e;
-  };
-
-  const validateForm = (): boolean => {
-    const keys: (keyof FormData)[] = ["name", "owner_name", "email", "phone"];
-    if (!isEditMode) keys.push("admin_password", "confirm_password");
-    const next: FieldErrors = {};
-    keys.forEach((k) => {
-      const err = validateField(k, formData);
-      if (err) next[k] = err;
-    });
-    setFieldErrors(next);
-    return Object.keys(next).length === 0;
-  };
-
-  const applyFieldErrorsAfterChange = (name: keyof FormData, data: FormData) => {
-    setFieldErrors((fe) => {
-      const updated = { ...fe, [name]: validateField(name, data) };
-      if (name === "admin_password" || name === "confirm_password") {
-        updated.admin_password = validateField("admin_password", data);
-        updated.confirm_password = validateField("confirm_password", data);
-      }
-      return updated;
-    });
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
@@ -239,7 +202,14 @@ export default function AddTenant() {
     const v = type === "checkbox" ? checked : value;
     setFormData((prev) => {
       const next = { ...prev, [n]: v } as FormData;
-      applyFieldErrorsAfterChange(n, next);
+      setFieldErrors((fe) => {
+        const updated = { ...fe, [n]: validateField(validationConfig, n, next) };
+        if (n === "admin_password" || n === "confirm_password") {
+          updated.admin_password = validateField(validationConfig, "admin_password", next);
+          updated.confirm_password = validateField(validationConfig, "confirm_password", next);
+        }
+        return updated;
+      });
       return next;
     });
     setError(null);
@@ -274,7 +244,9 @@ export default function AddTenant() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!validateForm()) return;
+    const errors = validateForm(validationConfig, formData);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
     setConfirmOpen(true);
   };
 
@@ -311,9 +283,11 @@ export default function AddTenant() {
       setTimeout(() => navigate("/tenants"), 1000);
     } catch (err: unknown) {
       console.error("Provisioning error:", err);
-      const { fieldPatch, message } = mapProvisionError(err, isEditMode);
-      setFieldErrors((p) => ({ ...p, ...fieldPatch }));
-      setError(message);
+      const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
+      setFieldErrors((p) => ({ ...p, ...apiFieldErrors }));
+      setError(
+        message || (isEditMode ? "Failed to update tenant." : "Failed to provision tenant.")
+      );
     } finally {
       setLoading(false);
     }
