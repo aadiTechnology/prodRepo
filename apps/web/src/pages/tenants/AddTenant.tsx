@@ -338,30 +338,41 @@ export default function AddTenant() {
       >
         <form onSubmit={handleSubmit} autoComplete="off">
           <Grid container spacing={3}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextFieldInput
-                label="Tenant name"
-                placeholder="e.g. Little Stars Academy"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                error={Boolean(fieldErrors.name)}
-                helperText={fieldErrors.name}
-                htmlInput={{ minLength: 3 }}
-              />
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <TextFieldInput
+                  label="Tenant name"
+                  placeholder="e.g. Little Stars Academy"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                  error={Boolean(fieldErrors.name)}
+                  helperText={fieldErrors.name}
+                  htmlInput={{ minLength: 3 }}
+                />
+                <TextFieldInput
+                  label="Owner name"
+                  placeholder="Full name of the principal or owner"
+                  name="owner_name"
+                  value={formData.owner_name}
+                  onChange={handleChange}
+                  required
+                  error={Boolean(fieldErrors.owner_name)}
+                  helperText={fieldErrors.owner_name}
+                  htmlInput={{ minLength: 1 }}
+                />
+              </Box>
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextFieldInput
-                label="Owner name"
-                placeholder="Full name of the principal or owner"
-                name="owner_name"
-                value={formData.owner_name}
-                onChange={handleChange}
-                required
-                error={Boolean(fieldErrors.owner_name)}
-                helperText={fieldErrors.owner_name}
-                htmlInput={{ minLength: 1 }}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TenantLogoField
+                logoUrl={formData.logo_url}
+                tabIndex={logoTab}
+                onTabChange={setLogoTab}
+                onLogoUrlChange={handleChange}
+                onFileInputChange={handleLogoUpload}
+                onClearLogo={handleClearLogo}
+                logoUrlError={fieldErrors.logo_url}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
@@ -416,28 +427,6 @@ export default function AddTenant() {
                 </Grid>
               </>
             )}
-            <Grid size={{ xs: 12 }}>
-              <LabeledSwitch
-                label="Account active"
-                checked={formData.is_active}
-                onChange={(e) => {
-                  setFormData((prev) => ({ ...prev, is_active: e.target.checked }));
-                  setError(null);
-                }}
-                name="is_active"
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TenantLogoField
-                logoUrl={formData.logo_url}
-                tabIndex={logoTab}
-                onTabChange={setLogoTab}
-                onLogoUrlChange={handleChange}
-                onFileInputChange={handleLogoUpload}
-                onClearLogo={handleClearLogo}
-                logoUrlError={fieldErrors.logo_url}
-              />
-            </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextFieldInput
                 label="Address line 1"
@@ -510,6 +499,19 @@ export default function AddTenant() {
                 }}
               />
             </Grid>
+            {isEditMode &&
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <LabeledSwitch
+                label="Account active"
+                checked={formData.is_active}
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, is_active: e.target.checked }));
+                  setError(null);
+                }}
+                name="is_active"
+              />
+            </Grid>
+            }
           </Grid>
 
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, justifyContent: "center", mt: 4 }}>

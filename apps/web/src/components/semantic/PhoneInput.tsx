@@ -19,6 +19,7 @@ export default function PhoneInput({
   return (
     <TextField
       type={type}
+      fullWidth={true}
       label={label}
       placeholder={placeholder ?? "e.g. +1 234 567 8900"}
       autoComplete="tel"
