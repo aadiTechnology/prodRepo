@@ -4,7 +4,7 @@ import type { User as AuthUser } from "../types/auth";
 import type { UserResponse } from "../types/user";
 import userService from "../api/services/userService";
 import ConfirmDialog from "../components/common/ConfirmDialog";
-import { ListPageLayout, ListPageToolbar, DirectoryInfoBar, DataTable, TableRowActions, TablePaginationBar } from "../components/reusable";
+import { ListPageLayout, ListPageToolbar, EntityTableSection } from "../components/reusable";
 import { PageHeader } from "../components/layout";
 import StatusChip from "../components/roles/StatusChip";
 import { Box, Typography, Button, Select, MenuItem } from "../components/primitives";
@@ -137,9 +137,6 @@ const Users = () => {
   // Get paginated users from sorted results
   const paginatedUsers = sortedUsers.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
-  const rangeStart = filteredUsers.length > 0 ? Math.min(page * rowsPerPage + 1, filteredUsers.length) : 0;
-  const rangeEnd = Math.min((page + 1) * rowsPerPage, filteredUsers.length);
-
   const userColumns = useMemo(
     () => [
       { id: "full_name", label: "Full Name" as const, field: "full_name" as const, render: (u: AuthUser) => u.full_name },
@@ -262,15 +259,16 @@ const Users = () => {
         </>
       }
     >
-      {!loading && filteredUsers.length > 0 && (
-        <DirectoryInfoBar
-          label="User Directory"
-          rangeStart={rangeStart}
-          rangeEnd={rangeEnd}
-          total={filteredUsers.length}
-        />
-      )}
-      <DataTable<AuthUser & Record<string, unknown>>
+      <EntityTableSection<AuthUser & Record<string, unknown>>
+        label="User Directory"
+        totalRows={filteredUsers.length}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        onPageChange={setPage}
+        onRowsPerPageChange={(v) => {
+          setRowsPerPage(v);
+          setPage(0);
+        }}
         columns={userColumns}
         data={paginatedUsers as (AuthUser & Record<string, unknown>)[]}
         loading={loading}
@@ -284,27 +282,13 @@ const Users = () => {
             </Button>
           </Box>
         }
-        renderRowActions={(user) => (
-          <TableRowActions
-            onEdit={() => navigate("/user/create", { state: { user, isEdit: true } })}
-            onDelete={() => handleDeleteClick(user)}
-          />
-        )}
+        rowActions={(user) => ({
+          onEdit: () => navigate("/user/create", { state: { user, isEdit: true } }),
+          onDelete: () => handleDeleteClick(user),
+        })}
         stickyHeader
         size="small"
       />
-      {!loading && filteredUsers.length > 0 && (
-        <TablePaginationBar
-          page={page}
-          rowsPerPage={rowsPerPage}
-          totalRows={filteredUsers.length}
-          onPageChange={setPage}
-          onRowsPerPageChange={(v) => {
-            setRowsPerPage(v);
-            setPage(0);
-          }}
-        />
-      )}
 
       <ConfirmDialog
         open={confirmDialogOpen}

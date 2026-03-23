@@ -60,3 +60,6 @@ export type { PrimaryActionButtonProps } from "./PrimaryActionButton";
 
 export { default as TableRowActions } from "./TableRowActions";
 export type { TableRowActionsProps } from "./TableRowActions";
+
+export { default as EntityTableSection } from "./EntityTableSection";
+export type { EntityTableSectionProps } from "./EntityTableSection";
