@@ -9,6 +9,7 @@ import { PageHeader } from "../components/layout";
 import StatusChip from "../components/roles/StatusChip";
 import { Box, Typography, Button, Select, MenuItem } from "../components/primitives";
 import { useAuth } from "../context/AuthContext";
+import { useListManager } from "../hooks";
 
 const Users = () => {
   const navigate = useNavigate();
@@ -16,18 +17,32 @@ const Users = () => {
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [confirmDialogType, setConfirmDialogType] = useState<'delete' | 'edit' | null>(null);
   const [userToDelete, setUserToDelete] = useState<AuthUser | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'name' | 'created_at'>('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const {
+    search,
+    onSearchChange,
+    filters,
+    setFilter,
+    page,
+    setPage,
+    rowsPerPage,
+    onRowsPerPageChange,
+    sortBy,
+    setSortBy,
+    sortOrder,
+    setSortOrder,
+  } = useListManager<{ role: string; status: string }, 'name' | 'created_at'>({
+    initialFilters: { role: "All", status: "All" },
+    initialSortBy: "created_at",
+    initialSortOrder: "asc",
+    initialRowsPerPage: 10,
+    initialPage: 0,
+    initialSearch: "",
+  });
 
   // --- Success Toast Handler ---
   const showSuccessToast = (message: string) => setSnackbar(message);
@@ -106,12 +121,12 @@ const Users = () => {
       u.email.toLowerCase().includes(search.toLowerCase()) ||
       String(u.id).includes(search);
 
-    const matchesRole = roleFilter === "All" || u.role === roleFilter;
+    const matchesRole = filters.role === "All" || u.role === filters.role;
 
     const matchesStatus =
-      statusFilter === "All" ||
-      (statusFilter === "Active" && u.is_active) ||
-      (statusFilter === "Inactive" && !u.is_active);
+      filters.status === "All" ||
+      (filters.status === "Active" && u.is_active) ||
+      (filters.status === "Inactive" && !u.is_active);
 
     return matchesTenant && matchesSearch && matchesRole && matchesStatus;
   });
@@ -172,10 +187,7 @@ const Users = () => {
             actions={
               <ListPageToolbar
                 searchValue={search}
-                onSearchChange={(value) => {
-                  setSearch(value);
-                  setPage(0);
-                }}
+                onSearchChange={onSearchChange}
                 searchPlaceholder="Search Name"
                 onAddClick={() => navigate("/user/create")}
                 addLabel="Add User"
@@ -185,8 +197,8 @@ const Users = () => {
                       Role:
                     </Typography>
                     <Select
-                      value={roleFilter}
-                      onChange={(e) => setRoleFilter(e.target.value as string)}
+                      value={filters.role}
+                      onChange={(e) => setFilter("role", e.target.value as string)}
                       size="small"
                       sx={(theme) => ({ minWidth: theme.spacing(16) })}
                     >
@@ -201,8 +213,8 @@ const Users = () => {
                       Status:
                     </Typography>
                     <Select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value as string)}
+                      value={filters.status}
+                      onChange={(e) => setFilter("status", e.target.value as string)}
                       size="small"
                       sx={(theme) => ({ minWidth: theme.spacing(16) })}
                     >
@@ -265,10 +277,7 @@ const Users = () => {
         page={page}
         rowsPerPage={rowsPerPage}
         onPageChange={setPage}
-        onRowsPerPageChange={(v) => {
-          setRowsPerPage(v);
-          setPage(0);
-        }}
+        onRowsPerPageChange={onRowsPerPageChange}
         columns={userColumns}
         data={paginatedUsers as (AuthUser & Record<string, unknown>)[]}
         loading={loading}
