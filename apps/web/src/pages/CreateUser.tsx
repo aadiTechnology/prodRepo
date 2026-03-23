@@ -5,6 +5,7 @@ import { UserCreate } from "../types/user";
 import { User } from "../types/auth";
 import roleService from "../api/services/roleService";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../utils/formValidation";
+import { EMAIL_PATTERN } from "../utils/validationPatterns";
 import { useFormManager } from "../hooks/useFormManager";
 import BaseForm from "../components/reusable/BaseForm";
 import type { FormConfig } from "../components/reusable/formFramework.types";
@@ -18,8 +19,6 @@ type FormData = {
   role_code: string;
   is_active: boolean;
 };
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const emptyForm = (): FormData => ({
   email: "",

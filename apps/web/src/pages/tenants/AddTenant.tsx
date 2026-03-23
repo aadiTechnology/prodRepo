@@ -11,6 +11,7 @@ import {
   mapApiErrorsToFields,
   type FormValidationConfig,
 } from "../../utils/formValidation";
+import { EMAIL_PATTERN, PHONE_PATTERN } from "../../utils/validationPatterns";
 import { useFormManager } from "../../hooks/useFormManager";
 import BaseForm from "../../components/reusable/BaseForm";
 import type { FormConfig } from "../../components/reusable/formFramework.types";
@@ -41,9 +42,6 @@ type FormData = {
   state: string;
   pin_code: string;
 };
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_PATTERN = /^\d{10,15}$/;
 
 const emptyForm = (): FormData => ({
   name: "",
