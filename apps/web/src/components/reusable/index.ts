@@ -30,6 +30,11 @@ export type {
   FormLayoutRow,
   FormRenderContext,
 } from "./formFramework.types";
+export type {
+  ListConfig,
+  ListSortOption,
+  ListUiPolicy,
+} from "./listFramework.types";
 
 export { default as DirectoryInfoBar } from "./DirectoryInfoBar";
 export type { DirectoryInfoBarProps } from "./DirectoryInfoBar";

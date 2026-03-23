@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-type SortOrder = "asc" | "desc";
+export type SortOrder = "asc" | "desc";
 
 export interface UseListManagerOptions<
   TFilters extends Record<string, string>,
