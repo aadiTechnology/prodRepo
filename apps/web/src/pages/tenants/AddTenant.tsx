@@ -43,6 +43,7 @@ type FormData = {
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^\d{10,15}$/;
 
 const emptyForm = (): FormData => ({
   name: "",
@@ -89,16 +90,7 @@ export default function AddTenant() {
         { type: "pattern", regex: EMAIL_PATTERN, message: "Invalid email." },
       ],
       phone: [
-        {
-          type: "custom",
-          validate: (fd) => {
-            const phone = fd.phone as string;
-            if (!phone) return "";
-            if (!/^\d+$/.test(phone)) return "Numeric only.";
-            if (phone.length < 10 || phone.length > 15) return "10–15 digits.";
-            return "";
-          },
-        },
+        { type: "pattern", regex: PHONE_PATTERN, message: "Invalid phone." },
       ],
     };
     if (!isEditMode) {
@@ -496,8 +488,8 @@ export default function AddTenant() {
         ],
         homePath: "/",
         cancelTooltip: "Cancel",
-        saveTooltipCreate: "Finish & Create",
-        saveTooltipEdit: "Update Changes",
+        saveTooltipCreate: "Save",
+        saveTooltipEdit: "Save",
       }}
       onCancelNavigate={() => navigate("/tenants")}
       confirmMessage={(ctx) =>

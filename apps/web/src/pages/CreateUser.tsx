@@ -275,8 +275,8 @@ export default function CreateUser() {
         ],
         homePath: "/",
         cancelTooltip: "Cancel",
-        saveTooltipCreate: "Finish & Create",
-        saveTooltipEdit: "Update Changes",
+        saveTooltipCreate: "Save",
+        saveTooltipEdit: "Save",
       }}
       onCancelNavigate={() => navigate("/users")}
       confirmMessage={(ctx) =>

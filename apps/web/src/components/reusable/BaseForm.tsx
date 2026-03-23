@@ -42,8 +42,8 @@ export default function BaseForm<T extends Record<string, unknown>>({
   headerConfig,
   onCancelNavigate,
   confirmMessage,
-  submitLabelCreate = "Finish & create",
-  submitLabelEdit = "Save changes",
+  submitLabelCreate = "Save",
+  submitLabelEdit = "Save",
 }: BaseFormProps<T>) {
   const formId = useId();
   const [confirmOpen, setConfirmOpen] = useState(false);
