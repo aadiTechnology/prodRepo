@@ -11,7 +11,17 @@ import {
   mapApiErrorsToFields,
   type FormValidationConfig,
 } from "../../utils/formValidation";
-import { EMAIL_PATTERN, PHONE_PATTERN } from "../../utils/validationPatterns";
+import {
+  accountConfirmPasswordField,
+  accountEmailField,
+  accountPasswordField,
+} from "../../utils/accountFormFieldPresets";
+import {
+  confirmPasswordMatchRules,
+  emailRequiredPatternRules,
+  newPasswordRules,
+  optionalPhonePatternRules,
+} from "../../utils/formValidationPresets";
 import { useFormManager } from "../../hooks/useFormManager";
 import BaseForm from "../../components/reusable/BaseForm";
 import type { FormConfig } from "../../components/reusable/formFramework.types";
@@ -83,23 +93,12 @@ export default function AddTenant() {
         { type: "minLength", value: 3, message: "Min 3 characters." },
       ],
       owner_name: [{ type: "required", message: "Required." }],
-      email: [
-        { type: "required", message: "Required." },
-        { type: "pattern", regex: EMAIL_PATTERN, message: "Invalid email." },
-      ],
-      phone: [
-        { type: "pattern", regex: PHONE_PATTERN, message: "Invalid phone." },
-      ],
+      email: emailRequiredPatternRules<FormData>(),
+      phone: optionalPhonePatternRules<FormData>(),
     };
     if (!isEditMode) {
-      cfg.admin_password = [
-        { type: "required", message: "Required." },
-        { type: "minLength", value: 8, message: "Min 8 characters." },
-      ];
-      cfg.confirm_password = [
-        { type: "required", message: "Required." },
-        { type: "matchField", field: "admin_password", message: "Passwords don't match." },
-      ];
+      cfg.admin_password = newPasswordRules<FormData>();
+      cfg.confirm_password = confirmPasswordMatchRules<FormData>("admin_password");
     }
     return cfg;
   }, [isEditMode]);
@@ -169,38 +168,18 @@ export default function AddTenant() {
           required: true,
           props: { htmlInput: { minLength: 1 } },
         },
-        email: {
-          name: "email",
-          label: "Email address",
-          type: "email",
+        email: accountEmailField<FormData>({
           placeholder: "admin@school.com",
-          required: true,
-          props: { disabled: isEditMode },
-          helperText: (ctx) =>
-            ctx.isEditMode ? "Account identifier cannot be changed" : undefined,
-        },
+          isEditMode,
+        }),
         phone: {
           name: "phone",
           label: "Phone number",
           type: "phone",
           placeholder: "Official contact number",
         },
-        admin_password: {
-          name: "admin_password",
-          label: "Password",
-          type: "password",
-          placeholder: "Enter secure password",
-          required: true,
-          conditionalRender: () => !isEditMode,
-        },
-        confirm_password: {
-          name: "confirm_password",
-          label: "Confirm password",
-          type: "password",
-          placeholder: "Repeat password",
-          required: true,
-          conditionalRender: () => !isEditMode,
-        },
+        admin_password: accountPasswordField<FormData>("admin_password", { isEditMode }),
+        confirm_password: accountConfirmPasswordField<FormData>({ isEditMode }),
         address_line1: {
           name: "address_line1",
           label: "Address line 1",

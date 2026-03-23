@@ -5,7 +5,16 @@ import { UserCreate } from "../types/user";
 import { User } from "../types/auth";
 import roleService from "../api/services/roleService";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../utils/formValidation";
-import { EMAIL_PATTERN } from "../utils/validationPatterns";
+import {
+  accountConfirmPasswordField,
+  accountEmailField,
+  accountPasswordField,
+} from "../utils/accountFormFieldPresets";
+import {
+  confirmPasswordMatchRules,
+  emailRequiredPatternRules,
+  newPasswordRules,
+} from "../utils/formValidationPresets";
 import { useFormManager } from "../hooks/useFormManager";
 import BaseForm from "../components/reusable/BaseForm";
 import type { FormConfig } from "../components/reusable/formFramework.types";
@@ -67,18 +76,9 @@ export default function CreateUser() {
       role_code: [{ type: "required", message: "Required." }],
     };
     if (!isEditMode) {
-      cfg.email = [
-        { type: "required", message: "Required." },
-        { type: "pattern", regex: EMAIL_PATTERN, message: "Invalid email." },
-      ];
-      cfg.password = [
-        { type: "required", message: "Required." },
-        { type: "minLength", value: 8, message: "Min 8 characters." },
-      ];
-      cfg.confirm_password = [
-        { type: "required", message: "Required." },
-        { type: "matchField", field: "password", message: "Passwords don't match." },
-      ];
+      cfg.email = emailRequiredPatternRules<FormData>();
+      cfg.password = newPasswordRules<FormData>();
+      cfg.confirm_password = confirmPasswordMatchRules<FormData>("password");
     }
     return cfg;
   }, [isEditMode]);
@@ -114,32 +114,12 @@ export default function CreateUser() {
           required: true,
           props: { htmlInput: { minLength: 2 } },
         },
-        email: {
-          name: "email",
-          label: "Email address",
-          type: "email",
+        email: accountEmailField<FormData>({
           placeholder: "user@example.com",
-          required: true,
-          props: { disabled: isEditMode },
-          helperText: (ctx) =>
-            ctx.isEditMode ? "Account identifier cannot be changed" : undefined,
-        },
-        password: {
-          name: "password",
-          label: "Password",
-          type: "password",
-          placeholder: "Enter secure password",
-          required: true,
-          conditionalRender: () => !isEditMode,
-        },
-        confirm_password: {
-          name: "confirm_password",
-          label: "Confirm password",
-          type: "password",
-          placeholder: "Repeat password",
-          required: true,
-          conditionalRender: () => !isEditMode,
-        },
+          isEditMode,
+        }),
+        password: accountPasswordField<FormData>("password", { isEditMode }),
+        confirm_password: accountConfirmPasswordField<FormData>({ isEditMode }),
         role_code: {
           name: "role_code",
           label: "Role",
