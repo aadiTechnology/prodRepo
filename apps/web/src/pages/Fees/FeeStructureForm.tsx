@@ -213,8 +213,8 @@ const FeeStructureForm = () => {
             // Calculate month step based on installment type
             const monthStep =
                 watchedInstallmentType === 'MONTHLY' ? 1 :
-                watchedInstallmentType === 'QUARTERLY' ? 3 :
-                12; // YEARLY
+                    watchedInstallmentType === 'QUARTERLY' ? 3 :
+                        12; // YEARLY
 
             const newInstallments = Array.from({ length: count }, (_, i) => {
                 const dueDate = new Date();

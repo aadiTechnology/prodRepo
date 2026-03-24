@@ -1,46 +1,46 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  Box, 
-  Typography, 
-  Button, 
-  Select, 
-  MenuItem, 
-  Stack, 
+import {
+  Box,
+  Typography,
+  Button,
+  Select,
+  MenuItem,
+  Stack,
   CircularProgress,
   Dialog,
   TextField
 } from "../../components/primitives";
-import { 
-  ListPageLayout, 
-  ListPageToolbar, 
-  DataTable, 
-  TableRowActions, 
-  TablePaginationBar, 
+import {
+  ListPageLayout,
+  ListPageToolbar,
+  DataTable,
+  TableRowActions,
+  TablePaginationBar,
   DirectoryInfoBar
 } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { SaveButton, CancelButton } from "../../components/semantic";
-import { 
-  FeeStructure, 
-  FeeCategory, 
-  AcademicYear, 
-  ClassEntity, 
-  FeeInstallment 
+import {
+  FeeStructure,
+  FeeCategory,
+  AcademicYear,
+  ClassEntity,
+  FeeInstallment
 } from "../../types/fee";
 import feeService from "../../api/services/feeService";
 import StatusChip from "../../components/roles/StatusChip";
 
 const FeeStructureSetup = () => {
   const navigate = useNavigate();
-  
+
   // -- State --
   const [structures, setStructures] = useState<FeeStructure[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalRecords, setTotalRecords] = useState(0);
-  
+
   // Filters & Pagination
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -55,14 +55,14 @@ const FeeStructureSetup = () => {
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string>("");
   const [selectedClassId, setSelectedClassId] = useState<string>("");
-  
+
   // Confirm Dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [structureToDelete, setStructureToDelete] = useState<number | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Lookups (no longer needed in this page, moved to form)
-  
+
   // -- Data Fetching --
   const fetchData = useCallback(async () => {
     try {
@@ -80,7 +80,7 @@ const FeeStructureSetup = () => {
     } catch (err: any) {
       let msg = err.message || "Failed to load fee structures.";
       if (err?.response?.status === 409 || msg.toLowerCase().includes("already exists")) {
-          msg = "Fee structure already exists for this class and category";
+        msg = "Fee structure already exists for this class and category";
       }
       setError(msg);
     } finally {
@@ -155,9 +155,9 @@ const FeeStructureSetup = () => {
     } catch (err: any) {
       let msg = err.message || "Failed to delete structure.";
       if (err?.response?.status === 409 || msg.toLowerCase().includes("process") || msg.toLowerCase().includes("pay")) {
-          msg = "Cannot delete structure: Payments have already been processed";
+        msg = "Cannot delete structure: Payments have already been processed";
       } else if (msg.toLowerCase().includes("already exists")) {
-          msg = "Fee structure already exists for this class and category";
+        msg = "Fee structure already exists for this class and category";
       }
       setError(msg);
     } finally {
@@ -264,19 +264,19 @@ const FeeStructureSetup = () => {
         </Box>
       ) : (
         <>
-          <DirectoryInfoBar 
-            label="Structures" 
-            rangeStart={rangeStart} 
-            rangeEnd={rangeEnd} 
-            total={totalRecords} 
+          <DirectoryInfoBar
+            label="Structures"
+            rangeStart={rangeStart}
+            rangeEnd={rangeEnd}
+            total={totalRecords}
           />
           <DataTable<FeeStructure & Record<string, any>>
             columns={columns}
             data={structures as (FeeStructure & Record<string, any>)[]}
             renderRowActions={(s) => (
-              <TableRowActions 
-                onEdit={() => handleEditClick(s)} 
-                onDelete={() => handleDeleteClick(s.id)} 
+              <TableRowActions
+                onEdit={() => handleEditClick(s)}
+                onDelete={() => handleDeleteClick(s.id)}
               />
             )}
             emptyMessage="No fee structures found. Click 'Setup Fee' to begin."
