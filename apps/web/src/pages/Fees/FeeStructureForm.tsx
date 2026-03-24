@@ -405,7 +405,7 @@ const FeeStructureForm = () => {
                                                     error={Boolean(errors.class_id)}
                                                     helperText={errors.class_id?.message}
                                                     sx={buildFieldSx(Boolean(errors.class_id))}>
-                                                    {classes.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+                                                    {classes.map(c => <MenuItem key={c.id} value={c.id}>{c.name} {c.section ? `(${c.section})` : ""}</MenuItem>)}
                                                 </Select>
                                             )}
                                         />
