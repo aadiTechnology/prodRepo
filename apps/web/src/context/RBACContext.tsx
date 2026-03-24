@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
 import { RBACState, LoginContextResponse } from "../types/rbac";
 import { MenuNode, Feature } from "../types/menu";
+import authService from "../api/services/authService";
 
 interface RBACContextType extends RBACState {
   // Permission checking
@@ -23,8 +24,9 @@ interface RBACContextType extends RBACState {
   getMenuFeatures: (menuId: number) => Feature[];
   
   // Actions
-  setRBACData: (data: Pick<LoginContextResponse, "roles" | "menus">) => void;
+  setRBACData: (data: Pick<LoginContextResponse, "roles" | "menus" | "permissions">) => void;
   clearRBACData: () => void;
+  refreshRBAC: () => Promise<void>;
 }
 
 const RBACContext = createContext<RBACContextType | undefined>(undefined);
@@ -35,14 +37,18 @@ const normalizeRole = (value: string): string => value.trim().toLowerCase();
 
 const normalizeRoles = (roles: string[] | undefined | null): string[] => {
   if (!Array.isArray(roles)) return [];
-  // de-dupe after normalization
   return Array.from(new Set(roles.map(normalizeRole).filter(Boolean)));
+};
+
+const normalizePermissions = (permissions: string[] | undefined | null): string[] => {
+  if (!Array.isArray(permissions)) return [];
+  return Array.from(new Set(permissions.filter(Boolean)));
 };
 
 /**
  * Get RBAC data from localStorage
  */
-const getStoredRBACData = (): Pick<RBACState, "roles" | "menus"> | null => {
+const getStoredRBACData = (): Pick<RBACState, "roles" | "menus" | "permissions"> | null => {
   try {
     const rbacStr = localStorage.getItem(RBAC_STORAGE_KEY);
     const parsed = rbacStr ? JSON.parse(rbacStr) : null;
@@ -50,6 +56,7 @@ const getStoredRBACData = (): Pick<RBACState, "roles" | "menus"> | null => {
     return {
       ...parsed,
       roles: normalizeRoles(parsed.roles),
+      permissions: normalizePermissions(parsed.permissions),
     };
   } catch {
     return null;
@@ -59,7 +66,7 @@ const getStoredRBACData = (): Pick<RBACState, "roles" | "menus"> | null => {
 /**
  * Save RBAC data to localStorage
  */
-const saveRBACData = (data: Pick<RBACState, "roles" | "menus">): void => {
+const saveRBACData = (data: Pick<RBACState, "roles" | "menus" | "permissions">): void => {
   try {
     localStorage.setItem(RBAC_STORAGE_KEY, JSON.stringify(data));
   } catch (error) {
@@ -82,6 +89,7 @@ const clearStoredRBACData = (): void => {
  * Extract permissions from menus (flatten features)
  */
 const extractPermissions = (menus: MenuNode[]): string[] => {
+  // FALLBACK: If backend doesn't provide granular codes, we can still derive basic view permission from menus
   const permissions = new Set<string>();
   
   const traverseMenu = (menu: MenuNode) => {
@@ -113,41 +121,71 @@ export function RBACProvider({ children }: RBACProviderProps) {
   
   const [roles, setRoles] = useState<string[]>(normalizeRoles(storedData?.roles));
   const [menus, setMenus] = useState<MenuNode[]>(storedData?.menus || []);
+  const [permissions, setPermissions] = useState<string[]>(normalizePermissions(storedData?.permissions));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Extract permissions from menus
-  const permissions = useMemo(() => extractPermissions(menus), [menus]);
+  // Derived permissions (fallback/merge)
+  const allPermissions = useMemo(() => {
+    const derived = extractPermissions(menus);
+    // Combine backend permissions with derived ones to be safe
+    return Array.from(new Set([...permissions, ...derived]));
+  }, [permissions, menus]);
 
   /**
    * Set RBAC data (called after login)
    */
-  const setRBACData = useCallback((data: Pick<LoginContextResponse, "roles" | "menus">) => {
-    const normalized = normalizeRoles(data.roles);
-    setRoles(normalized);
+  const setRBACData = useCallback((data: Pick<LoginContextResponse, "roles" | "menus" | "permissions">) => {
+    const normalizedRoles = normalizeRoles(data.roles);
+    const normalizedPerms = normalizePermissions(data.permissions);
+    
+    setRoles(normalizedRoles);
     setMenus(data.menus);
-    saveRBACData({ roles: normalized, menus: data.menus });
+    setPermissions(normalizedPerms);
+    
+    saveRBACData({ 
+      roles: normalizedRoles, 
+      menus: data.menus,
+      permissions: normalizedPerms 
+    });
+    setError(null);
+  }, []);
+
+  const clearRBACData = useCallback(() => {
+    setRoles([]);
+    setMenus([]);
+    setPermissions([]);
+    clearStoredRBACData();
     setError(null);
   }, []);
 
   /**
-   * Clear RBAC data (called on logout)
+   * Refresh RBAC data from backend (Hot Refresh)
    */
-  const clearRBACData = useCallback(() => {
-    setRoles([]);
-    setMenus([]);
-    clearStoredRBACData();
-    setError(null);
-  }, []);
+  const refreshRBAC = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await authService.getRBACContext();
+      setRBACData(data);
+    } catch (err: any) {
+      const msg = err.message || "Failed to refresh permissions";
+      setError(msg);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [setRBACData]);
 
   /**
    * Check if user has specific permission
    */
   const hasPermission = useCallback(
     (permission: string): boolean => {
-      return permissions.includes(permission);
+      // Direct match or partial match for case-insensitive features
+      return allPermissions.includes(permission);
     },
-    [permissions]
+    [allPermissions]
   );
 
   /**
@@ -155,9 +193,9 @@ export function RBACProvider({ children }: RBACProviderProps) {
    */
   const hasAnyPermission = useCallback(
     (permissionList: string[]): boolean => {
-      return permissionList.some((perm) => permissions.includes(perm));
+      return permissionList.some((perm) => allPermissions.includes(perm));
     },
-    [permissions]
+    [allPermissions]
   );
 
   /**
@@ -165,9 +203,9 @@ export function RBACProvider({ children }: RBACProviderProps) {
    */
   const hasAllPermissions = useCallback(
     (permissionList: string[]): boolean => {
-      return permissionList.every((perm) => permissions.includes(perm));
+      return permissionList.every((perm) => allPermissions.includes(perm));
     },
-    [permissions]
+    [allPermissions]
   );
 
   /**
@@ -250,7 +288,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
   const value: RBACContextType = useMemo(
     () => ({
       roles,
-      permissions,
+      permissions: allPermissions,
       menus,
       isLoading,
       error,
@@ -264,10 +302,11 @@ export function RBACProvider({ children }: RBACProviderProps) {
       getMenuFeatures,
       setRBACData,
       clearRBACData,
+      refreshRBAC,
     }),
     [
       roles,
-      permissions,
+      allPermissions,
       menus,
       isLoading,
       error,
@@ -281,6 +320,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
       getMenuFeatures,
       setRBACData,
       clearRBACData,
+      refreshRBAC,
     ]
   );
 

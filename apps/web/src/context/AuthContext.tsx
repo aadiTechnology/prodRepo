@@ -192,7 +192,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setUser(userWithExtras);
     saveUser(userWithExtras);
-    setRBACData({ roles: response.roles, menus: response.menus });
+    setRBACData({ 
+      roles: response.roles, 
+      menus: response.menus, 
+      permissions: response.permissions 
+    });
   }, [setRBACData]);
 
   /**
