@@ -9,7 +9,7 @@ import FeeCategoryManagement from "../pages/Fees/FeeCategoryManagement";
 import AddEditFeeCategory from "../pages/Fees/AddEditFeeCategory";
 import FeeDiscountsPage from "../pages/Fees/FeeDiscountsPage";
 import AddFeeDiscount from "../pages/AddFeeDiscount";
-
+import StudentFeeLedger from "../pages/StudentFeeLedger";   
 // Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
 const Users = lazy(() => import("../pages/Users"));
@@ -117,6 +117,7 @@ export default function AppRoutes() {
           <Route path="/fees/setup" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureSetup /></ProtectedRoute>} />
           <Route path="/fees/setup/add" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
           <Route path="/fees/setup/:id/edit" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
+          <Route path="/fees/ledger" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><StudentFeeLedger /></ProtectedRoute>} />
           
           {/* FEES MODULE (from user request) */}
           <Route
