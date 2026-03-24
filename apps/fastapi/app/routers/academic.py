@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_admin, CurrentUser
+from app.core.dependencies import get_current_user, require_admin, require_permission, CurrentUser
 from app.schemas.academic import ClassCreate, ClassResponse
 from app.services import academic_service
 from app.core.logging_config import get_logger
@@ -12,9 +12,9 @@ router = APIRouter(prefix="/academic", tags=["Academic"])
 
 @router.get("/classes", response_model=list[ClassResponse])
 async def read_classes(
-    academic_year_id: int = None,
+    academic_year_id: int | None = None,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user)
+    current_user: CurrentUser = Depends(require_permission("Classes", "view"))
 ):
     return academic_service.get_classes(db, current_user.tenant_id, academic_year_id)
 
@@ -22,6 +22,6 @@ async def read_classes(
 async def create_class(
     cls: ClassCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin)
+    current_user: CurrentUser = Depends(require_permission("Classes", "create"))
 ):
     return academic_service.create_class(db, cls, current_user.tenant_id, current_user.id)

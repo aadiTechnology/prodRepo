@@ -164,6 +164,16 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
     Resolve effective permission codes and menu tree for a user, based on roles.
     Uses the new RoleMenuPermission (CRUD) architecture.
     """
+    permission_codes, menu_rows = get_user_accessible_permissions_and_menus(db, user)
+    
+    menu_tree = menu_service.build_menu_tree(menu_rows) if menu_rows else []
+    return permission_codes, menu_tree
+
+
+def get_user_accessible_permissions_and_menus(db: Session, user: User) -> Tuple[List[str], List[Menu]]:
+    """
+    Resolve effective permission codes and a flat list of Menu objects for a user.
+    """
     from app.models.user import UserRole
     from app.core.dependencies import SYSTEM_ADMIN_ROLE_CODE
     
@@ -193,13 +203,15 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
             for action in ["view", "create", "edit", "delete"]:
                 permission_codes.add(f"{f.code}:{action}")
         
-        # All menus for tenant
+        # All menus
         menu_rows = db.query(Menu).filter(
             Menu.is_active == True,  # noqa: E712
             Menu.is_deleted == False,  # noqa: E712
         ).all()
-        # Filter by tenant
-        menu_rows = [m for m in menu_rows if m.tenant_id is None or m.tenant_id == user.tenant_id]
+        # If user is System Admin (tenant_id is None), they see ALL menus.
+        # Otherwise, filter by tenant: menus must be platform (None) or match user's tenant.
+        if user.tenant_id is not None:
+            menu_rows = [m for m in menu_rows if m.tenant_id is None or m.tenant_id == user.tenant_id]
         
     elif role_ids:
         perms = (
@@ -207,6 +219,7 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
             .join(Menu, RoleMenuPermission.menu_id == Menu.id)
             .filter(
                 RoleMenuPermission.role_id.in_(role_ids),
+                (RoleMenuPermission.tenant_id == None) | (RoleMenuPermission.tenant_id == user.tenant_id),
                 Menu.is_active == True,  # noqa: E712
                 Menu.is_deleted == False,  # noqa: E712
             )
@@ -231,11 +244,14 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
             if p.can_view and (m.tenant_id is None or m.tenant_id == user.tenant_id):
                 _include_menu_with_parents(db, m, menu_rows, seen_menu_ids)
 
-    
     logger.info(f"[RBAC] Resolved {len(permission_codes)} permission codes and {len(menu_rows)} menu rows")
-    
-    menu_tree = menu_service.build_menu_tree(menu_rows) if menu_rows else []
-    return list(permission_codes), menu_tree
+    return list(permission_codes), menu_rows
+
+
+def get_user_accessible_menus(db: Session, user: User) -> List[Menu]:
+    """Returns a flat list of Menu objects the user can view."""
+    _, menu_rows = get_user_accessible_permissions_and_menus(db, user)
+    return menu_rows
 
 
 def _path_from_name(name: str) -> str:
@@ -279,6 +295,28 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
     """Bulk replace RoleMenuPermission records for a role."""
     from sqlalchemy.exc import IntegrityError, DataError
     
+    # NEW: Fetch acting user's permissions for delegation check
+    acting_user_perms_codes = set()
+    is_system_admin = False
+    
+    if acting_user_id:
+        acting_user = db.query(User).get(acting_user_id)
+        if not acting_user:
+            raise ValidationException("Acting user not found.")
+            
+        # Role Ownership Check:
+        # If acting user is NOT a System Admin, they can only modify roles within their own tenant.
+        if acting_user.tenant_id is not None:
+             if role.tenant_id != acting_user.tenant_id:
+                  raise ForbiddenException(f"You don't have permission to manage permissions for role '{role.code}' in a different tenant.")
+        else:
+             is_system_admin = True
+        
+        if not is_system_admin:
+            # Fetch what the acting user themselves can do
+            acting_user_perms_codes_list, _ = get_user_accessible_permissions_and_menus(db, acting_user)
+            acting_user_perms_codes = set(acting_user_perms_codes_list)
+
     if not data.permissions:
         raise ValidationException("Permissions list cannot be empty.")
     
@@ -292,6 +330,25 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
         if not menu:
             raise ValidationException(f"Menu with id {p.menu_id} not found.")
         
+        # Delegation Validation:
+        if not is_system_admin and acting_user_id:
+            if menu.feature:
+                f_code = menu.feature.code
+                violations = []
+                if p.can_view and f"{f_code}:view" not in acting_user_perms_codes:
+                    violations.append("view")
+                if p.can_create and f"{f_code}:create" not in acting_user_perms_codes:
+                    violations.append("create")
+                if p.can_edit and f"{f_code}:edit" not in acting_user_perms_codes:
+                    violations.append("edit")
+                if p.can_delete and f"{f_code}:delete" not in acting_user_perms_codes:
+                    violations.append("delete")
+                
+                if violations:
+                    raise ForbiddenException(
+                        f"You cannot delegate {', '.join(violations)} permission for '{menu.name}' because you don't have it yourself."
+                    )
+
         if menu.tenant_id is not None and role.tenant_id is not None:
             if menu.tenant_id != role.tenant_id:
                 raise ForbiddenException(

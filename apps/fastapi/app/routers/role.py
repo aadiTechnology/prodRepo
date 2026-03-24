@@ -1,14 +1,14 @@
 from datetime import datetime
 import logging
 
-from app.models.role import Role
+from app.models.role import Role  # type: ignore
 
-from fastapi import APIRouter, Depends, status, Query
-from sqlalchemy.orm import Session
-from app.core.database import get_db
-from app.core.dependencies import require_admin, require_system_admin, CurrentUser
-from app.schemas.role import RoleCreate, RoleUpdate, RoleResponse, RoleListResponse, RoleListData
-from app.services import role_service
+from fastapi import APIRouter, Depends, status, Query  # type: ignore
+from sqlalchemy.orm import Session  # type: ignore
+from app.core.database import get_db  # type: ignore
+from app.core.dependencies import require_admin, require_system_admin, require_permission, CurrentUser  # type: ignore
+from app.schemas.role import RoleCreate, RoleUpdate, RoleResponse, RoleListResponse, RoleListData  # type: ignore
+from app.services import role_service  # type: ignore
 
 
 router = APIRouter(prefix="/roles", tags=["Roles"])
@@ -64,15 +64,17 @@ async def list_roles(
     sort_by: str = Query("id", alias="sortBy"),
     sort_order: str = Query("desc", alias="sortOrder"),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "view")),
 ) -> RoleListResponse:
     logging.debug(f"User: {current_user.email}, Role: {current_user.role}, Tenant: {current_user.tenant_id}")
     print(f"page_size={page_size}, page_number={page_number}")
-    from app.models.user import UserRole
+    from app.models.user import UserRole  # type: ignore
     is_platform = current_user.role == UserRole.SUPER_ADMIN
+    # Use current_user's tenant_id if not a platform admin
+    effective_tenant_id = None if is_platform else current_user.tenant_id
 
     roles, total = role_service.get_roles(
-        db, search, page_number, page_size, tenant_id=tenant_id, is_platform=is_platform,
+        db, search, page_number, page_size, tenant_id=effective_tenant_id, is_platform=is_platform,
         created_from=created_from, created_to=created_to,
         sort_by=sort_by, sort_order=sort_order
     )
@@ -91,10 +93,14 @@ async def list_roles(
 async def get_role(
     role_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "view")),
 ) -> RoleResponse:
-    """Get a single role by ID."""
-    role = role_service.get_role(db, role_id)
+    """Get a single role by ID with tenant isolation."""
+    from app.models.user import UserRole  # type: ignore
+    is_platform = current_user.role == UserRole.SUPER_ADMIN
+    effective_tenant_id = None if is_platform else current_user.tenant_id
+    
+    role = role_service.get_role(db, role_id, tenant_id=effective_tenant_id)
     return RoleResponse.model_validate(role)
 
 
@@ -102,9 +108,17 @@ async def get_role(
 async def create_role(
     data: RoleCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "create")),
 ) -> RoleResponse:
-    """Create a new role."""
+    """Create a new role with tenant enforcement."""
+    from app.models.user import UserRole  # type: ignore
+    is_platform = current_user.role == UserRole.SUPER_ADMIN
+    
+    if not is_platform:
+        # Enforce tenant_id and scope_type for tenant admins
+        data.tenant_id = current_user.tenant_id
+        data.scope_type = "Tenant"
+        
     role = role_service.create_role(db, data, created_by=current_user.id)
     return RoleResponse.model_validate(role)
 
@@ -114,11 +128,15 @@ async def update_role(
     role_id: int,
     data: RoleUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "edit")),
 ) -> RoleResponse:
-        """Update an existing role."""
-        role = role_service.update_role(db, role_id, data, updated_by=current_user.id)
-        return RoleResponse.model_validate(role)
+    """Update an existing role with tenant isolation."""
+    from app.models.user import UserRole  # type: ignore
+    is_platform = current_user.role == UserRole.SUPER_ADMIN
+    effective_tenant_id = None if is_platform else current_user.tenant_id
+    
+    role = role_service.update_role(db, role_id, data, updated_by=current_user.id, tenant_id=effective_tenant_id)
+    return RoleResponse.model_validate(role)
 
 
 
@@ -126,9 +144,15 @@ async def update_role(
 async def activate_role(
     role_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_system_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "edit")),
 ):
-    role_service.activate_role(db, role_id, current_user.id)
+    """Activate a role with tenant isolation."""
+    # Use effective_tenant_id to ensure tenant admin can only activate their own roles
+    from app.models.user import UserRole # type: ignore
+    is_platform = current_user.role == UserRole.SUPER_ADMIN
+    effective_tenant_id = None if is_platform else current_user.tenant_id
+    
+    role_service.activate_role(db, role_id, current_user.id, tenant_id=effective_tenant_id)
     return {"success": True}
 
 
@@ -137,9 +161,14 @@ async def activate_role(
 async def deactivate_role(
     role_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_system_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "edit")),
 ):
-    role_service.deactivate_role(db, role_id, current_user.id)
+    """Deactivate a role with tenant isolation."""
+    from app.models.user import UserRole # type: ignore
+    is_platform = current_user.role == UserRole.SUPER_ADMIN
+    effective_tenant_id = None if is_platform else current_user.tenant_id
+
+    role_service.deactivate_role(db, role_id, current_user.id, tenant_id=effective_tenant_id)
     return {"success": True}
 
 
@@ -147,9 +176,13 @@ async def deactivate_role(
 async def delete_role(
     role_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "delete")),
 ) -> None:
-    """Soft delete a role."""
-    role_service.soft_delete_role(db, role_id, deleted_by=current_user.id)
+    """Soft delete a role with tenant isolation."""
+    from app.models.user import UserRole  # type: ignore
+    is_platform = current_user.role == UserRole.SUPER_ADMIN
+    effective_tenant_id = None if is_platform else current_user.tenant_id
+    
+    role_service.soft_delete_role(db, role_id, deleted_by=current_user.id, tenant_id=effective_tenant_id)
     return None
 

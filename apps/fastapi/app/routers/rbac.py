@@ -1,27 +1,26 @@
 """RBAC assignment endpoints (user roles, role menus, role features)."""
 
-from fastapi import APIRouter, Depends, status
-from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
-from typing import List
+from fastapi import APIRouter, Depends, status  # type: ignore
+from fastapi.responses import JSONResponse  # type: ignore
+from sqlalchemy.orm import Session  # type: ignore
+from typing import List, Dict
 
-from app.core.database import get_db
-from app.core.dependencies import require_admin, require_permission, CurrentUser
-from app.core.exceptions import NotFoundException
-from app.models.user import User
-from app.models.role import Role
-from app.models.menu import Menu
-from app.models.feature import Feature
-from app.schemas.role import RoleResponse
-from app.schemas.menu import MenuResponse
-from app.schemas.feature import FeatureResponse
-from app.schemas.auth import UserWithRole
-from app.services import rbac_service, role_service, menu_service, feature_service, user_service
-from app.models.permission import Permission
-
-from app.schemas.permission import PermissionResponse
-from app.schemas.rbac_mgmt import RolePermissionMatrixResponse, PermissionMatrixRow, PermissionBulkUpdateRequest
-from app.models.role_menu_permission import RoleMenuPermission
+from app.core.database import get_db  # type: ignore
+from app.core.dependencies import require_admin, require_permission, CurrentUser  # type: ignore
+from app.core.exceptions import NotFoundException  # type: ignore
+from app.models.user import User  # type: ignore
+from app.models.role import Role  # type: ignore
+from app.models.menu import Menu  # type: ignore
+from app.models.feature import Feature  # type: ignore
+from app.schemas.role import RoleResponse  # type: ignore
+from app.schemas.menu import MenuResponse  # type: ignore
+from app.schemas.feature import FeatureResponse  # type: ignore
+from app.schemas.auth import UserWithRole  # type: ignore
+from app.services import rbac_service, role_service, menu_service, feature_service, user_service  # type: ignore
+from app.models.permission import Permission  # type: ignore
+from app.schemas.permission import PermissionResponse  # type: ignore
+from app.schemas.rbac_mgmt import RolePermissionMatrixResponse, PermissionMatrixRow, PermissionBulkUpdateRequest  # type: ignore
+from app.models.role_menu_permission import RoleMenuPermission  # type: ignore
 
 router = APIRouter(prefix="/rbac", tags=["RBAC"])
 
@@ -29,19 +28,18 @@ router = APIRouter(prefix="/rbac", tags=["RBAC"])
 def get_role_permission_matrix(
     role_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_permission("Roles", "view"))
+    current_user: CurrentUser = Depends(require_permission("Permission Mapping", "view"))
 ):
     """Fetch the full menu/permission grid for a role."""
     role = role_service.get_role(db, role_id)
     
-    tenant_id = role.tenant_id if role.tenant_id is not None else current_user.tenant_id
+    # 1. Fetch available menus (filtered by tenant AND caller's own access)
+    user = user_service.get_user(db, current_user.id)
+    all_menus = rbac_service.get_user_accessible_menus(db, user)
     
-    all_menus = db.query(Menu).filter(
-        Menu.is_active == True,  # noqa: E712
-        Menu.is_deleted == False,  # noqa: E712
-    ).filter(
-        (Menu.tenant_id == None) | (Menu.tenant_id == tenant_id)  # noqa: E712
-    ).all()
+    # 2. Further filter by the target role's tenant scope
+    target_tenant_id = role.tenant_id if role.tenant_id is not None else current_user.tenant_id
+    all_menus = [m for m in all_menus if m.tenant_id is None or m.tenant_id == target_tenant_id]
     
     # 2. Get current permissions for this role
     current_perms = db.query(RoleMenuPermission).filter(
@@ -95,7 +93,7 @@ def update_role_permission_matrix(
     role_id: int,
     data: PermissionBulkUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_permission("Roles", "edit"))
+    current_user: CurrentUser = Depends(require_permission("Permission Mapping", "edit"))
 ):
     """Bulk update the shared menu/permission mapping for a role."""
     role = role_service.get_role(db, role_id)
@@ -152,7 +150,7 @@ async def get_role_menus(
     current_user: CurrentUser = Depends(require_permission("Roles", "view")),
 ) -> List[MenuResponse]:
     role = role_service.get_role(db, role_id)
-    from app.models.role import role_menus
+    from app.models.role import role_menus  # type: ignore
     menus = db.query(Menu).join(role_menus).filter(role_menus.c.role_id == role.id).all()
     return menus
 

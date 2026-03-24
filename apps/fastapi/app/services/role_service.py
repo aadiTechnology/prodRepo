@@ -1,14 +1,15 @@
 """Service layer for Role CRUD and queries."""
 
-from app.schemas.role import RoleCreate, RoleUpdate
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from app.schemas.role import RoleCreate, RoleUpdate  # type: ignore
+from sqlalchemy.orm import Session  # type: ignore
+from sqlalchemy import and_  # type: ignore
+from typing import Optional
 
-from app.core.exceptions import NotFoundException, ConflictException
-from app.core.logging_config import get_logger
-from app.models.role import Role, role_features, role_menus
-from app.models.feature import Feature
-from app.models.menu import Menu
+from app.core.exceptions import NotFoundException, ConflictException  # type: ignore
+from app.core.logging_config import get_logger  # type: ignore
+from app.models.role import Role, role_features, role_menus  # type: ignore
+from app.models.feature import Feature  # type: ignore
+from app.models.menu import Menu  # type: ignore
 from datetime import datetime
 
 logger = get_logger(__name__)
@@ -16,31 +17,33 @@ logger = get_logger(__name__)
 
 def get_roles(
     db: Session,
-    search: str = None,
+    search: Optional[str] = None,
     page_number: int = 1,
     page_size: int = 50,
-    tenant_id: int | None = None,
+    tenant_id: Optional[int] = None,
     is_platform: bool = False,
-    created_from: datetime = None,
-    created_to: datetime = None,
+    created_from: Optional[datetime] = None,
+    created_to: Optional[datetime] = None,
     sort_by: str = "id",
     sort_order: str = "desc"
 ) -> tuple[list[Role], int]:
 
     """
     Get roles filtered by scope.
-    Super Admin (is_platform=True) -> Platform roles where tenant_id IS NULL.
+    System Admin (is_platform=True) -> ALL roles (Platform AND all Tenant roles).
     Tenant Admin (is_platform=False) -> Tenant roles where tenant_id = tenant_id.
     """
     try:
         query = db.query(Role).filter(Role.is_deleted == False)
 
         # RBAC filtering logic
-        # if is_platform:
-        #     query = query.filter(Role.scope_type == "Platform", Role.tenant_id == None)
-        # elif tenant_id:
-        #     query = query.filter(Role.scope_type == "Tenant", Role.tenant_id == tenant_id)
-        # # else: fallback, show all roles (for legacy or debugging)
+        if is_platform:
+            # System Admin sees ALL roles (both Platform and Tenant scope)
+            pass  # No filtering, return all roles
+        elif tenant_id is not None:
+            # Tenant Admin sees roles belonging to their tenant
+            query = query.filter(Role.tenant_id == tenant_id)
+        # else: fallback, show all roles (for legacy or debugging)
 
         if search:
             query = query.filter(Role.name.ilike(f"%{search}%"))
@@ -85,15 +88,16 @@ def get_roles(
         return [], 0
 
 
-def get_role(db: Session, role_id: int) -> Role:
-    """Get a single role by ID with eager loading of permissions."""
-    from sqlalchemy.orm import joinedload
-    role = (
-        db.query(Role)
-        .filter(Role.id == role_id, Role.is_deleted == False)  # noqa: E712
-        .options(joinedload(Role.permissions))
-        .first()
-    )
+def get_role(db: Session, role_id: int, tenant_id: Optional[int] = None) -> Role:
+    """Get a single role by ID with eager loading of permissions, optionally filtered by tenant."""
+    from sqlalchemy.orm import joinedload  # type: ignore
+    query = db.query(Role).filter(Role.id == role_id, Role.is_deleted == False)
+    
+    if tenant_id is not None:
+        query = query.filter(Role.tenant_id == tenant_id)
+        
+    role = query.options(joinedload(Role.permissions)).first()
+
     if not role:
         raise NotFoundException("Role", role_id)
     return role
@@ -143,15 +147,15 @@ def create_role(db: Session, data: RoleCreate, created_by: int | None = None) ->
     return role
 
 
-def update_role(db: Session, role_id: int, data: RoleUpdate, updated_by: int | None = None) -> Role:
-    """Update an existing role."""
-    role = get_role(db, role_id)
+def update_role(db: Session, role_id: int, data: RoleUpdate, updated_by: int | None = None, tenant_id: Optional[int] = None) -> Role:
+    """Update an existing role with ownership check."""
+    role = get_role(db, role_id, tenant_id=tenant_id)
     if data.name is not None:
-        role.name = data.name
+        role.name = data.name  # type: ignore
     if data.description is not None:
-        role.description = data.description
+        role.description = data.description  # type: ignore
     if data.is_active is not None:
-        role.is_active = data.is_active
+        role.is_active = data.is_active  # type: ignore
         
     if data.feature_ids is not None:
         features = db.query(Feature).filter(Feature.id.in_(data.feature_ids)).all()
@@ -165,45 +169,45 @@ def update_role(db: Session, role_id: int, data: RoleUpdate, updated_by: int | N
             raise ConflictException("One or more menu IDs are invalid")
         role.menus = menus
         
-    role.updated_by = updated_by
-    role.updated_at = datetime.utcnow()
+    role.updated_by = updated_by  # type: ignore
+    role.updated_at = datetime.utcnow()  # type: ignore
     db.commit()
     db.refresh(role)
     return role
 
 
 
-def soft_delete_role(db: Session, role_id: int, deleted_by: int | None = None) -> None:
-    """Soft delete a role."""
-    role = get_role(db, role_id)
-    role.is_deleted = True
-    role.deleted_by = deleted_by
+def soft_delete_role(db: Session, role_id: int, deleted_by: int | None = None, tenant_id: Optional[int] = None) -> None:
+    """Soft delete a role with ownership check."""
+    role = get_role(db, role_id, tenant_id=tenant_id)
+    role.is_deleted = True  # type: ignore
+    role.deleted_by = deleted_by  # type: ignore
     db.commit()
     logger.info(f"Role soft-deleted: {role.code} (id={role.id})")
 
 
 
-def activate_role(db: Session, role_id: int, updated_by: int | None) -> Role:
-    """Activate a role."""
-    role = get_role(db, role_id)
-    if role.is_system:
+def activate_role(db: Session, role_id: int, updated_by: int | None, tenant_id: Optional[int] = None) -> Role:
+    """Activate a role with ownership check."""
+    role = get_role(db, role_id, tenant_id=tenant_id)
+    if role.is_system:  # type: ignore
         raise ConflictException("System roles cannot be activated or deactivated.")
-    role.is_active = True
-    role.updated_at = datetime.utcnow()
-    role.updated_by = updated_by
+    role.is_active = True  # type: ignore
+    role.updated_at = datetime.utcnow()  # type: ignore
+    role.updated_by = updated_by  # type: ignore
     db.commit()
     return role
 
 
 
-def deactivate_role(db: Session, role_id: int, updated_by: int | None) -> Role:
-    """Deactivate a role."""
-    role = get_role(db, role_id)
-    if role.is_system:
+def deactivate_role(db: Session, role_id: int, updated_by: int | None, tenant_id: Optional[int] = None) -> Role:
+    """Deactivate a role with ownership check."""
+    role = get_role(db, role_id, tenant_id=tenant_id)
+    if role.is_system:  # type: ignore
         raise ConflictException("System roles cannot be deactivated.")
-    role.is_active = False
-    role.updated_at = datetime.utcnow()
-    role.updated_by = updated_by
+    role.is_active = False  # type: ignore
+    role.updated_at = datetime.utcnow()  # type: ignore
+    role.updated_by = updated_by  # type: ignore
     db.commit()
     return role
 

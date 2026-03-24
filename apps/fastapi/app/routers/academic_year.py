@@ -3,17 +3,17 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import get_current_user, require_admin, require_permission
 from app.schemas.auth import CurrentUser
 from app.schemas.academic import AcademicYearCreate, AcademicYearUpdate, AcademicYearResponse
 from app.crud import academic_year as academic_year_crud
 
-router = APIRouter(prefix="/api/academic-years", tags=["Academic Years"])
+router = APIRouter(prefix="/academic/academic-years", tags=["Academic Years"])
 
 @router.get("", response_model=List[AcademicYearResponse])
 def list_academic_years(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user)
+    current_user: CurrentUser = Depends(require_permission("Academic Years", "view"))
 ):
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="User does not belong to a tenant")
@@ -23,7 +23,7 @@ def list_academic_years(
 def get_academic_year(
     id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user)
+    current_user: CurrentUser = Depends(require_permission("Academic Years", "view"))
 ):
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="User does not belong to a tenant")
@@ -36,7 +36,7 @@ def get_academic_year(
 def create_academic_year(
     data: AcademicYearCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin)
+    current_user: CurrentUser = Depends(require_permission("Academic Years", "create"))
 ):
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="User does not belong to a tenant")
@@ -52,7 +52,7 @@ def update_academic_year(
     id: int,
     data: AcademicYearUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin)
+    current_user: CurrentUser = Depends(require_permission("Academic Years", "edit"))
 ):
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="User does not belong to a tenant")
@@ -68,7 +68,7 @@ def update_academic_year(
 def delete_academic_year(
     id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin)
+    current_user: CurrentUser = Depends(require_permission("Academic Years", "delete"))
 ):
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="User does not belong to a tenant")

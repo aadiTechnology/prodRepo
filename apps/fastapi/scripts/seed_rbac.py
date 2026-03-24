@@ -2,13 +2,14 @@ import sys
 import os
 
 # Add apps/fastapi to sys.path to allow importing from 'app'
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
 
-from sqlalchemy.orm import Session
-from app.core.database import SessionLocal
-from app.models import Feature, Menu 
+from sqlalchemy.orm import Session  # type: ignore
+from app.main import app # ensures all models are imported and registered
+from app.core.database import SessionLocal  # type: ignore
+from app.models import Feature, Menu   # type: ignore
 from datetime import datetime
 
 def seed_rbac_data():
@@ -56,6 +57,7 @@ def seed_rbac_data():
             {
                 "name": "Academics", "level": 1, "icon": "academicsIcon", "sort_order": 3,
                 "children": [
+                    {"name": "Classes", "path": "/academics/classes", "feature": "ACADEMIC_MGMT"},
                     {"name": "Attendance", "path": "/academics/attendance", "feature": "ACADEMIC_MGMT"},
                     {"name": "Academic Years", "path": "/academic-years", "feature": "ACADEMIC_MGMT"},
                 ]
@@ -67,6 +69,7 @@ def seed_rbac_data():
                     {"name": "Fee Category", "path": "/fees/categories", "feature": "FEE_MGMT"},
                     {"name": "Fee Structure", "path": "/fees/setup", "feature": "FEE_MGMT"},
                     {"name": "Fee Discount", "path": "/fees/discounts", "feature": "FEE_MGMT"},
+                    {"name": "Student Fee Ledger", "path": "/fees/ledger", "feature": "FEE_MGMT"},
                 ]
             },
             {
@@ -112,25 +115,25 @@ def seed_rbac_data():
                 print(f"[SEED] Updated Parent: {p_data['name']}")
 
             # Check for children
-            if "children" in p_data:
-                for c_data in p_data["children"]:
-                    child = db.query(Menu).filter(Menu.name == c_data["name"], Menu.parent_id == parent.id).first()
-                    fid = feature_map.get(c_data["feature"])
+            if "children" in p_data:  # type: ignore
+                for c_data in p_data["children"]:  # type: ignore
+                    child = db.query(Menu).filter(Menu.name == c_data["name"], Menu.parent_id == parent.id).first()  # type: ignore
+                    fid = feature_map.get(c_data["feature"])  # type: ignore
                     if not child:
                         child = Menu(
-                            name=c_data["name"],
-                            path=c_data["path"],
+                            name=c_data["name"],  # type: ignore
+                            path=c_data["path"],  # type: ignore
                             parent_id=parent.id,
                             level=2,
                             feature_id=fid,
                             is_active=True
                         )
                         db.add(child)
-                        print(f"[SEED] Created Child: {c_data['name']} under {p_data['name']}")
+                        print(f"[SEED] Created Child: {c_data['name']} under {p_data['name']}")  # type: ignore
                     else:
-                        child.path = c_data["path"]
+                        child.path = c_data["path"]  # type: ignore
                         child.feature_id = fid
-                        print(f"[SEED] Updated Child: {c_data['name']}")
+                        print(f"[SEED] Updated Child: {c_data['name']}")  # type: ignore
 
         db.commit()
         print("[SEED] RBAC seeding completed successfully.")

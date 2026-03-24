@@ -84,7 +84,7 @@ def delete_fee_category(db: Session, category_id: str, tenant_id: int, user_id: 
     db_obj.deleted_by = user_id
     db.commit()
 
-def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academic_year_id: int = None) -> list[FeeStructure]:
+def get_fee_structures(db: Session, tenant_id: int, class_id: int | None = None, academic_year_id: int | None = None) -> list[FeeStructure]:
     query = db.query(FeeStructure).filter(
         FeeStructure.tenant_id == tenant_id,
         FeeStructure.is_deleted == False

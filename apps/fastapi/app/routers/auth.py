@@ -133,6 +133,19 @@ async def get_current_user_info(
         original_user_id=current_user.original_user_id,
     )
 
+@router.get("/context", response_model=LoginContextResponse)
+async def get_rbac_context(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> LoginContextResponse:
+    """Get fresh RBAC context (roles, permissions, menus) for the current authenticated user."""
+    from app.services import user_service
+    user = user_service.get_user_by_id(db, current_user.id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return auth_service.get_login_context(db, user)
+
 @router.post("/logout")
 async def logout(
     request: Request,
