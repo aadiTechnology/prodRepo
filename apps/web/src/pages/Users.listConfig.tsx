@@ -1,21 +1,20 @@
 import type { User as AuthUser } from "../types/auth";
-import { type ListConfig } from "../components/reusable";
+import type { NavigateFunction } from "react-router-dom";
+import type { ListConfig } from "../components/reusable";
+import type { UsersSortBy } from "../hooks";
 import StatusChip from "../components/roles/StatusChip";
 import { Box, Typography, Button } from "../components/primitives";
-import type { UsersSortBy } from "../hooks";
 import { formatShortDate, toRoleLabel } from "../utils/formatters";
 
-type CreateUsersListConfigArgs = {
-  onAddUser: () => void;
-  onEditUser: (user: AuthUser) => void;
-  onDeleteUser: (user: AuthUser) => void;
+type UsersListConfigFactoryArgs = {
+  navigate: NavigateFunction;
+  onDeleteClick: (user: AuthUser) => void;
 };
 
 export function createUsersListConfig({
-  onAddUser,
-  onEditUser,
-  onDeleteUser,
-}: CreateUsersListConfigArgs): ListConfig<AuthUser, UsersSortBy> {
+  navigate,
+  onDeleteClick,
+}: UsersListConfigFactoryArgs): ListConfig<AuthUser, UsersSortBy> {
   return {
     columns: [
       { id: "full_name", label: "Full Name", field: "full_name", render: (u) => u.full_name },
@@ -45,7 +44,7 @@ export function createUsersListConfig({
           <Typography variant="body2" color="text.secondary">
             No users available.
           </Typography>
-          <Button variant="contained" color="primary" onClick={onAddUser}>
+          <Button variant="contained" color="primary" onClick={() => navigate("/user/create")}>
             Add User
           </Button>
         </Box>
@@ -55,8 +54,8 @@ export function createUsersListConfig({
     },
     actions: {
       rowActions: (tableUser) => ({
-        onEdit: () => onEditUser(tableUser),
-        onDelete: () => onDeleteUser(tableUser),
+        onEdit: () => navigate("/user/create", { state: { user: tableUser, isEdit: true } }),
+        onDelete: () => onDeleteClick(tableUser),
       }),
     },
   };

@@ -12,7 +12,7 @@ import { Box, Typography, Button, Select, MenuItem } from "../components/primiti
 import { useAuth } from "../context/AuthContext";
 import { useUsersListController } from "../hooks";
 import { toRoleLabel } from "../utils/formatters";
-import { createUsersListConfig } from "./Users.config";
+import { createUsersListConfig } from "./Users.listConfig";
 
 const Users = () => {
   const navigate = useNavigate();
@@ -49,10 +49,8 @@ const Users = () => {
   const listConfig = useMemo(
     () =>
       createUsersListConfig({
-        onAddUser: () => navigate("/user/create"),
-        onEditUser: (tableUser: AuthUser) =>
-          navigate("/user/create", { state: { user: tableUser, isEdit: true } }),
-        onDeleteUser: openDeleteConfirm,
+        navigate,
+        onDeleteClick: openDeleteConfirm,
       }),
     [navigate, openDeleteConfirm]
   );
