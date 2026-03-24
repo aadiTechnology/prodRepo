@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.fee import FeeStructure
@@ -6,17 +6,29 @@ from app.models.fee import FeeStructure
 router = APIRouter(prefix="/api/fee-structures", tags=["Fee Structures"])
 
 @router.get("")
-def list_fee_structures(db: Session = Depends(get_db)):
-    fee_structures = db.query(FeeStructure).all()
-    print("DEBUG fee_structures:", fee_structures)
-    for f in fee_structures:
-        print(f"DEBUG FeeStructure id={f.id} total_amount={f.total_amount}")
-    return [
+def list_fee_structures(
+    academicYear: int = Query(..., alias="academicYear"),
+    classId: int = Query(..., alias="classId"),
+    tenantId: int = Query(..., alias="tenantId"),
+    db: Session = Depends(get_db)
+):
+    print(f"Incoming academicYear={academicYear}, classId={classId}, tenantId={tenantId}")
+    fee_structures = (
+        db.query(FeeStructure)
+        .filter(
+            FeeStructure.academic_year_id == academicYear,
+            FeeStructure.class_id == classId,
+            FeeStructure.tenant_id == tenantId,
+            FeeStructure.is_active == True
+        )
+        .all()
+    )
+    print(f"Total records returned: {len(fee_structures)}")
+    result = [
         {
             "id": f.id,
-            "name": f.name,
-            "total_amount": f.total_amount,
-            "fee_category_id": f.fee_category_id
+            "name": getattr(f, "name", f"Fee Structure #{f.id}")
         }
         for f in fee_structures
     ]
+    return result

@@ -54,3 +54,4 @@ class ClassModel(Base):
     # Relationships
     academic_year = relationship("AcademicYear", back_populates="classes")
     fee_structures = relationship("FeeStructure", back_populates="class_model", cascade="all, delete-orphan")
+    students = relationship("Student", back_populates="class_")

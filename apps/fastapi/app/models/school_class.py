@@ -1,5 +1,7 @@
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 class SchoolClass(Base):
@@ -22,3 +24,6 @@ class SchoolClass(Base):
     is_deleted = Column(Boolean, default=False)
     deleted_at = Column(DateTime, nullable=True)
     deleted_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    # Relationships
+    students = relationship("Student", back_populates="class_")

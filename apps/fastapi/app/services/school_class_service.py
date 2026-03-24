@@ -3,7 +3,7 @@ import re
 from fastapi import HTTPException
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
-from app.models.school_class import SchoolClass as ClassModel
+from app.models.academic import ClassModel
 from app.models.academic import AcademicYear
 from app.schemas.school_class_schema import SchoolClassCreate, SchoolClassUpdate
 

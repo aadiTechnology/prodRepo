@@ -94,8 +94,19 @@ async def read_fee_structures(
     start = page * size
     end = start + size
     
+    # Patch: Ensure late_fee_percentage and description are never None in installments
+    def patch_installments(structure):
+        if hasattr(structure, 'installments') and structure.installments:
+            for inst in structure.installments:
+                if getattr(inst, 'late_fee_percentage', None) is None:
+                    inst.late_fee_percentage = 0.0
+                if getattr(inst, 'description', None) is None:
+                    inst.description = ""
+        return structure
+
+    items = [patch_installments(s) for s in structures[start:end]]
     return {
-        "items": structures[start:end],
+        "items": items,
         "total": total,
         "page": page,
         "size": size
