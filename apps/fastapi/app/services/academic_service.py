@@ -2,6 +2,8 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from app.models.academic import AcademicYear, ClassModel
 from app.schemas.academic import AcademicYearCreate, ClassCreate, AcademicYearUpdate, ClassUpdate
+from app.schemas.school_class_schema import SchoolClassCreate
+from app.services import school_class_service
 from app.core.exceptions import NotFoundException
 from app.core.logging_config import get_logger
 
@@ -54,12 +56,13 @@ def get_class(db: Session, class_id: int, tenant_id: int) -> ClassModel:
     return obj
 
 def create_class(db: Session, obj_in: ClassCreate, tenant_id: int, user_id: int) -> ClassModel:
-    db_obj = ClassModel(
-        **obj_in.model_dump(),
+    # Convert ClassCreate (from academic schema) to SchoolClassCreate (from school_class schema)
+    # to utilize the unified creation logic in school_class_service
+    creation_data = SchoolClassCreate(**obj_in.model_dump())
+    
+    return school_class_service.create_class(
+        db=db,
+        data=creation_data,
         tenant_id=tenant_id,
         created_by=user_id
     )
-    db.add(db_obj)
-    db.commit()
-    db.refresh(db_obj)
-    return db_obj
