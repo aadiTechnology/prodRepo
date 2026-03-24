@@ -1,3 +1,5 @@
+
+import StudentFeeLedger from "../pages/StudentFeeLedger";   
 import { Routes, Route, Outlet } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { Box, CircularProgress } from "@mui/material";
@@ -116,7 +118,9 @@ export default function AppRoutes() {
           <Route path="/fees/setup" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureSetup /></ProtectedRoute>} />
           <Route path="/fees/setup/add" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
           <Route path="/fees/setup/:id/edit" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><FeeStructureForm /></ProtectedRoute>} />
-          
+          {/* Student Fee Ledger Screen */}
+          <Route path="/fees/ledger" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><StudentFeeLedger /></ProtectedRoute>} />
+
           {/* FEES MODULE (from user request) */}
           <Route
             path="/fees/discounts"
