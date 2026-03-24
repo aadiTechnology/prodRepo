@@ -96,14 +96,25 @@ const FeeStructureSetup = () => {
   useEffect(() => {
     const loadLookups = async () => {
       try {
-        const [years, cls] = await Promise.all([
+        const results = await Promise.allSettled([
           feeService.getAcademicYears(),
           feeService.getClasses(),
         ]);
-        setAcademicYears(years);
-        setClasses(cls);
+
+        if (results[0].status === 'fulfilled') {
+          setAcademicYears(results[0].value);
+        } else {
+          console.error("Failed to load academic years", results[0].reason);
+        }
+
+        if (results[1].status === 'fulfilled') {
+          setClasses(results[1].value);
+        } else {
+          console.error("Failed to load classes", results[1].reason);
+        }
       } catch (err) {
         // silent failure – main list will still load
+        console.error("Unexpected error loading lookups", err);
       }
     };
     loadLookups();
@@ -196,7 +207,7 @@ const FeeStructureSetup = () => {
                   >
                     <MenuItem value="">
                       <Typography variant="body2" color="text.secondary">
-                        Name
+                        Class
                       </Typography>
                     </MenuItem>
                     {classes.map((cls) => (

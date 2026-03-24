@@ -69,12 +69,12 @@ const feeService = {
   },
 
   getAcademicYears: async (): Promise<AcademicYear[]> => {
-    const response = await apiClient.get("/academic/academic-years");
+    const response = await apiClient.get("/api/academic-years");
     return response.data;
   },
 
   getClasses: async (academicYearId?: number): Promise<ClassEntity[]> => {
-    const response = await apiClient.get("/academic/classes", {
+    const response = await apiClient.get("/api/classes", {
       params: { academic_year_id: academicYearId }
     });
     return response.data;
