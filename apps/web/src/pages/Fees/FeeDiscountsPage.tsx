@@ -19,9 +19,16 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import feeDiscountService from "../../api/services/feeDiscountService";
 import { FeeDiscount } from "../../types/feeDiscount";
 import CreateDiscountDialog from "./CreateDiscountDialog";
+import { useRBAC } from "../../context/RBACContext";
 
 const FeeDiscountsPage = () => {
     const navigate = useNavigate();
+    const { hasPermission } = useRBAC();
+
+    const canCreate = hasPermission("FEE_MGMT:create");
+    const canEdit = hasPermission("FEE_MGMT:edit");
+    const canDelete = hasPermission("FEE_MGMT:delete");
+
     const [discounts, setDiscounts] = useState<FeeDiscount[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -127,8 +134,8 @@ const FeeDiscountsPage = () => {
                                 searchValue={search}
                                 onSearchChange={setSearch}
                                 searchPlaceholder="Search discounts by name"
-                                onAddClick={handleCreateClick}
-                                addLabel="Create Discount"
+                                onAddClick={canCreate ? handleCreateClick : undefined}
+                                addLabel={canCreate ? "Create Discount" : undefined}
                             />
                         }
                     />
@@ -156,8 +163,8 @@ const FeeDiscountsPage = () => {
                 renderRowActions={(row) => (
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <TableRowActions
-                            onEdit={() => handleEditClick(row)}
-                            onDelete={() => handleDeleteClick(row)}
+                            onEdit={canEdit ? () => handleEditClick(row) : undefined}
+                            onDelete={canDelete ? () => handleDeleteClick(row) : undefined}
                         />
                     </Box>
                 )}

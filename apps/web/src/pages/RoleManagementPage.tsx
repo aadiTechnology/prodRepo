@@ -14,9 +14,16 @@ import { ListPageLayout, ListPageToolbar, DirectoryInfoBar, TablePaginationBar, 
 import { PageHeader } from "../components/layout";
 import ConfirmDialog from "../components/common/ConfirmDialog";
 import StatusChip from "../components/roles/StatusChip";
+import { useRBAC } from "../context/RBACContext";
 
 const RoleManagementPage = () => {
   const navigate = useNavigate();
+  const { hasPermission } = useRBAC();
+
+  const canCreate = hasPermission("ADMIN_MGMT:create");
+  const canEdit = hasPermission("ADMIN_MGMT:edit");
+  const canDelete = hasPermission("ADMIN_MGMT:delete");
+
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +110,7 @@ const RoleManagementPage = () => {
     if (!roleToDelete) return;
     try {
       setDeleteLoading(true);
-      await roleService.deactivateRole(roleToDelete.id);
+      await roleService.deleteRole(roleToDelete.id);
       setConfirmDialogOpen(false);
       setRoleToDelete(null);
       showSuccessToast("Role deleted successfully");
@@ -134,9 +141,9 @@ const RoleManagementPage = () => {
               searchValue={search}
               onSearchChange={setSearch}
               searchPlaceholder="Search roles..."
-              onAddClick={() => navigate("/roles/create")}
-              addLabel="Add Role"
-              addIcon={<AddIcon sx={{ fontSize: 24 }} />}
+              onAddClick={canCreate ? () => navigate("/roles/create") : undefined}
+              addLabel={canCreate ? "Add Role" : undefined}
+              addIcon={canCreate ? <AddIcon sx={{ fontSize: 24 }} /> : undefined}
             />
           }
         />
@@ -164,8 +171,8 @@ const RoleManagementPage = () => {
           emptyMessage="No roles available."
           renderRowActions={(role) => (
             <TableRowActions
-              onEdit={() => navigate(`/roles/create?id=${role.id}`)}
-              onDelete={() => handleDeleteClick(role)}
+              onEdit={canEdit ? () => navigate(`/roles/create?id=${role.id}`) : undefined}
+              onDelete={canDelete ? () => handleDeleteClick(role) : undefined}
             />
           )}
           stickyHeader

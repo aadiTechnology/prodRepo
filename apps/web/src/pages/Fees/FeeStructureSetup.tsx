@@ -31,9 +31,15 @@ import {
 } from "../../types/fee";
 import feeService from "../../api/services/feeService";
 import StatusChip from "../../components/roles/StatusChip";
+import { useRBAC } from "../../context/RBACContext";
 
 const FeeStructureSetup = () => {
   const navigate = useNavigate();
+  const { hasPermission } = useRBAC();
+
+  const canCreate = hasPermission("FEE_MGMT:create");
+  const canEdit = hasPermission("FEE_MGMT:edit");
+  const canDelete = hasPermission("FEE_MGMT:delete");
   
   // -- State --
   const [structures, setStructures] = useState<FeeStructure[]>([]);
@@ -96,14 +102,19 @@ const FeeStructureSetup = () => {
   useEffect(() => {
     const loadLookups = async () => {
       try {
-        const [years, cls] = await Promise.all([
+        const results = await Promise.allSettled([
           feeService.getAcademicYears(),
           feeService.getClasses(),
         ]);
-        setAcademicYears(years);
-        setClasses(cls);
+        
+        if (results[0].status === 'fulfilled') setAcademicYears(results[0].value);
+        else console.error("Failed to load academic years for filters", results[0].reason);
+        
+        if (results[1].status === 'fulfilled') setClasses(results[1].value);
+        else console.error("Failed to load classes for filters", results[1].reason);
+        
       } catch (err) {
-        // silent failure – main list will still load
+        console.error("Unexpected error loading filter lookups", err);
       }
     };
     loadLookups();
@@ -232,8 +243,8 @@ const FeeStructureSetup = () => {
                   </Select>
                 </>
               }
-              onAddClick={handleAddClick}
-              addLabel="Setup Fee"
+              onAddClick={canCreate ? handleAddClick : undefined}
+              addLabel={canCreate ? "Setup Fee" : undefined}
               searchPlaceholder="Search by class..."
             />
           }
@@ -264,8 +275,8 @@ const FeeStructureSetup = () => {
             data={structures as (FeeStructure & Record<string, any>)[]}
             renderRowActions={(s) => (
               <TableRowActions 
-                onEdit={() => handleEditClick(s)} 
-                onDelete={() => handleDeleteClick(s.id)} 
+                onEdit={canEdit ? () => handleEditClick(s) : undefined} 
+                onDelete={canDelete ? () => handleDeleteClick(s.id) : undefined} 
               />
             )}
             emptyMessage="No fee structures found. Click 'Setup Fee' to begin."

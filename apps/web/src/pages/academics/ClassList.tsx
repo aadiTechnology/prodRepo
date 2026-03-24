@@ -13,10 +13,18 @@ import {
 import { Box, Typography, Button, CircularProgress } from "../../components/primitives";
 import schoolClassService, { SchoolClass } from "../../api/services/schoolClassService";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { useAuth } from "../../context/AuthContext";
+import { useRBAC } from "../../context/RBACContext";
+import { colorTokens } from "../../tokens/colors";
 import StatusChip from "../../components/roles/StatusChip";
 
 const ClassList = () => {
     const navigate = useNavigate();
+    const { hasPermission } = useRBAC();
+
+    const canCreate = hasPermission("ACADEMIC_MGMT:create");
+    const canEdit = hasPermission("ACADEMIC_MGMT:edit");
+    const canDelete = hasPermission("ACADEMIC_MGMT:delete");
 
     const [classes, setClasses] = useState<SchoolClass[]>([]);
     const [loading, setLoading] = useState(true);
@@ -54,7 +62,7 @@ const ClassList = () => {
     }, [fetchData]);
 
     const handleEdit = (item: SchoolClass) => {
-        navigate(`/classes/${item.id}/edit`);
+        navigate(`/academics/classes/${item.id}/edit`);
     };
 
     const handleDeleteClick = (item: SchoolClass) => {
@@ -138,8 +146,8 @@ const ClassList = () => {
                             searchValue={search}
                             onSearchChange={handleSearchChange}
                             searchPlaceholder="Search classes..."
-                            onAddClick={() => navigate("/classes/new")}
-                            addLabel="Add Class"
+                            onAddClick={canCreate ? () => navigate("/academics/classes/new") : undefined}
+                            addLabel={canCreate ? "Add Class" : undefined}
                         />
                     }
                 />
@@ -180,8 +188,8 @@ const ClassList = () => {
                         emptyMessage="No classes found. Click 'Add Class' to begin."
                         renderRowActions={(item) => (
                             <TableRowActions
-                                onEdit={() => handleEdit(item)}
-                                onDelete={() => handleDeleteClick(item)}
+                                onEdit={canEdit ? () => handleEdit(item) : undefined}
+                                onDelete={canDelete ? () => handleDeleteClick(item) : undefined}
                             />
                         )}
                     />

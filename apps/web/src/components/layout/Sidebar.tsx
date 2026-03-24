@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Drawer,
   Box,
@@ -24,8 +24,11 @@ import {
   ChevronRight as ChevronRightIcon,
   Menu as MenuIcon,
   Search as SearchIcon,
+  Sync as SyncIcon,
 } from "@mui/icons-material";
+import { CircularProgress } from "@mui/material";
 import { useAuth } from "../../context/AuthContext";
+import { useRBAC } from "../../context/RBACContext";
 import { colorTokens } from "../../tokens/colors";
 
 // Import Icons from assets
@@ -172,6 +175,8 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { menus: rbacMenus, refreshRBAC, isLoading: isRBACLoading } = useRBAC();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [mounted, setMounted] = useState(false);
@@ -180,15 +185,50 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
     setMounted(true);
   }, []);
 
-  const menuItems: MenuItemData[] = useMemo(() => {
-    const rawRole = user?.role || "";
-    const role = rawRole.toUpperCase();
-    
-    // Role Definitions
-    const isSuperAdmin = role === "SUPER_ADMIN" || role === "SYSTEM_ADMIN";
-    const isTenantAdmin = ["TENANT_ADMIN", "ADMIN"].includes(role);
+  /**
+   * Get the appropriate icon for a menu based on its name
+   * Maps common menu names to their corresponding icons
+   */
+  const getIconForMenu = useCallback((menuName: string): string => {
+    const name = menuName.toLowerCase();
+    if (name.includes("dashboard")) return workingIcon;
+    if (name.includes("user") || name.includes("admin")) return userIcon;
+    if (name.includes("role") || name.includes("permission")) return assetsIcon;
+    if (name.includes("tenant")) return schoolIcon;
+    if (name.includes("staff") || name.includes("teacher")) return teamworkIcon;
+    if (name.includes("student")) return userIcon;
+    if (name.includes("class") || name.includes("academic")) return schoolIcon;
+    if (name.includes("fee")) return moneyIcon;
+    if (name.includes("finance") || name.includes("payment")) return moneyIcon;
+    if (name.includes("report")) return assetsIcon;
+    return assetsIcon; // Default icon
+  }, []);
 
-    if (isSuperAdmin) {
+  /**
+   * Get color for a menu based on its name
+   */
+  const getColorForMenu = useCallback((menuName: string): string => {
+    const name = menuName.toLowerCase();
+    if (name.includes("dashboard")) return colorTokens.menuColors.dashboard;
+    if (name.includes("student")) return colorTokens.menuColors.students;
+    if (name.includes("academic") || name.includes("class")) return colorTokens.menuColors.academics;
+    if (name.includes("fee")) return colorTokens.menuColors.fees;
+    if (name.includes("staff")) return colorTokens.menuColors.staff;
+    if (name.includes("finance")) return colorTokens.menuColors.finance;
+    return colorTokens.menuColors.settings;
+  }, []);
+
+  /**
+   * Transform RBACContext menu structure into MenuItemData format
+   * System Admin: Always use hardcoded menu
+   * Tenant Admin: Use RBAC menus if available, otherwise fallback
+   */
+  const menuItems: MenuItemData[] = useMemo(() => {
+    // Determine if user is System Admin (tenant_id is null/undefined)
+    const isSystemAdmin = user?.tenant_id == null && !!user;
+
+    // SYSTEM ADMIN: Always use hardcoded menu structure
+    if (isSystemAdmin) {
       return [
         { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: colorTokens.menuColors.dashboard },
         { 
@@ -216,44 +256,71 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
           color: colorTokens.menuColors.settings,
           children: [
             { id: "roles", label: "Role Management", path: "/roles" },
+            { id: "permissions", label: "Permission Management", path: "/roles/permissions" },
             { id: "theme", label: "Theme Studio", path: "/admin/theme-studio" },
-            { id: "ai-review", label: "AI Review", path: "/ai/review" },
-            { id: "ai-gen", label: "Story Generation", path: "/ai/generate" },
           ]
         }
       ];
     }
 
-    if (isTenantAdmin) {
-      return [
-        { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: colorTokens.menuColors.dashboard },
-        { id: "students", label: "Students", icon: userIcon, path: "/students", color: colorTokens.menuColors.students },
-        { id: "academics", label: "Academics", icon: schoolIcon, path: "/academics", color: colorTokens.menuColors.academics },
-        { id: "academic-years", label: "Academic Years", icon: schoolIcon, path: "/academic-years", color: colorTokens.menuColors.academics },
-        {
-          id: "fees",
-          label: "Fees",
-          icon: feesIcon,
-          color: colorTokens.menuColors.fees,
-          children: [
-            { id: "fee-cat", label: "Fee Category", path: "/fees/categories" },
-            { id: "fee-struct", label: "Fee Structure", path: "/fees/setup" },
-            { id: "fee-discount", label: "Fee Discount", path: "/fees/discounts" },
-            { id: "fee-ledger", label: "Student Fee Ledger", path: "/fees/ledger" },
-          ]
-        },
-        { id: "staff", label: "Staff", icon: teamworkIcon, path: "/staff", color: colorTokens.menuColors.staff },
-        { id: "finance", label: "Finance", icon: moneyIcon, path: "/finance", color: colorTokens.menuColors.finance },
-        { id: "settings", label: "Settings", icon: assetsIcon, path: "/settings", color: colorTokens.menuColors.settings },
-      ];
+    // TENANT ADMIN: Use RBAC menus if available, otherwise fallback
+    if (rbacMenus && rbacMenus.length > 0) {
+      // Transform RBAC menu structure into MenuItemData
+      return rbacMenus
+        .filter(node => node && node.name) // Safety filter
+        .map((node) => {
+          const menuItem: MenuItemData = {
+            id: `menu-${node.id}`,
+            label: node.name,
+            icon: getIconForMenu(node.name),
+            path: node.path || undefined,
+            color: getColorForMenu(node.name),
+            children: node.children
+              ? node.children
+                  .filter(child => child && child.name)
+                  .map((child) => ({
+                    id: `menu-${child.id}`,
+                    label: child.name,
+                    path: child.path || "",
+                  }))
+              : undefined,
+          };
+          return menuItem;
+        });
     }
 
-    // Default User Menu
+
+    // FALLBACK: Default tenant admin menus
     return [
       { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: colorTokens.menuColors.dashboard },
-      { id: "profile", label: "My Profile", icon: userIcon, path: "/profile", color: colorTokens.menuColors.students },
+      { id: "students", label: "Students", icon: userIcon, path: "/students", color: colorTokens.menuColors.students },
+      { id: "academics", label: "Academics", icon: schoolIcon, path: "/academics", color: colorTokens.menuColors.academics },
+      { id: "academic-years", label: "Academic Years", icon: schoolIcon, path: "/academic-years", color: colorTokens.menuColors.academics },
+      {
+        id: "fees",
+        label: "Fees",
+        icon: feesIcon,
+        color: colorTokens.menuColors.fees,
+        children: [
+          { id: "fee-cat", label: "Fee Category", path: "/fees/categories" },
+          { id: "fee-struct", label: "Fee Structure", path: "/fees/setup" },
+          { id: "fee-discount", label: "Fee Discount", path: "/fees/discounts" },
+        ]
+      },
+      { id: "staff", label: "Staff", icon: teamworkIcon, path: "/staff", color: colorTokens.menuColors.staff },
+      { id: "finance", label: "Finance", icon: moneyIcon, path: "/finance", color: colorTokens.menuColors.finance },
+      {
+        id: "admin",
+        label: "Admin",
+        icon: assetsIcon,
+        color: colorTokens.menuColors.settings,
+        children: [
+          { id: "roles", label: "Roles", path: "/roles" },
+          { id: "permissions", label: "Permissions", path: "/roles/permissions" },
+        ]
+      }
     ];
-  }, [user?.role]);
+  }, [rbacMenus, user?.tenant_id, getIconForMenu, getColorForMenu]);
 
   const toggleSection = (id: string, isActive: boolean) => {
     setExpandedSections((prev) => ({
@@ -307,6 +374,36 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         >
           {collapsed ? <MenuIcon fontSize="small" /> : <ChevronRightIcon sx={{ transform: "rotate(180deg)" }} fontSize="small" />}
         </IconButton>
+        
+        {!collapsed && (
+          <Tooltip title="Sync Permissions" placement="bottom">
+            <IconButton
+              onClick={async () => {
+                setIsRefreshing(true);
+                try {
+                  await refreshRBAC();
+                } finally {
+                  setIsRefreshing(false);
+                }
+              }}
+              disabled={isRefreshing || isRBACLoading}
+              sx={{
+                color: "#ffffff",
+                ml: 1,
+                bgcolor: alpha("#ffffff", 0.15),
+                "&:hover": { bgcolor: alpha("#ffffff", 0.25) },
+                "&.Mui-disabled": { color: alpha("#ffffff", 0.3) }
+              }}
+              size="small"
+            >
+              {isRefreshing || isRBACLoading ? (
+                <CircularProgress size={16} sx={{ color: "#ffffff" }} />
+              ) : (
+                <SyncIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
+        )}
       </HeaderGradient>
 
       {!collapsed && (

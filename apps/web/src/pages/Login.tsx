@@ -117,6 +117,7 @@ export default function Login() {
       setRBACData({
         roles: response.roles,
         menus: response.menus,
+        permissions: response.permissions,
       });
 
       // 3. Navigation happens via useEffect or explicitly here

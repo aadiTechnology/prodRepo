@@ -131,16 +131,23 @@ const FeeStructureForm = () => {
     useEffect(() => {
         const fetchLookups = async () => {
             try {
-                const [cats, years, cls] = await Promise.all([
+                const results = await Promise.allSettled([
                     feeService.getFeeCategories(),
                     feeService.getAcademicYears(),
                     feeService.getClasses(),
                 ]);
-                setCategories(cats);
-                setAcademicYears(years);
-                setClasses(cls);
+                
+                if (results[0].status === 'fulfilled') setCategories(results[0].value);
+                else console.error("Failed to load fee categories", results[0].reason);
+                
+                if (results[1].status === 'fulfilled') setAcademicYears(results[1].value);
+                else console.error("Failed to load academic years", results[1].reason);
+                
+                if (results[2].status === 'fulfilled') setClasses(results[2].value);
+                else console.error("Failed to load classes", results[2].reason);
+                
             } catch (err) {
-                console.error("Failed to load lookups", err);
+                console.error("Unexpected error loading lookups", err);
             }
         };
         fetchLookups();

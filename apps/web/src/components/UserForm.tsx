@@ -109,8 +109,11 @@ function UserForm({ open, onClose, onSubmit, user, isEdit = false }: UserFormPro
     setError(null);
   }, [user, isEdit, open]);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+  const handleChange = useCallback((e: any) => {
+    const { name, value } = e.target;
+    const type = e.target.type;
+    const checked = e.target.checked;
+    
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,

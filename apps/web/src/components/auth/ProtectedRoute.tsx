@@ -114,6 +114,18 @@ export default function ProtectedRoute({
   } = useRBAC();
   const location = useLocation();
   const userRole = normalizeRole(user?.role);
+  
+  // Debug log
+  if (requiredRoles || requiredPermissions) {
+    console.log("DEBUG ProtectedRoute:", {
+      path: location.pathname,
+      userRole,
+      requiredRoles,
+      requiredPermissions,
+      isAuthenticated,
+      hasRequiredRoles: requiredRoles ? (Array.isArray(requiredRoles) ? hasAnyRole(requiredRoles) : hasRole(requiredRoles)) : 'N/A'
+    });
+  }
 
   // Show loading spinner while checking authentication
   if (isLoading) {

@@ -200,7 +200,7 @@ const AddClass = () => {
                 await schoolClassService.create(payload);
                 setSuccess("Class created successfully!");
             }
-            setTimeout(() => navigate("/classes"), 1500);
+            setTimeout(() => navigate("/academics/classes"), 1500);
         } catch (err: any) {
             setError(err?.message || (isEditMode ? "Failed to update class." : "Failed to create class."));
         } finally {
@@ -225,7 +225,7 @@ const AddClass = () => {
                 <Box sx={{ mb: 2 }}>
                     <PageHeader
                         links={[
-                            { title: "Classes", path: "/classes" },
+                            { title: "Classes", path: "/academics/classes" },
                             { title: isEditMode ? "Edit Class" : "Add Class", path: "#" },
                         ]}
                         homePath="/"
@@ -233,7 +233,7 @@ const AddClass = () => {
                             <Box sx={{ display: "flex", gap: 1.5 }}>
                                 <Tooltip title="Discard Changes">
                                     <IconButton
-                                        onClick={() => navigate("/classes")}
+                                        onClick={() => navigate("/academics/classes")}
                                         sx={{
                                             color: colorTokens.preschool.coral.main,
                                             backgroundColor: alpha(colorTokens.preschool.coral.main, 0.08),
@@ -472,7 +472,7 @@ const AddClass = () => {
                 >
                     <Button
                         variant="text"
-                        onClick={() => navigate("/classes")}
+                        onClick={() => navigate("/academics/classes")}
                         sx={{
                             color: colorTokens.preschool.coral.main,
                             fontWeight: 700,

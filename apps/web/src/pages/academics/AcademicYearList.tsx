@@ -13,10 +13,17 @@ import {
 import { Box, Typography, Button, CircularProgress } from "../../components/primitives";
 import academicYearService, { AcademicYear } from "../../api/services/academicYearService";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { useAuth } from "../../context/AuthContext";
+import { useRBAC } from "../../context/RBACContext";
 import StatusChip from "../../components/roles/StatusChip";
 
 const AcademicYearList = () => {
     const navigate = useNavigate();
+    const { hasPermission } = useRBAC();
+
+    const canCreate = hasPermission("ACADEMIC_MGMT:create");
+    const canEdit = hasPermission("ACADEMIC_MGMT:edit");
+    const canDelete = hasPermission("ACADEMIC_MGMT:delete");
 
     const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
     const [loading, setLoading] = useState(true);
@@ -140,8 +147,8 @@ const AcademicYearList = () => {
                             searchValue={search}
                             onSearchChange={handleSearchChange}
                             searchPlaceholder="Search academic years..."
-                            onAddClick={() => navigate("/academic-years/new")}
-                            addLabel="Add Academic Year"
+                            onAddClick={canCreate ? () => navigate("/academic-years/new") : undefined}
+                            addLabel={canCreate ? "Add Academic Year" : undefined}
                         />
                     }
                 />
@@ -182,8 +189,8 @@ const AcademicYearList = () => {
                         emptyMessage="No academic years found. Click 'Add Academic Year' to begin."
                         renderRowActions={(year) => (
                             <TableRowActions
-                                onEdit={() => handleEdit(year)}
-                                onDelete={() => handleDeleteClick(year)}
+                                onEdit={canEdit ? () => handleEdit(year) : undefined}
+                                onDelete={canDelete ? () => handleDeleteClick(year) : undefined}
                             />
                         )}
                     />

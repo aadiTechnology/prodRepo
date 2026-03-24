@@ -14,10 +14,16 @@ import { Box, Typography, Button, Select, MenuItem } from "../components/primiti
 import { useAuth } from "../context/AuthContext";
 import { useUsersListController, type UsersSortBy } from "../hooks";
 import { formatShortDate, toRoleLabel } from "../utils/formatters";
+import { useRBAC } from "../context/RBACContext";
 
 const Users = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { hasPermission } = useRBAC();
+  const canCreate = hasPermission("ADMIN_MGMT:create");
+  const canEdit = hasPermission("ADMIN_MGMT:edit");
+  const canDelete = hasPermission("ADMIN_MGMT:delete");
+
   const {
     listState: {
       search,
@@ -77,9 +83,11 @@ const Users = () => {
             <Typography variant="body2" color="text.secondary">
               No users available.
             </Typography>
-            <Button variant="contained" color="primary" onClick={() => navigate("/user/create")}>
-              Add User
-            </Button>
+            {canCreate && (
+              <Button variant="contained" color="primary" onClick={() => navigate("/user/create")}>
+                Add User
+              </Button>
+            )}
           </Box>
         ),
         errorFallbackMessage: "Failed to fetch users.",
@@ -87,12 +95,12 @@ const Users = () => {
       },
       actions: {
         rowActions: (tableUser) => ({
-          onEdit: () => navigate("/user/create", { state: { user: tableUser, isEdit: true } }),
-          onDelete: () => openDeleteConfirm(tableUser),
+          onEdit: canEdit ? () => navigate("/user/create", { state: { user: tableUser, isEdit: true } }) : undefined,
+          onDelete: canDelete ? () => openDeleteConfirm(tableUser) : undefined,
         }),
       },
     }),
-    [navigate, openDeleteConfirm]
+    [navigate, openDeleteConfirm, canCreate, canEdit, canDelete]
   );
 
   return (
@@ -107,8 +115,8 @@ const Users = () => {
                 searchValue={search}
                 onSearchChange={onSearchChange}
                 searchPlaceholder="Search Name"
-                onAddClick={() => navigate("/user/create")}
-                addLabel="Add User"
+                onAddClick={canCreate ? () => navigate("/user/create") : undefined}
+                addLabel={canCreate ? "Add User" : undefined}
                 renderActions={
                   <>
                     <Typography component="span" variant="body2" sx={{ whiteSpace: "nowrap" }}>

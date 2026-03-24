@@ -8,10 +8,16 @@ import { ListPageLayout, ListPageToolbar, DirectoryInfoBar, DataTable, TableRowA
 import type { DataTableColumn } from '../../components/reusable';
 import PageHeader from '../../components/layout/PageHeader';
 import StatusChip from '../../components/roles/StatusChip';
-// ...existing code...
+import { useRBAC } from '../../context/RBACContext';
 
 const FeeCategoryManagement = () => {
   const navigate = useNavigate();
+  const { hasPermission } = useRBAC();
+
+  const canCreate = hasPermission("FEE_MGMT:create");
+  const canEdit = hasPermission("FEE_MGMT:edit");
+  const canDelete = hasPermission("FEE_MGMT:delete");
+
   const [categories, setCategories] = useState<FeeCategoryResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,8 +131,8 @@ const FeeCategoryManagement = () => {
                 searchValue={search}
                 onSearchChange={setSearch}
                 searchPlaceholder="Search Category"
-                onAddClick={handleAdd}
-                addLabel="Add Category"
+                onAddClick={canCreate ? handleAdd : undefined}
+                addLabel={canCreate ? "Add Category" : undefined}
               />
             }
           />
@@ -154,8 +160,8 @@ const FeeCategoryManagement = () => {
         emptyMessage="No fee categories available."
         renderRowActions={(cat) => (
           <TableRowActions
-            onEdit={() => handleEdit(cat)}
-            onDelete={() => handleDeleteClick(cat)}
+            onEdit={canEdit ? () => handleEdit(cat) : undefined}
+            onDelete={canDelete ? () => handleDeleteClick(cat) : undefined}
           />
         )}
         stickyHeader
