@@ -20,7 +20,7 @@ export interface AcademicYearCreate {
 
 export interface AcademicYearUpdate extends Partial<AcademicYearCreate> {}
 
-const BASE_URL = "/api/academic-years";
+const BASE_URL = "/academic/academic-years";
 
 export const academicYearService = {
   getAll: async (): Promise<AcademicYear[]> => {

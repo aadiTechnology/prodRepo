@@ -54,6 +54,14 @@ export const authService = {
     const response = await apiClient.post<LoginContextResponse>("/auth/exit-impersonation");
     return response.data;
   },
+
+  /**
+   * Get fresh RBAC context (roles, menus, permissions) without re-authenticating
+   */
+  getRBACContext: async (): Promise<LoginContextResponse> => {
+    const response = await apiClient.get<LoginContextResponse>("/auth/context");
+    return response.data;
+  },
 };
 
 export default authService;

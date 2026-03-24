@@ -31,7 +31,7 @@ export interface SchoolClassCreate {
 
 export interface SchoolClassUpdate extends Partial<SchoolClassCreate> {}
 
-const BASE_URL = "/api/classes";
+const BASE_URL = "/academic/classes";
 
 const schoolClassService = {
   getAll: async (params?: { search?: string }): Promise<SchoolClass[]> => {
