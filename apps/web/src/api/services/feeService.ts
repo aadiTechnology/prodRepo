@@ -74,7 +74,7 @@ const feeService = {
   },
 
   getClasses: async (academicYearId?: number): Promise<ClassEntity[]> => {
-    const response = await apiClient.get("/api/classes", {
+    const response = await apiClient.get("/academic/classes", {
       params: { academic_year_id: academicYearId }
     });
     return response.data;

@@ -24,6 +24,8 @@ from app.models import (  # noqa: F401
     Menu,
     ThemeTemplate,
     SchoolClass,
+    AcademicYear,
+    FeeStructure,
 )
 
 from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, academic_year, class_fee_structure_assignment, class_router,student_fee_assignment, fee_structure

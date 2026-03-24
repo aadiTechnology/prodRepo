@@ -94,34 +94,35 @@ const FeeStructureSetup = () => {
 
   // Fetch filter lookups
   useEffect(() => {
-    const loadLookups = async () => {
+    const loadAcademicYears = async () => {
       try {
-        const results = await Promise.allSettled([
-          feeService.getAcademicYears(),
-          feeService.getClasses(),
-        ]);
-
-        if (results[0].status === 'fulfilled') {
-          setAcademicYears(results[0].value);
-        } else {
-          console.error("Failed to load academic years", results[0].reason);
-        }
-
-        if (results[1].status === 'fulfilled') {
-          setClasses(results[1].value);
-        } else {
-          console.error("Failed to load classes", results[1].reason);
-        }
+        const years = await feeService.getAcademicYears();
+        setAcademicYears(years);
       } catch (err) {
-        // silent failure – main list will still load
-        console.error("Unexpected error loading lookups", err);
+        console.error("Failed to load academic years", err);
       }
     };
-    loadLookups();
+    loadAcademicYears();
   }, []);
+
+  // Fetch classes when academic year changes
+  useEffect(() => {
+    const loadClasses = async () => {
+      try {
+        const classList = await feeService.getClasses(
+          selectedAcademicYearId ? Number(selectedAcademicYearId) : undefined
+        );
+        setClasses(classList);
+      } catch (err) {
+        console.error("Failed to load classes", err);
+      }
+    };
+    loadClasses();
+  }, [selectedAcademicYearId]);
 
   const handleAcademicYearChange = (value: string) => {
     setSelectedAcademicYearId(value);
+    setSelectedClassId(""); // Clear class selection when year changes
     setPage(0);
   };
 
@@ -212,7 +213,7 @@ const FeeStructureSetup = () => {
                     </MenuItem>
                     {classes.map((cls) => (
                       <MenuItem key={cls.id} value={cls.id.toString()}>
-                        {cls.name}
+                        {cls.name} {cls.section ? `(${cls.section})` : ""}
                       </MenuItem>
                     ))}
                   </Select>
