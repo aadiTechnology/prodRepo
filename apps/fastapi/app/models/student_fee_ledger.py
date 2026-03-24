@@ -11,10 +11,12 @@ class Student(Base):
     student_name = Column(String(100), nullable=False)
     student_code = Column(String(50), nullable=False)
     academic_year = Column(String(20), nullable=False)
-    class_id = Column(Integer, nullable=True)  # Added class_id for fee structure lookup
+    class_id = Column(Integer, ForeignKey("classes.id", ondelete="SET NULL"), nullable=True)
     fee_structure_id = Column(Integer, nullable=True)  # Added for unique fee structure per student
     is_active = Column(Boolean, default=True)
     fee_ledgers = relationship("FeeLedger", back_populates="student")
+    assignments = relationship("StudentFeeAssignment", back_populates="student")
+    class_ = relationship("ClassModel", back_populates="students", overlaps="students")
 
 class FeeLedger(Base):
     __tablename__ = "fee_ledger"

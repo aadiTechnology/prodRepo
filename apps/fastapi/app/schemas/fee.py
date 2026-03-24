@@ -6,9 +6,9 @@ from pydantic import BaseModel, constr, condecimal
 class FeeCategoryBase(BaseModel):
     """Shared fields for fee categories used in create/update."""
 
-    name: constr(max_length=100)
-    code: Optional[constr(max_length=20)] = None
-    description: Optional[str] = None
+    name: str = None
+    code: str = None
+    description: str = None
     status: bool = True
 
 
@@ -19,10 +19,10 @@ class FeeCategoryCreate(FeeCategoryBase):
 
 
 class FeeCategoryUpdate(BaseModel):
-    name: Optional[str] = None
-    code: Optional[str] = None
-    description: Optional[str] = None
-    status: Optional[bool] = None
+    name: str = None
+    code: str = None
+    description: str = None
+    status: bool = None
 
 
 class FeeCategoryResponse(FeeCategoryBase):
@@ -37,19 +37,21 @@ class FeeCategoryResponse(FeeCategoryBase):
 
 class FeeInstallmentBase(BaseModel):
     installment_number: int
-    amount: condecimal(max_digits=10, decimal_places=2)
+    amount: float = None  # Use float or Decimal if you import Decimal
     due_date: date
     late_fee_applicable: bool = False
-    late_fee_amount: Optional[condecimal(max_digits=10, decimal_places=2)] = None
-    late_fee_percentage: Optional[condecimal(max_digits=5, decimal_places=2)] = None
-    description: Optional[str] = None
+    late_fee_amount: float = None
+    late_fee_percentage: float = None
+    description: str = None
+
 
 class FeeInstallmentCreate(FeeInstallmentBase):
-    pass
+    fee_category_id: str = None
 
 class FeeInstallmentResponse(FeeInstallmentBase):
     id: int
     fee_structure_id: int
+    ee_category_id: str = None
 
     class Config:
         from_attributes = True
@@ -58,22 +60,22 @@ class FeeStructureBase(BaseModel):
     class_id: int
     fee_category_id: str
     academic_year_id: int
-    total_amount: condecimal(max_digits=10, decimal_places=2)
-    installment_type: constr(max_length=20)
+    total_amount: float = None
+    installment_type: str = None
     num_installments: int
-    description: Optional[str] = None
+    description: str = None
     is_active: bool = True
 
 class FeeStructureCreate(FeeStructureBase):
     installments: List[FeeInstallmentCreate]
 
 class FeeStructureUpdate(BaseModel):
-    total_amount: Optional[condecimal(max_digits=10, decimal_places=2)] = None
-    installment_type: Optional[str] = None
-    num_installments: Optional[int] = None
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
-    installments: Optional[List[FeeInstallmentCreate]] = None
+    total_amount: float = None
+    installment_type: str = None
+    num_installments: int = None
+    description: str = None
+    is_active: bool = None
+    installments: List[FeeInstallmentCreate] = None
 
 class FeeStructureResponse(FeeStructureBase):
     id: int

@@ -26,4 +26,7 @@ class SchoolClass(Base):
     deleted_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Relationships
-    students = relationship("Student", back_populates="class_")
+    # Student.class_ is paired with ClassModel.students (in academic.py).
+    # Keep this relationship unidirectional here to avoid conflicting
+    # reverse-property configuration across two class mappers on "classes".
+    students = relationship("Student", overlaps="students")

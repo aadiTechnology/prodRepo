@@ -13,6 +13,7 @@ from app.core.exception_handlers import (
     generic_exception_handler,
 )
 from fastapi.exceptions import RequestValidationError
+from app.routers import student_fee_ledger
 
 # Import all models first to ensure SQLAlchemy relationships are properly configured
 # This must happen before any database operations or router imports
@@ -88,6 +89,7 @@ app.include_router(academic.router)
 app.include_router(academic_year.router)
 app.include_router(class_router.router)
 app.include_router(class_fee_structure_assignment.router)
+app.include_router(student_fee_ledger.router) 
 app.include_router(student_fee_assignment.router)
 app.include_router(fee_structure.router)
 

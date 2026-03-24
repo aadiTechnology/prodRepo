@@ -144,9 +144,12 @@ def create_fee_structure(db: Session, obj_in: FeeStructureCreate, tenant_id: int
 
     # Handle installments
     for inst_in in obj_in.installments:
+        inst_data = inst_in.model_dump()
+        if not inst_data.get("fee_category_id"):
+            inst_data["fee_category_id"] = db_obj.fee_category_id
         inst_db = FeeInstallment(
             fee_structure_id=db_obj.id,
-            **inst_in.model_dump(),
+            **inst_data,
             created_by=user_id
         )
         db.add(inst_db)
@@ -169,9 +172,12 @@ def update_fee_structure(db: Session, structure_id: int, obj_in: FeeStructureUpd
         # Simple implementation: Delete existing and add new
         db.query(FeeInstallment).filter(FeeInstallment.fee_structure_id == structure_id).delete()
         for inst_in in obj_in.installments:
+            inst_data = inst_in.model_dump()
+            if not inst_data.get("fee_category_id"):
+                inst_data["fee_category_id"] = db_obj.fee_category_id
             inst_db = FeeInstallment(
                 fee_structure_id=db_obj.id,
-                **inst_in.model_dump(),
+                **inst_data,
                 created_by=user_id
             )
             db.add(inst_db)
