@@ -6,30 +6,16 @@ import { User } from "../types/auth";
 import roleService from "../api/services/roleService";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../utils/formValidation";
 import {
-  accountConfirmPasswordField,
-  accountEmailField,
-  accountPasswordField,
-} from "../utils/accountFormFieldPresets";
-import {
   confirmPasswordMatchRules,
   emailRequiredPatternRules,
   newPasswordRules,
 } from "../utils/formValidationPresets";
 import { useFormManager } from "../hooks/useFormManager";
 import BaseForm from "../components/reusable/BaseForm";
-import type { FormConfig } from "../components/reusable/formFramework.types";
 import type { SelectItemOption } from "../components/semantic";
+import { createUserFormConfig, type CreateUserFormData } from "./CreateUser.formConfig";
 
-type FormData = {
-  email: string;
-  full_name: string;
-  password: string;
-  confirm_password: string;
-  role_code: string;
-  is_active: boolean;
-};
-
-const emptyForm = (): FormData => ({
+const emptyForm = (): CreateUserFormData => ({
   email: "",
   full_name: "",
   password: "",
@@ -38,7 +24,7 @@ const emptyForm = (): FormData => ({
   is_active: true,
 });
 
-function formFromUser(user: User): FormData {
+function formFromUser(user: User): CreateUserFormData {
   return {
     ...emptyForm(),
     email: user.email ?? "",
@@ -67,8 +53,8 @@ export default function CreateUser() {
     [isEditMode, editUser]
   );
 
-  const validationConfig = useMemo<FormValidationConfig<FormData>>(() => {
-    const cfg: FormValidationConfig<FormData> = {
+  const validationConfig = useMemo<FormValidationConfig<CreateUserFormData>>(() => {
+    const cfg: FormValidationConfig<CreateUserFormData> = {
       full_name: [
         { type: "required", message: "Required." },
         { type: "minLength", value: 2, message: "Min 2 characters." },
@@ -76,9 +62,9 @@ export default function CreateUser() {
       role_code: [{ type: "required", message: "Required." }],
     };
     if (!isEditMode) {
-      cfg.email = emailRequiredPatternRules<FormData>();
-      cfg.password = newPasswordRules<FormData>();
-      cfg.confirm_password = confirmPasswordMatchRules<FormData>("password");
+      cfg.email = emailRequiredPatternRules<CreateUserFormData>();
+      cfg.password = newPasswordRules<CreateUserFormData>();
+      cfg.confirm_password = confirmPasswordMatchRules<CreateUserFormData>("password");
     }
     return cfg;
   }, [isEditMode]);
@@ -96,76 +82,20 @@ export default function CreateUser() {
     handleChange,
     handleFieldValueChange,
     handleSubmit,
-  } = useFormManager<FormData>({
+  } = useFormManager<CreateUserFormData>({
     initialValues,
     validationConfig,
     dependentFieldPairs,
     onClearError: () => setError(null),
   });
 
-  const formConfig = useMemo<FormConfig<FormData>>(
-    () => ({
-      fields: {
-        full_name: {
-          name: "full_name",
-          label: "Full name",
-          type: "text",
-          placeholder: "Enter full name",
-          required: true,
-          props: { htmlInput: { minLength: 2 } },
-        },
-        email: accountEmailField<FormData>({
-          placeholder: "user@example.com",
-          isEditMode,
-        }),
-        password: accountPasswordField<FormData>("password", { isEditMode }),
-        confirm_password: accountConfirmPasswordField<FormData>({ isEditMode }),
-        role_code: {
-          name: "role_code",
-          label: "Role",
-          type: "select",
-          required: true,
-          props: {
-            options: roleOptions,
-            loading: roleOptionsLoading,
-            loadingLabel: "Loading roles...",
-            emptyListLabel: "No roles found",
-            disableWhenEmpty: true,
-          },
-        },
-        is_active: {
-          name: "is_active",
-          label: "Account active",
-          type: "switch",
-          conditionalRender: () => isEditMode,
-        },
-      },
-      layoutRows: [
-        {
-          kind: "fields",
-          grid: { xs: 12, md: 6 },
-          fieldNames: ["full_name", "email"],
-        },
-        {
-          kind: "fields",
-          grid: { xs: 12, md: 6 },
-          fieldNames: ["password", "confirm_password"],
-          show: (c) => !c.isEditMode,
-        },
-        {
-          kind: "fields",
-          grid: { xs: 12, md: 6 },
-          fieldNames: ["role_code", "is_active"],
-          show: (c) => c.isEditMode,
-        },
-        {
-          kind: "fields",
-          grid: { xs: 12, sm: 6 },
-          fieldNames: ["role_code"],
-          show: (c) => !c.isEditMode,
-        },
-      ],
-    }),
+  const formConfig = useMemo(
+    () =>
+      createUserFormConfig({
+        isEditMode,
+        roleOptions,
+        roleOptionsLoading,
+      }),
     [isEditMode, roleOptions, roleOptionsLoading]
   );
 
@@ -231,7 +161,7 @@ export default function CreateUser() {
   };
 
   return (
-    <BaseForm<FormData>
+    <BaseForm<CreateUserFormData>
       formConfig={formConfig}
       formData={formData}
       setFormData={setFormData}
