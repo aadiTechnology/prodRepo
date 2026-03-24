@@ -61,6 +61,7 @@ class FeeInstallment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     fee_structure_id = Column(Integer, ForeignKey("fee_structures.id", ondelete="CASCADE"), nullable=False)
+    fee_category_id = Column(String(36), ForeignKey("fee_categories.id", ondelete="CASCADE"), nullable=True)
     installment_number = Column(Integer, nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
     due_date = Column(Date, nullable=False)
@@ -80,3 +81,5 @@ class FeeInstallment(Base):
 
     # Relationships
     fee_structure = relationship("FeeStructure", back_populates="installments")
+    fee_category = relationship("FeeCategory")
+    fee_payments = relationship("FeePayment", back_populates="installment")

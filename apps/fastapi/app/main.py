@@ -85,6 +85,9 @@ app.include_router(academic_year.router)
 app.include_router(class_router.router)
 app.include_router(class_fee_structure_assignment.router)
 
+from app.routers import student_fee_ledger
+app.include_router(student_fee_ledger.router) 
+
 # Mount static files for profile images
 # Ensure the directory exists
 import os
