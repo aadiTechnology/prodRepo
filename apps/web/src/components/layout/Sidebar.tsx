@@ -239,6 +239,10 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
             { id: "fee-cat", label: "Fee Category", path: "/fees/categories" },
             { id: "fee-struct", label: "Fee Structure", path: "/fees/setup" },
             { id: "fee-discount", label: "Fee Discount", path: "/fees/discounts" },
+            { id: "fee-ledger", label: "Student Fee Ledger", path: "/fees/ledger" },
+            { id: "assign-student-fee", label: "Assign Fee To Student", path: "/fees/assign-student-fee" },
+
+
           ]
         },
         { id: "staff", label: "Staff", icon: teamworkIcon, path: "/staff", color: colorTokens.menuColors.staff },

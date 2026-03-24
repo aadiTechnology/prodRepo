@@ -15,8 +15,12 @@ export const academicYearService = {
 };
 
 export const feeStructureService = {
-  async list() {
-    const response = await apiClient.get("/api/fee-structures");
+  async list(params: { academicYear: string | number, classId: string | number, tenantId: string | number }) {
+    // The backend expects academicYear, classId, tenantId (not academicYearId)
+    const { academicYear, classId, tenantId } = params;
+    const response = await apiClient.get("/api/fee-structures", {
+      params: { academicYear, classId, tenantId }
+    });
     return response.data;
   },
 };

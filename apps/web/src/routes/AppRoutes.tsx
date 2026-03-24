@@ -33,6 +33,7 @@ const AcademicYearList = lazy(() => import("../pages/academics/AcademicYearList"
 const AddAcademicYear = lazy(() => import("../pages/academics/AddAcademicYear"));
 const ClassList = lazy(() => import("../pages/academics/ClassList"));
 const AddClass = lazy(() => import("../pages/academics/AddClass"));
+const AssignStudentFee = lazy(() => import("../pages/Fees/AssignStudentFee"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -142,6 +143,8 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          <Route path="/fees/assign-student-fee" element={<ProtectedRoute requiredRoles={["TENANT_ADMIN", "ADMIN", "admin"]}><AssignStudentFee /></ProtectedRoute>} />
+
           
           <Route path="/admin/theme-studio" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><ThemeStudioPage /></ProtectedRoute>} />
           
