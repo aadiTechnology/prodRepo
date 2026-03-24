@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { User as AuthUser } from "../types/auth";
-import type { UserResponse } from "../types/user";
-import userService from "../api/services/userService";
 import ConfirmDialog from "../components/common/ConfirmDialog";
 import {
   ListPageLayout,
@@ -14,151 +12,40 @@ import { PageHeader } from "../components/layout";
 import StatusChip from "../components/roles/StatusChip";
 import { Box, Typography, Button, Select, MenuItem } from "../components/primitives";
 import { useAuth } from "../context/AuthContext";
-import { useListManager } from "../hooks";
-
-type UsersFilters = { role: string; status: string };
-type UsersSortBy = "name" | "created_at";
-
-function toRoleLabel(role: string | null | undefined): string {
-  if (!role) return "Unknown";
-  return role.replace(/_/g, " ").replace(/\b\w/g, (letter: string) => letter.toUpperCase());
-}
+import { useUsersListController, type UsersSortBy } from "../hooks";
+import { formatShortDate, toRoleLabel } from "../utils/formatters";
 
 const Users = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [users, setUsers] = useState<AuthUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [confirmDialogType, setConfirmDialogType] = useState<'delete' | 'edit' | null>(null);
-  const [userToDelete, setUserToDelete] = useState<AuthUser | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState<string | null>(null);
   const {
-    search,
-    onSearchChange,
-    filters,
-    setFilter,
-    page,
-    setPage,
-    rowsPerPage,
-    onRowsPerPageChange,
-    sortBy,
-    setSortBy,
-    sortOrder,
-    setSortOrder,
-  } = useListManager<UsersFilters, UsersSortBy>({
-    initialFilters: { role: "All", status: "All" },
-    initialSortBy: "created_at",
-    initialSortOrder: "asc",
-    initialRowsPerPage: 10,
-    initialPage: 0,
-    initialSearch: "",
-  });
-
-  const showSuccessToast = (message: string) => setSnackbar(message);
-
-  const fetchUsers = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await userService.getAllUsers();
-      const mappedUsers: AuthUser[] = (data as UserResponse[]).map((u) => ({
-        id: u.id,
-        email: u.email,
-        full_name: u.full_name,
-        role: Array.isArray(u.roles) && u.roles.length > 0 ? u.roles[0] : "Unknown",
-        tenant_id: u.tenant_id ?? null,
-        phone_number: u.phone_number ?? null,
-        is_active: u.is_active ?? true,
-        created_at: u.created_at,
-      }));
-      setUsers(mappedUsers);
-    } catch (err: unknown) {
-      const errorObject = err as { message?: string; detail?: string };
-      setError(errorObject.message || errorObject.detail || "Failed to fetch users.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchUsers();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [fetchUsers]);
-
-  useEffect(() => {
-    if (!snackbar) return;
-    const timer = setTimeout(() => setSnackbar(null), 3000);
-    return () => clearTimeout(timer);
-  }, [snackbar]);
-
-  const handleDeleteClick = (user: AuthUser) => {
-    setUserToDelete(user);
-    setConfirmDialogType('delete');
-    setConfirmDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!userToDelete) return;
-    try {
-      setDeleteLoading(true);
-      await userService.deleteUser(userToDelete.id);
-      setConfirmDialogOpen(false);
-      setUserToDelete(null);
-      showSuccessToast("User deleted successfully");
-      fetchUsers();
-    } catch (err: unknown) {
-      const errorObject = err as { message?: string; detail?: string };
-      setError(errorObject.message || errorObject.detail || "Failed to delete user.");
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
-
-  const uniqueRoles = Array.from(new Set(users.map((u) => u.role).filter(Boolean)));
-
-  const isSystemAdmin = user?.tenant_id == null && !!user;
-  const currentTenantId = user?.tenant_id ?? null;
-
-  const filteredUsers = users.filter((u) => {
-    const matchesTenant = isSystemAdmin || (currentTenantId !== null && u.tenant_id === currentTenantId);
-    const matchesSearch =
-      u.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
-      String(u.id).includes(search);
-
-    const matchesRole = filters.role === "All" || u.role === filters.role;
-
-    const matchesStatus =
-      filters.status === "All" ||
-      (filters.status === "Active" && u.is_active) ||
-      (filters.status === "Inactive" && !u.is_active);
-
-    return matchesTenant && matchesSearch && matchesRole && matchesStatus;
-  });
-
-  const sortedUsers = [...filteredUsers].sort((a, b) => {
-    let aVal: number | string = a.full_name;
-    let bVal: number | string = b.full_name;
-
-    if (sortBy === 'created_at') {
-      aVal = a.created_at ? new Date(a.created_at).getTime() : 0;
-      bVal = b.created_at ? new Date(b.created_at).getTime() : 0;
-    } else if (sortBy === 'name') {
-      aVal = a.full_name.toLowerCase();
-      bVal = b.full_name.toLowerCase();
-    }
-
-    if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  const paginatedUsers = sortedUsers.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+    listState: {
+      search,
+      onSearchChange,
+      filters,
+      setFilter,
+      page,
+      setPage,
+      rowsPerPage,
+      onRowsPerPageChange,
+      sortBy,
+      setSortBy,
+      sortOrder,
+      setSortOrder,
+    },
+    filteredUsers,
+    paginatedUsers,
+    uniqueRoles,
+    loading,
+    error,
+    snackbar,
+    fetchUsers,
+    confirmDialogOpen,
+    deleteLoading,
+    openDeleteConfirm,
+    closeDeleteConfirm,
+    confirmDelete,
+  } = useUsersListController({ currentUser: user });
 
   const listConfig = useMemo<ListConfig<AuthUser, UsersSortBy>>(
     () => ({
@@ -175,14 +62,7 @@ const Users = () => {
         {
           id: "created_at",
           label: "Created Date",
-          render: (u) =>
-            u.created_at
-              ? new Date(u.created_at).toLocaleDateString("en-US", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })
-              : "-",
+          render: (u) => formatShortDate(u.created_at),
         },
       ],
       sortOptions: [
@@ -208,11 +88,11 @@ const Users = () => {
       actions: {
         rowActions: (tableUser) => ({
           onEdit: () => navigate("/user/create", { state: { user: tableUser, isEdit: true } }),
-          onDelete: () => handleDeleteClick(tableUser),
+          onDelete: () => openDeleteConfirm(tableUser),
         }),
       },
     }),
-    [handleDeleteClick, navigate]
+    [navigate, openDeleteConfirm]
   );
 
   return (
@@ -329,10 +209,10 @@ const Users = () => {
       <ConfirmDialog
         open={confirmDialogOpen}
         title="Please Confirm"
-        message={confirmDialogType === "delete" ? "Are you sure you want to delete user?" : confirmDialogType === "edit" ? "Are you sure you want to update this user?" : ""}
+        message="Are you sure you want to delete user?"
         confirmText={deleteLoading ? "Deleting…" : "Confirm"}
-        onConfirm={confirmDialogType === "delete" ? handleConfirmDelete : () => setConfirmDialogOpen(false)}
-        onCancel={() => setConfirmDialogOpen(false)}
+        onConfirm={confirmDelete}
+        onCancel={closeDeleteConfirm}
         loading={deleteLoading}
       />
     </ListPageLayout>
