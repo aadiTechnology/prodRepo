@@ -17,7 +17,7 @@ import {
 } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
-import { useTenantListController } from "../../hooks/useTenantListController";
+import { useTenantListController } from "../../hooks";
 import { createTenantListConfig, renderTenantRowActions } from "./TenantList.listConfig";
 
 const TenantList = () => {
