@@ -25,10 +25,10 @@ class AcademicYear(Base):
     deleted_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Relationships
-    classes = relationship("ClassModel", back_populates="academic_year", cascade="all, delete-orphan")
+    classes = relationship("SchoolClass", back_populates="academic_year", cascade="all, delete-orphan")
 
 
-class ClassModel(Base):
+class SchoolClass(Base):
     __tablename__ = "classes"
     __table_args__ = {'extend_existing': True}
 
@@ -54,4 +54,4 @@ class ClassModel(Base):
     # Relationships
     academic_year = relationship("AcademicYear", back_populates="classes")
     fee_structures = relationship("FeeStructure", back_populates="class_model", cascade="all, delete-orphan")
-    students = relationship("Student", back_populates="class_")
+    students = relationship("Student", back_populates="class_", overlaps="students")

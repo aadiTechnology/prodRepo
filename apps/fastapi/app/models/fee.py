@@ -52,7 +52,7 @@ class FeeStructure(Base):
     deleted_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Relationships
-    class_model = relationship("ClassModel", back_populates="fee_structures")
+    class_model = relationship("SchoolClass", back_populates="fee_structures")
     fee_category = relationship("FeeCategory", back_populates="fee_structures")
     installments = relationship("FeeInstallment", back_populates="fee_structure", cascade="all, delete-orphan")
 

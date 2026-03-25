@@ -11,7 +11,7 @@ from app.models.fee_discount import FeeDiscount
 from app.models.fee import FeeCategory
 from app.models.fee import FeeInstallment
 from app.models.academic import AcademicYear
-from app.models.academic import ClassModel
+from app.models.academic import SchoolClass
 from app.schemas.student_fee_assignment import (
     StudentFeeAssignmentCreate,
 )
@@ -24,8 +24,8 @@ logger = get_logger(__name__)
 def get_students_for_dropdown(db: Session):
     # Join students and classes
     results = (
-        db.query(Student.id, Student.student_name, ClassModel.id.label("class_id"), ClassModel.name.label("class_name"))
-        .join(ClassModel, Student.class_id == ClassModel.id)
+        db.query(Student.id, Student.student_name, SchoolClass.id.label("class_id"), SchoolClass.name.label("class_name"))
+        .join(SchoolClass, Student.class_id == SchoolClass.id)
         .all()
     )
     return [
@@ -42,7 +42,7 @@ def get_student_detail(db: Session, student_id: int):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise NotFoundException("Student not found", 404)
-    class_ = db.query(ClassModel).filter(ClassModel.id == student.class_id).first()
+    class_ = db.query(SchoolClass).filter(SchoolClass.id == student.class_id).first()
     return {
         "id": student.id,
         "name": student.student_name,

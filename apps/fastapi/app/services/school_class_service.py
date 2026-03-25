@@ -3,8 +3,7 @@ import re
 from fastapi import HTTPException
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
-from app.models.academic import ClassModel
-from app.models.academic import AcademicYear
+from app.models import SchoolClass, AcademicYear
 from app.schemas.school_class_schema import SchoolClassCreate, SchoolClassUpdate
 
 
@@ -21,13 +20,13 @@ def _check_duplicate_code(
     code: str,
     exclude_id: int | None = None,
 ) -> None:
-    query = db.query(ClassModel).filter(
-        ClassModel.tenant_id == tenant_id,
-        func.lower(ClassModel.code) == code.lower(),
-        ClassModel.is_deleted == False,
+    query = db.query(SchoolClass).filter(
+        SchoolClass.tenant_id == tenant_id,
+        func.lower(SchoolClass.code) == code.lower(),
+        SchoolClass.is_deleted == False,
     )
     if exclude_id is not None:
-        query = query.filter(ClassModel.id != exclude_id)
+        query = query.filter(SchoolClass.id != exclude_id)
     existing = query.first()
     if existing:
         raise HTTPException(
@@ -49,9 +48,9 @@ def _generate_unique_code(
     section: str | None,
 ) -> str:
     seed = _build_code_seed(name, section)
-    query = db.query(ClassModel.code).filter(
-        ClassModel.tenant_id == tenant_id,
-        ClassModel.is_deleted == False,
+    query = db.query(SchoolClass.code).filter(
+        SchoolClass.tenant_id == tenant_id,
+        SchoolClass.is_deleted == False,
     )
     existing_codes = {row[0].lower() for row in query.all() if row[0]}
 
@@ -78,29 +77,29 @@ def get_all_classes(
     tenant_id: int,
     search: str | None = None,
 ):
-    query = db.query(ClassModel).filter(
-        ClassModel.tenant_id == tenant_id,
-        ClassModel.is_deleted == False,
+    query = db.query(SchoolClass).filter(
+        SchoolClass.tenant_id == tenant_id,
+        SchoolClass.is_deleted == False,
     )
 
     if search:
         text = f"%{search.strip()}%"
         query = query.filter(
             or_(
-                ClassModel.name.ilike(text),
-                ClassModel.code.ilike(text),
-                ClassModel.section.ilike(text),
+                SchoolClass.name.ilike(text),
+                SchoolClass.code.ilike(text),
+                SchoolClass.section.ilike(text),
             )
         )
 
-    return query.order_by(ClassModel.name.asc(), ClassModel.section.asc()).all()
+    return query.order_by(SchoolClass.name.asc(), SchoolClass.section.asc()).all()
 
 
 def get_class_by_id(db: Session, class_id: int, tenant_id: int):
-    db_obj = db.query(ClassModel).filter(
-        ClassModel.id == class_id,
-        ClassModel.tenant_id == tenant_id,
-        ClassModel.is_deleted == False,
+    db_obj = db.query(SchoolClass).filter(
+        SchoolClass.id == class_id,
+        SchoolClass.tenant_id == tenant_id,
+        SchoolClass.is_deleted == False,
     ).first()
     if not db_obj:
         raise HTTPException(status_code=404, detail="Class not found")
@@ -125,7 +124,7 @@ def create_class(
     )
     _check_duplicate_code(db, tenant_id, final_code)
 
-    db_obj = ClassModel(
+    db_obj = SchoolClass(
         tenant_id=tenant_id,
         academic_year_id=data.academic_year_id,
         name=normalized_name,

@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import uuid4
 from sqlalchemy.orm import Session
 from app.models.fee import FeeCategory, FeeStructure, FeeInstallment
-from app.models.academic import ClassModel, AcademicYear
+from app.models.academic import SchoolClass, AcademicYear
 from app.schemas.fee import FeeStructureCreate, FeeStructureUpdate, FeeCategoryCreate, FeeCategoryUpdate
 from app.core.exceptions import NotFoundException, ConflictException
 from app.core.logging_config import get_logger
@@ -95,7 +95,7 @@ def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academ
     if class_id:
         query = query.filter(FeeStructure.class_id == class_id)
     if class_name:
-        query = query.join(FeeStructure.class_model).filter(ClassModel.name == class_name)
+        query = query.join(FeeStructure.class_model).filter(SchoolClass.name == class_name)
     if academic_year_id:
         query = query.filter(FeeStructure.academic_year_id == academic_year_id)
     
@@ -103,7 +103,7 @@ def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academ
     
     # Enrich with names (or use joinedload in production)
     for s in structures:
-        s.class_name = db.query(ClassModel.name).filter(ClassModel.id == s.class_id).scalar()
+        s.class_name = db.query(SchoolClass.name).filter(SchoolClass.id == s.class_id).scalar()
         s.fee_category_name = db.query(FeeCategory.name).filter(FeeCategory.id == str(s.fee_category_id)).scalar()
         s.academic_year_name = db.query(AcademicYear.name).filter(AcademicYear.id == s.academic_year_id).scalar()
         
