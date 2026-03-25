@@ -1,3 +1,9 @@
+/**
+ * Sidebar Component - Main navigation sidebar with dynamic menu rendering
+ * Renders menu items based on user's RBAC permissions
+ * Supports collapsible state, search, and nested menu items
+ */
+
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
 import {
@@ -26,8 +32,12 @@ import {
   Search as SearchIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
+import { useRBAC } from "../../context/RBACContext";
 import { colorTokens } from "../../tokens/colors";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Asset Icons - Menu item icons
+// ═══════════════════════════════════════════════════════════════════════════
 // Import Icons from assets
 import userIcon from "../../assets/icons/user.png";
 import teamworkIcon from "../../assets/icons/teamwork.png";
@@ -37,9 +47,15 @@ import assetsIcon from "../../assets/icons/assets.png";
 import moneyIcon from "../../assets/icons/money.png";
 import feesIcon from "../../assets/icons/fees.png";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Constants
+// ═══════════════════════════════════════════════════════════════════════════
 const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 88;
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Styled Components
+// ═══════════════════════════════════════════════════════════════════════════
 const SidebarContainer = styled(Box)(({ theme }) => ({
   height: "100%",
   display: "flex",
@@ -168,10 +184,43 @@ interface MenuItemData {
   children?: { id: string; label: string; path: string }[];
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Icon Mapping
+// ═══════════════════════════════════════════════════════════════════════════
+const ICON_MAP: Record<string, string> = {
+  "dashboard": workingIcon,
+  "students": userIcon,
+  "academics": schoolIcon,
+  "academic-years": schoolIcon,
+  "fees": feesIcon,
+  "staff": teamworkIcon,
+  "finance": moneyIcon,
+  "settings": assetsIcon,
+  "tenants": schoolIcon,
+  "users": userIcon,
+  "config": assetsIcon,
+  "default": workingIcon
+};
+
+const COLOR_MAP: Record<string, string> = {
+  "dashboard": colorTokens.menuColors.dashboard,
+  "students": colorTokens.menuColors.students,
+  "academics": colorTokens.menuColors.academics,
+  "academic-years": colorTokens.menuColors.academics,
+  "fees": colorTokens.menuColors.fees,
+  "staff": colorTokens.menuColors.staff,
+  "finance": colorTokens.menuColors.finance,
+  "settings": colorTokens.menuColors.settings,
+  "tenants": colorTokens.menuColors.students,
+  "users": colorTokens.menuColors.academics,
+  "config": colorTokens.menuColors.settings,
+};
+
 export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggleCollapse }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { menus } = useRBAC();
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [mounted, setMounted] = useState(false);
@@ -181,82 +230,27 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   }, []);
 
   const menuItems: MenuItemData[] = useMemo(() => {
-    const rawRole = user?.role || "";
-    const role = rawRole.toUpperCase();
-    
-    // Role Definitions
-    const isSuperAdmin = role === "SUPER_ADMIN" || role === "SYSTEM_ADMIN";
-    const isTenantAdmin = ["TENANT_ADMIN", "ADMIN"].includes(role);
+    if (!menus || menus.length === 0) return [];
 
-    if (isSuperAdmin) {
-      return [
-        { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: colorTokens.menuColors.dashboard },
-        { 
-          id: "tenants", 
-          label: "Tenants", 
-          icon: schoolIcon, 
-          color: colorTokens.menuColors.students,
-          children: [
-            { id: "tenant-mgmt", label: "Tenant Management", path: "/tenants" },
-          ]
-        },
-        { 
-          id: "users", 
-          label: "Users", 
-          icon: userIcon, 
-          color: colorTokens.menuColors.academics,
-          children: [
-            { id: "user-mgmt", label: "User Management", path: "/users" },
-          ]
-        },
-        {
-          id: "config",
-          label: "System Config",
-          icon: assetsIcon,
-          color: colorTokens.menuColors.settings,
-          children: [
-            { id: "roles", label: "Role Management", path: "/roles" },
-            { id: "theme", label: "Theme Studio", path: "/admin/theme-studio" },
-            { id: "ai-review", label: "AI Review", path: "/ai/review" },
-            { id: "ai-gen", label: "Story Generation", path: "/ai/generate" },
-          ]
-        }
-      ];
-    }
+    return menus.map(node => {
+      const slug = (node.path || "").replace(/\//g, "") || "dashboard";
+      const icon = ICON_MAP[slug] || ICON_MAP[node.icon || ""] || ICON_MAP.default;
+      const color = COLOR_MAP[slug] || COLOR_MAP[node.icon || ""] || colorTokens.menuColors.dashboard;
 
-    if (isTenantAdmin) {
-      return [
-        { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: colorTokens.menuColors.dashboard },
-        { id: "students", label: "Students", icon: userIcon, path: "/students", color: colorTokens.menuColors.students },
-        { id: "academics", label: "Academics", icon: schoolIcon, path: "/academics", color: colorTokens.menuColors.academics },
-        { id: "academic-years", label: "Academic Years", icon: schoolIcon, path: "/academic-years", color: colorTokens.menuColors.academics },
-        {
-          id: "fees",
-          label: "Fees",
-          icon: feesIcon,
-          color: colorTokens.menuColors.fees,
-          children: [
-            { id: "fee-cat", label: "Fee Category", path: "/fees/categories" },
-            { id: "fee-struct", label: "Fee Structure", path: "/fees/setup" },
-            { id: "fee-discount", label: "Fee Discount", path: "/fees/discounts" },
-            { id: "fee-ledger", label: "Student Fee Ledger", path: "/fees/ledger" },
-            { id: "assign-student-fee", label: "Assign Fee To Student", path: "/fees/assign-student-fee" },
-
-
-          ]
-        },
-        { id: "staff", label: "Staff", icon: teamworkIcon, path: "/staff", color: colorTokens.menuColors.staff },
-        { id: "finance", label: "Finance", icon: moneyIcon, path: "/finance", color: colorTokens.menuColors.finance },
-        { id: "settings", label: "Settings", icon: assetsIcon, path: "/settings", color: colorTokens.menuColors.settings },
-      ];
-    }
-
-    // Default User Menu
-    return [
-      { id: "dashboard", label: "Dashboard", icon: workingIcon, path: "/", color: colorTokens.menuColors.dashboard },
-      { id: "profile", label: "My Profile", icon: userIcon, path: "/profile", color: colorTokens.menuColors.students },
-    ];
-  }, [user?.role]);
+      return {
+        id: node.id.toString(),
+        label: node.name,
+        icon: icon,
+        path: node.path || undefined,
+        color: color,
+        children: node.children?.map(child => ({
+          id: child.id.toString(),
+          label: child.name,
+          path: child.path || ""
+        }))
+      };
+    });
+  }, [menus]);
 
   const toggleSection = (id: string, isActive: boolean) => {
     setExpandedSections((prev) => ({

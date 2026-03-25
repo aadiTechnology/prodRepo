@@ -1,3 +1,9 @@
+/**
+ * Fee Discounts Page - Manage fee discounts for the institution
+ * Displays list of fee discounts with create, edit, and delete operations
+ * Uses RBAC permissions for managing discount access
+ */
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
     Box,
@@ -20,6 +26,9 @@ import feeDiscountService from "../../api/services/feeDiscountService";
 import { FeeDiscount } from "../../types/feeDiscount";
 import CreateDiscountDialog from "./CreateDiscountDialog";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Fee Discounts Page Component
+// ═══════════════════════════════════════════════════════════════════════════
 const FeeDiscountsPage = () => {
     const navigate = useNavigate();
     const [discounts, setDiscounts] = useState<FeeDiscount[]>([]);

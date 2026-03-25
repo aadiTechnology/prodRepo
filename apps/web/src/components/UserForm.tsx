@@ -1,3 +1,9 @@
+/**
+ * User Form Component - Form for creating and editing users
+ * Handles user creation/update with role selection and active status
+ * Includes email and password validation with RBAC integration
+ */
+
 import { useState, useEffect, useCallback, memo } from "react";
 import {
   Box,
@@ -21,6 +27,9 @@ import { User, UserCreate, UserUpdate } from "../types/user";
 import roleService from "../api/services/roleService";
 import tenantService from "../api/services/tenantService";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// User Form Props Interface
+// ═══════════════════════════════════════════════════════════════════════════
 interface UserFormProps {
   open: boolean;
   onClose: () => void;

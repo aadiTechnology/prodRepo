@@ -1,3 +1,9 @@
+/**
+ * Add Class Page - Create and edit school classes
+ * Form page for adding/editing class details with validation
+ * Manages academic year association and class metadata
+ */
+
 import { useState, useEffect, useCallback } from "react";
 import { Box, Typography, Alert, CircularProgress, IconButton, Tooltip, Switch, alpha } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
@@ -10,6 +16,9 @@ import schoolClassService from "../../api/services/schoolClassService";
 import academicYearService, { AcademicYear } from "../../api/services/academicYearService";
 import { colorTokens } from "../../tokens/colors";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Form Field Styling Helper
+// ═══════════════════════════════════════════════════════════════════════════
 const buildFieldSx = (hasError: boolean) => (theme: Theme) => ({
     "& .MuiOutlinedInput-root": {
         borderRadius: "12px",

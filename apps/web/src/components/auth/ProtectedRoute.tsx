@@ -1,6 +1,7 @@
 /**
- * ProtectedRoute Component
+ * ProtectedRoute Component - Route guard for authentication and authorization
  * Wraps routes that require authentication and optionally permissions/roles
+ * Uses both legacy requireAdmin and modern RBAC permission/role checking
  */
 
 import { Navigate, useLocation } from "react-router-dom";
@@ -9,8 +10,14 @@ import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
 import { ReactNode } from "react";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Utility Functions
+// ═══════════════════════════════════════════════════════════════════════════
 const normalizeRole = (value: string | undefined | null): string => (value || "").trim().toLowerCase();
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Props Interface
+// ═══════════════════════════════════════════════════════════════════════════
 interface ProtectedRouteProps {
   children: ReactNode;
   /**

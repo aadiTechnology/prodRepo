@@ -1,3 +1,9 @@
+/**
+ * Role Management Page - Manage application roles and permissions
+ * Displays list of roles with create, edit, and delete operations
+ * Integrates RBAC for admin-level permission management
+ */
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
@@ -6,7 +12,7 @@ import {
   CircularProgress,
   Snackbar,
 } from "@mui/material";
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from "@mui/icons-material";
+import { Add as AddIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { Role } from "../types/role.types";
 import roleService from "../api/services/roleService";
@@ -14,9 +20,17 @@ import { ListPageLayout, ListPageToolbar, DirectoryInfoBar, TablePaginationBar, 
 import { PageHeader } from "../components/layout";
 import ConfirmDialog from "../components/common/ConfirmDialog";
 import StatusChip from "../components/roles/StatusChip";
+import { useRBAC } from "../context/RBACContext";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Role Management Page Component
+// ═══════════════════════════════════════════════════════════════════════════
 const RoleManagementPage = () => {
   const navigate = useNavigate();
+  const { hasPermission } = useRBAC();
+  const canCreateRole = hasPermission("ADMIN_MGMT:create");
+  const canEditRole = hasPermission("ADMIN_MGMT:edit");
+  const canDeleteRole = hasPermission("ADMIN_MGMT:delete");
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -134,9 +148,9 @@ const RoleManagementPage = () => {
               searchValue={search}
               onSearchChange={setSearch}
               searchPlaceholder="Search roles..."
-              onAddClick={() => navigate("/roles/create")}
-              addLabel="Add Role"
-              addIcon={<AddIcon sx={{ fontSize: 24 }} />}
+              onAddClick={canCreateRole ? () => navigate("/roles/create") : undefined}
+              addLabel={canCreateRole ? "Add Role" : undefined}
+              addIcon={canCreateRole ? <AddIcon sx={{ fontSize: 24 }} /> : undefined}
             />
           }
         />
@@ -164,8 +178,8 @@ const RoleManagementPage = () => {
           emptyMessage="No roles available."
           renderRowActions={(role) => (
             <TableRowActions
-              onEdit={() => navigate(`/roles/create?id=${role.id}`)}
-              onDelete={() => handleDeleteClick(role)}
+              onEdit={canEditRole ? () => navigate(`/roles/create?id=${role.id}`) : undefined}
+              onDelete={canDeleteRole ? () => handleDeleteClick(role) : undefined}
             />
           )}
           stickyHeader

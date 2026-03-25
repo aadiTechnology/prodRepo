@@ -1,3 +1,9 @@
+/**
+ * Fee Structure Form Page - Create/Edit fee structure for classes
+ * Handles form validation, submission, and fee configuration
+ * Integrated with academic year, class, and fee category management
+ */
+
 import { useState, useEffect, useCallback } from "react";
 import {
     Box,
@@ -28,6 +34,10 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
 import feeService from "../../api/services/feeService";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Fee Structure Form Page Component
+// ═══════════════════════════════════════════════════════════════════════════
 import { ListPageLayout, FormSectionLabel, FieldLabel, DataTable } from "../../components/reusable";
 import { FeeStructure, FeeCategory, AcademicYear, ClassEntity, FeeInstallment } from "../../types/fee";
 import { useForm, Controller } from "react-hook-form";

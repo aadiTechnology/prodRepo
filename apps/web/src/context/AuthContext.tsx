@@ -1,6 +1,7 @@
 /**
- * Authentication Context
- * Provides authentication state and methods throughout the application
+ * Authentication Context - Global authentication state management
+ * Provides user login, logout, token management, and RBAC context integration
+ * Manages token persistence and user session across application
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from "react";
@@ -12,6 +13,9 @@ import { useNavigate } from "react-router-dom";
 import { useRBAC } from "./RBACContext";
 import { enqueueSnackbar } from "notistack";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Type Definitions
+// ═══════════════════════════════════════════════════════════════════════════
 interface AuthContextType extends AuthState {
   login: (credentials: LoginRequest) => Promise<void>;
   loginWithContext: (credentials: LoginRequest) => Promise<LoginContextResponse>;
@@ -192,7 +196,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setUser(userWithExtras);
     saveUser(userWithExtras);
-    setRBACData({ roles: response.roles, menus: response.menus });
+    setRBACData({ roles: response.roles, menus: response.menus, permissions: response.permissions });
   }, [setRBACData]);
 
   /**

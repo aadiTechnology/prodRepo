@@ -1,3 +1,9 @@
+/**
+ * Class List Page - Display and manage school classes
+ * Provides listing with search, filtering, and CRUD operations
+ * Integrates RBAC for class management permissions
+ */
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
@@ -15,6 +21,9 @@ import schoolClassService, { SchoolClass } from "../../api/services/schoolClassS
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import StatusChip from "../../components/roles/StatusChip";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Class List Page Component
+// ═══════════════════════════════════════════════════════════════════════════
 const ClassList = () => {
     const navigate = useNavigate();
 

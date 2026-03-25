@@ -1,3 +1,9 @@
+/**
+ * Academic Year List Page - Display and manage academic years
+ * Provides listing, search, and CRUD operations for academic years
+ * Integrates RBAC for academic management permissions
+ */
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
@@ -15,6 +21,9 @@ import academicYearService, { AcademicYear } from "../../api/services/academicYe
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import StatusChip from "../../components/roles/StatusChip";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Academic Year List Page Component
+// ═══════════════════════════════════════════════════════════════════════════
 const AcademicYearList = () => {
     const navigate = useNavigate();
 

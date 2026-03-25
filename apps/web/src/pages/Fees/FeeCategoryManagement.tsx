@@ -1,3 +1,9 @@
+/**
+ * Fee Category Management Page - Manage fee categories for the institution
+ * Displays list of fee categories with CRUD operations
+ * Integrates with RBAC for create, edit, and delete permissions
+ */
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Alert, Snackbar } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +16,9 @@ import PageHeader from '../../components/layout/PageHeader';
 import StatusChip from '../../components/roles/StatusChip';
 // ...existing code...
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Fee Category Management Page Component
+// ═══════════════════════════════════════════════════════════════════════════
 const FeeCategoryManagement = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<FeeCategoryResponse[]>([]);

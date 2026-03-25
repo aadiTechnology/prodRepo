@@ -1,12 +1,18 @@
 /**
- * RBAC Context
- * Provides RBAC data (roles, permissions, menus) throughout the application
+ * RBAC Context - Role-Based Access Control state management
+ * Provides role checking, permission validation, and menu utilities
+ * Manages roles, permissions, and menu hierarchy for the entire application
  */
 
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
 import { RBACState, LoginContextResponse } from "../types/rbac";
 import { MenuNode, Feature } from "../types/menu";
+import { authService } from "../api/services/authService";
+import { useEffect } from "react";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Type Definitions - RBAC Context interface and methods
+// ═══════════════════════════════════════════════════════════════════════════
 interface RBACContextType extends RBACState {
   // Permission checking
   hasPermission: (permission: string) => boolean;
@@ -23,7 +29,8 @@ interface RBACContextType extends RBACState {
   getMenuFeatures: (menuId: number) => Feature[];
   
   // Actions
-  setRBACData: (data: Pick<LoginContextResponse, "roles" | "menus">) => void;
+  setRBACData: (data: Pick<LoginContextResponse, "roles" | "menus" | "permissions">) => void;
+  refreshRBAC: () => Promise<void>;
   clearRBACData: () => void;
 }
 
@@ -42,7 +49,7 @@ const normalizeRoles = (roles: string[] | undefined | null): string[] => {
 /**
  * Get RBAC data from localStorage
  */
-const getStoredRBACData = (): Pick<RBACState, "roles" | "menus"> | null => {
+const getStoredRBACData = (): Pick<RBACState, "roles" | "menus" | "permissions"> | null => {
   try {
     const rbacStr = localStorage.getItem(RBAC_STORAGE_KEY);
     const parsed = rbacStr ? JSON.parse(rbacStr) : null;
@@ -59,7 +66,7 @@ const getStoredRBACData = (): Pick<RBACState, "roles" | "menus"> | null => {
 /**
  * Save RBAC data to localStorage
  */
-const saveRBACData = (data: Pick<RBACState, "roles" | "menus">): void => {
+const saveRBACData = (data: Pick<RBACState, "roles" | "menus" | "permissions">): void => {
   try {
     localStorage.setItem(RBAC_STORAGE_KEY, JSON.stringify(data));
   } catch (error) {
@@ -113,20 +120,20 @@ export function RBACProvider({ children }: RBACProviderProps) {
   
   const [roles, setRoles] = useState<string[]>(normalizeRoles(storedData?.roles));
   const [menus, setMenus] = useState<MenuNode[]>(storedData?.menus || []);
+  const [permissions, setPermissions] = useState<string[]>(storedData?.permissions || []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Extract permissions from menus
-  const permissions = useMemo(() => extractPermissions(menus), [menus]);
 
   /**
    * Set RBAC data (called after login)
    */
-  const setRBACData = useCallback((data: Pick<LoginContextResponse, "roles" | "menus">) => {
+  const setRBACData = useCallback((data: Pick<LoginContextResponse, "roles" | "menus" | "permissions">) => {
     const normalized = normalizeRoles(data.roles);
+    const effectivePermissions = data.permissions?.length ? data.permissions : extractPermissions(data.menus);
     setRoles(normalized);
     setMenus(data.menus);
-    saveRBACData({ roles: normalized, menus: data.menus });
+    setPermissions(effectivePermissions);
+    saveRBACData({ roles: normalized, menus: data.menus, permissions: effectivePermissions });
     setError(null);
   }, []);
 
@@ -136,9 +143,42 @@ export function RBACProvider({ children }: RBACProviderProps) {
   const clearRBACData = useCallback(() => {
     setRoles([]);
     setMenus([]);
+    setPermissions([]);
     clearStoredRBACData();
     setError(null);
   }, []);
+
+  /**
+   * Refresh RBAC data from backend
+   */
+  const refreshRBAC = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await authService.getRBACContext();
+      const normalized = normalizeRoles(data.roles);
+      const effectivePermissions = data.permissions?.length ? data.permissions : extractPermissions(data.menus);
+      setRoles(normalized);
+      setMenus(data.menus);
+      setPermissions(effectivePermissions);
+      saveRBACData({ roles: normalized, menus: data.menus, permissions: effectivePermissions });
+    } catch (err: any) {
+      console.error("Failed to refresh RBAC data:", err);
+      setError(err.message || "Failed to refresh permissions");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /**
+   * Auto-refresh on mount if we have stored data (meaning we are likely logged in)
+   */
+  useEffect(() => {
+    const hasToken = !!localStorage.getItem("token"); // Assuming token is stored in localStorage
+    if (hasToken) {
+      refreshRBAC();
+    }
+  }, [refreshRBAC]);
 
   /**
    * Check if user has specific permission
@@ -263,6 +303,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
       getMenuByPath,
       getMenuFeatures,
       setRBACData,
+      refreshRBAC,
       clearRBACData,
     }),
     [
@@ -280,6 +321,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
       getMenuByPath,
       getMenuFeatures,
       setRBACData,
+      refreshRBAC,
       clearRBACData,
     ]
   );

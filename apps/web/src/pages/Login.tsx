@@ -1,6 +1,7 @@
 /**
- * Login Page
- * User authentication page with unified design and RBAC integration
+ * Login Page - User authentication interface
+ * Handles email/password login with RBAC context integration
+ * Includes form validation, error handling, and loading states
  */
 
 import { useState, useEffect } from "react";
@@ -117,6 +118,7 @@ export default function Login() {
       setRBACData({
         roles: response.roles,
         menus: response.menus,
+        permissions: response.permissions,
       });
 
       // 3. Navigation happens via useEffect or explicitly here

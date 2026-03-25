@@ -1,3 +1,9 @@
+/**
+ * Users Management Page - Manage application users and their roles
+ * Displays user list with search, filtering, and CRUD operations
+ * Integrates RBAC for user management permissions
+ */
+
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { User as AuthUser } from "../types/auth";
@@ -14,6 +20,9 @@ import { useUsersListController } from "../hooks";
 import { toRoleLabel } from "../utils/formatters";
 import { createUsersListConfig } from "./Users.listConfig";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Users Management Page Component
+// ═══════════════════════════════════════════════════════════════════════════
 const Users = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
