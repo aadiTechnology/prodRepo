@@ -5,7 +5,7 @@ from app.models.student_fee_assignment import (
     StudentFeeDetail,
     StudentFeeInstallment,
 )
-from app.models.student_fee_ledger import Student
+from app.models.student import Student
 from app.models.fee import FeeStructure
 from app.models.fee_discount import FeeDiscount
 from app.models.fee import FeeCategory

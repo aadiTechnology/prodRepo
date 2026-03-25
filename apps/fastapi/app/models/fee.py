@@ -84,4 +84,5 @@ class FeeInstallment(Base):
     fee_structure = relationship("FeeStructure", back_populates="installments")
 
     fee_category = relationship("FeeCategory")
-    fee_payments = relationship("FeePayment", back_populates="installment")
+    # Fee payments are linked via FeePaymentAllocation (no direct FK from FeePayment -> FeeInstallment).
+    # Keep the model graph consistent and let repositories join through allocations.

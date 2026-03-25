@@ -10,7 +10,7 @@ class StudentFeeAssignment(Base):
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
     academic_year_id = Column(Integer, ForeignKey("academic_years.id"), nullable=False)
     fee_structure_id = Column(Integer, ForeignKey("fee_structures.id"), nullable=False)
-    discount_id = Column(Integer, ForeignKey("discounts.id"), nullable=True)
+    discount_id = Column(Integer, ForeignKey("fee_discounts.id"), nullable=True)
     additional_fee = Column(Numeric(10,2), nullable=True)
     total_amount = Column(Numeric(10,2), nullable=False)
     final_amount = Column(Numeric(10,2), nullable=False)

@@ -34,6 +34,7 @@ from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, 
 
 
 from app.routers import fee_discount, fee_category_router
+from app.routers import installment_tracking, fee_installment_status, fee_collection
 
 # Setup logging first
 setup_logging()
@@ -92,6 +93,9 @@ app.include_router(class_fee_structure_assignment.router)
 app.include_router(student_fee_ledger.router) 
 app.include_router(student_fee_assignment.router)
 app.include_router(fee_structure.router)
+app.include_router(installment_tracking.router)
+app.include_router(fee_installment_status.router)
+app.include_router(fee_collection.router)
 
 
 # Mount static files for profile images

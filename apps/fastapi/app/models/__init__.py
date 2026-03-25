@@ -18,6 +18,17 @@ from app.models.class_fee_structure_assignment import ClassFeeStructureAssignmen
 from app.models.academic import AcademicYear, SchoolClass
 # from app.models.school_class import SchoolClass
 from app.models.fee import FeeCategory, FeeStructure, FeeInstallment
+from app.models.fee_discount import FeeDiscount
+from app.models.fee_payment import FeePayment, FeePaymentAllocation
+from app.models.role_menu_permission import RoleMenuPermission
+from app.models.student import Student
+from app.models.student_fee_assignment import (
+    StudentFeeAssignment,
+    StudentFeeDetail,
+    StudentFeeInstallment,
+)
+from app.models.student_fee_ledger import FeeLedger
+from app.models.permission import Permission, role_permissions
 # Export all models for convenience
 __all__ = [
     "Tenant",
@@ -25,21 +36,33 @@ __all__ = [
     "UserRole",
     "UserRoleType",
     "Role",
+    "RoleMenuPermission",
     "Feature",
     "Menu",
     "UserProfile",
     "user_roles",
     "role_features",
     "role_menus",
+    "Permission",
+    "role_permissions",
     "RevokedToken",
     "Requirement",
     "UserStory",
     "TestCase",
     "DevelopmentTask",
     "ThemeTemplate",
-     "SchoolClass",
+    "SchoolClass",
     "FeeStructure",
     "AcademicYear",
-
+    "FeeCategory",
+    "FeeInstallment",
+    "FeeDiscount",
+    "FeeLedger",
+    "Student",
+    "StudentFeeAssignment",
+    "StudentFeeDetail",
+    "StudentFeeInstallment",
+    "FeePayment",
+    "FeePaymentAllocation",
 
 ]

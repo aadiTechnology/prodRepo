@@ -1,7 +1,8 @@
 # PDF download support
 from fastapi.responses import Response
 import io
-from app.models.student_fee_ledger import Student, FeeLedger
+from app.models.student import Student
+from app.models.student_fee_ledger import FeeLedger
 # Student Fee Ledger Router
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
@@ -61,7 +62,7 @@ def get_fee_ledger(student_id: int, academic_year: str = Query(...), tenant_id: 
     else:
         logger.info(f"[DEBUG] No fee_structure_id set for student {student.id}")
     logger.info(f"[DEBUG] fee_structures found: {[fs.id for fs in fee_structures]}")
-    from app.models.student_fee_ledger import FeePayment
+    from app.models.fee_payment import FeePayment
     if not ledger and fee_structures:
         # No ledger, generate from all fee structures
         installment_list = []

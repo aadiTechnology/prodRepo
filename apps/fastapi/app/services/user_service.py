@@ -88,7 +88,7 @@ def update_user(
     """Update a user."""
     db_user = get_user(db, user_id)
     # Block changes if protected
-    if db_user.is_protected:
+    if getattr(db_user, "is_protected", False):
         if user.role is not None and user.role != db_user.role:
             raise ConflictException("Cannot change role of protected user.")
         if user.is_active is not None and not user.is_active:
