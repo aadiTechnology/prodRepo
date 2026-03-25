@@ -45,6 +45,8 @@ const ClassList = lazy(() => import("../pages/academics/ClassList"));
 const AddClass = lazy(() => import("../pages/academics/AddClass"));
 const AssignStudentFee = lazy(() => import("../pages/Fees/AssignStudentFee"));
 const PermissionManagementPage = lazy(() => import("../pages/admin/PermissionManagementPage"));
+const FeeInstallmentStatus = lazy(() => import("../pages/Fees/FeeInstallmentStatus"));
+const CollectPaymentPage = lazy(() => import("../pages/Fees/CollectPaymentPage"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -130,6 +132,20 @@ export default function AppRoutes() {
           <Route path="/fees/setup/add" element={<ProtectedRoute requiredPermissions="FEE_MGMT:create"><FeeStructureForm /></ProtectedRoute>} />
           <Route path="/fees/setup/:id/edit" element={<ProtectedRoute requiredPermissions="FEE_MGMT:edit"><FeeStructureForm /></ProtectedRoute>} />
           <Route path="/fees/ledger" element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><StudentFeeLedger /></ProtectedRoute>} />
+
+          {/* Installment status / payment collection */}
+          <Route
+            path="/fees/collection"
+            element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeInstallmentStatus /></ProtectedRoute>}
+          />
+          <Route
+            path="/fees/installment-status"
+            element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeInstallmentStatus /></ProtectedRoute>}
+          />
+          <Route
+            path="/fees/collect-payment"
+            element={<ProtectedRoute requiredPermissions="FEE_MGMT:create"><CollectPaymentPage /></ProtectedRoute>}
+          />
           
           {/* FEES MODULE (from user request) */}
           <Route
