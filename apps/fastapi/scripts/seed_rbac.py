@@ -67,6 +67,7 @@ def seed_rbac_data():
                     {"name": "Fee Category", "path": "/fees/categories", "feature": "FEE_MGMT"},
                     {"name": "Fee Structure", "path": "/fees/setup", "feature": "FEE_MGMT"},
                     {"name": "Fee Discount", "path": "/fees/discounts", "feature": "FEE_MGMT"},
+                    {"name": "Fee Installment Status", "path": "/fees/installment-status", "feature": "FEE_MGMT"},
                 ]
             },
             {
