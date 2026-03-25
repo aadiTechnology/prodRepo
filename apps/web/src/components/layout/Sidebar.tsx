@@ -216,6 +216,47 @@ const COLOR_MAP: Record<string, string> = {
   "config": colorTokens.menuColors.settings,
 };
 
+const SYSTEM_ADMIN_MENU: MenuItemData[] = [
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    icon: workingIcon,
+    path: "/",
+    color: colorTokens.menuColors.dashboard,
+  },
+  {
+    id: "tenants",
+    label: "Tenants",
+    icon: schoolIcon,
+    color: colorTokens.menuColors.students,
+    children: [
+      { id: "tenant-management", label: "Tenant Management", path: "/tenants" }
+    ]
+  },
+  {
+    id: "users",
+    label: "Users",
+    icon: userIcon,
+    color: colorTokens.menuColors.academics,
+    children: [
+      { id: "user-management", label: "User Management", path: "/users" }
+    ]
+  },
+  {
+    id: "system-config",
+    label: "System Config",
+    icon: assetsIcon,
+    color: colorTokens.menuColors.settings,
+    children: [
+      { id: "role-management", label: "Role Management", path: "/roles" },
+      { id: "permission-management", label: "Permission Management", path: "/admin/permission-management" },
+      { id: "theme-studio", label: "Theme Studio", path: "/admin/theme-studio" },
+      { id: "ai-review", label: "AI Review", path: "/ai/review" },
+      { id: "story-generation", label: "Story Generation", path: "/ai/generate" }
+    ]
+  }
+];
+
 export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggleCollapse }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -230,11 +271,26 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   }, []);
 
   const menuItems: MenuItemData[] = useMemo(() => {
+    if (user?.role === "SUPER_ADMIN") {
+      return SYSTEM_ADMIN_MENU;
+    }
+
     if (!menus || menus.length === 0) return [];
 
     return menus.map(node => {
-      const slug = (node.path || "").replace(/\//g, "") || "dashboard";
-      const icon = ICON_MAP[slug] || ICON_MAP[node.icon || ""] || ICON_MAP.default;
+      const path = (node.path || "").toLowerCase();
+      const name = (node.name || "").toLowerCase();
+      
+      let icon = workingIcon;
+      if (path.includes("fee") || name.includes("fee")) icon = feesIcon;
+      else if (path.includes("user") || path.includes("student") || name.includes("user") || name.includes("student")) icon = userIcon;
+      else if (path.includes("academic") || path.includes("class") || name.includes("academic") || name.includes("class") || path.includes("tenant") || name.includes("tenant")) icon = schoolIcon;
+      else if (path.includes("staff") || path.includes("role") || name.includes("staff") || name.includes("role") || path.includes("permission") || name.includes("permission")) icon = teamworkIcon;
+      else if (path.includes("finance") || name.includes("finance")) icon = moneyIcon;
+      else if (path.includes("setting") || path.includes("config") || path.includes("admin") || name.includes("setting") || name.includes("config") || name.includes("theme")) icon = assetsIcon;
+
+      // Keep default coloring logic or simplify
+      const slug = path.replace(/\//g, "") || "dashboard";
       const color = COLOR_MAP[slug] || COLOR_MAP[node.icon || ""] || colorTokens.menuColors.dashboard;
 
       return {
@@ -250,7 +306,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         }))
       };
     });
-  }, [menus]);
+  }, [menus, user]);
 
   const toggleSection = (id: string, isActive: boolean) => {
     setExpandedSections((prev) => ({
