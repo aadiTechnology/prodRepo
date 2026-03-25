@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
-from app.core.dependencies import get_db, require_admin
+from app.core.dependencies import get_db, require_permission
 from app.services.class_fee_structure_assignment_service import ClassFeeStructureAssignmentService
 from app.schemas.class_fee_structure_assignment import (
     ClassFeeStructureAssignmentCreate,
@@ -10,7 +10,7 @@ from app.schemas.class_fee_structure_assignment import (
     ClassFeeStructureAssignmentCreateResponse,
 )
 from app.core.exceptions import AppException
-from app.models.user import User
+from app.schemas.auth import CurrentUser
 
 router = APIRouter(prefix="/api/fees", tags=["Fees"])
 
@@ -27,7 +27,7 @@ def assign_fee_structure_list(
     page: int = Query(1),
     limit: int = Query(20),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "view")),
 ):
     filters = {}
     if academicYear:
@@ -42,7 +42,7 @@ def assign_fee_structure_list(
 def assign_fee_structure_create(
     payload: ClassFeeStructureAssignmentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "create")),
 ):
     assignment = ClassFeeStructureAssignmentService.create_assignment(db, payload, current_user.id)
     return {"success": True, "message": "Fee structure assigned successfully", "data": assignment}
@@ -51,7 +51,7 @@ def assign_fee_structure_create(
 def assign_fee_structure_get_by_id(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "view")),
 ):
     assignment = ClassFeeStructureAssignmentService.get_assignment_by_id(db, id)
     return assignment
@@ -61,7 +61,7 @@ def assign_fee_structure_update(
     id: int,
     payload: ClassFeeStructureAssignmentUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "edit")),
 ):
     assignment = ClassFeeStructureAssignmentService.update_assignment(db, id, payload, current_user.id)
     return assignment
@@ -70,7 +70,7 @@ def assign_fee_structure_update(
 def assign_fee_structure_deactivate(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "delete")),
 ):
     assignment = ClassFeeStructureAssignmentService.deactivate_assignment(db, id, current_user.id)
     return assignment
@@ -79,7 +79,7 @@ def assign_fee_structure_deactivate(
 def create_assignment(
     payload: ClassFeeStructureAssignmentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "create")),
 ):
     assignment = ClassFeeStructureAssignmentService.create_assignment(db, payload, current_user.id)
     return {
@@ -96,7 +96,7 @@ def get_assignments(
     page: int = Query(1),
     limit: int = Query(20),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "view")),
 ):
     filters = {}
     if academicYear:
@@ -112,7 +112,7 @@ def update_assignment(
     id: int,
     payload: ClassFeeStructureAssignmentUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "edit")),
 ):
     assignment = ClassFeeStructureAssignmentService.update_assignment(db, id, payload, current_user.id)
     return assignment
@@ -121,7 +121,7 @@ def update_assignment(
 def deactivate_assignment(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "delete")),
 ):
     assignment = ClassFeeStructureAssignmentService.deactivate_assignment(db, id, current_user.id)
     return assignment

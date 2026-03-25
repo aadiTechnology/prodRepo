@@ -1,12 +1,16 @@
 /**
- * Authentication Service
- * Handles authentication API calls
+ * Authentication Service - API client for user authentication & authorization
+ * Handles login, logout, user info, and RBAC context retrieval
+ * Supports user impersonation for system administrators
  */
 
 import apiClient from "../client";
 import { LoginRequest, TokenResponse, User } from "../../types/auth";
 import { LoginContextResponse } from "../../types/rbac";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Authentication Service - Core methods
+// ═══════════════════════════════════════════════════════════════════════════
 export const authService = {
   /**
    * Login user and get access token
@@ -52,6 +56,14 @@ export const authService = {
    */
   exitImpersonation: async (): Promise<LoginContextResponse> => {
     const response = await apiClient.post<LoginContextResponse>("/auth/exit-impersonation");
+    return response.data;
+  },
+
+  /**
+   * Get current user's RBAC context (roles, menus, permissions)
+   */
+  getRBACContext: async (): Promise<LoginContextResponse> => {
+    const response = await apiClient.get<LoginContextResponse>("/auth/rbac/context");
     return response.data;
   },
 };

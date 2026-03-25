@@ -1,3 +1,9 @@
+/**
+ * Fee Structure Setup Page - Manage fee structures across academic years and classes
+ * Provides UI for creating, editing, and managing fee structures
+ * Integrates with academic year, class, and fee category selection
+ */
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -54,7 +60,16 @@ const FeeStructureSetup = () => {
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string>("");
-  const [selectedClassId, setSelectedClassId] = useState<string>("");
+  const [selectedClassName, setSelectedClassName] = useState<string>("");
+  
+  const uniqueClasses = useMemo(() => {
+    const seen = new Set();
+    return classes.filter(cls => {
+      if (!cls.name || seen.has(cls.name)) return false;
+      seen.add(cls.name);
+      return true;
+    });
+  }, [classes]);
 
   // Confirm Dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -72,8 +87,9 @@ const FeeStructureSetup = () => {
         page,
         rowsPerPage,
         search,
+        undefined, // classId no longer used for filter
         selectedAcademicYearId ? Number(selectedAcademicYearId) : undefined,
-        selectedClassId ? Number(selectedClassId) : undefined
+        selectedClassName || undefined
       );
       setStructures(res.items);
       setTotalRecords(res.total);
@@ -86,7 +102,7 @@ const FeeStructureSetup = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, search, selectedAcademicYearId, selectedClassId]);
+  }, [page, rowsPerPage, search, selectedAcademicYearId, selectedClassName]);
 
   useEffect(() => {
     fetchData();
@@ -122,12 +138,12 @@ const FeeStructureSetup = () => {
 
   const handleAcademicYearChange = (value: string) => {
     setSelectedAcademicYearId(value);
-    setSelectedClassId(""); // Clear class selection when year changes
+    setSelectedClassName(""); // Clear class selection when year changes
     setPage(0);
   };
 
   const handleClassChange = (value: string) => {
-    setSelectedClassId(value);
+    setSelectedClassName(value);
     setPage(0);
   };
 
@@ -193,7 +209,7 @@ const FeeStructureSetup = () => {
               renderActions={
                 <> {/* Custom filters rendered here (Filter > Search > Add) */}
                   <Select
-                    value={selectedClassId}
+                    value={selectedClassName}
                     onChange={(e) => handleClassChange(e.target.value as string)}
                     displayEmpty
                     size="small"
@@ -211,9 +227,9 @@ const FeeStructureSetup = () => {
                         Class
                       </Typography>
                     </MenuItem>
-                    {classes.map((cls) => (
-                      <MenuItem key={cls.id} value={cls.id.toString()}>
-                        {cls.name} {cls.section ? `(${cls.section})` : ""}
+                    {uniqueClasses.map((cls) => (
+                      <MenuItem key={cls.id} value={cls.name}>
+                        {cls.name}
                       </MenuItem>
                     ))}
                   </Select>
@@ -238,7 +254,7 @@ const FeeStructureSetup = () => {
                     </MenuItem>
                     {academicYears.map((ay) => (
                       <MenuItem key={ay.id} value={ay.id.toString()}>
-                        {ay.name}
+                        {ay.name} ({ay.code})
                       </MenuItem>
                     ))}
                   </Select>

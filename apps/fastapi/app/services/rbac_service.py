@@ -51,31 +51,42 @@ def get_user_roles(db: Session, user_id: int) -> List[Role]:
 
 def _validate_role_scope(role: Role, user: User, action: str) -> None:
     """Validate that a role can be assigned to a user based on scope."""
-    role_scope = role.scope_type or RoleScope.TENANT
+    role_scope = (role.scope_type or RoleScope.TENANT).upper()
     
-    if role_scope == RoleScope.PLATFORM and user.tenant_id is not None:
+    if role_scope == RoleScope.PLATFORM.value and user.tenant_id is not None:
         raise ForbiddenException(
             f"Cannot {action} platform-level role '{role.code}' to a tenant user."
         )
     
-    if role_scope == RoleScope.TENANT and user.tenant_id is None:
+    if role_scope == RoleScope.TENANT.value and user.tenant_id is None:
         raise ForbiddenException(
             f"Cannot {action} tenant-level role '{role.code}' to a platform user."
         )
     
-    if role_scope == RoleScope.TENANT and role.tenant_id is not None and role.tenant_id != user.tenant_id:
+    if role_scope == RoleScope.TENANT.value and role.tenant_id is not None and role.tenant_id != user.tenant_id:
         raise ForbiddenException(
             f"Cannot {action} role '{role.code}' - role belongs to a different tenant."
         )
 
 
-def set_user_roles(db: Session, user: User, role_ids: List[int], acting_user_id: int | None = None) -> None:
+def set_user_roles(
+    db: Session,
+    user: User,
+    role_ids: List[int],
+    acting_user_id: int | None = None,
+    acting_user: User | Any | None = None,
+) -> None:
     """Replace user roles with the given set."""
+    if acting_user and acting_user.tenant_id is not None and user.tenant_id != acting_user.tenant_id:
+        raise ForbiddenException("Cannot update roles for a user from a different tenant.")
+
     for role_id in role_ids:
         role = db.query(Role).filter(Role.id == role_id, Role.is_deleted == False).first()
         if not role:
             raise ValidationException(f"Role with id {role_id} not found.")
         _validate_role_scope(role, user, "assign")
+        if acting_user and acting_user.tenant_id is not None and role.tenant_id != acting_user.tenant_id:
+            raise ForbiddenException(f"Cannot assign role '{role.code}' from a different tenant.")
     
     db.execute(user_roles.delete().where(user_roles.c.user_id == user.id))
 
@@ -302,6 +313,38 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
                 f"Cannot assign tenant-specific menu '{menu.name}' to a platform role."
             )
     
+    # Delegation Validation: Ensure acting user has the permissions they are trying to assign
+    if acting_user_id:
+        acting_user = db.query(User).get(acting_user_id)
+        if acting_user:
+            # Check if acting user is SUPER_ADMIN
+            is_super_admin = (
+                acting_user.role == "SUPER_ADMIN" or 
+                (acting_user.role == "ADMIN" and acting_user.tenant_id is None)
+            )
+            
+            if not is_super_admin:
+                # Get acting user's effective permissions
+                user_perms_codes, _ = resolve_user_permissions_and_menus(db, acting_user)
+                user_perms = set(user_perms_codes)
+                
+                for p in data.permissions:
+                    menu = db.query(Menu).get(p.menu_id) # Already checked above
+                    if not menu or not menu.feature:
+                        continue
+                        
+                    f_code = menu.feature.code
+                    
+                    # If they are trying to grant a permission, they must have it themselves
+                    if p.can_view and f"{f_code}:view" not in user_perms:
+                        raise ForbiddenException(f"You cannot grant 'view' access to '{menu.name}' because you don't have it.")
+                    if p.can_create and f"{f_code}:create" not in user_perms:
+                        raise ForbiddenException(f"You cannot grant 'create' access to '{menu.name}' because you don't have it.")
+                    if p.can_edit and f"{f_code}:edit" not in user_perms:
+                        raise ForbiddenException(f"You cannot grant 'edit' access to '{menu.name}' because you don't have it.")
+                    if p.can_delete and f"{f_code}:delete" not in user_perms:
+                        raise ForbiddenException(f"You cannot grant 'delete' access to '{menu.name}' because you don't have it.")
+
     try:
         db.query(RoleMenuPermission).filter(
             RoleMenuPermission.role_id == role.id

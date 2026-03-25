@@ -3,19 +3,15 @@
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict
 
 from app.core.database import get_db
-from app.core.dependencies import require_admin, require_permission, CurrentUser
-from app.core.exceptions import NotFoundException
-from app.models.user import User
-from app.models.role import Role
+from app.core.dependencies import require_permission, CurrentUser, get_rbac_role_codes, SYSTEM_ADMIN_ROLE_CODE
+from app.core.exceptions import ForbiddenException
 from app.models.menu import Menu
-from app.models.feature import Feature
 from app.schemas.role import RoleResponse
 from app.schemas.menu import MenuResponse
 from app.schemas.feature import FeatureResponse
-from app.schemas.auth import UserWithRole
 from app.services import rbac_service, role_service, menu_service, feature_service, user_service
 from app.models.permission import Permission
 
@@ -25,6 +21,23 @@ from app.models.role_menu_permission import RoleMenuPermission
 
 router = APIRouter(prefix="/rbac", tags=["RBAC"])
 
+
+def _is_system_admin(current_user: CurrentUser, db: Session) -> bool:
+    if current_user.tenant_id is not None:
+        return False
+    user_role = str(current_user.role)
+    if user_role in ["SUPER_ADMIN", "admin", "ADMIN"]:
+        return True
+    rbac_role_codes = get_rbac_role_codes(db, current_user.id)
+    return SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_role_codes
+
+
+def _assert_role_scope_access(role, current_user: CurrentUser, db: Session) -> None:
+    if _is_system_admin(current_user, db):
+        return
+    if current_user.tenant_id is None or role.tenant_id != current_user.tenant_id:
+        raise ForbiddenException("Insufficient permissions")
+
 @router.get("/roles/{role_id}/matrix", response_model=RolePermissionMatrixResponse)
 def get_role_permission_matrix(
     role_id: int,
@@ -33,15 +46,46 @@ def get_role_permission_matrix(
 ):
     """Fetch the full menu/permission grid for a role."""
     role = role_service.get_role(db, role_id)
+    _assert_role_scope_access(role, current_user, db)
     
+    # 1. Get all menus accessible to THIS tenant, further filtered by what the CURRENT USER can see
+    # This prevents a Tenant Admin from delegating a menu they themselves don't have access to.
+    
+    # Get user's effective menus (flat IDs)
+    _, user_menu_nodes = rbac_service.resolve_user_permissions_and_menus(db, current_user)
+    
+    def get_all_ids(nodes):
+        ids = []
+        for n in nodes:
+            ids.append(n.id)
+            if n.children:
+                ids.extend(get_all_ids(n.children))
+        return ids
+    
+    accessible_menu_ids = set(get_all_ids(user_menu_nodes))
+    
+    # If the user is PLATFORM ADMIN (is_super_admin), they should see all menus for the tenant
+    is_super_admin = (
+        current_user.role == "SUPER_ADMIN" or 
+        (current_user.role == "ADMIN" and current_user.tenant_id is None)
+    )
+
     tenant_id = role.tenant_id if role.tenant_id is not None else current_user.tenant_id
-    
-    all_menus = db.query(Menu).filter(
+
+    query = db.query(Menu).filter(
         Menu.is_active == True,  # noqa: E712
         Menu.is_deleted == False,  # noqa: E712
     ).filter(
         (Menu.tenant_id == None) | (Menu.tenant_id == tenant_id)  # noqa: E712
-    ).all()
+    )
+    
+    all_menus_raw = query.all()
+    
+    if is_super_admin:
+        all_menus = all_menus_raw
+    else:
+        # Filter by what the user is allowed to see
+        all_menus = [m for m in all_menus_raw if m.id in accessible_menu_ids]
     
     # 2. Get current permissions for this role
     current_perms = db.query(RoleMenuPermission).filter(
@@ -99,6 +143,7 @@ def update_role_permission_matrix(
 ):
     """Bulk update the shared menu/permission mapping for a role."""
     role = role_service.get_role(db, role_id)
+    _assert_role_scope_access(role, current_user, db)
     rbac_service.set_role_menu_permissions(db, role, data, acting_user_id=current_user.id)
     return None
 
@@ -126,8 +171,10 @@ async def get_user_roles(
     current_user: CurrentUser = Depends(require_permission("Roles", "view")),
 ) -> List[RoleResponse]:
     """Get roles assigned to a user."""
-    # Ensure user exists
-    user_service.get_user(db, user_id)
+    user = user_service.get_user(db, user_id)
+    if not _is_system_admin(current_user, db):
+        if current_user.tenant_id is None or user.tenant_id != current_user.tenant_id:
+            raise ForbiddenException("Insufficient permissions")
     roles = rbac_service.get_user_roles(db, user_id)
     return roles
 
@@ -141,7 +188,10 @@ async def set_user_roles(
 ) -> None:
     """Replace roles assigned to a user."""
     user = user_service.get_user(db, user_id)
-    rbac_service.set_user_roles(db, user, role_ids, acting_user_id=current_user.id)
+    if not _is_system_admin(current_user, db):
+        if current_user.tenant_id is None or user.tenant_id != current_user.tenant_id:
+            raise ForbiddenException("Insufficient permissions")
+    rbac_service.set_user_roles(db, user, role_ids, acting_user_id=current_user.id, acting_user=current_user)
     return None
 
 
@@ -152,6 +202,7 @@ async def get_role_menus(
     current_user: CurrentUser = Depends(require_permission("Roles", "view")),
 ) -> List[MenuResponse]:
     role = role_service.get_role(db, role_id)
+    _assert_role_scope_access(role, current_user, db)
     from app.models.role import role_menus
     menus = db.query(Menu).join(role_menus).filter(role_menus.c.role_id == role.id).all()
     return menus
@@ -166,6 +217,7 @@ async def set_role_menus(
 ) -> None:
     """Replace menus assigned to a role."""
     role = role_service.get_role(db, role_id)
+    _assert_role_scope_access(role, current_user, db)
     # Ensure menus exist
     for mid in menu_ids:
         menu_service.get_menu(db, mid)
@@ -181,6 +233,7 @@ async def get_role_features(
 ) -> List[FeatureResponse]:
     """Get features assigned to a role."""
     role = role_service.get_role(db, role_id)
+    _assert_role_scope_access(role, current_user, db)
     return role.features  # type: ignore[return-value]
 
 
@@ -193,6 +246,7 @@ async def set_role_features(
 ) -> None:
     """Replace features assigned to a role."""
     role = role_service.get_role(db, role_id)
+    _assert_role_scope_access(role, current_user, db)
     # Ensure features exist
     for fid in feature_ids:
         feature_service.get_feature(db, fid)

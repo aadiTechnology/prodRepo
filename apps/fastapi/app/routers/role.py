@@ -2,11 +2,13 @@ from datetime import datetime
 import logging
 
 from app.models.role import Role
+from app.models.user import UserRole
 
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.dependencies import require_admin, require_system_admin, CurrentUser
+from app.core.dependencies import require_permission, require_system_admin, CurrentUser, get_rbac_role_codes, SYSTEM_ADMIN_ROLE_CODE
+from app.core.exceptions import ForbiddenException
 from app.schemas.role import RoleCreate, RoleUpdate, RoleResponse, RoleListResponse, RoleListData
 from app.services import role_service
 
@@ -15,6 +17,22 @@ router = APIRouter(prefix="/roles", tags=["Roles"])
 
 # IMPORTANT: Keep all path literals (e.g. /summary) above path-parameter routes (e.g. /{role_id})
 # to avoid accidental matching of /summary as a role_id. See FastAPI routing order.
+
+
+def _is_system_admin(current_user: CurrentUser, db: Session) -> bool:
+    if current_user.tenant_id is not None:
+        return False
+    if current_user.role in [UserRole.SUPER_ADMIN, UserRole.ADMIN]:
+        return True
+    rbac_role_codes = get_rbac_role_codes(db, current_user.id)
+    return SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_role_codes
+
+
+def _assert_role_access(role: Role, current_user: CurrentUser, db: Session) -> None:
+    if _is_system_admin(current_user, db):
+        return
+    if current_user.tenant_id is None or role.tenant_id != current_user.tenant_id:
+        raise ForbiddenException("Insufficient permissions")
 
 
 @router.get("/summary")
@@ -38,10 +56,16 @@ async def role_summary(db: Session = Depends(get_db), current_user: CurrentUser 
 
 
 @router.get("/dropdown")
-async def get_roles_dropdown(db: Session = Depends(get_db)):
-    """Get simple role list for dropdowns (id and name only) - no authentication required for dropdowns."""
+async def get_roles_dropdown(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_permission("Roles", "view")),
+):
+    """Get simple role list for dropdowns (id and name only)."""
     try:
-        roles = db.query(Role.id, Role.name).filter(Role.is_deleted == False, Role.is_active == True).all()
+        query = db.query(Role.id, Role.name).filter(Role.is_deleted == False, Role.is_active == True)
+        if not _is_system_admin(current_user, db):
+            query = query.filter(Role.tenant_id == current_user.tenant_id)
+        roles = query.all()
         return {
             "success": True,
             "data": [{"id": r[0], "name": r[1]} for r in roles]
@@ -64,15 +88,15 @@ async def list_roles(
     sort_by: str = Query("id", alias="sortBy"),
     sort_order: str = Query("desc", alias="sortOrder"),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "view")),
 ) -> RoleListResponse:
     logging.debug(f"User: {current_user.email}, Role: {current_user.role}, Tenant: {current_user.tenant_id}")
-    print(f"page_size={page_size}, page_number={page_number}")
-    from app.models.user import UserRole
-    is_platform = current_user.role == UserRole.SUPER_ADMIN
+    is_platform = _is_system_admin(current_user, db)
+    effective_tenant_id = tenant_id if is_platform else current_user.tenant_id
 
     roles, total = role_service.get_roles(
-        db, search, page_number, page_size, tenant_id=tenant_id, is_platform=is_platform,
+        db, search, page_number, page_size, tenant_id=effective_tenant_id, is_platform=is_platform,
+        scope_type=scope_type, status=status,
         created_from=created_from, created_to=created_to,
         sort_by=sort_by, sort_order=sort_order
     )
@@ -91,10 +115,11 @@ async def list_roles(
 async def get_role(
     role_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "view")),
 ) -> RoleResponse:
     """Get a single role by ID."""
     role = role_service.get_role(db, role_id)
+    _assert_role_access(role, current_user, db)
     return RoleResponse.model_validate(role)
 
 
@@ -102,9 +127,13 @@ async def get_role(
 async def create_role(
     data: RoleCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "create")),
 ) -> RoleResponse:
     """Create a new role."""
+    is_system_admin = _is_system_admin(current_user, db)
+    if not is_system_admin:
+        data.scope_type = "Tenant"
+        data.tenant_id = current_user.tenant_id
     role = role_service.create_role(db, data, created_by=current_user.id)
     return RoleResponse.model_validate(role)
 
@@ -114,9 +143,11 @@ async def update_role(
     role_id: int,
     data: RoleUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "edit")),
 ) -> RoleResponse:
         """Update an existing role."""
+        role = role_service.get_role(db, role_id)
+        _assert_role_access(role, current_user, db)
         role = role_service.update_role(db, role_id, data, updated_by=current_user.id)
         return RoleResponse.model_validate(role)
 
@@ -126,8 +157,10 @@ async def update_role(
 async def activate_role(
     role_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_system_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "edit")),
 ):
+    role = role_service.get_role(db, role_id)
+    _assert_role_access(role, current_user, db)
     role_service.activate_role(db, role_id, current_user.id)
     return {"success": True}
 
@@ -137,8 +170,10 @@ async def activate_role(
 async def deactivate_role(
     role_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_system_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "delete")),
 ):
+    role = role_service.get_role(db, role_id)
+    _assert_role_access(role, current_user, db)
     role_service.deactivate_role(db, role_id, current_user.id)
     return {"success": True}
 
@@ -147,9 +182,11 @@ async def deactivate_role(
 async def delete_role(
     role_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Roles", "delete")),
 ) -> None:
     """Soft delete a role."""
+    role = role_service.get_role(db, role_id)
+    _assert_role_access(role, current_user, db)
     role_service.soft_delete_role(db, role_id, deleted_by=current_user.id)
     return None
 

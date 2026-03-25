@@ -1,5 +1,14 @@
+/**
+ * Academic Year Service - API client for Academic Year management
+ * Provides methods to fetch, create, update, and delete academic years
+ * Communicates with backend academic year endpoints
+ */
+
 import apiClient from "../client";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Type Definitions
+// ═══════════════════════════════════════════════════════════════════════════
 export interface AcademicYear {
   id: number;
   name: string;
@@ -22,6 +31,9 @@ export interface AcademicYearUpdate extends Partial<AcademicYearCreate> {}
 
 const BASE_URL = "/api/academic-years";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Academic Year Service - CRUD operations
+// ═══════════════════════════════════════════════════════════════════════════
 export const academicYearService = {
   getAll: async (): Promise<AcademicYear[]> => {
     const response = await apiClient.get(BASE_URL);

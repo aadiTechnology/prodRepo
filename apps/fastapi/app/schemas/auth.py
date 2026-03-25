@@ -62,8 +62,8 @@ class CurrentUser(BaseModel):
 
 class LoginContextResponse(BaseModel):
     """Extended login response including RBAC context."""
-    access_token: str
-    token_type: str = "bearer"
+    access_token: Optional[str] = None
+    token_type: Optional[str] = "bearer"
     user: UserWithRole
     roles: List[str]
     permissions: List[str]

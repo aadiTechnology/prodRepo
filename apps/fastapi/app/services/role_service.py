@@ -2,7 +2,7 @@
 
 from app.schemas.role import RoleCreate, RoleUpdate
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 
 from app.core.exceptions import NotFoundException, ConflictException
 from app.core.logging_config import get_logger
@@ -21,6 +21,8 @@ def get_roles(
     page_size: int = 50,
     tenant_id: int | None = None,
     is_platform: bool = False,
+    scope_type: str | None = None,
+    status: bool | None = None,
     created_from: datetime = None,
     created_to: datetime = None,
     sort_by: str = "id",
@@ -35,12 +37,19 @@ def get_roles(
     try:
         query = db.query(Role).filter(Role.is_deleted == False)
 
-        # RBAC filtering logic
-        # if is_platform:
-        #     query = query.filter(Role.scope_type == "Platform", Role.tenant_id == None)
-        # elif tenant_id:
-        #     query = query.filter(Role.scope_type == "Tenant", Role.tenant_id == tenant_id)
-        # # else: fallback, show all roles (for legacy or debugging)
+        if is_platform:
+            if tenant_id is not None:
+                query = query.filter(Role.tenant_id == tenant_id)
+        elif tenant_id is not None:
+            query = query.filter(Role.tenant_id == tenant_id)
+        else:
+            query = query.filter(Role.id == -1)
+
+        if scope_type:
+            query = query.filter(func.lower(Role.scope_type) == scope_type.lower())
+
+        if status is not None:
+            query = query.filter(Role.is_active == status)
 
         if search:
             query = query.filter(Role.name.ilike(f"%{search}%"))

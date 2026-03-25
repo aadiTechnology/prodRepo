@@ -15,16 +15,18 @@ const feeService = {
     page = 0,
     size = 10,
     search = "",
+    classId?: number,
     academicYearId?: number,
-    classId?: number
+    className?: string
   ): Promise<PaginatedResponse<FeeStructure>> => {
     const response = await apiClient.get("/fees/structures", {
       params: {
         page,
         size,
         search,
-        academic_year_id: academicYearId,
         class_id: classId,
+        academic_year_id: academicYearId,
+        class_name: className,
       },
     });
     return response.data;

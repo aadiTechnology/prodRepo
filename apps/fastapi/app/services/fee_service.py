@@ -14,19 +14,20 @@ def get_fee_categories(db: Session, tenant_id: int) -> list[FeeCategory]:
     """Return all non-deleted fee categories for a tenant."""
     return (
         db.query(FeeCategory)
-        .filter(FeeCategory.tenant_id == tenant_id, FeeCategory.deleted_at.is_(None))
+        .filter(FeeCategory.tenant_id == tenant_id, FeeCategory.status == True)
         .all()
     )
 
 
 def get_fee_category(db: Session, tenant_id: int, category_id: str) -> FeeCategory:
     """Return a single fee category or raise if not found."""
+    category_id = str(category_id)
     obj = (
         db.query(FeeCategory)
         .filter(
             FeeCategory.id == category_id,
             FeeCategory.tenant_id == tenant_id,
-            FeeCategory.deleted_at.is_(None),
+            FeeCategory.status == True,
         )
         .first()
     )
@@ -80,17 +81,21 @@ def update_fee_category(
 def delete_fee_category(db: Session, category_id: str, tenant_id: int, user_id: int | None) -> None:
     """Soft delete a fee category."""
     db_obj = get_fee_category(db, tenant_id, category_id)
-    db_obj.deleted_at = datetime.utcnow()
+    db_obj.status = False
+    db_obj.updated_at = datetime.utcnow()
+    db_obj.updated_by = user_id
     db_obj.deleted_by = user_id
     db.commit()
 
-def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academic_year_id: int = None) -> list[FeeStructure]:
+def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academic_year_id: int = None, class_name: str = None) -> list[FeeStructure]:
     query = db.query(FeeStructure).filter(
         FeeStructure.tenant_id == tenant_id,
         FeeStructure.is_deleted == False
     )
     if class_id:
         query = query.filter(FeeStructure.class_id == class_id)
+    if class_name:
+        query = query.join(FeeStructure.class_model).filter(ClassModel.name == class_name)
     if academic_year_id:
         query = query.filter(FeeStructure.academic_year_id == academic_year_id)
     
@@ -99,7 +104,7 @@ def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academ
     # Enrich with names (or use joinedload in production)
     for s in structures:
         s.class_name = db.query(ClassModel.name).filter(ClassModel.id == s.class_id).scalar()
-        s.fee_category_name = db.query(FeeCategory.name).filter(FeeCategory.id == s.fee_category_id).scalar()
+        s.fee_category_name = db.query(FeeCategory.name).filter(FeeCategory.id == str(s.fee_category_id)).scalar()
         s.academic_year_name = db.query(AcademicYear.name).filter(AcademicYear.id == s.academic_year_id).scalar()
         
     return structures

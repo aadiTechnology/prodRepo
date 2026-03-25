@@ -146,6 +146,18 @@ async def logout(
         revoke_token(db, token, current_user.id)
         logger.info(f"User logged out: {current_user.email}")
     return {"message": "Logged out successfully"}
+    
+@router.get("/rbac/context", response_model=LoginContextResponse)
+async def get_rbac_context(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user)
+) -> LoginContextResponse:
+    """Get the current user's RBAC context (roles, permissions, menus)."""
+    user = user_service.get_user_by_id(db, current_user.id)
+    if not user:
+        raise UnauthorizedException("User not found")
+        
+    return auth_service.get_login_context(db, user)
 
 @router.post("/impersonate/{user_id}", response_model=LoginContextResponse)
 async def impersonate_user(

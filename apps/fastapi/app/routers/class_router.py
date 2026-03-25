@@ -1,11 +1,20 @@
+"""
+Class Router - School Classes Management
+Handles CRUD operations for school classes with permission-based access control
+Uses RBAC (Role-Based Access Control) to restrict operations by user permissions
+"""
+
 from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import get_current_user, require_admin, require_permission
 from app.schemas.auth import CurrentUser
 from app.schemas.school_class_schema import SchoolClassCreate, SchoolClassResponse, SchoolClassUpdate
 from app.services import school_class_service
 
+# ═══════════════════════════════════════════════════════════════════════════
+# API Router - Classes endpoints
+# ═══════════════════════════════════════════════════════════════════════════
 router = APIRouter(prefix="/api/classes", tags=["Classes"])
 
 
@@ -13,7 +22,7 @@ router = APIRouter(prefix="/api/classes", tags=["Classes"])
 def list_classes(
     search: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("Classes", "view")),
 ):
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="User does not belong to a tenant")
@@ -28,7 +37,7 @@ def list_classes(
 def get_class_by_id(
     class_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("Classes", "view")),
 ):
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="User does not belong to a tenant")
@@ -43,7 +52,7 @@ def get_class_by_id(
 def create_class(
     data: SchoolClassCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Classes", "create")),
 ):
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="User does not belong to a tenant")
@@ -60,7 +69,7 @@ def update_class(
     class_id: int,
     data: SchoolClassUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Classes", "edit")),
 ):
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="User does not belong to a tenant")
@@ -77,7 +86,7 @@ def update_class(
 def delete_class(
     class_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Classes", "delete")),
 ):
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="User does not belong to a tenant")

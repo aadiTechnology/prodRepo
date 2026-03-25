@@ -1,5 +1,14 @@
+/**
+ * School Class Service - API client for school class management
+ * Provides methods to fetch, create, update, and delete school classes
+ * Supports searching and filtering by academic year
+ */
+
 import apiClient from "../client";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Type Definitions
+// ═══════════════════════════════════════════════════════════════════════════
 export interface SchoolClass {
   id: number;
   tenant_id: number;
@@ -33,6 +42,9 @@ export interface SchoolClassUpdate extends Partial<SchoolClassCreate> {}
 
 const BASE_URL = "/api/classes";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// School Class Service - CRUD operations
+// ═══════════════════════════════════════════════════════════════════════════
 const schoolClassService = {
   getAll: async (params?: { search?: string }): Promise<SchoolClass[]> => {
     const response = await apiClient.get(BASE_URL, { params });

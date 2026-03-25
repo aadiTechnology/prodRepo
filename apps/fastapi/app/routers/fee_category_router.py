@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_admin, CurrentUser
+from app.core.dependencies import require_permission, CurrentUser
 from app.schemas.fee import FeeCategoryResponse, FeeCategoryCreate, FeeCategoryUpdate
 from app.services import fee_service
 
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/fee-categories", tags=["Fee Categories"])
 @router.get("/", response_model=list[FeeCategoryResponse])
 def list_fee_categories(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("Fees", "view")),
 ):
     return fee_service.get_fee_categories(db, current_user.tenant_id)
 
@@ -21,7 +21,7 @@ def list_fee_categories(
 def get_fee_category(
     category_id: str,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("Fees", "view")),
 ):
     return fee_service.get_fee_category(db, current_user.tenant_id, category_id)
 
@@ -31,7 +31,7 @@ def get_fee_category(
 def create_fee_category(
     category: FeeCategoryCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "create")),
 ):
     return fee_service.create_fee_category(db, category, current_user.tenant_id, current_user.id)
 
@@ -42,7 +42,7 @@ def update_fee_category(
     category_id: str,
     category: FeeCategoryUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "edit")),
 ):
     return fee_service.update_fee_category(db, category_id, category, current_user.tenant_id, current_user.id)
 
@@ -51,7 +51,7 @@ def update_fee_category(
 def delete_fee_category(
     category_id: str,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "delete")),
 ):
     fee_service.delete_fee_category(db, category_id, current_user.tenant_id, current_user.id)
     return None

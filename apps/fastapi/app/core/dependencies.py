@@ -209,7 +209,7 @@ def require_system_admin(
 
 
 # Convenience dependencies
-require_admin = require_role([UserRole.ADMIN])
+require_admin = require_role([UserRole.ADMIN, UserRole.TENANT_ADMIN])
 require_user = require_role([UserRole.USER, UserRole.ADMIN])
 
 

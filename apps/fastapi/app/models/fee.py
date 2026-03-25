@@ -9,7 +9,6 @@ class FeeCategory(Base):
     # UUID format, NOT auto-increment
     id = Column(String(36), primary_key=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
-    fee_category_id = Column(String(36), ForeignKey("fee_categories.id", ondelete="CASCADE"), nullable=True)
     name = Column(String(100), nullable=False)
     code = Column(String(20), nullable=False)
     description = Column(String(500), nullable=True)
@@ -40,6 +39,7 @@ class FeeStructure(Base):
     installment_type = Column(String(20), nullable=False)
     num_installments = Column(Integer, nullable=False)
     description = Column(String(500), nullable=True)
+    name = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Audit fields

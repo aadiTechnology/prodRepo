@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_admin, CurrentUser
+from app.core.dependencies import get_current_user, require_permission, CurrentUser
 from app.schemas.fee import (
     FeeCategoryResponse,
     FeeCategoryCreate,
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/fees", tags=["Fees"])
 @router.get("/categories", response_model=list[FeeCategoryResponse])
 async def read_fee_categories(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("Fees", "view")),
 ):
     """List all fee categories for the current tenant."""
     return fee_service.get_fee_categories(db, current_user.tenant_id)
@@ -32,7 +32,7 @@ async def read_fee_categories(
 async def read_fee_category(
     category_id: str,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("Fees", "view")),
 ):
     """Get a single fee category by ID."""
     return fee_service.get_fee_category(db, current_user.tenant_id, category_id)
@@ -42,7 +42,7 @@ async def read_fee_category(
 async def create_fee_category(
     category: FeeCategoryCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "create")),
 ):
     """Create a new fee category."""
     return fee_service.create_fee_category(db, category, current_user.tenant_id, current_user.id)
@@ -53,7 +53,7 @@ async def update_fee_category(
     category_id: str,
     category: FeeCategoryUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "edit")),
 ):
     """Update an existing fee category."""
     return fee_service.update_fee_category(db, category_id, category, current_user.tenant_id, current_user.id)
@@ -63,7 +63,7 @@ async def update_fee_category(
 async def delete_fee_category(
     category_id: str,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("Fees", "delete")),
 ):
     """Delete a fee category."""
     fee_service.delete_fee_category(db, category_id, current_user.tenant_id, current_user.id)
@@ -75,15 +75,17 @@ async def read_fee_structures(
     size: int = Query(10, ge=1),
     search: str = Query(None),
     class_id: int = Query(None),
+    class_name: str = Query(None),
     academic_year_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user)
+    current_user: CurrentUser = Depends(require_permission("Fees", "view"))
 ):
     structures = fee_service.get_fee_structures(
         db, 
         current_user.tenant_id, 
         class_id=class_id, 
-        academic_year_id=academic_year_id
+        academic_year_id=academic_year_id,
+        class_name=class_name
     )
     
     # Simple manual search for now if needed, or implement in service
@@ -116,7 +118,7 @@ async def read_fee_structures(
 async def create_fee_structure(
     structure: FeeStructureCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin)
+    current_user: CurrentUser = Depends(require_permission("Fees", "create"))
 ):
     return fee_service.create_fee_structure(db, structure, current_user.tenant_id, current_user.id)
 
@@ -125,7 +127,7 @@ async def update_fee_structure(
     structure_id: int,
     structure: FeeStructureUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin)
+    current_user: CurrentUser = Depends(require_permission("Fees", "edit"))
 ):
     return fee_service.update_fee_structure(db, structure_id, structure, current_user.tenant_id, current_user.id)
 
@@ -133,7 +135,7 @@ async def update_fee_structure(
 async def delete_fee_structure(
     structure_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin)
+    current_user: CurrentUser = Depends(require_permission("Fees", "delete"))
 ):
     fee_service.delete_fee_structure(db, structure_id, current_user.tenant_id, current_user.id)
     return None
