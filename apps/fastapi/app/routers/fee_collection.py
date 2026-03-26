@@ -16,9 +16,12 @@ async def collect_fee_payment(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_installment_tracking_access),
 ):
+    # Use provided tenant_id or fallback to current_user.tenant_id
+    effective_tenant_id = payload.tenant_id if payload.tenant_id is not None else current_user.tenant_id
+    
     return collect_payment(
         db,
-        tenant_id=current_user.tenant_id,
+        tenant_id=effective_tenant_id,
         user_id=current_user.id,
         req=payload,
     )

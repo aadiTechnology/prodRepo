@@ -19,6 +19,10 @@ class FeePayment(Base):
     total_amount = Column(Numeric(10, 2), nullable=False)
     notes = Column(Text, nullable=True)
 
+    # Direct installment link (matches actual DB schema)
+    fee_installment_id = Column(Integer, ForeignKey("fee_installments.id", ondelete="SET NULL"), nullable=True)
+    paid_amount = Column(Numeric(10, 2), nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
@@ -27,10 +31,10 @@ class FeePayment(Base):
         back_populates="payment",
         cascade="all, delete-orphan",
     )
-    # Fee payment is associated with installments via FeePaymentAllocation (no direct FK here).
 
 
 class FeePaymentAllocation(Base):
+    """New allocation table for multi-installment payments. May not exist in DB yet."""
     __tablename__ = "fee_payment_allocations"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -45,4 +49,3 @@ class FeePaymentAllocation(Base):
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     payment = relationship("FeePayment", back_populates="allocations")
-

@@ -14,12 +14,16 @@ router = APIRouter(prefix="/api/fees", tags=["Fees - Installment Status"])
 async def fee_installment_status(
     student_id: int = Query(..., ge=1),
     academic_year_id: int = Query(..., ge=1),
+    tenant_id: int | None = Query(None),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_installment_tracking_access),
 ):
+    # Use provided tenant_id or fallback to current_user.tenant_id
+    effective_tenant_id = tenant_id if tenant_id is not None else current_user.tenant_id
+    
     return get_fee_installment_status(
         db,
-        tenant_id=current_user.tenant_id,
+        tenant_id=effective_tenant_id,
         student_id=student_id,
         academic_year_id=academic_year_id,
     )

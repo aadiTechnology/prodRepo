@@ -13,6 +13,7 @@ class FeePaymentAllocationCreate(BaseModel):
 
 class FeePaymentCollectRequest(BaseModel):
     student_id: int = Field(..., ge=1)
+    tenant_id: Optional[int] = Field(None, ge=1)
     payment_method: str = Field(..., min_length=1, max_length=30)
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
