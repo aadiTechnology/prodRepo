@@ -5,6 +5,7 @@ export interface FeePaymentAllocationCreate {
 
 export interface FeePaymentCollectRequest {
   student_id: number;
+  tenant_id?: number;
   payment_method: string;
   reference_no?: string | null;
   notes?: string | null;

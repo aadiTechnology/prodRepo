@@ -3,6 +3,7 @@ import { Alert, alpha, Box, CircularProgress, IconButton, Switch, Tooltip, Typog
 import type { Theme } from "@mui/material/styles";
 import { useState, useEffect } from "react";
 import { Cancel as CancelIcon, Save as SaveIcon } from "@mui/icons-material";
+import { useAuth } from "../../context";
 
 import { collectFeePayment } from "../../api/services/feeCollectionService";
 import { colorTokens } from "../../tokens/colors";
@@ -78,6 +79,8 @@ export default function CollectPaymentPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const tenantId = user?.tenant_id || 1;
 
   const state = location.state as {
     student: StudentSearchItem;
@@ -182,6 +185,7 @@ export default function CollectPaymentPage() {
 
       const res = await collectFeePayment({
         student_id: student.id,
+        tenant_id: academicYearId ? tenantId : (user?.tenant_id || 1), // Use same tenantId logic
         payment_method: paymentMethod,
         reference_no: referenceNo || undefined,
         notes: notes || undefined,

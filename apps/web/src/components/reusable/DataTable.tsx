@@ -42,6 +42,8 @@ export interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   /** Stable row key when index is not sufficient. */
   getRowKey?: (row: T, index: number) => Key;
+  /** Optional function to return custom styles for a row. */
+  getRowSx?: (row: T) => any;
 }
 
 function getCellValue<T>(row: T, field: keyof T | string): ReactNode {
@@ -61,6 +63,7 @@ export default function DataTable<T extends object>({
   maxHeight,
   onRowClick,
   getRowKey,
+  getRowSx,
 }: DataTableProps<T>) {
  const hasActions = renderRowActions != null;
   // Defensive: always use an array
@@ -133,6 +136,7 @@ export default function DataTable<T extends object>({
                     },
                     cursor: onRowClick ? "pointer" : "default",
                     transition: "background-color 0.2s ease",
+                    ...(getRowSx ? getRowSx(row) : {}),
                   })}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >

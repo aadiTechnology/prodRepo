@@ -70,6 +70,7 @@ interface StudentSearchItem {
 async function fetchFeeInstallmentStatus(params: {
   student_id: number;
   academic_year_id: number;
+  tenant_id?: number;
 }): Promise<FeeInstallmentStatusResponse> {
   const res = await apiClient.get<FeeInstallmentStatusResponse>(
     "/api/fees/installment-status",
@@ -81,7 +82,9 @@ async function fetchFeeInstallmentStatus(params: {
 async function searchStudents(params: {
   search?: string;
   class_id?: number;
+  class_name?: string;
   limit?: number;
+  tenant_id?: number;
 }): Promise<StudentSearchItem[]> {
   const res = await apiClient.get<StudentSearchItem[]>(
     "/fees/installment-tracking/students",
@@ -97,11 +100,21 @@ function money(v: number) {
   return `₹${Number(v || 0).toLocaleString()}`;
 }
 
+const statusColors = {
+  Paid: { bg: "#e8f5e9", text: "#2e7d32" },
+  Partial: { bg: "#fff3e0", text: "#ed6c02" },
+  Pending: { bg: "#fffde7", text: "#fbc02d" },
+  Overdue: { bg: "#ffebee", text: "#d32f2f" },
+};
+
 export default function FeeInstallmentStatusPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const tenantId = user?.tenant_id;
+
+  // Use tenantId=1 as per user's hardcoded value in StudentFeeLedger.tsx
+  const tenantId = user?.tenant_id || 1;
+
   const [classId, setClassId] = useState<number | "">("");
   const [academicYearId, setAcademicYearId] = useState<number | "">("");
   const [student, setStudent] = useState<StudentSearchItem | null>(null);
@@ -143,8 +156,7 @@ export default function FeeInstallmentStatusPage() {
     const fetchLookups = async () => {
       try {
         if (tenantId == null) {
-          // Installment tracking requires a tenant-scoped user.
-          setError("Tenant is missing. Please login as a tenant user.");
+          setError("Tenant is missing.");
           return;
         }
         setError(null);
@@ -154,10 +166,12 @@ export default function FeeInstallmentStatusPage() {
         ]);
         const classData = classRes.data as ClassOption[];
         const yearData = yearRes.data as AcademicYearOption[];
-        const classMap = new Map(classData.map(c => [c.name, c]));
-        const yearMap = new Map(yearData.map(y => [y.name, y]));
-        setClasses(Array.from(classMap.values()));
-        setYears(Array.from(yearMap.values()));
+        
+        // Deduplicate classes ONLY (per user request: "bro only do it for class")
+        const uniqueClasses = Array.from(new Map(classData.map(c => [c.name, c])).values());
+
+        setClasses(uniqueClasses);
+        setYears(yearData ?? []);
         setAcademicYearId((prev) =>
           typeof prev !== "number" && yearData?.length ? yearData[0].id : prev
         );
@@ -173,9 +187,11 @@ export default function FeeInstallmentStatusPage() {
     const fetchStudents = async () => {
       try {
         setStudentLoading(true);
+        const selectedClass = classes.find(c => c.id === classId);
         const items = await searchStudents({
           search: "",
-          class_id: typeof classId === "number" ? classId : undefined,
+          class_name: selectedClass?.name, 
+          tenant_id: tenantId,
           limit: 50,
         });
         setAllStudents(items ?? []);
@@ -188,7 +204,7 @@ export default function FeeInstallmentStatusPage() {
     };
 
     fetchStudents();
-  }, [classId]);
+  }, [classId, tenantId]);
 
   useEffect(() => {
     if (!studentQuery || studentQuery.trim().length < 1) {
@@ -202,6 +218,7 @@ export default function FeeInstallmentStatusPage() {
         const items = await searchStudents({
           search: studentQuery.trim(),
           class_id: typeof classId === "number" ? classId : undefined,
+          tenant_id: tenantId,
           limit: 50,
         });
         setSearchResults(items ?? []);
@@ -214,7 +231,7 @@ export default function FeeInstallmentStatusPage() {
     return () => {
       if (studentSearchTimer.current) window.clearTimeout(studentSearchTimer.current);
     };
-  }, [studentQuery, classId]);
+  }, [studentQuery, classId, tenantId]);
 
   const canFetch = Boolean(student?.id) && typeof academicYearId === "number";
 
@@ -231,6 +248,7 @@ export default function FeeInstallmentStatusPage() {
         const res = await fetchFeeInstallmentStatus({
           student_id: student!.id,
           academic_year_id: academicYearId as number,
+          tenant_id: tenantId,
         });
         setData(res);
       } catch (e: any) {
@@ -241,7 +259,8 @@ export default function FeeInstallmentStatusPage() {
       }
     };
     run();
-  }, [canFetch, student, academicYearId]);
+  }, [canFetch, student, academicYearId, tenantId]);
+
 
   const refresh = async () => {
     if (!canFetch) return;
@@ -390,8 +409,8 @@ export default function FeeInstallmentStatusPage() {
                     typeof classId !== "number"
                       ? "Please select a class first"
                       : studentLoading
-                      ? "Loading students..."
-                      : "No students found"
+                        ? "Loading students..."
+                        : "No students found"
                   }
                   getOptionLabel={(o) => {
                     const parts = [o.student_name];
@@ -673,17 +692,24 @@ export default function FeeInstallmentStatusPage() {
         loading={loading}
         emptyMessage={emptyState}
         getRowKey={(row) => row.fee_installment_id}
+        getRowSx={(row) => {
+          const colors = statusColors[row.status as keyof typeof statusColors];
+          return colors ? { bgcolor: colors.bg, "&:hover": { bgcolor: colors.bg } } : {};
+        }}
         renderRowActions={(row) => (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+          <Box sx={{ display: "flex", gap: 1 }}>
             {row.status === "Paid" ? (
               <Link
-                href="#"
-                underline="hover"
-                sx={{ fontWeight: 800, fontSize: "0.9rem" }}
-                onClick={(e) => {
-                  e.preventDefault();
+                component="button"
+                variant="body2"
+                onClick={() => {
                   setReceiptRow(row);
                   setReceiptOpen(true);
+                }}
+                sx={{
+                  fontWeight: 900,
+                  textDecoration: "none",
+                  "&:hover": { textDecoration: "underline" },
                 }}
               >
                 Receipt
