@@ -101,11 +101,20 @@ def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academ
     
     structures = query.all()
     
-    # Enrich with names (or use joinedload in production)
+    # Enrich with names (Fix: Added tenant_id filter to ensure isolation)
     for s in structures:
-        s.class_name = db.query(SchoolClass.name).filter(SchoolClass.id == s.class_id).scalar()
-        s.fee_category_name = db.query(FeeCategory.name).filter(FeeCategory.id == str(s.fee_category_id)).scalar()
-        s.academic_year_name = db.query(AcademicYear.name).filter(AcademicYear.id == s.academic_year_id).scalar()
+        s.class_name = db.query(SchoolClass.name).filter(
+            SchoolClass.id == s.class_id,
+            SchoolClass.tenant_id == tenant_id
+        ).scalar()
+        s.fee_category_name = db.query(FeeCategory.name).filter(
+            FeeCategory.id == str(s.fee_category_id),
+            FeeCategory.tenant_id == tenant_id
+        ).scalar()
+        s.academic_year_name = db.query(AcademicYear.name).filter(
+            AcademicYear.id == s.academic_year_id,
+            AcademicYear.tenant_id == tenant_id
+        ).scalar()
         
     return structures
 

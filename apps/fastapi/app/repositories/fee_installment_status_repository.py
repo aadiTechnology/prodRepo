@@ -40,6 +40,54 @@ def _to_decimal(v) -> Decimal:
     return Decimal(str(v))
 
 
+def _get_paid_for_installment(db: Session, student_id: int, installment_id: int, tenant_id: int) -> Decimal:
+    """Sum all payments made for a specific installment by a student (Sync with Ledger)."""
+    total = db.query(func.sum(FeePayment.paid_amount)).filter(
+        FeePayment.student_id == student_id,
+        FeePayment.fee_installment_id == installment_id,
+        FeePayment.tenant_id == tenant_id,
+        FeePayment.paid_amount.isnot(None),
+    ).scalar()
+    return _to_decimal(total)
+
+
+def _get_fee_structures_for_student(db: Session, student: Student, tenant_id: int, academic_year_id: int):
+    """Align with StudentFeeLedger fallback logic."""
+    # Strategy 1: direct fee_structure_id on student
+    if student.fee_structure_id:
+        structs = db.query(FeeStructure).filter(
+            FeeStructure.id == student.fee_structure_id,
+            FeeStructure.tenant_id == tenant_id
+        ).all()
+        if structs:
+            return structs
+
+    # Strategy 2: class + academic year
+    if student.class_id and academic_year_id:
+        structs = db.query(FeeStructure).filter(
+            FeeStructure.class_id == student.class_id,
+            FeeStructure.academic_year_id == academic_year_id,
+            FeeStructure.tenant_id == tenant_id,
+            FeeStructure.is_deleted == False,
+            FeeStructure.is_active == True,
+        ).all()
+        if structs:
+            return structs
+
+    # Strategy 3: class only (any year)
+    if student.class_id:
+        structs = db.query(FeeStructure).filter(
+            FeeStructure.class_id == student.class_id,
+            FeeStructure.tenant_id == tenant_id,
+            FeeStructure.is_deleted == False,
+            FeeStructure.is_active == True,
+        ).all()
+        if structs:
+            return structs
+
+    return []
+
+
 def get_fee_installment_status(
     db: Session,
     *,
@@ -54,126 +102,76 @@ def get_fee_installment_status(
     )
     if not student:
         raise NotFoundException("Student", student_id)
-    if not student.class_id:
-        raise NotFoundException("Student class", f"student_id={student_id}")
 
-    class_id = student.class_id
+    fee_structures = _get_fee_structures_for_student(db, student, tenant_id, academic_year_id)
+    if not fee_structures:
+        return FeeInstallmentStatusResponse(
+            summary=FeeInstallmentStatusSummary(total_due=0, total_paid=0, outstanding_balance=0),
+            installments=[],
+        )
 
-    # Get all fee installments for this student's class + academic year
-    # Use the canonical fee structure per category (min id wins)
-    canonical_structure_subq = (
-        db.query(
-            FeeStructure.fee_category_id,
-            func.min(FeeStructure.id).label("canonical_id"),
-        )
-        .filter(
-            FeeStructure.tenant_id == tenant_id,
-            FeeStructure.academic_year_id == academic_year_id,
-            FeeStructure.class_id == class_id,
-            func.coalesce(FeeStructure.is_deleted, False) == False,
-            func.coalesce(FeeStructure.is_active, True) == True,
-        )
-        .group_by(FeeStructure.fee_category_id)
-    ).subquery()
-
-    # Fetch installments with per-installment paid amounts from fee_payments
-    # Uses fee_payments.fee_installment_id + fee_payments.paid_amount (direct columns in DB)
-    q = (
-        db.query(
-            FeeInstallment.id.label("fee_installment_id"),
-            FeeInstallment.installment_number.label("installment_number"),
-            FeeCategory.name.label("fee_category_name"),
-            FeeInstallment.due_date.label("due_date"),
-            FeeInstallment.amount.label("amount"),
-            func.coalesce(
-                func.sum(
-                    case(
-                        (
-                            (FeePayment.student_id == student_id)
-                            & (FeePayment.tenant_id == tenant_id)
-                            & (FeePayment.fee_installment_id == FeeInstallment.id)
-                            & (FeePayment.paid_amount.isnot(None)),
-                            FeePayment.paid_amount,
-                        ),
-                        else_=0,
-                    )
-                ),
-                0,
-            ).label("paid"),
-        )
-        .join(FeeStructure, FeeStructure.id == FeeInstallment.fee_structure_id)
-        .join(
-            canonical_structure_subq,
-            (FeeStructure.id == canonical_structure_subq.c.canonical_id)
-            & (FeeStructure.fee_category_id == canonical_structure_subq.c.fee_category_id),
-        )
-        .join(FeeCategory, FeeCategory.id == FeeStructure.fee_category_id)
-        .outerjoin(
-            FeePayment,
-            (FeePayment.fee_installment_id == FeeInstallment.id)
-            & (FeePayment.student_id == student_id)
-            & (FeePayment.tenant_id == tenant_id),
-        )
-        .filter(
-            FeeStructure.tenant_id == tenant_id,
-            FeeCategory.tenant_id == tenant_id,
-            FeeStructure.academic_year_id == academic_year_id,
-            FeeStructure.class_id == class_id,
-            func.coalesce(FeeStructure.is_deleted, False) == False,
-            func.coalesce(FeeStructure.is_active, True) == True,
-            func.coalesce(FeeInstallment.is_deleted, False) == False,
-            FeeCategory.deleted_at.is_(None),
-        )
-        .group_by(
-            FeeInstallment.id,
-            FeeInstallment.installment_number,
-            FeeCategory.name,
-            FeeInstallment.due_date,
-            FeeInstallment.amount,
-        )
-        .order_by(
-            FeeInstallment.installment_number.asc(),
-            FeeCategory.name.asc(),
-            FeeInstallment.due_date.asc(),
-        )
-    )
-
-    today = date.today()
     installments: list[FeeInstallmentStatusItem] = []
     total_due = Decimal("0")
     total_paid = Decimal("0")
     total_balance = Decimal("0")
+    today = date.today()
 
-    for r in q.all():
-        amount = _to_decimal(r.amount)
-        paid = _to_decimal(r.paid)
-        balance = max(amount - paid, Decimal("0"))
+    for fs in fee_structures:
+        fs_installments = db.query(FeeInstallment).filter(
+            FeeInstallment.fee_structure_id == fs.id,
+            FeeInstallment.is_deleted == False,
+        ).order_by(FeeInstallment.installment_number.asc()).all()
 
-        if paid >= amount and amount > 0:
-            status = "Paid"
-        elif paid > 0 and paid < amount:
-            status = "Partial"
-        elif r.due_date < today:
-            status = "Overdue"
-        else:
-            status = "Pending"
+        for inst in fs_installments:
+            amount = _to_decimal(inst.amount)
+            paid = _get_paid_for_installment(db, student_id, inst.id, tenant_id)
+            # Match Ledger's cap: paid = min(paid, amount)
+            # Use original paid for status, but capped for balance/totals if Ledger does it
+            # Actually Ledger does: balance = max(amount - paid, 0.0) where paid is capped.
+            paid_capped = min(paid, amount)
+            balance = max(amount - paid_capped, Decimal("0"))
+            
+            # Category name
+            fee_category_name = "Tuition"
+            if inst.fee_category_id:
+                cat = db.query(FeeCategory).filter(
+                    FeeCategory.id == inst.fee_category_id,
+                    FeeCategory.tenant_id == tenant_id
+                ).first()
+                if cat:
+                    fee_category_name = cat.name
+            elif hasattr(inst, 'description') and inst.description:
+                fee_category_name = inst.description
 
-        installments.append(
-            FeeInstallmentStatusItem(
-                fee_installment_id=int(r.fee_installment_id),
-                installment=_installment_label(int(r.installment_number)),
-                category=str(r.fee_category_name),
-                due_date=r.due_date,
-                amount=float(amount),
-                paid=float(paid),
-                balance=float(balance),
-                status=status,
+            # Status (Sync with Ledger logic but keep Status page casing)
+            if balance == 0 and amount > 0:
+                status = "Paid"
+            elif paid > 0 and balance > 0:
+                status = "Partial"
+            elif inst.due_date < today:
+                status = "Overdue"
+            else:
+                status = "Pending"
+
+            installments.append(
+                FeeInstallmentStatusItem(
+                    fee_installment_id=int(inst.id),
+                    installment=_installment_label(int(inst.installment_number)),
+                    category=str(fee_category_name),
+                    due_date=inst.due_date,
+                    amount=float(amount),
+                    paid=float(paid_capped),
+                    balance=float(balance),
+                    status=status,
+                )
             )
-        )
 
-        total_due += amount
-        total_paid += paid
-        total_balance += balance
+            total_due += amount
+            total_paid += paid_capped
+            total_balance += balance
+
+    # Sort final list to match common view
+    installments.sort(key=lambda x: (x.due_date, x.category))
 
     return FeeInstallmentStatusResponse(
         summary=FeeInstallmentStatusSummary(
