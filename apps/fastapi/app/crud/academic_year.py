@@ -12,7 +12,7 @@ def get_all(db: Session, tenant_id: int) -> List[AcademicYear]:
     ).order_by(
         AcademicYear.start_date.desc(),
         AcademicYear.id.desc(),
-    ).all()
+    ).distinct().all()
 
 def get_by_id(db: Session, id: int, tenant_id: int) -> Optional[AcademicYear]:
     return db.query(AcademicYear).filter(

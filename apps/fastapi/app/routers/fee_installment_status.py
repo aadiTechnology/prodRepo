@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.core.dependencies import CurrentUser
 from app.routers.installment_tracking import require_installment_tracking_access
 from app.schemas.fee_installment_status import FeeInstallmentStatusResponse
-from app.services.fee_installment_status_service import get_fee_installment_status
+from app.repositories.fee_installment_status_repository import get_fee_installment_status
 
 router = APIRouter(prefix="/api/fees", tags=["Fees - Installment Status"])
 

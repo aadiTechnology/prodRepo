@@ -23,15 +23,6 @@ import MonetizationOnOutlinedIcon from "@mui/icons-material/MonetizationOnOutlin
 
 import { apiClient } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
-import {
-  fetchFeeInstallmentStatus,
-  searchStudents,
-} from "../../api/services/feeInstallmentStatusService";
-import type {
-  FeeInstallmentStatusInstallment,
-  FeeInstallmentStatusResponse,
-  StudentSearchItem,
-} from "../../types/feeInstallmentStatus";
 import FeeInstallmentStatusChip from "../../components/fees/FeeInstallmentStatusChip";
 import { colorTokens } from "../../tokens/colors";
 import {
@@ -41,6 +32,63 @@ import {
   TablePaginationBar,
 } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
+
+type FeeInstallmentStatusValue = "Paid" | "Partial" | "Pending" | "Overdue";
+
+interface FeeInstallmentStatusInstallment {
+  fee_installment_id: number;
+  installment: string;
+  category: string;
+  due_date: string;
+  amount: number;
+  paid: number;
+  balance: number;
+  status: FeeInstallmentStatusValue;
+}
+
+interface FeeInstallmentStatusSummary {
+  total_due: number;
+  total_paid: number;
+  outstanding_balance: number;
+}
+
+interface FeeInstallmentStatusResponse {
+  summary: FeeInstallmentStatusSummary;
+  installments: FeeInstallmentStatusInstallment[];
+}
+
+interface StudentSearchItem {
+  id: number;
+  student_name: string;
+  student_code?: string | null;
+  admission_no?: string | null;
+  roll_no?: string | null;
+  class_id?: number | null;
+  class_name?: string | null;
+}
+
+async function fetchFeeInstallmentStatus(params: {
+  student_id: number;
+  academic_year_id: number;
+}): Promise<FeeInstallmentStatusResponse> {
+  const res = await apiClient.get<FeeInstallmentStatusResponse>(
+    "/api/fees/installment-status",
+    { params }
+  );
+  return res.data;
+}
+
+async function searchStudents(params: {
+  search?: string;
+  class_id?: number;
+  limit?: number;
+}): Promise<StudentSearchItem[]> {
+  const res = await apiClient.get<StudentSearchItem[]>(
+    "/fees/installment-tracking/students",
+    { params }
+  );
+  return res.data;
+}
 
 type ClassOption = { id: number; name: string };
 type AcademicYearOption = { id: number; name: string };
@@ -106,8 +154,10 @@ export default function FeeInstallmentStatusPage() {
         ]);
         const classData = classRes.data as ClassOption[];
         const yearData = yearRes.data as AcademicYearOption[];
-        setClasses(classData);
-        setYears(yearData);
+        const classMap = new Map(classData.map(c => [c.name, c]));
+        const yearMap = new Map(yearData.map(y => [y.name, y]));
+        setClasses(Array.from(classMap.values()));
+        setYears(Array.from(yearMap.values()));
         setAcademicYearId((prev) =>
           typeof prev !== "number" && yearData?.length ? yearData[0].id : prev
         );

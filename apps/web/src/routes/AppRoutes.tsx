@@ -135,10 +135,6 @@ export default function AppRoutes() {
 
           {/* Installment status / payment collection */}
           <Route
-            path="/fees/collection"
-            element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeInstallmentStatus /></ProtectedRoute>}
-          />
-          <Route
             path="/fees/installment-status"
             element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeInstallmentStatus /></ProtectedRoute>}
           />

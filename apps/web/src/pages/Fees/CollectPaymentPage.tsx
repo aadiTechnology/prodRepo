@@ -5,11 +5,33 @@ import { useState, useEffect } from "react";
 import { Cancel as CancelIcon, Save as SaveIcon } from "@mui/icons-material";
 
 import { collectFeePayment } from "../../api/services/feeCollectionService";
-import type { FeeInstallmentStatusInstallment, StudentSearchItem } from "../../types/feeInstallmentStatus";
 import { colorTokens } from "../../tokens/colors";
 import { ListPageLayout } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
 import { Button, MenuItem, Select, TextField } from "../../components/primitives";
+
+type FeeInstallmentStatusValue = "Paid" | "Partial" | "Pending" | "Overdue";
+
+interface FeeInstallmentStatusInstallment {
+  fee_installment_id: number;
+  installment: string;
+  category: string;
+  due_date: string;
+  amount: number;
+  paid: number;
+  balance: number;
+  status: FeeInstallmentStatusValue;
+}
+
+interface StudentSearchItem {
+  id: number;
+  student_name: string;
+  student_code?: string | null;
+  admission_no?: string | null;
+  roll_no?: string | null;
+  class_id?: number | null;
+  class_name?: string | null;
+}
 
 function money(v: number) {
   return `₹${Number(v || 0).toLocaleString()}`;

@@ -1,9 +1,9 @@
 import { Chip, alpha } from "@mui/material";
 
-import type { FeeInstallmentStatusValue } from "../../types/feeInstallmentStatus";
 import { colorTokens } from "../../tokens/colors";
 
-// Status colors per user story: Green=Paid, Orange=Partial, Yellow=Pending, Red=Overdue
+type FeeInstallmentStatusValue = "Paid" | "Partial" | "Pending" | "Overdue";
+
 const statusConfig: Record<
   FeeInstallmentStatusValue,
   { label: string; color: string }

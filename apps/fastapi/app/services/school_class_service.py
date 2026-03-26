@@ -92,7 +92,7 @@ def get_all_classes(
             )
         )
 
-    return query.order_by(SchoolClass.name.asc(), SchoolClass.section.asc()).all()
+    return query.order_by(SchoolClass.name.asc(), SchoolClass.section.asc()).distinct().all()
 
 
 def get_class_by_id(db: Session, class_id: int, tenant_id: int):
