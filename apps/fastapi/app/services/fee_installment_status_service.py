@@ -63,34 +63,6 @@ def get_fee_installment_status(
         class_id=student.class_id,
     )
 
-    # Defensive fallback:
-    # If the UI passed an academic_year_id that doesn't match the student's
-    # legacy academic_year string (common when tenant scoping or IDs drift),
-    # try to resolve it and re-run the query.
-    if not db_rows and getattr(student, "academic_year", None):
-        academic_year_name = (student.academic_year or "").strip()
-        if academic_year_name:
-            from app.models.academic import AcademicYear
-
-            fallback_ay = (
-                db.query(AcademicYear)
-                .filter(
-                    AcademicYear.tenant_id == tenant_id,
-                    (AcademicYear.name == academic_year_name) | (AcademicYear.code == academic_year_name),
-                    AcademicYear.is_active == True,  # noqa: E712
-                    AcademicYear.is_deleted == False,  # noqa: E712
-                )
-                .first()
-            )
-            if fallback_ay:
-                db_rows = fetch_fee_installment_status_rows(
-                    db=db,
-                    tenant_id=tenant_id,
-                    student_id=student_id,
-                    academic_year_id=fallback_ay.id,
-                    class_id=student.class_id,
-                )
-
     today = date.today()
     installments: list[FeeInstallmentStatusItem] = []
 
