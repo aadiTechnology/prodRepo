@@ -15,6 +15,7 @@ class MenuBase(BaseModel):
     parent_id: Optional[int] = None
     tenant_id: Optional[int] = None
     is_active: bool = True
+    feature_id: Optional[int] = None
 
 
 class MenuCreate(MenuBase):
@@ -31,6 +32,8 @@ class MenuUpdate(BaseModel):
     icon: Optional[str] = None
     sort_order: Optional[int] = None
     is_active: Optional[bool] = None
+    feature_id: Optional[int] = None
+    parent_id: Optional[int] = None
 
 
 class MenuResponse(MenuBase):
@@ -38,9 +41,12 @@ class MenuResponse(MenuBase):
 
     id: int
     created_at: datetime
+    feature_code: Optional[str] = None
+    feature_name: Optional[str] = None
 
     class Config:
         from_attributes = True
+
 
 
 class MenuNode(BaseModel):
@@ -54,4 +60,3 @@ class MenuNode(BaseModel):
 
     class Config:
         from_attributes = True
-

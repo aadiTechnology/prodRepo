@@ -1,6 +1,7 @@
 """Service layer for Menu CRUD and hierarchical queries."""
 
 from collections import defaultdict
+from datetime import datetime
 from typing import Iterable, List, Optional
 
 from sqlalchemy.orm import Session
@@ -41,6 +42,7 @@ def create_menu(db: Session, data: MenuCreate, created_by: int | None = None) ->
         sort_order=data.sort_order,
         level=data.level,
         is_active=data.is_active,
+        feature_id=data.feature_id,
         created_by=created_by,
     )
     db.add(menu)
@@ -64,8 +66,13 @@ def update_menu(db: Session, menu_id: int, data: MenuUpdate, updated_by: int | N
         menu.sort_order = data.sort_order
     if data.is_active is not None:
         menu.is_active = data.is_active
+    if data.feature_id is not None:
+        menu.feature_id = data.feature_id
+    if data.parent_id is not None:
+        menu.parent_id = data.parent_id
 
     menu.updated_by = updated_by
+    menu.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(menu)
     logger.info(f"Menu updated: {menu.name} (id={menu.id})")
@@ -77,8 +84,10 @@ def soft_delete_menu(db: Session, menu_id: int, deleted_by: int | None = None) -
     menu = get_menu(db, menu_id)
     menu.is_deleted = True
     menu.deleted_by = deleted_by
+    menu.deleted_at = datetime.utcnow()
     db.commit()
     logger.info(f"Menu soft-deleted: {menu.name} (id={menu.id})")
+
 
 
 def build_menu_tree(menus: Iterable[Menu]) -> List[MenuNode]:
@@ -103,4 +112,3 @@ def build_menu_tree(menus: Iterable[Menu]) -> List[MenuNode]:
 
     roots = by_parent.get(None, [])
     return [to_node(m) for m in roots]
-

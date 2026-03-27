@@ -1,4 +1,8 @@
-"""Feature (permission) CRUD endpoints."""
+"""Feature (permission) CRUD endpoints.
+
+Mutation endpoints (POST, PUT, DELETE) are System Admin only.
+GET endpoints are accessible to any admin (platform or tenant).
+"""
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
@@ -18,7 +22,7 @@ async def list_features(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ) -> List[FeatureResponse]:
-    """List all features."""
+    """List all features (admin-accessible)."""
     return feature_service.get_features(db)
 
 
@@ -38,7 +42,7 @@ async def create_feature(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ) -> FeatureResponse:
-    """Create a new feature."""
+    """Create a new feature (System Admin only)."""
     return feature_service.create_feature(db, data, created_by=current_user.id)
 
 
@@ -49,7 +53,7 @@ async def update_feature(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ) -> FeatureResponse:
-    """Update an existing feature."""
+    """Update an existing feature (System Admin only)."""
     return feature_service.update_feature(db, feature_id, data, updated_by=current_user.id)
 
 
@@ -59,7 +63,6 @@ async def delete_feature(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ) -> None:
-    """Soft delete a feature."""
+    """Soft delete a feature (System Admin only)."""
     feature_service.soft_delete_feature(db, feature_id, deleted_by=current_user.id)
     return None
-

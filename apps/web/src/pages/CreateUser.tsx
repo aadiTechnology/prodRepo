@@ -4,6 +4,7 @@ import userService from "../api/services/userService";
 import { UserCreate } from "../types/user";
 import { User } from "../types/auth";
 import roleService from "../api/services/roleService";
+import permissionService from "../api/services/permissionService";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../utils/formValidation";
 import {
   confirmPasswordMatchRules,
@@ -47,6 +48,8 @@ export default function CreateUser() {
 
   const [roleOptions, setRoleOptions] = useState<SelectItemOption[]>([]);
   const [roleOptionsLoading, setRoleOptionsLoading] = useState(false);
+  // Track role numeric ID alongside role_code for RBAC assignment
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
 
   const initialValues = useMemo(
     () => (isEditMode && editUser ? formFromUser(editUser) : emptyForm()),
@@ -103,7 +106,8 @@ export default function CreateUser() {
     setRoleOptionsLoading(true);
     try {
       const res = await roleService.getRoles({});
-      const mappedRoles = (res.items || []).map(
+      const items = res.items || [];
+      const mappedRoles = items.map(
         (role: { id: unknown; code?: string; name?: string; scope?: string }) => ({
           id: String(role.id),
           value:
@@ -115,12 +119,24 @@ export default function CreateUser() {
         })
       );
       setRoleOptions(mappedRoles);
+      // In edit mode, pre-select the existing role from RBAC table
+      if (isEditMode && editUser) {
+        const currentRoleIds = await permissionService.getUserRoles(editUser.id);
+        if (currentRoleIds.length > 0) {
+          setSelectedRoleId(currentRoleIds[0]);
+          // Find the matching role code to pre-fill the form
+          const matchedRole = items.find((r: any) => r.id === currentRoleIds[0]) as any;
+          if (matchedRole && !formData.role_code) {
+            handleFieldValueChange("role_code", (matchedRole.code as string) || (matchedRole.name as string) || "");
+          }
+        }
+      }
     } catch {
       setError("Failed to fetch roles");
     } finally {
       setRoleOptionsLoading(false);
     }
-  }, []);
+  }, [isEditMode, editUser]);
 
   useEffect(() => {
     fetchRoles();
@@ -134,11 +150,19 @@ export default function CreateUser() {
         full_name: formData.full_name,
         role: formData.role_code,
       };
+
+      // Find the numeric role ID for RBAC assignment
+      const matchedOption = roleOptions.find(o => o.value === formData.role_code);
+      const roleIdToAssign = matchedOption ? parseInt(matchedOption.id, 10) : selectedRoleId;
+
+      let savedUserId: number | null = null;
+
       if (isEditMode && editUser) {
         await userService.updateUser(editUser.id, {
           ...common,
           is_active: formData.is_active,
         });
+        savedUserId = editUser.id;
         setSnackbar("User updated successfully.");
       } else {
         const payload: UserCreate = {
@@ -146,9 +170,22 @@ export default function CreateUser() {
           email: formData.email,
           password: formData.password,
         };
-        await userService.createUser(payload);
+        const createdUser = await userService.createUser(payload);
+        savedUserId = createdUser.id;
         setSnackbar("User saved successfully.");
       }
+
+      // Assign role via RBAC endpoint (populates user_roles table)
+      if (savedUserId && roleIdToAssign && !isNaN(roleIdToAssign)) {
+        try {
+          await permissionService.assignRolesToUser(savedUserId, [roleIdToAssign]);
+          console.log(`[CreateUser] Assigned role ${roleIdToAssign} to user ${savedUserId}`);
+        } catch (roleErr) {
+          // Non-blocking: user was saved, just log the role assignment error
+          console.warn("[CreateUser] Role assignment failed (RBAC):", roleErr);
+        }
+      }
+
       setTimeout(() => navigate("/users"), 1200);
     } catch (err: unknown) {
       console.error("User save error:", err);

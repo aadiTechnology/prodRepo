@@ -233,6 +233,35 @@ class PermissionService {
     traverse(menus);
     return menuMap;
   }
+
+  /**
+   * Get roles assigned to a user
+   */
+  async getUserRoles(userId: number): Promise<number[]> {
+    try {
+      const response = await apiClient.get(`/rbac/users/${userId}/roles`);
+      const roles = response.data || [];
+      return Array.isArray(roles) ? roles.map((r: any) => r.id) : [];
+    } catch (error) {
+      console.error(`Failed to get roles for user ${userId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Assign roles to a user via RBAC endpoint
+   * @param userId - The user's ID
+   * @param roleIds - Array of role IDs to assign
+   */
+  async assignRolesToUser(userId: number, roleIds: number[]): Promise<void> {
+    try {
+      await apiClient.post(`/rbac/users/${userId}/roles`, roleIds);
+      console.log(`[PermissionService] Assigned roles ${roleIds} to user ${userId}`);
+    } catch (error) {
+      console.error(`Failed to assign roles to user ${userId}:`, error);
+      throw error;
+    }
+  }
 }
 
 export default new PermissionService();
