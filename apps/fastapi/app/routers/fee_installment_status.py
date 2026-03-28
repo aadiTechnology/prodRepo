@@ -15,6 +15,7 @@ async def fee_installment_status(
     student_id: int = Query(..., ge=1),
     academic_year_id: int = Query(..., ge=1),
     tenant_id: int | None = Query(None),
+    class_id: int | None = Query(None, ge=1, description="When set, installments only if student belongs to this class"),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_installment_tracking_access),
 ):
@@ -26,5 +27,6 @@ async def fee_installment_status(
         tenant_id=effective_tenant_id,
         student_id=student_id,
         academic_year_id=academic_year_id,
+        class_id=class_id,
     )
 

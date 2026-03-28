@@ -71,6 +71,8 @@ async function fetchFeeInstallmentStatus(params: {
   student_id: number;
   academic_year_id: number;
   tenant_id?: number;
+  /** When set, backend only returns installments if the student belongs to this class */
+  class_id?: number;
 }): Promise<FeeInstallmentStatusResponse> {
   const res = await apiClient.get<FeeInstallmentStatusResponse>(
     "/api/fees/installment-status",
@@ -249,6 +251,7 @@ export default function FeeInstallmentStatusPage() {
           student_id: student!.id,
           academic_year_id: academicYearId as number,
           tenant_id: tenantId,
+          ...(typeof classId === "number" ? { class_id: classId } : {}),
         });
         setData(res);
       } catch (e: any) {
@@ -259,17 +262,12 @@ export default function FeeInstallmentStatusPage() {
       }
     };
     run();
-  }, [canFetch, student, academicYearId, tenantId]);
+  }, [canFetch, student, academicYearId, tenantId, classId, location.key]);
 
 
-  const refresh = async () => {
-    if (!canFetch) return;
-    const res = await fetchFeeInstallmentStatus({
-      student_id: student!.id,
-      academic_year_id: academicYearId as number,
-    });
-    setData(res);
-  };
+  useEffect(() => {
+    setPage(0);
+  }, [academicYearId, student?.id, classId]);
 
   const installments: FeeInstallmentStatusInstallment[] = data?.installments ?? [];
   const summary = data?.summary;

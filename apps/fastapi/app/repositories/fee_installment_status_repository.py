@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, case
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException
 from app.models.student import Student
 from app.models.fee import FeeCategory, FeeInstallment, FeeStructure
-from app.models.fee_payment import FeePayment
+from app.models.fee_payment import FeePayment, FeePaymentAllocation
 from app.schemas.fee_installment_status import (
     FeeInstallmentStatusItem,
     FeeInstallmentStatusResponse,
@@ -41,28 +40,47 @@ def _to_decimal(v) -> Decimal:
 
 
 def _get_paid_for_installment(db: Session, student_id: int, installment_id: int, tenant_id: int) -> Decimal:
-    """Sum all payments made for a specific installment by a student (Sync with Ledger)."""
-    total = db.query(func.sum(FeePayment.paid_amount)).filter(
+    """Sum all payments for an installment: direct FeePayment rows + allocation rows (collection API)."""
+    direct = db.query(func.coalesce(func.sum(FeePayment.paid_amount), 0)).filter(
         FeePayment.student_id == student_id,
         FeePayment.fee_installment_id == installment_id,
         FeePayment.tenant_id == tenant_id,
         FeePayment.paid_amount.isnot(None),
     ).scalar()
-    return _to_decimal(total)
+    alloc_total = (
+        db.query(func.coalesce(func.sum(FeePaymentAllocation.amount_allocated), 0))
+        .join(FeePayment, FeePaymentAllocation.payment_id == FeePayment.id)
+        .filter(
+            FeePayment.student_id == student_id,
+            FeePayment.tenant_id == tenant_id,
+            FeePaymentAllocation.fee_installment_id == installment_id,
+            FeePaymentAllocation.tenant_id == tenant_id,
+        )
+        .scalar()
+    )
+    return _to_decimal(direct) + _to_decimal(alloc_total)
 
 
 def _get_fee_structures_for_student(db: Session, student: Student, tenant_id: int, academic_year_id: int):
-    """Align with StudentFeeLedger fallback logic."""
-    # Strategy 1: direct fee_structure_id on student
+    """
+    Get fee structures for a student with strict academic year filtering.
+    When academic_year_id is explicitly provided, only return structures for that year.
+    """
+    # Strategy 1: direct fee_structure_id on student (must match selected academic year when provided)
     if student.fee_structure_id:
-        structs = db.query(FeeStructure).filter(
+        q = db.query(FeeStructure).filter(
             FeeStructure.id == student.fee_structure_id,
-            FeeStructure.tenant_id == tenant_id
-        ).all()
+            FeeStructure.tenant_id == tenant_id,
+            FeeStructure.is_deleted == False,  # noqa: E712
+            FeeStructure.is_active == True,  # noqa: E712
+        )
+        if academic_year_id:
+            q = q.filter(FeeStructure.academic_year_id == academic_year_id)
+        structs = q.all()
         if structs:
             return structs
 
-    # Strategy 2: class + academic year
+    # Strategy 2: class + academic year (strict filter when academic_year_id is provided)
     if student.class_id and academic_year_id:
         structs = db.query(FeeStructure).filter(
             FeeStructure.class_id == student.class_id,
@@ -71,11 +89,13 @@ def _get_fee_structures_for_student(db: Session, student: Student, tenant_id: in
             FeeStructure.is_deleted == False,
             FeeStructure.is_active == True,
         ).all()
-        if structs:
-            return structs
+        # Return even if empty - don't fall back to any year
+        # This ensures academic year filtering is strictly respected
+        return structs
 
-    # Strategy 3: class only (any year)
-    if student.class_id:
+    # Strategy 3: class only (only if no academic_year_id provided)
+    # This is a safe fallback for legacy scenarios only
+    if student.class_id and not academic_year_id:
         structs = db.query(FeeStructure).filter(
             FeeStructure.class_id == student.class_id,
             FeeStructure.tenant_id == tenant_id,
@@ -94,6 +114,7 @@ def get_fee_installment_status(
     tenant_id: int,
     student_id: int,
     academic_year_id: int,
+    class_id: int | None = None,
 ) -> FeeInstallmentStatusResponse:
     student = (
         db.query(Student)
@@ -102,6 +123,13 @@ def get_fee_installment_status(
     )
     if not student:
         raise NotFoundException("Student", student_id)
+
+    # When UI filters by class, only show data if the student belongs to that class
+    if class_id is not None and student.class_id != class_id:
+        return FeeInstallmentStatusResponse(
+            summary=FeeInstallmentStatusSummary(total_due=0, total_paid=0, outstanding_balance=0),
+            installments=[],
+        )
 
     fee_structures = _get_fee_structures_for_student(db, student, tenant_id, academic_year_id)
     if not fee_structures:
