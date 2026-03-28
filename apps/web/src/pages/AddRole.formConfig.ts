@@ -47,12 +47,6 @@ export function createAddRoleFormConfig({
           rows: 3,
         },
       },
-      is_active: {
-        name: "is_active",
-        label: "Account Active",
-        helperText: "Control system access for this role",
-        type: "switch",
-      },
     },
     layoutRows: [
       {
@@ -64,11 +58,6 @@ export function createAddRoleFormConfig({
         kind: "fields",
         grid: { xs: 12 },
         fieldNames: ["description"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12 },
-        fieldNames: ["is_active"],
       },
     ],
   };
