@@ -221,10 +221,6 @@ const StudentFeeLedger = () => {
           <Typography variant="body2" color="text.secondary">Partial</Typography>
         </Box>
         <Box display="flex" alignItems="center" gap={1}>
-          <Box width={16} height={16} bgcolor="#ffe082" borderRadius={0.5} border="1px solid #ccc" mr={0.5} />
-          <Typography variant="body2" color="text.secondary">Pending</Typography>
-        </Box>
-        <Box display="flex" alignItems="center" gap={1}>
           <Box width={16} height={16} bgcolor="#e53935" borderRadius={0.5} border="1px solid #ccc" mr={0.5} />
           <Typography variant="body2" color="text.secondary">Overdue</Typography>
         </Box>
