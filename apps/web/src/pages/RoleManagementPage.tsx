@@ -4,136 +4,32 @@
  * Integrates RBAC for admin-level permission management
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  Box,
-  Typography,
-  Alert,
-  CircularProgress,
-  Snackbar,
-} from "@mui/material";
+import { Alert, Snackbar } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { Role } from "../types/role.types";
-import roleService from "../api/services/roleService";
-import { ListPageLayout, ListPageToolbar, DirectoryInfoBar, TablePaginationBar, DataTable, TableRowActions } from "../components/reusable";
+import { ListPageLayout, ListPageToolbar, EntityTableSection } from "../components/reusable";
 import { PageHeader } from "../components/layout";
 import ConfirmDialog from "../components/common/ConfirmDialog";
-import StatusChip from "../components/roles/StatusChip";
 import { useRBAC } from "../context/RBACContext";
+import { useRolesListController } from "../hooks/useRolesListController";
+import { createRoleListConfig } from "./RoleManagementPage.listConfig";
+import { type Role } from "../types/role.types";
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Role Management Page Component
-// ═══════════════════════════════════════════════════════════════════════════
 const RoleManagementPage = () => {
   const navigate = useNavigate();
   const { hasPermission } = useRBAC();
   const canCreateRole = hasPermission("ADMIN_MGMT:create");
   const canEditRole = hasPermission("ADMIN_MGMT:edit");
   const canDeleteRole = hasPermission("ADMIN_MGMT:delete");
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [totalRoles, setTotalRoles] = useState(0);
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [confirmDialogType, setConfirmDialogType] = useState<'delete' | 'edit' | null>(null);
-  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState<string | null>(null);
-  // --- Success Toast Handler ---
-  const showSuccessToast = (message: string) => setSnackbar(message);
 
-  // Sorting state
-  const [sortBy, setSortBy] = useState<'name' | 'createdAt'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
-  const fetchRoles = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await roleService.getRoles({
-        search: search || undefined,
-        page: page + 1,
-        pageSize: rowsPerPage,
-        sortBy: sortBy === 'createdAt' ? 'created_at' : sortBy,
-        sortOrder,
-      });
-      // Map backend fields to Role type
-      const mappedRoles = (data.items ?? []).map((role: any) => ({
-        ...role,
-        status: role.is_active ? "ACTIVE" : "INACTIVE",
-        createdAt: role.created_at,
-      }));
-      setRoles(mappedRoles);
-      setTotalRoles(data.totalCount);
-    } catch (err: any) {
-      setError(err?.message || "Failed to fetch roles.");
-    } finally {
-      setLoading(false);
-    }
-  }, [search, page, rowsPerPage, sortBy, sortOrder]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchRoles();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [fetchRoles]);
-
-  // No local sorting; roles are sorted by backend
-  const sortedRoles = roles;
-
-  const roleColumns = useMemo(
-    () => [
-      { id: "name", label: "Role Name" as const, field: "name" as keyof Role, render: (r: Role) => r.name },
-      { id: "description", label: "Description" as const, field: "description" as keyof Role },
-      {
-        id: "status",
-        label: "Status" as const,
-        render: (r: Role) => <StatusChip status={r.status} />,
-      },
-      {
-        id: "createdAt",
-        label: "Created Date" as const,
-        render: (r: Role) =>
-          r.createdAt && !isNaN(new Date(r.createdAt).getTime())
-            ? new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })
-            : "-",
-      },
-    ],
-    []
-  );
-
-  const handleDeleteClick = (role: Role) => {
-    setRoleToDelete(role);
-    setConfirmDialogType('delete');
-    setConfirmDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!roleToDelete) return;
-    try {
-      setDeleteLoading(true);
-      await roleService.deactivateRole(roleToDelete.id);
-      setConfirmDialogOpen(false);
-      setRoleToDelete(null);
-      showSuccessToast("Role deleted successfully");
-      fetchRoles();
-    } catch (err: any) {
-      setError(err?.message || "Failed to delete role.");
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
-
-  const confirmMessage = confirmDialogType === "delete"
-    ? "Are you sure you want to delete role?"
-    : confirmDialogType === "edit"
-      ? "Are you sure you want to update this role?"
-      : "";
+  const controller = useRolesListController();
+  
+  const listConfig = createRoleListConfig({
+    navigate,
+    onDeleteClick: controller.handleDeleteClick,
+    canEditRole,
+    canDeleteRole,
+  });
 
   return (
     <ListPageLayout
@@ -145,8 +41,8 @@ const RoleManagementPage = () => {
           homePath="/"
           actions={
             <ListPageToolbar
-              searchValue={search}
-              onSearchChange={setSearch}
+              searchValue={controller.search}
+              onSearchChange={controller.setSearch}
               searchPlaceholder="Search roles..."
               onAddClick={canCreateRole ? () => navigate("/roles/create") : undefined}
               addLabel={canCreateRole ? "Add Role" : undefined}
@@ -156,67 +52,46 @@ const RoleManagementPage = () => {
         />
       }
     >
-      {error && (
-        <Alert severity="error" sx={{ m: 2 }} onClose={() => setError(null)}>
-          {error}
+      {controller.error && (
+        <Alert severity="error" sx={{ m: 2 }} onClose={() => controller.setError?.(null)}>
+          {controller.error}
         </Alert>
       )}
 
-      {!loading && totalRoles > 0 && (
-        <DirectoryInfoBar
-          label="Role Directory"
-          rangeStart={Math.min(page * rowsPerPage + 1, totalRoles)}
-          rangeEnd={Math.min((page + 1) * rowsPerPage, totalRoles)}
-          total={totalRoles}
-        />
-      )}
-
-        <DataTable<Role & Record<string, unknown>>
-          columns={roleColumns}
-          data={sortedRoles as (Role & Record<string, unknown>)[]}
-          loading={loading}
-          emptyMessage="No roles available."
-          renderRowActions={(role) => (
-            <TableRowActions
-              onEdit={canEditRole ? () => navigate(`/roles/create?id=${role.id}`) : undefined}
-              onDelete={canDeleteRole ? () => handleDeleteClick(role) : undefined}
-            />
-          )}
-          stickyHeader
-          size="small"
-          maxHeight="calc(100vh - 200px)"
-        />
-      {!loading && roles.length > 0 && (
-        <TablePaginationBar
-          page={page}
-          rowsPerPage={rowsPerPage}
-          totalRows={totalRoles}
-          onPageChange={setPage}
-          onRowsPerPageChange={(v) => {
-            setRowsPerPage(v);
-            setPage(0);
-          }}
-        />
-      )}
+      <EntityTableSection<Role>
+        label="Role Directory"
+        totalRows={controller.totalRoles}
+        page={controller.page}
+        rowsPerPage={controller.rowsPerPage}
+        onPageChange={controller.setPage}
+        onRowsPerPageChange={controller.setRowsPerPage}
+        columns={listConfig.columns}
+        data={controller.roles}
+        loading={controller.loading}
+        emptyMessage={listConfig.uiPolicy.emptyMessage}
+        rowActions={listConfig.actions.rowActions}
+        stickyHeader
+        size="small"
+      />
 
       <ConfirmDialog
-        open={confirmDialogOpen}
+        open={controller.confirmDialogOpen}
         title="Please Confirm"
-        message={confirmMessage}
-        confirmText={deleteLoading ? "Deleting…" : "Confirm"}
-        onConfirm={confirmDialogType === "delete" ? handleConfirmDelete : () => setConfirmDialogOpen(false)}
-        onCancel={() => setConfirmDialogOpen(false)}
-        loading={deleteLoading}
+        message="Are you sure you want to delete role?"
+        confirmText={controller.deleteLoading ? "Deleting…" : "Confirm"}
+        onConfirm={controller.handleConfirmDelete}
+        onCancel={() => controller.setConfirmDialogOpen(false)}
+        loading={controller.deleteLoading}
       />
 
       <Snackbar
-        open={!!snackbar}
+        open={!!controller.snackbar}
         autoHideDuration={3000}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        onClose={() => setSnackbar(null)}
+        onClose={() => controller.setSnackbar(null)}
       >
-        <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: "100%" }}>
-          {snackbar}
+        <Alert onClose={() => controller.setSnackbar(null)} severity="success" sx={{ width: "100%" }}>
+          {controller.snackbar}
         </Alert>
       </Snackbar>
     </ListPageLayout>
