@@ -2,6 +2,7 @@
 
 
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, Card, CardContent, FormControl, InputLabel, Select, MenuItem, Button, CircularProgress, Alert, TextField, Checkbox, FormGroup, FormControlLabel, Divider
 } from "@mui/material";
@@ -17,6 +18,7 @@ const optionalComponents = [
 ];
 
 const AssignStudentFee: React.FC = () => {
+  const navigate = useNavigate();
   const [students, setStudents] = useState<StudentDropdownItem[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string>("");
   const [studentInfo, setStudentInfo] = useState<StudentDetails | null>(null);
@@ -26,6 +28,7 @@ const AssignStudentFee: React.FC = () => {
   const [selectedFeeStructure, setSelectedFeeStructure] = useState<string>("");
   const [optional, setOptional] = useState<string[]>([]);
   const [remarks, setRemarks] = useState("");
+  const [additionalFee, setAdditionalFee] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -114,12 +117,32 @@ const AssignStudentFee: React.FC = () => {
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
-    // TODO: Implement API call to assign fee ledger
-    setSuccess("Fee ledger generated successfully (mocked).");
+    try {
+      const payload: any = {
+        student_id: Number(selectedStudent),
+        academic_year_id: Number(selectedAcademicYear),
+        fee_structure_id: Number(selectedFeeStructure),
+        discount_id: selectedDiscount ? Number(selectedDiscount) : undefined,
+        remarks
+      };
+      if (additionalFee !== "") {
+        const feeNum = Number(additionalFee);
+        if (!isNaN(feeNum)) {
+          payload.additional_fee = feeNum;
+        }
+      }
+      await studentService.assignFeeToStudent(payload);
+      setSuccess("Fee ledger generated successfully.");
+      setTimeout(() => {
+        navigate("/fees/ledger");
+      }, 1000);
+    } catch (err) {
+      setError("Failed to assign fee. Please try again.");
+    }
   };
 
   return (
@@ -248,6 +271,15 @@ const AssignStudentFee: React.FC = () => {
               placeholder="Add any notes about manual discounts or special payment arrangements..."
               value={remarks}
               onChange={e => setRemarks(e.target.value)}
+              sx={{ mb: 2 }}
+            />
+            <Typography variant="subtitle2" mb={1}>Additional Fee (Optional)</Typography>
+            <TextField
+              fullWidth
+              type="number"
+              placeholder="Enter additional fee if any"
+              value={additionalFee}
+              onChange={e => setAdditionalFee(e.target.value)}
               sx={{ mb: 2 }}
             />
             <Divider sx={{ mb: 2 }} />

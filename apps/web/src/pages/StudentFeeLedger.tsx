@@ -209,7 +209,26 @@ const StudentFeeLedger = () => {
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {loading && <Box textAlign="center" py={4}><CircularProgress /></Box>}
       {/* Student Info Section below removed, info is now in left card */}
-      {/* Installment Ledger Table (refactored to match TenantList) */}
+      {/* Legend for Installment Status */}
+      <Box mb={1} mt={2} display="flex" alignItems="center" gap={2}>
+        <Typography variant="subtitle2" color="text.secondary" fontWeight={700} mr={1}>Legend</Typography>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Box width={16} height={16} bgcolor="#43a047" borderRadius={0.5} border="1px solid #ccc" mr={0.5} />
+          <Typography variant="body2" color="text.secondary">Paid</Typography>
+        </Box>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Box width={16} height={16} bgcolor="#ffb300" borderRadius={0.5} border="1px solid #ccc" mr={0.5} />
+          <Typography variant="body2" color="text.secondary">Partial</Typography>
+        </Box>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Box width={16} height={16} bgcolor="#ffe082" borderRadius={0.5} border="1px solid #ccc" mr={0.5} />
+          <Typography variant="body2" color="text.secondary">Pending</Typography>
+        </Box>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Box width={16} height={16} bgcolor="#e53935" borderRadius={0.5} border="1px solid #ccc" mr={0.5} />
+          <Typography variant="body2" color="text.secondary">Overdue</Typography>
+        </Box>
+      </Box>
       <Box mb={4}>
         <Box
           sx={{

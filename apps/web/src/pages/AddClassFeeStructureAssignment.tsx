@@ -358,7 +358,7 @@ function AddClassFeeStructureAssignment() {
                     >
                       <MenuItem value=""><em>Select Fee Structure</em></MenuItem>
                       {feeStructureOptions.map(opt => (
-                        <MenuItem key={opt.id} value={Number(opt.id)}>{opt.fee_category_id}</MenuItem>
+                        <MenuItem key={opt.id} value={Number(opt.id)}>{opt.name}</MenuItem>
                       ))}
                     </Select>
                   </FormControl>

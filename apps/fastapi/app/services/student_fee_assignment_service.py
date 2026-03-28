@@ -1,3 +1,4 @@
+
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from app.models.student_fee_assignment import (
@@ -76,15 +77,7 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate):
     if not academic_year_name:
         academic_year_name = getattr(student, 'academic_year', None)
 
-    # Check duplicate
-    exists = db.query(StudentFeeAssignment).filter(
-        and_(
-            StudentFeeAssignment.student_id == payload.student_id,
-            StudentFeeAssignment.academic_year_id == payload.academic_year_id,
-        )
-    ).first()
-    if exists:
-        raise AppException("Fee already assigned for this academic year", status_code=400)
+    # Removed uniqueness check for academic year; allow multiple assignments per student per academic year
 
     # Fetch fee structure
     fee_structure = db.query(FeeStructure).filter(FeeStructure.id == payload.fee_structure_id).first()
@@ -121,8 +114,7 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate):
             "final_amount": final_amount,
         })
         total_amount += final_amount
-    if payload.additional_fee:
-        total_amount += payload.additional_fee
+    # additional_fee logic removed
 
     # Save in transaction
     try:
@@ -174,12 +166,24 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate):
             )
             db.add(new_ledger)
         db.commit()
+        # Fetch installments for the assignment
+        assignment_installments = db.query(StudentFeeInstallment).filter(StudentFeeInstallment.assignment_id == assignment.id).all()
+        installments_response = [
+            {
+                "installment_no": inst.installment_no,
+                "due_date": inst.due_date,
+                "amount": float(inst.amount),
+                "status": inst.status,
+            }
+            for inst in assignment_installments
+        ]
         return {
             "message": "Fee ledger generated successfully",
             "student_id": assignment.student_id,
             "total_amount": assignment.total_amount,
             "final_amount": assignment.final_amount,
             "details": details,
+            "installments": installments_response,
         }
     except SQLAlchemyError as e:
         db.rollback()

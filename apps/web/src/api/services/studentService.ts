@@ -1,3 +1,4 @@
+// ...existing code...
 import axiosInstance from "../client";
 
 export interface StudentDropdownItem {
@@ -32,6 +33,18 @@ const studentService = {
       tenantId: d.tenantId || d.tenant_id,
       feeStructureId: d.feeStructureId || d.fee_structure_id,
     };
+  },
+
+  async assignFeeToStudent(payload: {
+    student_id: number,
+    academic_year_id: number,
+    fee_structure_id: number,
+    discount_id?: number,
+    additional_fee?: number,
+    remarks?: string
+  }) {
+    const { data } = await axiosInstance.post("/students/assign-fee", payload);
+    return data;
   },
 };
 

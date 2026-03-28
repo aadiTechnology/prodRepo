@@ -24,11 +24,12 @@ def list_fee_structures(
         .all()
     )
     print(f"Total records returned: {len(fee_structures)}")
-    result = [
-        {
+    result = []
+    for f in fee_structures:
+        # Always use fee structure name if present, otherwise fallback to 'Fee Structure #{id}'
+        display_name = f.name.strip() if f.name and f.name.strip() != "" else f"Fee Structure #{f.id}"
+        result.append({
             "id": f.id,
-            "name": getattr(f, "name", f"Fee Structure #{f.id}")
-        }
-        for f in fee_structures
-    ]
+            "name": display_name
+        })
     return result

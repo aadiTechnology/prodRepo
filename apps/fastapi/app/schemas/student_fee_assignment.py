@@ -20,7 +20,7 @@ class StudentFeeAssignmentCreate(BaseModel):
     academic_year_id: int = Field(...)
     fee_structure_id: int = Field(...)
     discount_id: Optional[int] = None
-    additional_fee: Optional[float] = 0
+    additional_fee: Optional[float] = None  # Added field for additional fee
     remarks: Optional[str] = None
 
 class StudentFeeDetailResponse(BaseModel):
