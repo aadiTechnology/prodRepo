@@ -65,10 +65,10 @@ export function createAddFeeDiscountFormConfig({
         props: {
           options: [
             { id: "", label: "", value: "" },
-            ...feeCategoryOptions.map((v: any) => ({
-              id: v.code || v.name,
-              label: v.name,
-              value: v.code || v.name,
+            ...feeCategoryOptions.map((v: string) => ({
+              id: v,
+              label: v,
+              value: v,
             })),
           ],
           disableWhenEmpty: false,
@@ -82,10 +82,10 @@ export function createAddFeeDiscountFormConfig({
         props: {
           options: [
             { id: "", label: "", value: "" },
-            ...classOptions.map((v: any) => ({
-              id: v.code || v.name,
-              label: v.name,
-              value: v.code || v.name,
+            ...classOptions.map((v: string) => ({
+              id: v,
+              label: v,
+              value: v,
             })),
           ],
           disableWhenEmpty: false,
