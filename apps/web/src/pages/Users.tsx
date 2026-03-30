@@ -7,7 +7,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { User as AuthUser } from "../types/auth";
-import ConfirmDialog from "../components/common/ConfirmDialog";
+import ConfirmDialog from "../components/semantic/ConfirmDialog";
 import {
   ListPageLayout,
   ListPageToolbar,
@@ -78,58 +78,58 @@ const Users = () => {
                 searchPlaceholder="Search Name"
                 onAddClick={() => navigate("/user/create")}
                 addLabel="Add User"
-                renderActions={
-                  <>
-                    <Typography component="span" variant="body2" sx={{ whiteSpace: "nowrap" }}>
-                      Role:
-                    </Typography>
-                    <Select
-                      value={filters.role}
-                      onChange={(e) => setFilter("role", e.target.value as string)}
-                      size="small"
-                      sx={(theme) => ({ minWidth: theme.spacing(16) })}
-                    >
-                      <MenuItem value="All">All</MenuItem>
-                      {uniqueRoles.map((role) => (
-                        <MenuItem key={role} value={role}>
-                          {toRoleLabel(role)}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    <Typography component="span" variant="body2" sx={{ whiteSpace: "nowrap" }}>
-                      Status:
-                    </Typography>
-                    <Select
-                      value={filters.status}
-                      onChange={(e) => setFilter("status", e.target.value as string)}
-                      size="small"
-                      sx={(theme) => ({ minWidth: theme.spacing(16) })}
-                    >
-                      <MenuItem value="All">All</MenuItem>
-                      <MenuItem value="Active">Active</MenuItem>
-                      <MenuItem value="Inactive">Inactive</MenuItem>
-                    </Select>
-                    <Typography component="span" variant="body2" sx={{ whiteSpace: "nowrap" }}>
-                      Sort:
-                    </Typography>
-                    <Select
-                      value={`${sortBy}-${sortOrder}`}
-                      onChange={(e) => {
-                        const [s, o] = (e.target.value as string).split("-") as [typeof sortBy, typeof sortOrder];
-                        setSortBy(s);
-                        setSortOrder(o);
-                      }}
-                      size="small"
-                      sx={(theme) => ({ minWidth: theme.spacing(18) })}
-                    >
-                      {listConfig.sortOptions.map((opt) => (
-                        <MenuItem key={opt.id} value={`${opt.sortBy}-${opt.sortOrder}`}>
-                          {opt.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </>
-                }
+                filters={[
+                  {
+                    label: "Role",
+                    value: filters.role,
+                    onChange: (val) => setFilter("role", val),
+                    options: [
+                      { label: "All", value: "All" },
+                      ...uniqueRoles.map((role) => ({ label: toRoleLabel(role), value: role }))
+                    ]
+                  },
+                  {
+                    label: "Status",
+                    value: filters.status,
+                    onChange: (val) => setFilter("status", val),
+                    options: [
+                      { label: "All", value: "All" },
+                      { label: "Active", value: "Active" },
+                      { label: "Inactive", value: "Inactive" }
+                    ]
+                  },
+                  {
+                    label: "Sort by Name",
+                    value: sortBy === "name" ? sortOrder : "",
+                    onChange: (val) => {
+                      if (val) {
+                        setSortBy("name");
+                        setSortOrder(val as "asc" | "desc");
+                      } else {
+                        setSortBy("created_at");
+                        setSortOrder("desc");
+                      }
+                    },
+                    options: [
+                      { label: "A-Z", value: "asc" },
+                      { label: "Z-A", value: "desc" },
+                    ]
+                  },
+                  {
+                    label: "Sort by Date",
+                    value: sortBy === "created_at" ? sortOrder : "",
+                    onChange: (val) => {
+                      if (val) {
+                        setSortBy("created_at");
+                        setSortOrder(val as "asc" | "desc");
+                      }
+                    },
+                    options: [
+                      { label: "Newest First", value: "desc" },
+                      { label: "Oldest First", value: "asc" },
+                    ]
+                  }
+                ]}
               />
             }
           />
@@ -179,9 +179,9 @@ const Users = () => {
         open={confirmDialogOpen}
         title="Please Confirm"
         message="Are you sure you want to delete user?"
-        confirmText={deleteLoading ? "Deleting…" : "Confirm"}
+        confirmLabel={deleteLoading ? "Deleting…" : "Confirm"}
         onConfirm={confirmDelete}
-        onCancel={closeDeleteConfirm}
+        onClose={closeDeleteConfirm}
         loading={deleteLoading}
       />
     </ListPageLayout>

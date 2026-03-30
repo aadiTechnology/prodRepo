@@ -20,7 +20,7 @@ import {
 import { useNavigate, useParams, Link as RouterLink } from "react-router-dom";
 import { Tenant } from "../../types/tenant";
 import tenantService from "../../api/services/tenantService";
-import ConfirmDialog from "../../components/common/ConfirmDialog";
+import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import { DetailFieldRow } from "../../components/reusable";
 import StatusChip from "../../components/roles/StatusChip";
 
@@ -347,7 +347,6 @@ const TenantDetail = () => {
             <ConfirmDialog
                 open={deleteDialogOpen}
                 title="Confirm Tenant Deletion"
-                message=""
                 messageNode={
                     <Typography component="span">
                         Are you sure you want to delete <strong>{tenant?.name}</strong>?
@@ -359,10 +358,9 @@ const TenantDetail = () => {
                         and <strong>all associated user accounts</strong> will be deactivated immediately.
                     </Alert>
                 }
-                confirmText="Delete Permanently"
-                confirmVariant="error"
+                confirmLabel="Delete Permanently"
                 onConfirm={handleDeleteTenant}
-                onCancel={() => setDeleteDialogOpen(false)}
+                onClose={() => setDeleteDialogOpen(false)}
                 loading={deleteLoading}
             />
         </>

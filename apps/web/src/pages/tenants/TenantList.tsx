@@ -16,7 +16,7 @@ import {
   EntityTableSection,
 } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
-import ConfirmDialog from "../../components/common/ConfirmDialog";
+import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import { useTenantListController } from "../../hooks";
 import { createTenantListConfig, renderTenantRowActions } from "./TenantList.listConfig";
 
@@ -84,32 +84,39 @@ const TenantList = () => {
                 searchPlaceholder="Search tenants..."
                 onAddClick={() => navigate("/tenants/add")}
                 addLabel="Add Tenant"
-                renderActions={
-                  <>
-                    <Typography component="span" variant="body2" sx={{ whiteSpace: "nowrap" }}>
-                      Sort:
-                    </Typography>
-                    <Select
-                      value={`${sortBy}-${sortOrder}`}
-                      onChange={(e) => {
-                        const [s, o] = (e.target.value as string).split("-") as [
-                          typeof sortBy,
-                          typeof sortOrder
-                        ];
-                        setSortBy(s);
-                        setSortOrder(o);
-                      }}
-                      size="small"
-                      sx={(theme) => ({ minWidth: theme.spacing(18) })}
-                    >
-                      {listConfig.sortOptions.map((opt) => (
-                        <MenuItem key={opt.id} value={`${opt.sortBy}-${opt.sortOrder}`}>
-                          {opt.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </>
-                }
+                filters={[
+                  {
+                    label: "Sort by Name",
+                    value: sortBy === "name" ? sortOrder : "",
+                    onChange: (val) => {
+                      if (val) {
+                        setSortBy("name");
+                        setSortOrder(val as "asc" | "desc");
+                      } else {
+                        setSortBy("created_at");
+                        setSortOrder("desc");
+                      }
+                    },
+                    options: [
+                      { label: "A-Z", value: "asc" },
+                      { label: "Z-A", value: "desc" },
+                    ]
+                  },
+                  {
+                    label: "Sort by Date",
+                    value: sortBy === "created_at" ? sortOrder : "",
+                    onChange: (val) => {
+                      if (val) {
+                        setSortBy("created_at");
+                        setSortOrder(val as "asc" | "desc");
+                      }
+                    },
+                    options: [
+                      { label: "Newest First", value: "desc" },
+                      { label: "Oldest First", value: "asc" },
+                    ]
+                  }
+                ]}
               />
             }
           />
@@ -161,9 +168,9 @@ const TenantList = () => {
         open={confirmDialogOpen}
         title="Please Confirm"
         message={`Are you sure you want to delete tenant ${tenantToDelete?.name}?`}
-        confirmText={deleteLoading ? "Deleting..." : "Confirm"}
+        confirmLabel={deleteLoading ? "Deleting..." : "Confirm"}
         onConfirm={confirmDelete}
-        onCancel={closeDeleteConfirm}
+        onClose={closeDeleteConfirm}
         loading={deleteLoading}
       />
 
