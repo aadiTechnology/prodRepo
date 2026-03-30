@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import feeDiscountService from "../api/services/feeDiscountService";
 import { useFormManager } from "../hooks/useFormManager";
 import BaseForm from "../components/reusable/BaseForm";
@@ -18,9 +18,9 @@ const emptyForm = (): AddFeeDiscountFormData => ({
 
 export default function AddFeeDiscount() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const discountId = searchParams.get("id");
-  const isEditMode = !!discountId;
+  const { id: routeDiscountId } = useParams<{ id?: string }>();
+  const discountId = routeDiscountId ?? null;
+  const isEditMode = Boolean(discountId);
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);

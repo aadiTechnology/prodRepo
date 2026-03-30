@@ -32,8 +32,9 @@ from app.models import (  # noqa: F401
 from app.models.fee_payment import FeePayment, FeePaymentAllocation  # noqa: F401
 # Import FeeLedger model
 from app.models.student_fee_ledger import FeeLedger  # noqa: F401
+from app.models.timesheet_entry import timesheet_entries  # noqa: F401
 
-from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, academic_year, class_fee_structure_assignment, class_router,student_fee_assignment, fee_structure
+from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, academic_year, class_fee_structure_assignment, class_router,student_fee_assignment, fee_structure, reports
 
 
 
@@ -100,6 +101,7 @@ app.include_router(fee_structure.router)
 app.include_router(installment_tracking.router)
 app.include_router(fee_installment_status.router)
 app.include_router(fee_collection.router)
+app.include_router(reports.router)
 
 
 # Mount static files for profile images

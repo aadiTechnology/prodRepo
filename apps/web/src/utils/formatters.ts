@@ -25,3 +25,19 @@ export function formatShortDate(
     year: "numeric",
   });
 }
+
+/** Hours / effort values from APIs that may return string decimals. */
+export function formatHours(
+  value: string | number | null | undefined,
+  options?: { emptyPlaceholder?: string; fractionDigits?: number; locale?: string }
+): string {
+  const empty = options?.emptyPlaceholder ?? "—";
+  if (value == null || value === "") return empty;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return empty;
+  const digits = options?.fractionDigits ?? 2;
+  return n.toLocaleString((options?.locale ?? DEFAULT_LOCALE) as string, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}

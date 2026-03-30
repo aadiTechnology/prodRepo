@@ -47,6 +47,7 @@ const AssignStudentFee = lazy(() => import("../pages/Fees/AssignStudentFee"));
 const PermissionManagementPage = lazy(() => import("../pages/admin/PermissionManagementPage"));
 const FeeInstallmentStatus = lazy(() => import("../pages/Fees/FeeInstallmentStatus"));
 const CollectPaymentPage = lazy(() => import("../pages/Fees/CollectPaymentPage"));
+const SprintPerformanceReportPage = lazy(() => import("../pages/reports/SprintPerformanceReportPage"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -84,6 +85,14 @@ export default function AppRoutes() {
           <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
 
           {/* User Management */}
+          <Route
+            path="/reports/sprint-performance"
+            element={
+              <ProtectedRoute>
+                <SprintPerformanceReportPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/users" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:view"><Users /></ProtectedRoute>} />
           <Route path="/user/create" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:create"><CreateUser /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
