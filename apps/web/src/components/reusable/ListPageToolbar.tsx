@@ -3,13 +3,20 @@
  * Search field + optional primary action (e.g. Add). Theme-driven.
  */
 
-import { TextField, InputAdornment, Box } from "@mui/material";
+import { TextField, InputAdornment, Box, Select, MenuItem, Typography } from "@mui/material";
 import { ReactNode } from "react";
 import { Search as SearchIcon, Add as AddIcon } from "@mui/icons-material";
 import { Stack } from "../primitives";
 import PrimaryActionButton from "./PrimaryActionButton";
 import { colorTokens } from "../../tokens/colors";
 import { alpha } from "@mui/material";
+
+export interface ToolbarFilter {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  options: { label: string; value: string }[];
+}
 
 export interface ListPageToolbarProps {
   searchValue: string;
@@ -20,6 +27,8 @@ export interface ListPageToolbarProps {
   addIcon?: ReactNode;
   /** Extra actions (e.g. filters, buttons). */
   renderActions?: ReactNode;
+  /** Reusable dropdown filters */
+  filters?: ToolbarFilter[];
 }
 
 export default function ListPageToolbar({
@@ -30,10 +39,11 @@ export default function ListPageToolbar({
   addLabel = "Add",
   addIcon,
   renderActions,
+  filters,
 }: ListPageToolbarProps) {
   return (
     /* 
-      Arrangement: Filter (renderActions) > Search (Field) > Add (PrimaryActionButton)
+      Arrangement: Filter (props/renderActions) > Search (Field) > Add (PrimaryActionButton)
       Responsive: Column on xs, Row on sm; Stretch on xs for full-width touch targets
     */
     <Box sx={{ 
@@ -45,6 +55,38 @@ export default function ListPageToolbar({
       flexWrap: "wrap",
       justifyContent: "flex-end"
     }}>
+      {filters && filters.length > 0 && (
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
+          {filters.map((filter) => (
+            <Select
+              key={filter.label}
+              value={filter.value}
+              onChange={(e) => filter.onChange(e.target.value as string)}
+              displayEmpty
+              size="small"
+              sx={{
+                minWidth: { xs: "100%", sm: 160 },
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "15px",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                },
+              }}
+            >
+              <MenuItem value="">
+                <Typography variant="body2" color="text.secondary">
+                  {filter.label}
+                </Typography>
+              </MenuItem>
+              {filter.options.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </Select>
+          ))}
+        </Stack>
+      )}
       {renderActions != null && (
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
           {renderActions}

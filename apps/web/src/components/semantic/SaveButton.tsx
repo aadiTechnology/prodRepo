@@ -1,5 +1,6 @@
 import { Button, CircularProgress, type ButtonProps } from "../primitives";
 import type { SxProps, Theme } from "@mui/material/styles";
+import { alpha } from "@mui/material/styles";
 
 export interface SaveButtonProps extends Omit<ButtonProps, "children"> {
   children?: React.ReactNode;
@@ -26,8 +27,9 @@ export default function SaveButton({
     px: 4.4,
     py: 1.1,
     "&:hover": {
-      backgroundColor: "transparent",
-      textDecoration: "underline",
+      backgroundColor: alpha(theme.palette.success.main, 0.1),
+      textDecoration: "none",
+      borderRadius: theme.shape.borderRadius,
     },
     "&:disabled": {
       color: theme.palette.grey[400],

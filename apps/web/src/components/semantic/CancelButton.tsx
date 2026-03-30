@@ -1,5 +1,6 @@
 import { Button, type ButtonProps } from "../primitives";
 import type { SxProps, Theme } from "@mui/material/styles";
+import { alpha } from "@mui/material/styles";
 
 export interface CancelButtonProps extends Omit<ButtonProps, "children"> {
   children?: React.ReactNode;
@@ -23,8 +24,9 @@ export default function CancelButton({
     px: 4.4,
     py: 1.1,
     "&:hover": {
-      backgroundColor: "transparent",
-      textDecoration: "underline",
+      backgroundColor: alpha(theme.palette.error.main, 0.1),
+      textDecoration: "none",
+      borderRadius: theme.shape.borderRadius,
     },
     "&:disabled": {
       color: theme.palette.grey[400],

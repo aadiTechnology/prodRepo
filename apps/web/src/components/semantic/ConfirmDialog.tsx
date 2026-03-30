@@ -10,6 +10,9 @@ import CheckIcon from "@mui/icons-material/Check";
 import CancelIcon from "@mui/icons-material/Cancel";
 import { Button } from "../primitives";
 import CancelButton from "./CancelButton";
+import { colorTokens } from "../../tokens/colors";
+import React from "react";
+import { alpha } from "@mui/material/styles";
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -18,7 +21,11 @@ export interface ConfirmDialogProps {
   /** Main heading (e.g. "Please Confirm"). */
   title?: string;
   /** Body message. */
-  message: string;
+  message?: string | React.ReactNode;
+  /** Optional Custom node for message */
+  messageNode?: React.ReactNode;
+  /** Optional Warning block */
+  warningContent?: React.ReactNode;
   /** Confirm button label. */
   confirmLabel?: string;
   /** Cancel button label. */
@@ -33,6 +40,8 @@ export default function ConfirmDialog({
   onConfirm,
   title = "Please Confirm",
   message,
+  messageNode,
+  warningContent,
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   loading = false,
@@ -60,7 +69,7 @@ export default function ConfirmDialog({
       {/* Header */}
       <Box
         sx={(theme) => ({
-          bgcolor: theme.palette.grey[800],
+          background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
           borderTopLeftRadius: 12,
           borderTopRightRadius: 12,
           px: 2,
@@ -116,19 +125,30 @@ export default function ConfirmDialog({
             {title}
           </Typography>
         </Box>
-        <Typography
-         sx={(theme) => ({
-         fontSize: "1.05rem",
-         textAlign: "center",
-         pr:49,
-         ml:10,
-         mb:5,
-         color: theme.palette.text.primary,
-         fontWeight: 125,
-         })}
-        >
-         {message}
-        </Typography>
+        {message && typeof message === "string" && (
+          <Typography
+            sx={(theme) => ({
+              fontSize: "1.05rem",
+              textAlign: "center",
+              pr:49,
+              ml:10,
+              mb:5,
+              color: theme.palette.text.primary,
+              fontWeight: 125,
+            })}
+          >
+           {message}
+          </Typography>
+        )}
+        {message && typeof message !== "string" && (
+           <Box sx={{ pr: 49, ml: 10, mb: 5 }}>{message}</Box>
+        )}
+        {messageNode && (
+           <Box sx={{ pr: 49, ml: 10, mb: 5 }}>{messageNode}</Box>
+        )}
+        {warningContent && (
+           <Box sx={{ px: 4, mb: 2 }}>{warningContent}</Box>
+        )}
         <Divider sx={{ my: 0.5 }} />
         <Box
           sx={{
@@ -154,7 +174,11 @@ export default function ConfirmDialog({
             fontSize: "1.1rem",
             px: 4,
             minWidth: 120,
-            "&:hover": { backgroundColor: "transparent", textDecoration: "underline" },
+            "&:hover": { 
+              backgroundColor: alpha(theme.palette.success.main, 0.1), 
+              textDecoration: "none",
+              borderRadius: theme.shape.borderRadius,
+            },
             "&:disabled": { color: theme.palette.grey[400] },
           })}
         >

@@ -9,6 +9,7 @@ import IconButton from "./IconButton";
 import CircularProgress from "./CircularProgress";
 import { colorTokens } from "../../tokens/colors";
 import type { IconButtonProps } from "./IconButton";
+import type { Theme } from "@mui/material/styles";
 
 type Base = Omit<IconButtonProps, "children">;
 
@@ -33,19 +34,20 @@ const cancelButtonSx = {
   "&:hover": { backgroundColor: alpha(colorTokens.preschool.coral.main, 0.15) },
 } as const;
 
-const saveButtonSx = {
-  background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
-  color: "white",
+const saveButtonSx = (theme: Theme) => ({
+  color: theme.palette.success.main,
+  backgroundColor: alpha(theme.palette.success.main, 0.08),
   borderRadius: "12px",
   width: 44,
   height: 44,
-  boxShadow: `0 4px 12px ${alpha(colorTokens.preschool.turquoise.main, 0.3)}`,
-  "&:hover": {
+  border: `1.5px solid ${alpha(theme.palette.success.main, 0.2)}`,
+  "&:hover": { 
     transform: "translateY(-2px)",
-    boxShadow: `0 6px 16px ${alpha(colorTokens.preschool.turquoise.main, 0.4)}`,
+    backgroundColor: alpha(theme.palette.success.main, 0.15),
+    boxShadow: `0 4px 12px ${alpha(theme.palette.success.main, 0.2)}`,
   },
   "&.Mui-disabled": { background: "#e2e8f0", color: "#94a3b8" },
-} as const;
+});
 
 export default function FormHeaderIconAction(props: FormHeaderIconActionProps) {
   if (props.variant === "cancel") {
