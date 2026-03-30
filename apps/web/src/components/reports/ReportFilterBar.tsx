@@ -1,17 +1,15 @@
-import { Box, Button, MenuItem, Select, TextField, Typography } from "../primitives";
+import { Box, Button, TextField, Typography } from "../primitives";
 import type { SprintReportFilters } from "../../types/sprintPerformanceReport";
-
-export interface EmployeeOption {
-  id: number;
-  label: string;
-}
+import type { SprintPerformanceFilterOptionsResponse } from "../../types/sprintPerformanceReport";
+import { SearchableSelect } from "../semantic";
 
 export interface ReportFilterBarProps {
   filters: SprintReportFilters;
   onChange: (patch: Partial<SprintReportFilters>) => void;
   onRunReport: () => void;
   loading: boolean;
-  employees: EmployeeOption[];
+  options: SprintPerformanceFilterOptionsResponse;
+  optionsLoading: boolean;
 }
 
 export default function ReportFilterBar({
@@ -19,7 +17,8 @@ export default function ReportFilterBar({
   onChange,
   onRunReport,
   loading,
-  employees,
+  options,
+  optionsLoading,
 }: ReportFilterBarProps) {
   return (
     <Box
@@ -33,70 +32,58 @@ export default function ReportFilterBar({
     >
       <Box>
         <Typography variant="caption" color="text.secondary" display="block">
-          Sprint (#)
+          Sprint
         </Typography>
-        <TextField
-          size="small"
-          value={filters.sprint}
-          onChange={(e) => onChange({ sprint: e.target.value })}
-          placeholder="e.g. 12"
-          sx={{ width: 100 }}
+        <SearchableSelect
+          label=""
+          valueId={filters.sprintId}
+          options={options.sprints}
+          onChangeId={(id) => onChange({ sprintId: id })}
+          placeholder={optionsLoading ? "Loading..." : "Select sprint"}
+          disabled={optionsLoading}
+          fullWidth={false}
         />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" display="block">
-          Feature / area (team filter)
+          Feature
         </Typography>
-        <TextField
-          size="small"
-          value={filters.team}
-          onChange={(e) => onChange({ team: e.target.value })}
-          placeholder="FeatureName contains"
-          sx={{ minWidth: 180 }}
+        <SearchableSelect
+          label=""
+          valueId={filters.featureId}
+          options={options.features}
+          onChangeId={(id) => onChange({ featureId: id })}
+          placeholder={optionsLoading ? "Loading..." : "Select feature"}
+          disabled={optionsLoading}
+          fullWidth={false}
         />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" display="block">
-          Employee
+          Owner
         </Typography>
-        <Select
-          size="small"
-          value={filters.employeeId}
-          displayEmpty
-          onChange={(e) => onChange({ employeeId: e.target.value as string, ownerName: "" })}
-          sx={{ minWidth: 200 }}
-        >
-          <MenuItem value="">All</MenuItem>
-          {employees.map((e) => (
-            <MenuItem key={e.id} value={String(e.id)}>
-              {e.label}
-            </MenuItem>
-          ))}
-        </Select>
-      </Box>
-      <Box>
-        <Typography variant="caption" color="text.secondary" display="block">
-          Owner name (exact)
-        </Typography>
-        <TextField
-          size="small"
-          value={filters.ownerName}
-          onChange={(e) => onChange({ ownerName: e.target.value, employeeId: "" })}
-          placeholder="If no employee list"
-          disabled={Boolean(filters.employeeId)}
-          sx={{ minWidth: 180 }}
+        <SearchableSelect
+          label=""
+          valueId={filters.ownerId}
+          options={options.owners}
+          onChangeId={(id) => onChange({ ownerId: id })}
+          placeholder={optionsLoading ? "Loading..." : "Select owner"}
+          disabled={optionsLoading}
+          fullWidth={false}
         />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" display="block">
-          Activity (TaskType)
+          Activity (task)
         </Typography>
-        <TextField
-          size="small"
-          value={filters.activityType}
-          onChange={(e) => onChange({ activityType: e.target.value })}
-          placeholder="Contains"
-          sx={{ minWidth: 140 }}
+        <SearchableSelect
+          label=""
+          valueId={filters.taskId}
+          options={options.tasks}
+          onChangeId={(id) => onChange({ taskId: id })}
+          placeholder={optionsLoading ? "Loading..." : "Select task"}
+          disabled={optionsLoading}
+          fullWidth={false}
         />
       </Box>
       <Box>

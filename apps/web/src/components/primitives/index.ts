@@ -38,6 +38,9 @@ export type { MenuItemProps } from "./MenuItem";
 export { default as Checkbox } from "./Checkbox";
 export type { CheckboxProps } from "./Checkbox";
 
+export { default as Autocomplete } from "./Autocomplete";
+export type { AutocompleteProps } from "./Autocomplete";
+
 export {
   Dialog,
   DialogTitle,

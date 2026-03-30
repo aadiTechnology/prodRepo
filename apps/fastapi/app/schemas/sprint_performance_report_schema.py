@@ -29,3 +29,15 @@ class SprintPerformanceAggregations(BaseModel):
 class SprintPerformanceReportResponse(BaseModel):
     rows: list[TimesheetEntryRow]
     aggregations: SprintPerformanceAggregations
+
+
+class ReportOption(BaseModel):
+    id: int
+    label: str
+
+
+class SprintPerformanceFilterOptionsResponse(BaseModel):
+    sprints: list[ReportOption]
+    owners: list[ReportOption]
+    features: list[ReportOption]
+    tasks: list[ReportOption]

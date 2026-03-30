@@ -24,6 +24,9 @@ export type { PasswordInputProps } from "./PasswordInput";
 export { default as SelectItem } from "./SelectItem";
 export type { SelectItemOption, SelectItemProps } from "./SelectItem";
 
+export { default as SearchableSelect } from "./SearchableSelect";
+export type { SearchableOption, SearchableSelectProps } from "./SearchableSelect";
+
 export { default as ReviewStatusBadge } from "./ReviewStatusBadge";
 export type { ReviewStatusBadgeProps, ReviewStatus } from "./ReviewStatusBadge";
 

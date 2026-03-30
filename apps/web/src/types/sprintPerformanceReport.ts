@@ -23,11 +23,19 @@ export interface SprintPerformanceReportResponse {
 }
 
 export type SprintReportFilters = {
-  sprint: string;
-  team: string;
-  employeeId: string;
-  ownerName: string;
-  activityType: string;
+  sprintId: number | null;
+  featureId: number | null;
+  ownerId: number | null;
+  taskId: number | null;
   fromDate: string;
   toDate: string;
 };
+
+export type ReportOption = { id: number; label: string };
+
+export interface SprintPerformanceFilterOptionsResponse {
+  sprints: ReportOption[];
+  owners: ReportOption[];
+  features: ReportOption[];
+  tasks: ReportOption[];
+}

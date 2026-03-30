@@ -17,6 +17,10 @@ from app.schemas.sprint_performance_report_schema import (
 def get_sprint_performance_report(
     db: Session,
     *,
+    sprint_id: int | None = None,
+    feature_id: int | None = None,
+    owner_id: int | None = None,
+    task_id: int | None = None,
     sprint_name: str | None,
     team_name: str | None,
     employee_id: int | None,
@@ -36,6 +40,10 @@ def get_sprint_performance_report(
 
     raw_rows = fetch_entries(
         db,
+        sprint_id=sprint_id,
+        feature_id=feature_id,
+        owner_id=owner_id,
+        task_id=task_id,
         sprint_name=sprint_name,
         team_name=team_name,
         owner_name=resolved_owner,

@@ -3,6 +3,7 @@
  * Dataset is kept in React state until a full page reload.
  */
 
+import { useState } from "react";
 import Chip from "@mui/material/Chip";
 import Grid from "@mui/material/Grid";
 import { Box, Button, Typography } from "../../components/primitives";
@@ -30,8 +31,11 @@ export default function SprintPerformanceReportPage() {
     setVisibleColumnIds,
     visibleColumns,
     columnVisibilityOptions,
-    employees,
+    options,
+    optionsLoading,
   } = useSprintPerformanceReportController();
+
+  const [showDataTable, setShowDataTable] = useState(false);
 
   return (
     <ListPageLayout
@@ -51,18 +55,12 @@ export default function SprintPerformanceReportPage() {
               onChange={patchFilters}
               onRunReport={runReport}
               loading={loading}
-              employees={employees}
+              options={options}
+              optionsLoading={optionsLoading}
             />
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center", mt: 1 }}>
-              <ColumnVisibilityMenu
-                options={columnVisibilityOptions}
-                visibleIds={visibleColumnIds}
-                onChange={setVisibleColumnIds}
-              />
-              <Typography variant="caption" color="text.secondary">
-                Results stay in memory until you refresh the browser.
-              </Typography>
-            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+              Results stay in memory until you refresh the browser.
+            </Typography>
           </Box>
           {error && (
             <Box sx={{ px: 2, pb: 1, display: "flex", alignItems: "center", gap: 2 }}>
@@ -78,36 +76,68 @@ export default function SprintPerformanceReportPage() {
       }
     >
       <Box sx={{ px: 2, pb: 2 }}>
-        {aggregations && (
-          <Grid container spacing={1} sx={{ mb: 2 }}>
-            {listConfig.aggregationMeta.map((m) => {
-              const raw = aggregations[m.field];
-              const display =
-                m.field === "pages_per_hour"
-                  ? raw == null
-                    ? "—"
-                    : formatHours(raw, { fractionDigits: 3 })
-                  : m.field === "total_hours"
-                    ? formatHours(raw as number)
-                    : String(raw ?? "—");
-              return (
-                <Grid item key={m.id}>
-                  <Chip label={`${m.label}: ${display}`} variant="outlined" size="small" />
-                </Grid>
-              );
-            })}
-          </Grid>
+        {aggregations != null && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Report summary
+            </Typography>
+            <Grid container spacing={1}>
+              {listConfig.aggregationMeta.map((m) => {
+                const raw = aggregations[m.field];
+                const display =
+                  m.field === "pages_per_hour"
+                    ? raw == null
+                      ? "—"
+                      : formatHours(raw, { fractionDigits: 3 })
+                    : m.field === "total_hours"
+                      ? formatHours(raw as number)
+                      : String(raw ?? "—");
+                return (
+                  <Grid item key={m.id}>
+                    <Chip label={`${m.label}: ${display}`} variant="outlined" size="small" />
+                  </Grid>
+                );
+              })}
+            </Grid>
+          </Box>
         )}
 
-        <ReportTable<TimesheetEntryRow>
-          label="Timesheet entries"
-          columns={visibleColumns}
-          data={rows}
-          loading={loading}
-          emptyMessage={listConfig.uiPolicy.emptyMessage}
-        />
-
         <GraphPanel rows={rows} />
+
+        <Box sx={{ mt: 2, mb: showDataTable ? 2 : 0 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => setShowDataTable((v) => !v)}
+            disabled={aggregations == null}
+          >
+            {showDataTable ? "Hide detail data" : "Show detail data"}
+          </Button>
+          {!rows.length && !loading && (
+            <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
+              Run a report to load rows.
+            </Typography>
+          )}
+        </Box>
+
+        {showDataTable && (
+          <Box sx={{ mt: 1 }}>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center", mb: 1 }}>
+              <ColumnVisibilityMenu
+                options={columnVisibilityOptions}
+                visibleIds={visibleColumnIds}
+                onChange={setVisibleColumnIds}
+              />
+            </Box>
+            <ReportTable<TimesheetEntryRow>
+              label="Timesheet entries"
+              columns={visibleColumns}
+              data={rows}
+              loading={loading}
+              emptyMessage={listConfig.uiPolicy.emptyMessage}
+            />
+          </Box>
+        )}
       </Box>
     </ListPageLayout>
   );

@@ -1,21 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import userService from "../api/services/userService";
 import sprintPerformanceReportService from "../api/services/sprintPerformanceReportService";
 import { createSprintPerformanceReportConfig } from "../pages/reports/SprintPerformanceReport.config";
-import type { User } from "../types/user";
 import type {
   SprintPerformanceAggregations,
   SprintPerformanceReportResponse,
   SprintReportFilters,
+  SprintPerformanceFilterOptionsResponse,
   TimesheetEntryRow,
 } from "../types/sprintPerformanceReport";
 
 const initialFilters: SprintReportFilters = {
-  sprint: "",
-  team: "",
-  employeeId: "",
-  ownerName: "",
-  activityType: "",
+  sprintId: null,
+  featureId: null,
+  ownerId: null,
+  taskId: null,
   fromDate: "",
   toDate: "",
 };
@@ -30,7 +28,13 @@ export function useSprintPerformanceReportController() {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [employees, setEmployees] = useState<{ id: number; label: string }[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [options, setOptions] = useState<SprintPerformanceFilterOptionsResponse>({
+    sprints: [],
+    owners: [],
+    features: [],
+    tasks: [],
+  });
 
   const patchFilters = useCallback((patch: Partial<SprintReportFilters>) => {
     setFilters((f) => ({ ...f, ...patch }));
@@ -39,17 +43,16 @@ export function useSprintPerformanceReportController() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setOptionsLoading(true);
       try {
-        const data = await userService.getAllUsers();
-        if (cancelled) return;
-        const opts = (data as User[]).map((u) => ({
-          id: u.id,
-          label: u.full_name || u.email,
-        }));
-        opts.sort((a, b) => a.label.localeCompare(b.label));
-        setEmployees(opts);
+        const res = await sprintPerformanceReportService.fetchOptions();
+        if (!cancelled) setOptions(res);
       } catch {
-        if (!cancelled) setEmployees([]);
+        if (!cancelled) {
+          setOptions({ sprints: [], owners: [], features: [], tasks: [] });
+        }
+      } finally {
+        if (!cancelled) setOptionsLoading(false);
       }
     })();
     return () => {
@@ -97,6 +100,7 @@ export function useSprintPerformanceReportController() {
     setVisibleColumnIds,
     visibleColumns,
     columnVisibilityOptions,
-    employees,
+    options,
+    optionsLoading,
   };
 }
