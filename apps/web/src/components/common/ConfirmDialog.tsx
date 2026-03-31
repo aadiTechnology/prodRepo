@@ -1,14 +1,5 @@
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  Button,
-  CircularProgress,
-} from "../primitives";
-import { CancelButton } from "../semantic";
 import { ReactNode } from "react";
+import SemanticConfirmDialog from "../semantic/ConfirmDialog";
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -33,32 +24,21 @@ export default function ConfirmDialog({
   messageNode,
   warningContent,
   confirmText,
-  confirmVariant = "error",
   onConfirm,
   onCancel,
   loading = false,
 }: ConfirmDialogProps) {
   return (
-    <Dialog open={open} onClose={loading ? undefined : onCancel} aria-labelledby="confirm-dialog-title">
-      <DialogTitle id="confirm-dialog-title">{title}</DialogTitle>
-      <DialogContent>
-        {messageNode != null ? messageNode : <DialogContentText>{message}</DialogContentText>}
-        {warningContent}
-      </DialogContent>
-      <DialogActions>
-        <CancelButton onClick={onCancel} disabled={loading}>
-          Cancel
-        </CancelButton>
-        <Button
-          onClick={onConfirm}
-          color={confirmVariant}
-          variant="contained"
-          disabled={loading}
-          startIcon={loading ? <CircularProgress size={18} /> : undefined}
-        >
-          {confirmText}
-        </Button>
-      </DialogActions>
-    </Dialog>
+    <SemanticConfirmDialog
+      open={open}
+      onClose={onCancel}
+      onConfirm={onConfirm}
+      title={title}
+      message={message}
+      messageNode={messageNode}
+      warningContent={warningContent}
+      confirmLabel={confirmText}
+      loading={loading}
+    />
   );
 }

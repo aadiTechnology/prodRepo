@@ -130,11 +130,12 @@ export default function ConfirmDialog({
             sx={(theme) => ({
               fontSize: "1.05rem",
               textAlign: "center",
-              pr:49,
-              ml:10,
-              mb:5,
+              mb: 5,
               color: theme.palette.text.primary,
               fontWeight: 125,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             })}
           >
            {message}

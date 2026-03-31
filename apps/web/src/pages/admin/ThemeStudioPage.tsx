@@ -45,6 +45,7 @@ import type { Tokens } from "../../tokens";
 import { PageHeader } from "../../components/layout";
 import { AppCard } from "../../components/primitives";
 import { DataTable } from "../../components/reusable";
+import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import themeTemplateService from "../../api/services/themeTemplateService";
 import type { ThemeTemplate } from "../../types/themeTemplate";
 
@@ -647,24 +648,18 @@ export default function ThemeStudioPage() {
       </Dialog>
 
       {/* Delete confirmation dialog */}
-      <Dialog open={deleteConfirmId != null} onClose={() => setDeleteConfirmId(null)}>
-        <DialogTitle>Delete template?</DialogTitle>
-        <DialogContent>
-          <Typography>
-            This cannot be undone. The template will be removed from the list.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => deleteConfirmId != null && handleDeleteTemplate(deleteConfirmId)}
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteConfirmId != null}
+        title="Please Confirm"
+        message="This cannot be undone. The template will be removed from the list."
+        confirmLabel="Delete"
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => {
+          if (deleteConfirmId != null) {
+            void handleDeleteTemplate(deleteConfirmId);
+          }
+        }}
+      />
     </Box>
   );
 }
