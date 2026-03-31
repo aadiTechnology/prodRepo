@@ -38,7 +38,7 @@ export default function AddClass() {
         ],
         capacity: [
             { type: "required", message: "Capacity is required." },
-            { type: "pattern", value: /^[1-9][0-9]*$/, message: "Must be a positive number." },
+            { type: "pattern", regex: /^[1-9][0-9]*$/, message: "Must be a positive number." },
         ],
     }), []);
 
