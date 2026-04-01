@@ -11,13 +11,24 @@ from app.models.user import UserRole
 from app.utils.security import verify_password, create_access_token
 from app.core.exceptions import UnauthorizedException, ForbiddenException
 from app.core.logging_config import get_logger
-from app.core.dependencies import get_current_user, CurrentUser, get_rbac_role_codes, require_system_admin
+from app.core.dependencies import get_current_user, CurrentUser, get_rbac_role_codes, SYSTEM_ADMIN_ROLE_CODE
 from app.services.auth_service import revoke_token
 from app.models.tenant import Tenant
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+def _has_full_user_management_access(db: Session, user) -> bool:
+    permission_codes, _ = rbac_service.resolve_user_permissions_and_menus(db, user)
+    required_permissions = {
+        "ADMIN_MGMT:view",
+        "ADMIN_MGMT:create",
+        "ADMIN_MGMT:edit",
+        "ADMIN_MGMT:delete",
+    }
+    return required_permissions.issubset(set(permission_codes))
 
 @router.post("/register", response_model=UserResponse, status_code=201)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)) -> UserResponse:
@@ -163,17 +174,28 @@ async def get_rbac_context(
 async def impersonate_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_system_admin),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> LoginContextResponse:
     """
-    System admin impersonates another user.
-    Only system admins (users with no tenant_id) can impersonate other users.
+    Impersonate another user.
+    - System admin (tenant_id is None) can impersonate tenant users.
+    - Tenant users can impersonate only users of the same tenant when they have
+      full User Management permissions.
     """
-    logger.info(f"Impersonation attempt: System admin {current_user.id} trying to impersonate user {user_id}")
+    logger.info(f"Impersonation attempt: actor={current_user.id} target={user_id}")
     
-    if current_user.tenant_id is not None:
-        raise ForbiddenException("Only system administrators can impersonate users")
-    
+    actor_user = user_service.get_user_by_id(db, current_user.id)
+    if not actor_user:
+        raise UnauthorizedException("Actor user not found")
+
+    actor_is_system_admin = (
+        current_user.tenant_id is None
+        and (
+            current_user.role in [UserRole.ADMIN, UserRole.SUPER_ADMIN]
+            or SYSTEM_ADMIN_ROLE_CODE.lower() in get_rbac_role_codes(db, current_user.id)
+        )
+    )
+
     target_user = user_service.get_user_by_id(db, user_id)
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -183,6 +205,16 @@ async def impersonate_user(
     
     if target_user.tenant_id is None:
         raise ForbiddenException("Cannot impersonate system administrators")
+
+    if not actor_is_system_admin:
+        if current_user.tenant_id is None:
+            raise ForbiddenException("Insufficient permissions")
+        if target_user.tenant_id != current_user.tenant_id:
+            raise ForbiddenException("You can only login as users from your tenant")
+        if not _has_full_user_management_access(db, actor_user):
+            raise ForbiddenException(
+                "Insufficient permissions. Full User Management access is required."
+            )
     
     tenant = db.query(Tenant).filter(Tenant.id == target_user.tenant_id).first()
     if not tenant or not tenant.is_active or tenant.is_deleted:

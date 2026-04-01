@@ -14,18 +14,29 @@ import {
   EntityTableSection,
 } from "../components/reusable";
 import { PageHeader } from "../components/layout";
-import { Box, Typography, Button, Select, MenuItem } from "../components/primitives";
+import { Box, Typography, Button } from "../components/primitives";
 import { useAuth } from "../context/AuthContext";
+import { useRBAC } from "../context/RBACContext";
 import { useUsersListController } from "../hooks";
 import { toRoleLabel } from "../utils/formatters";
-import { createUsersListConfig } from "./Users.listConfig";
+import { createUsersListConfig, renderUserRowActions } from "./Users.listConfig";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Users Management Page Component
 // ═══════════════════════════════════════════════════════════════════════════
 const Users = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, applyLoginContextResponse } = useAuth();
+  const { hasAllPermissions } = useRBAC();
+  const isSystemAdmin = user?.tenant_id == null && !!user;
+  const canLoginAsUser =
+    !isSystemAdmin &&
+    hasAllPermissions([
+      "ADMIN_MGMT:view",
+      "ADMIN_MGMT:create",
+      "ADMIN_MGMT:edit",
+      "ADMIN_MGMT:delete",
+    ]);
   const {
     listState: {
       search,
@@ -36,10 +47,6 @@ const Users = () => {
       setPage,
       rowsPerPage,
       onRowsPerPageChange,
-      sortBy,
-      setSortBy,
-      sortOrder,
-      setSortOrder,
     },
     filteredUsers,
     paginatedUsers,
@@ -50,18 +57,23 @@ const Users = () => {
     fetchUsers,
     confirmDialogOpen,
     deleteLoading,
+    impersonationLoading,
     openDeleteConfirm,
     closeDeleteConfirm,
     confirmDelete,
-  } = useUsersListController({ currentUser: user });
+    loginAsUser,
+  } = useUsersListController({ currentUser: user, navigate, applyLoginContextResponse });
 
   const listConfig = useMemo(
     () =>
       createUsersListConfig({
         navigate,
         onDeleteClick: openDeleteConfirm,
+        onLoginAsUser: loginAsUser,
+        canLoginAsUser,
+        impersonationLoading,
       }),
-    [navigate, openDeleteConfirm]
+    [canLoginAsUser, impersonationLoading, loginAsUser, navigate, openDeleteConfirm]
   );
 
   return (
@@ -84,7 +96,6 @@ const Users = () => {
                     value: filters.role,
                     onChange: (val) => setFilter("role", val),
                     options: [
-                      { label: "All", value: "All" },
                       ...uniqueRoles.map((role) => ({ label: toRoleLabel(role), value: role }))
                     ]
                   },
@@ -93,40 +104,8 @@ const Users = () => {
                     value: filters.status,
                     onChange: (val) => setFilter("status", val),
                     options: [
-                      { label: "All", value: "All" },
                       { label: "Active", value: "Active" },
                       { label: "Inactive", value: "Inactive" }
-                    ]
-                  },
-                  {
-                    label: "Sort by Name",
-                    value: sortBy === "name" ? sortOrder : "",
-                    onChange: (val) => {
-                      if (val) {
-                        setSortBy("name");
-                        setSortOrder(val as "asc" | "desc");
-                      } else {
-                        setSortBy("created_at");
-                        setSortOrder("desc");
-                      }
-                    },
-                    options: [
-                      { label: "A-Z", value: "asc" },
-                      { label: "Z-A", value: "desc" },
-                    ]
-                  },
-                  {
-                    label: "Sort by Date",
-                    value: sortBy === "created_at" ? sortOrder : "",
-                    onChange: (val) => {
-                      if (val) {
-                        setSortBy("created_at");
-                        setSortOrder(val as "asc" | "desc");
-                      }
-                    },
-                    options: [
-                      { label: "Newest First", value: "desc" },
-                      { label: "Oldest First", value: "asc" },
                     ]
                   }
                 ]}
@@ -170,7 +149,16 @@ const Users = () => {
         data={paginatedUsers}
         loading={loading}
         emptyMessage={listConfig.uiPolicy.emptyMessage}
-        rowActions={listConfig.actions.rowActions}
+        renderRowActions={(row) =>
+          renderUserRowActions({
+            row,
+            canLoginAsUser,
+            impersonationLoading,
+            onEdit: () => navigate("/user/create", { state: { user: row, isEdit: true } }),
+            onDelete: () => openDeleteConfirm(row),
+            onLoginAsUser: loginAsUser,
+          })
+        }
         stickyHeader
         size="small"
       />

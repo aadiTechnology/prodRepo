@@ -2,13 +2,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { User as AuthUser } from "../types/auth";
 import type { UserResponse } from "../types/user";
 import userService from "../api/services/userService";
+import authService from "../api/services/authService";
 import { useListManager, type UseListManagerResult } from "./useListManager";
+import type { NavigateFunction } from "react-router-dom";
+import type { LoginContextResponse } from "../types/rbac";
+import { enqueueSnackbar } from "notistack";
 
 export type UsersFilters = { role: string; status: string };
 export type UsersSortBy = "name" | "created_at";
 
 type UseUsersListControllerOptions = {
   currentUser: AuthUser | null;
+  navigate: NavigateFunction;
+  applyLoginContextResponse: (response: LoginContextResponse) => void;
 };
 
 type UseUsersListControllerResult = {
@@ -24,9 +30,11 @@ type UseUsersListControllerResult = {
   closeSnackbar: () => void;
   confirmDialogOpen: boolean;
   deleteLoading: boolean;
+  impersonationLoading: number | null;
   openDeleteConfirm: (user: AuthUser) => void;
   closeDeleteConfirm: () => void;
   confirmDelete: () => Promise<void>;
+  loginAsUser: (userId: number) => Promise<void>;
 };
 
 function mapUsers(data: UserResponse[]): AuthUser[] {
@@ -44,6 +52,8 @@ function mapUsers(data: UserResponse[]): AuthUser[] {
 
 export function useUsersListController({
   currentUser,
+  navigate,
+  applyLoginContextResponse,
 }: UseUsersListControllerOptions): UseUsersListControllerResult {
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,9 +62,12 @@ export function useUsersListController({
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<AuthUser | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [impersonationLoading, setImpersonationLoading] = useState<number | null>(null);
+  const isSystemAdmin = currentUser?.tenant_id == null && !!currentUser;
+  const currentTenantId = currentUser?.tenant_id ?? null;
 
   const listState = useListManager<UsersFilters, UsersSortBy>({
-    initialFilters: { role: "All", status: "All" },
+    initialFilters: { role: "", status: "" },
     initialSortBy: "created_at",
     initialSortOrder: "asc",
     initialRowsPerPage: 10,
@@ -115,13 +128,41 @@ export function useUsersListController({
     }
   }, [fetchUsers, userToDelete]);
 
+  const loginAsUser = useCallback(
+    async (userId: number) => {
+      const targetUser = users.find((u) => u.id === userId);
+      if (!targetUser) {
+        enqueueSnackbar("Selected user not found", { variant: "error" });
+        return;
+      }
+      if (!targetUser.is_active) {
+        enqueueSnackbar("Cannot login as inactive user", { variant: "error" });
+        return;
+      }
+      if (!isSystemAdmin && currentTenantId !== null && targetUser.tenant_id !== currentTenantId) {
+        enqueueSnackbar("You can only login as users from your tenant", { variant: "error" });
+        return;
+      }
+      try {
+        setImpersonationLoading(userId);
+        const response = await authService.impersonate(userId);
+        applyLoginContextResponse(response);
+        enqueueSnackbar("Logged in as user successfully", { variant: "success" });
+        navigate("/");
+      } catch (err) {
+        console.error("Failed to login as user:", err);
+        enqueueSnackbar("Failed to login as user", { variant: "error" });
+      } finally {
+        setImpersonationLoading(null);
+      }
+    },
+    [applyLoginContextResponse, currentTenantId, isSystemAdmin, navigate, users]
+  );
+
   const uniqueRoles = useMemo(
     () => Array.from(new Set(users.map((u) => u.role).filter(Boolean))),
     [users]
   );
-
-  const isSystemAdmin = currentUser?.tenant_id == null && !!currentUser;
-  const currentTenantId = currentUser?.tenant_id ?? null;
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
@@ -132,9 +173,9 @@ export function useUsersListController({
         u.email.toLowerCase().includes(listState.search.toLowerCase()) ||
         String(u.id).includes(listState.search);
       const matchesRole =
-        listState.filters.role === "All" || u.role === listState.filters.role;
+        listState.filters.role === "" || u.role === listState.filters.role;
       const matchesStatus =
-        listState.filters.status === "All" ||
+        listState.filters.status === "" ||
         (listState.filters.status === "Active" && u.is_active) ||
         (listState.filters.status === "Inactive" && !u.is_active);
       return matchesTenant && matchesSearch && matchesRole && matchesStatus;
@@ -182,8 +223,10 @@ export function useUsersListController({
     closeSnackbar: () => setSnackbar(null),
     confirmDialogOpen,
     deleteLoading,
+    impersonationLoading,
     openDeleteConfirm,
     closeDeleteConfirm,
     confirmDelete,
+    loginAsUser,
   };
 }

@@ -5,15 +5,32 @@ import type { UsersSortBy } from "../hooks";
 import StatusChip from "../components/roles/StatusChip";
 import { Box, Typography, Button } from "../components/primitives";
 import { formatShortDate, toRoleLabel } from "../utils/formatters";
+import {
+  Login as LoginIcon,
+} from "@mui/icons-material";
+import {
+  IconButton,
+  Tooltip,
+  CircularProgress,
+  alpha,
+} from "@mui/material";
+import TableRowActions from "../components/reusable/TableRowActions";
+import { colorTokens } from "../tokens/colors";
 
 type UsersListConfigFactoryArgs = {
   navigate: NavigateFunction;
   onDeleteClick: (user: AuthUser) => void;
+  onLoginAsUser: (userId: number) => Promise<void>;
+  canLoginAsUser: boolean;
+  impersonationLoading: number | null;
 };
 
 export function createUsersListConfig({
   navigate,
   onDeleteClick,
+  onLoginAsUser,
+  canLoginAsUser,
+  impersonationLoading,
 }: UsersListConfigFactoryArgs): ListConfig<AuthUser, UsersSortBy> {
   return {
     columns: [
@@ -56,7 +73,62 @@ export function createUsersListConfig({
       rowActions: (tableUser) => ({
         onEdit: () => navigate("/user/create", { state: { user: tableUser, isEdit: true } }),
         onDelete: () => onDeleteClick(tableUser),
+        onView:
+          canLoginAsUser
+            ? () => {
+                void onLoginAsUser(tableUser.id);
+              }
+            : undefined,
+        disabled: impersonationLoading === tableUser.id || !tableUser.is_active,
       }),
     },
   };
+}
+
+export function renderUserRowActions(args: {
+  row: AuthUser;
+  canLoginAsUser: boolean;
+  impersonationLoading: number | null;
+  onEdit: () => void;
+  onDelete: () => void;
+  onLoginAsUser: (userId: number) => Promise<void>;
+}) {
+  const {
+    row,
+    canLoginAsUser,
+    impersonationLoading,
+    onEdit,
+    onDelete,
+    onLoginAsUser,
+  } = args;
+
+  return (
+    <Box sx={{ display: "flex", alignItems: "center" }}>
+      <TableRowActions onEdit={onEdit} onDelete={onDelete} />
+      {canLoginAsUser && (
+        <Tooltip title="Login as this user">
+          <IconButton
+            size="small"
+            onClick={() => void onLoginAsUser(row.id)}
+            disabled={impersonationLoading === row.id || !row.is_active}
+            sx={{
+              color: colorTokens.menuColors.staff,
+              ml: 1,
+              "&:hover": {
+                bgcolor: alpha(colorTokens.menuColors.staff, 0.1),
+                transform: "scale(1.15)",
+              },
+              transition: "all 0.2s",
+            }}
+          >
+            {impersonationLoading === row.id ? (
+              <CircularProgress size={16} color="inherit" />
+            ) : (
+              <LoginIcon fontSize="small" />
+            )}
+          </IconButton>
+        </Tooltip>
+      )}
+    </Box>
+  );
 }
