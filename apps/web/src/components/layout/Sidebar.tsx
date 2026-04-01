@@ -252,7 +252,8 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
       { id: "permission-management", label: "Permission Management", path: "/admin/permission-management" },
       { id: "theme-studio", label: "Theme Studio", path: "/admin/theme-studio" },
       { id: "ai-review", label: "AI Review", path: "/ai/review" },
-      { id: "story-generation", label: "Story Generation", path: "/ai/generate" }
+      { id: "story-generation", label: "Story Generation", path: "/ai/generate" },
+      { id: "sprint-performance", label: "Sprint Performance", path: "/reports/sprint-performance" }
     ]
   }
 ];

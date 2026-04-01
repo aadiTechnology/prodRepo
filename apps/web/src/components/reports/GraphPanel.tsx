@@ -1,7 +1,6 @@
 import Paper from "@mui/material/Paper";
 import Grid from "@mui/material/Grid";
-import { BarChart } from "@mui/x-charts/BarChart";
-import { LineChart } from "@mui/x-charts/LineChart";
+import { BarChart, LineChart } from "@mui/x-charts";
 import { Typography } from "../primitives";
 import { colorTokens } from "../../tokens/colors";
 import type { TimesheetEntryRow } from "../../types/sprintPerformanceReport";
