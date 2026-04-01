@@ -4,7 +4,7 @@
  * Integrated with academic year, class, and fee category management
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
     Box,
     Paper,
@@ -34,6 +34,7 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
 import feeService from "../../api/services/feeService";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Fee Structure Form Page Component
@@ -106,11 +107,23 @@ const FeeStructureForm = () => {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [pendingData, setPendingData] = useState<FeeStructureFormValues | null>(null);
+
     // Lookups
     const [categories, setCategories] = useState<FeeCategory[]>([]);
     const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
     const [classes, setClasses] = useState<ClassEntity[]>([]);
     const [installments, setInstallments] = useState<FeeInstallment[]>([]);
+
+    const uniqueClasses = useMemo(() => {
+        const seen = new Set();
+        return classes.filter(cls => {
+            if (!cls.name || seen.has(cls.name)) return false;
+            seen.add(cls.name);
+            return true;
+        });
+    }, [classes]);
 
     const {
         control,
@@ -136,15 +149,15 @@ const FeeStructureForm = () => {
     const watchedTotalAmount = watch("total_amount");
     const watchedNumInstallments = watch("num_installments");
     const watchedInstallmentType = watch("installment_type");
+    const watchedAcademicYearId = watch("academic_year_id");
 
-    // Fetch Lookups
+    // Fetch Global Lookups
     useEffect(() => {
         const fetchLookups = async () => {
             try {
                 const results = await Promise.allSettled([
                     feeService.getFeeCategories(),
                     feeService.getAcademicYears(),
-                    feeService.getClasses(),
                 ]);
 
                 if (results[0].status === 'fulfilled') {
@@ -159,12 +172,6 @@ const FeeStructureForm = () => {
                     console.error("Failed to load academic years", results[1].reason);
                     setError("Failed to load academic years. Filters and selection may be limited.");
                 }
-
-                if (results[2].status === 'fulfilled') {
-                    setClasses(results[2].value);
-                } else {
-                    console.error("Failed to load classes", results[2].reason);
-                }
             } catch (err) {
                 console.error("Unexpected error loading lookups", err);
             }
@@ -172,20 +179,41 @@ const FeeStructureForm = () => {
         fetchLookups();
     }, []);
 
+    // Fetch Classes based on selected Academic Year
+    useEffect(() => {
+        if (!watchedAcademicYearId) {
+            setClasses([]);
+            setValue("class_id", "" as any);
+            return;
+        }
+        feeService.getClasses(Number(watchedAcademicYearId))
+            .then(res => {
+                setClasses(res);
+                // When classes refresh, if currently selected class_id is no longer valid, clear it
+                if (watch("class_id")) {
+                    const currentClassId = Number(watch("class_id"));
+                    // uniqueClasses calculation equivalent
+                    const seen = new Set();
+                    const uniques = res.filter(cls => {
+                        if (!cls.name || seen.has(cls.name)) return false;
+                        seen.add(cls.name);
+                        return true;
+                    });
+                    
+                    if (!uniques.find(c => c.id === currentClassId)) {
+                         // Only clear if it's not present at all. (In edit mode we might still be loading, but getFeeStructure sets this explicitly anyway)
+                    }
+                }
+            })
+            .catch(err => console.error("Failed to load classes for academic year", err));
+    }, [watchedAcademicYearId, setValue]);
+
     // Fetch existing data for Edit Mode
     const fetchStructure = useCallback(async () => {
         if (!id) return;
         try {
             setFetchLoading(true);
-            const structuresRes = await feeService.getFeeStructures(0, 10, ""); // Need a getById in service?
-            // Since there's no getById, we might need to find it or the service needs an update.
-            // For now, let's assume we might need to fetch it differently or the service has it.
-            // Checking feeService.ts again... it has updateFeeStructure(id, data) but no getFeeStructure(id).
-            // Actually, FeeStructureSetup.tsx uses `selectedStructure` passed from list.
-            // In a real app with routes, we need a getById.
-            // Let's check if the service can be extended or if I should just use the list.
-            const response = await feeService.getFeeStructures(0, 1000);
-            const found = response.items.find(s => s.id === Number(id));
+            const found = await feeService.getFeeStructure(Number(id));
 
             if (found) {
                 reset({
@@ -244,14 +272,12 @@ const FeeStructureForm = () => {
     }, [watchedNumInstallments, watchedTotalAmount, watchedInstallmentType]);
 
     const onFormSubmit = async (data: FeeStructureFormValues) => {
-        setLoading(true);
         setError(null);
         try {
             // 1. Validate installment total
             const instSum = installments.reduce((acc, inst) => acc + (Number(inst.amount) || 0), 0);
             if (Math.abs(instSum - data.total_amount) > 0.01) {
                 setError("Installment total must equal fee amount");
-                setLoading(false);
                 return;
             }
 
@@ -263,33 +289,42 @@ const FeeStructureForm = () => {
             for (const inst of installments) {
                 if (Number(inst.amount) <= 0) {
                     setError("Installment amount must be greater than zero");
-                    setLoading(false);
                     return;
                 }
 
                 const instDate = new Date(inst.due_date);
                 if (instDate < now) {
                     setError("Due date cannot be in the past");
-                    setLoading(false);
                     return;
                 }
 
                 if (instDate < lastDate) {
                     setError("Installment dates must be sequential");
-                    setLoading(false);
                     return;
                 }
                 lastDate = instDate;
 
                 if (Number(inst.late_fee_amount) < 0) {
                     setError("Late fee cannot be negative");
-                    setLoading(false);
                     return;
                 }
             }
 
+            setPendingData(data);
+            setConfirmOpen(true);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleConfirm = async () => {
+        if (!pendingData) return;
+        setConfirmOpen(false);
+        setLoading(true);
+        setError(null);
+        try {
             const payload = {
-                ...data,
+                ...pendingData,
                 installments: installments.map(({ id, ...rest }) => rest),
             };
 
@@ -318,6 +353,7 @@ const FeeStructureForm = () => {
             setError(msg);
         } finally {
             setLoading(false);
+            setPendingData(null);
         }
     };
 
@@ -415,7 +451,11 @@ const FeeStructureForm = () => {
                                                     error={Boolean(errors.class_id)}
                                                     helperText={errors.class_id?.message}
                                                     sx={buildFieldSx(Boolean(errors.class_id))}>
-                                                    {classes.map(c => <MenuItem key={c.id} value={c.id}>{c.name} {c.section ? `(${c.section})` : ""}</MenuItem>)}
+                                                    <MenuItem value="" disabled>
+                                                        {classes.length === 0 && watchedAcademicYearId ? "No classes available" : 
+                                                         !watchedAcademicYearId ? "Select Academic Year first" : "Select Class"}
+                                                    </MenuItem>
+                                                    {uniqueClasses.map((c: ClassEntity) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
                                                 </Select>
                                             )}
                                         />
@@ -597,6 +637,26 @@ const FeeStructureForm = () => {
                     </Box>
                 </Paper>
             </Box>
+
+            <ConfirmDialog
+                open={confirmOpen}
+                title={isEditMode ? "Update Fee Structure" : "Create Fee Structure"}
+                message={isEditMode ? "Are you sure you want to update this fee structure?" : "Are you sure you want to create this new fee structure?"}
+                warningContent={
+                    isEditMode &&
+                    <Alert severity="warning" sx={{ mt: 1, p: 1 }}>
+                        Updating an active fee structure may affect student installments that have not yet been paid.
+                    </Alert>
+                }
+                confirmText={isEditMode ? "Update" : "Create"}
+                confirmVariant="primary"
+                onConfirm={handleConfirm}
+                onCancel={() => {
+                    setConfirmOpen(false);
+                    setPendingData(null);
+                }}
+                loading={loading}
+            />
         </ListPageLayout>
     );
 };

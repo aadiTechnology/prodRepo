@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/academic-years", tags=["Academic Years"])
 @router.get("", response_model=List[AcademicYearResponse])
 def list_academic_years(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_permission("Academic Years", "view"))
+    current_user: CurrentUser = Depends(get_current_user)
 ):
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="User does not belong to a tenant")

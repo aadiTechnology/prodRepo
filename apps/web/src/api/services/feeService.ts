@@ -32,6 +32,11 @@ const feeService = {
     return response.data;
   },
 
+  getFeeStructure: async (id: number): Promise<FeeStructure> => {
+    const response = await apiClient.get(`/fees/structures/${id}`);
+    return response.data;
+  },
+
   createFeeStructure: async (data: FeeStructureCreate): Promise<FeeStructure> => {
     const response = await apiClient.post("/fees/structures", data);
     return response.data;
@@ -85,6 +90,7 @@ const feeService = {
 
 export const {
   getFeeStructures,
+  getFeeStructure,
   createFeeStructure,
   updateFeeStructure,
   deleteFeeStructure,

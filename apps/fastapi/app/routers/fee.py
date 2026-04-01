@@ -139,3 +139,22 @@ async def delete_fee_structure(
 ):
     fee_service.delete_fee_structure(db, structure_id, current_user.tenant_id, current_user.id)
     return None
+
+@router.get("/structures/{structure_id}", response_model=FeeStructureResponse)
+async def read_fee_structure(
+    structure_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_permission("Fees", "view"))
+):
+    structure = fee_service.get_fee_structure(db, structure_id, current_user.tenant_id)
+    
+    # Patch installments for consistency with read_fee_structures
+    if hasattr(structure, 'installments') and structure.installments:
+        for inst in structure.installments:
+            if getattr(inst, 'late_fee_percentage', None) is None:
+                inst.late_fee_percentage = 0.0
+            if getattr(inst, 'description', None) is None:
+                inst.description = ""
+                
+    return structure
+
