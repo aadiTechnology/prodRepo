@@ -1,333 +1,124 @@
-import { useState, useEffect } from "react";
-import {
-    Box,
-    Paper,
-    Typography,
-    Alert,
-    CircularProgress,
-    IconButton,
-    Tooltip,
-    Switch,
-} from "@mui/material";
-import type { Theme } from "@mui/material/styles";
-import { TextField } from "../../components/primitives";
-import { SaveButton, CancelButton } from "../../components/semantic";
-import {
-    Category as CategoryIcon,
-    ErrorOutline as ErrorIcon,
-    Save as SaveIcon,
-    Cancel as CancelIcon,
-} from "@mui/icons-material";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { PageHeader } from "../../components/layout";
-import { createFeeCategory, updateFeeCategory, getFeeCategory } from "../../api/services/feeService";
-import type { FeeCategoryCreate, FeeCategoryResponse } from "../../types/fee";
-import { ListPageLayout, FormSectionLabel, FieldLabel } from "../../components/reusable";
-import SaveIconButton from "../../components/semantic/SaveIconButton";
-import CloseIconButton from "../../components/semantic/CloseIconButton";
-
-const buildFieldSx = (hasError: boolean) => (theme: Theme) => ({
-    "& .MuiOutlinedInput-root": {
-        borderRadius: 1,
-        bgcolor: theme.palette.background.paper,
-        fontSize: "0.875rem",
-        fontWeight: 500,
-        "& fieldset": { borderColor: hasError ? theme.palette.error.main : theme.palette.divider, borderWidth: hasError ? "1.5px" : "1.2px" },
-        "&:hover fieldset": { borderColor: hasError ? theme.palette.error.main : theme.palette.grey[400] },
-        "&.Mui-focused": {
-            "& fieldset": { borderColor: hasError ? theme.palette.error.main : theme.palette.primary.main, borderWidth: "1.8px" },
-        },
-        "& .MuiInputBase-input.Mui-disabled": { WebkitTextFillColor: theme.palette.grey[500] },
-    },
-    "& .MuiFormHelperText-root": { fontSize: "0.7rem", mt: 0.3, ml: 0 },
-});
+import { Alert, Snackbar, Box } from "@mui/material";
+import {
+  createFeeCategory,
+  updateFeeCategory,
+  getFeeCategory,
+} from "../../api/services/feeService";
+import BaseForm from "../../components/reusable/BaseForm";
+import { useFormManager } from "../../hooks/useFormManager";
+import {
+  createFeeCategoryFormConfig,
+  type FeeCategoryFormData,
+} from "./FeeCategory.formConfig";
 
 const AddEditFeeCategory = () => {
-    const navigate = useNavigate();
-    const { id } = useParams<{ id?: string }>();
-    const isEditMode = Boolean(id);
+  const navigate = useNavigate();
+  const { id } = useParams<{ id?: string }>();
+  const isEditMode = Boolean(id);
 
-    const [loading, setLoading] = useState(false);
-    const [fetchLoading, setFetchLoading] = useState(isEditMode);
-    const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [formData, setFormData] = useState<FeeCategoryCreate>({
-        name: "",
-        status: true,
-    });
+  const [loading, setLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(isEditMode);
+  const [error, setError] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (isEditMode && id) {
-            setFetchLoading(true);
-            getFeeCategory(id)
-                .then((data: FeeCategoryResponse) => {
-                    setFormData({
-                        name: data.name || "",
-                        status: !!data.status,
-                    });
-                })
-                .catch(() => setError("Failed to load category."))
-                .finally(() => setFetchLoading(false));
-        }
-    }, [id, isEditMode]);
+  const initialValues = useMemo<FeeCategoryFormData>(
+    () => ({
+      name: "",
+      status: true,
+    }),
+    []
+  );
 
-    const validateField = (name: string, value: any) => {
-        let e = "";
-        if (name === "name") {
-            if (!value) e = "Required.";
-            else if (value.length < 3) e = "Min 3 characters.";
-        }
-        return e;
-    };
+  const formConfig = useMemo(
+    () => createFeeCategoryFormConfig({ isEditMode }),
+    [isEditMode]
+  );
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value, checked, type } = e.target;
-        const v = name === "status" ? checked : value;
-        setFormData((prev) => ({ ...prev, [name]: v }));
-        setErrors((prev) => ({ ...prev, [name]: validateField(name, v) }));
-    };
+  const formManager = useFormManager<FeeCategoryFormData>({
+    initialValues,
+    validationConfig: {}, // Basic required validation handled by browser/logic if config is empty here
+  });
 
-    const validateForm = () => {
-        const fields = ["name"];
-        const newErrors: Record<string, string> = {};
-        fields.forEach((f) => {
-            const e = validateField(f, formData[f as keyof FeeCategoryCreate]);
-            if (e) newErrors[f] = e;
-        });
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
+  const { formData, setFormData, fieldErrors, handleChange, handleFieldValueChange, handleSubmit } = formManager;
 
-    const handleSubmit = async () => {
-        if (!validateForm()) return;
-        setLoading(true);
-        setError(null);
-        try {
-            if (isEditMode && id) {
-                await updateFeeCategory(id, formData);
-                setSuccess("Category updated successfully!");
-            } else {
-                await createFeeCategory(formData);
-                setSuccess("Category created successfully!");
-            }
-            setTimeout(() => navigate("/fees/categories"), 1000);
-        } catch (err: any) {
-            setError(err?.message || (isEditMode ? "Failed to update category." : "Failed to create category."));
-        } finally {
-            setLoading(false);
-        }
-    };
+  const fetchCategory = useCallback(async () => {
+    if (!id) return;
+    try {
+      setFetchLoading(true);
+      const data = await getFeeCategory(id);
+      setFormData({
+        name: data.name,
+        status: !!data.status,
+      });
+    } catch (err: any) {
+      setError("Failed to load category.");
+    } finally {
+      setFetchLoading(false);
+    }
+  }, [id, setFormData]);
 
-    if (fetchLoading)
-        return (
-            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
-                <CircularProgress sx={{ color: "#1a1a2e" }} />
-            </Box>
-        );
+  useEffect(() => {
+    if (isEditMode) fetchCategory();
+  }, [isEditMode, fetchCategory]);
 
-    return (
-        <Box sx={{ flex: 1, overflowY: "auto", pb: 2, pr: 0.5 }}>
-        
-                    <PageHeader
-                        links={[
-                            { title: "Fee Categories", path: "/fees/categories" },
-                            { title: isEditMode ? "Edit Fee Category" : "Add Fee Category", path: "#" },
-                        ]}
-                        homePath="/fees/categories"
-                        actions={
-                            <>
-                              <Tooltip title="Cancel"><span><CloseIconButton onClick={() => navigate("/fees/categories")} /></span></Tooltip>
-                              <Tooltip title={isEditMode ? "Update category" : "Save category"}><span><SaveIconButton onClick={handleSubmit} loading={loading} /></span></Tooltip>
-                            </>
-                          }
-                    />
-            
-        
-            {error && (
-                <Alert 
-                severity="error"
-                icon={<ErrorIcon />}
-                sx={{ mb: 1, borderRadius: "8px", py: 0.3 }}
-                onClose={() => setError(null)}
-                >
-                    {error}
-                </Alert>
-            )}
-            {success && (
-                <Alert severity="success" sx={{ mb: 1, borderRadius: "8px", py: 0.3 }}>
-                    {success}
-                </Alert>
-                )}
-            <Box sx={{ flex: 1, overflowY: "auto", pb: 2, pr: 0.5 }}>
-                <Paper
-                    elevation={0}
-                    sx={(theme) => ({
-                        borderRadius: 1.25,
-                        border: `1px solid ${theme.palette.divider}`,
-                        bgcolor: theme.palette.background.paper,
-                        overflow: "hidden",
-                    })}
-                >
-                    {/* Dark header */}
-                    <Box
-                        sx={{
-                            py: 1,
-                            px: { xs: 2, md: 3 },
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            bgcolor: "#1a1a2e",
-                        }}
-                    >
-                        <Typography
-                            sx={{
-                                fontSize: "0.75rem",
-                                color: "rgba(255,255,255,0.7)",
-                                fontWeight: 700,
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                            }}
-                        >
-                            {isEditMode ? "Edit Fee Category Details" : "New Fee Category Details"}
-                        </Typography>
-                        <Typography sx={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)" }}>
-                            <Box component="span" sx={(theme) => ({ color: theme.palette.error.light })}>
-                                *
-                            </Box>{" "}
-                            required fields
-                        </Typography>
-                    </Box>
+  const onConfirmSubmit = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (isEditMode && id) {
+        await updateFeeCategory(id, formData);
+        setSnackbar("Category updated successfully!");
+      } else {
+        await createFeeCategory(formData);
+        setSnackbar("Category created successfully!");
+      }
+      setTimeout(() => navigate("/fees/categories"), 1000);
+    } catch (err: any) {
+      setError(
+        err?.message ||
+          (isEditMode
+            ? "Failed to update category."
+            : "Failed to create category.")
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-                    {/* Form body */}
-                    <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 2 }}>
-                        <FormSectionLabel
-                            icon={<CategoryIcon sx={{ fontSize: 15 }} />}
-                            title="Category Information"
-                        />
-                        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
-                            <Box>
-                                <FieldLabel required>Category Name</FieldLabel>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    name="name"
-                                    value={formData.name}
-                                    onChange={handleChange}
-                                    placeholder="e.g. Tuition"
-                                    error={Boolean(errors.name)}
-                                    helperText={errors.name}
-                                    inputProps={{ maxLength: 255 }}
-                                    sx={buildFieldSx(Boolean(errors.name))}
-                                />
-                            </Box>
-                            {/* Code and Description fields removed as per requirements */}
-                            <Box
-                                sx={(theme) => ({
-                                    gridColumn: "1 / -1",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    px: 1.5,
-                                    py: 0.8,
-                                    borderRadius: 1,
-                                    border: `1.2px solid ${theme.palette.divider}`,
-                                    bgcolor: theme.palette.grey[50],
-                                })}
-                            >
-                                <Box>
-                                    <Typography
-                                        sx={(theme) => ({
-                                            fontSize: "0.82rem",
-                                            fontWeight: 700,
-                                            color: theme.palette.text.primary,
-                                        })}
-                                    >
-                                        Status
-                                    </Typography>
-                                    <Typography
-                                        sx={(theme) => ({
-                                            fontSize: "0.7rem",
-                                            color: theme.palette.text.secondary,
-                                        })}
-                                    >
-                                        Active categories are available for use
-                                    </Typography>
-                                </Box>
-                                <Switch
-                                    checked={!!formData.status}
-                                    onChange={handleChange}
-                                    name="status"
-                                    size="small"
-                                    sx={(theme) => ({
-                                        "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.success.main },
-                                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                                            bgcolor: theme.palette.success.main,
-                                        },
-                                    })}
-                                />
-                            </Box>
-                        </Box>
-                    </Box>
-
-                    {/* Footer */}
-                    <Box
-                        sx={(theme) => ({
-                            px: { xs: 2, md: 3 },
-                            py: 1.2,
-                            borderTop: `1px solid ${theme.palette.divider}`,
-                            bgcolor: theme.palette.grey[50],
-                            display: "flex",
-                            justifyContent: "flex-end",
-                            alignItems: "center",
-                            gap: 0,
-                        })}
-                    >
-                        <CancelButton
-                            onClick={() => navigate("/fees/categories")}
-                            sx={{
-                                color: "#ef4444",
-                                backgroundColor: "transparent",
-                                fontWeight: "bold",
-                                fontSize: "1.1rem",
-                                px: 4,
-                                borderRadius: 0,
-                                minWidth: 120,
-                                boxShadow: "none",
-                                border: "none",
-                                textTransform: "none",
-                                "&:hover": { backgroundColor: "transparent", textDecoration: "underline" },
-                            }}
-                        >
-                            Cancel
-                        </CancelButton>
-                        <SaveButton
-                            onClick={loading ? undefined : handleSubmit}
-                            disabled={loading}
-                            loading={loading}
-                            sx={(theme) => ({
-                                color: theme.palette.success.main,
-                                backgroundColor: "transparent",
-                                fontWeight: "bold",
-                                fontSize: "1.1rem",
-                                px: 4,
-                                borderRadius: 0,
-                                minWidth: 120,
-                                boxShadow: "none",
-                                border: "none",
-                                textTransform: "none",
-                                "&:hover": { backgroundColor: "transparent", textDecoration: "underline" },
-                                "&.Mui-disabled": { color: theme.palette.text.secondary },
-                            })}
-                        >
-                            {loading ? "Saving…" : isEditMode ? "Update" : "Save"}
-                        </SaveButton>
-                    </Box>
-                </Paper>
-            </Box>
-        {/* </ListPageLayout> */}
-        </Box>
-    );
+  return (
+    <BaseForm<FeeCategoryFormData>
+      formConfig={formConfig}
+      formData={formData}
+      setFormData={setFormData}
+      fieldErrors={fieldErrors}
+      handleChange={handleChange}
+      handleFieldValueChange={handleFieldValueChange}
+      handleSubmit={handleSubmit}
+      onConfirmSubmit={onConfirmSubmit}
+      setFormError={setError}
+      isEditMode={isEditMode}
+      loading={loading}
+      fetchLoading={fetchLoading}
+      error={error}
+      onErrorDismiss={() => setError(null)}
+      snackbar={snackbar}
+      onSnackbarClose={() => setSnackbar(null)}
+      headerConfig={{
+        links: [
+          { title: "Fee Categories", path: "/fees/categories" },
+          {
+            title: isEditMode ? "Edit Fee Category" : "Add Fee Category",
+            path: "#",
+          },
+        ],
+        homePath: "/fees/categories",
+      }}
+      onCancelNavigate={() => navigate("/fees/categories")}
+      confirmMessage={isEditMode ? "Update this fee category?" : "Create this fee category?"}
+    />
+  );
 };
 
 export default AddEditFeeCategory;
