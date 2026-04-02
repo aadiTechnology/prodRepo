@@ -1,5 +1,5 @@
 import Paper from "@mui/material/Paper";
-import Grid from "@mui/material/Grid";
+import Grid from "@mui/material/Grid2";
 import { BarChart, LineChart } from "@mui/x-charts";
 import { Typography } from "../primitives";
 import { colorTokens } from "../../tokens/colors";
@@ -44,7 +44,7 @@ export default function GraphPanel({ rows }: GraphPanelProps) {
 
   return (
     <Grid container spacing={2} sx={{ mt: 1 }}>
-      <Grid item xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <Paper variant="outlined" sx={{ p: 2, height: 360 }}>
           <Typography variant="subtitle2" gutterBottom>
             Sprint vs distinct page names
@@ -60,7 +60,7 @@ export default function GraphPanel({ rows }: GraphPanelProps) {
           />
         </Paper>
       </Grid>
-      <Grid item xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <Paper variant="outlined" sx={{ p: 2, height: 360 }}>
           <Typography variant="subtitle2" gutterBottom>
             Sprint vs hours spent
@@ -73,7 +73,7 @@ export default function GraphPanel({ rows }: GraphPanelProps) {
           />
         </Paper>
       </Grid>
-      <Grid item xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <Paper variant="outlined" sx={{ p: 2, height: 360 }}>
           <Typography variant="subtitle2" gutterBottom>
             Feature / area comparison (hours)
@@ -95,7 +95,7 @@ export default function GraphPanel({ rows }: GraphPanelProps) {
           />
         </Paper>
       </Grid>
-      <Grid item xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <Paper variant="outlined" sx={{ p: 2, height: 360 }}>
           <Typography variant="subtitle2" gutterBottom>
             Individual hours by month

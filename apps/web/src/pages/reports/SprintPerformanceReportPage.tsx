@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import Chip from "@mui/material/Chip";
-import Grid from "@mui/material/Grid";
+import Grid from "@mui/material/Grid2";
 import { Box, Button, Typography } from "../../components/primitives";
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout } from "../../components/reusable";
@@ -93,7 +93,7 @@ export default function SprintPerformanceReportPage() {
                       ? formatHours(raw as number)
                       : String(raw ?? "—");
                 return (
-                  <Grid item key={m.id}>
+                  <Grid key={m.id}>
                     <Chip label={`${m.label}: ${display}`} variant="outlined" size="small" />
                   </Grid>
                 );
