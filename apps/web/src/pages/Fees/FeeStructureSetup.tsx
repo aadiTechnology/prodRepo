@@ -1,200 +1,43 @@
-/**
- * Fee Structure Setup Page - Manage fee structures across academic years and classes
- * Provides UI for creating, editing, and managing fee structures
- * Integrates with academic year, class, and fee category selection
- */
-
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import React from "react";
 import {
   Box,
   Typography,
-  Button,
   Select,
   MenuItem,
-  Stack,
-  CircularProgress,
-  Dialog,
-  TextField
-} from "../../components/primitives";
+  Alert,
+  Snackbar,
+} from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { PageHeader } from "../../components/layout";
 import {
   ListPageLayout,
   ListPageToolbar,
+  DirectoryInfoBar,
   DataTable,
   TableRowActions,
   TablePaginationBar,
-  DirectoryInfoBar
 } from "../../components/reusable";
-import { PageHeader } from "../../components/layout";
-import ConfirmDialog from "../../components/common/ConfirmDialog";
-import { SaveButton, CancelButton } from "../../components/semantic";
-import {
-  FeeStructure,
-  FeeCategory,
-  AcademicYear,
-  ClassEntity,
-  FeeInstallment
-} from "../../types/fee";
-import feeService from "../../api/services/feeService";
-import StatusChip from "../../components/roles/StatusChip";
+import { useFeeStructureListController } from "../../hooks/useFeeStructureListController";
+import { createFeeStructureListConfig } from "./FeeStructureList.listConfig";
 
 const FeeStructureSetup = () => {
   const navigate = useNavigate();
+  const controller = useFeeStructureListController();
 
-  // -- State --
-  const [structures, setStructures] = useState<FeeStructure[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [totalRecords, setTotalRecords] = useState(0);
+  const config = createFeeStructureListConfig({
+    navigate,
+    onDeleteClick: controller.handleDeleteClick,
+  });
 
-  // Filters & Pagination
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-
-  // Handle search input change and reset to first page to ensure sync with entire data
-  const handleSearchChange = (value: string) => {
-    setSearch(value);
-    setPage(0);
-  };
-  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
-  const [classes, setClasses] = useState<ClassEntity[]>([]);
-  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string>("");
-  const [selectedClassName, setSelectedClassName] = useState<string>("");
-  
-  const uniqueClasses = useMemo(() => {
-    const seen = new Set();
-    return classes.filter(cls => {
-      if (!cls.name || seen.has(cls.name)) return false;
-      seen.add(cls.name);
-      return true;
-    });
-  }, [classes]);
-
-  // Confirm Dialog
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [structureToDelete, setStructureToDelete] = useState<number | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
-  // Lookups (no longer needed in this page, moved to form)
-
-  // -- Data Fetching --
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await feeService.getFeeStructures(
-        page,
-        rowsPerPage,
-        search,
-        undefined, // classId no longer used for filter
-        selectedAcademicYearId ? Number(selectedAcademicYearId) : undefined,
-        selectedClassName || undefined
-      );
-      setStructures(res.items);
-      setTotalRecords(res.total);
-    } catch (err: any) {
-      let msg = err.message || "Failed to load fee structures.";
-      if (err?.response?.status === 409 || msg.toLowerCase().includes("already exists")) {
-        msg = "Fee structure already exists for this class and category";
-      }
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, rowsPerPage, search, selectedAcademicYearId, selectedClassName]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Fetch filter lookups
-  useEffect(() => {
-    const loadAcademicYears = async () => {
-      try {
-        const years = await feeService.getAcademicYears();
-        setAcademicYears(years);
-      } catch (err) {
-        console.error("Failed to load academic years", err);
-      }
-    };
-    loadAcademicYears();
-  }, []);
-
-  // Fetch classes when academic year changes
-  useEffect(() => {
-    const loadClasses = async () => {
-      try {
-        const classList = await feeService.getClasses(
-          selectedAcademicYearId ? Number(selectedAcademicYearId) : undefined
-        );
-        setClasses(classList);
-      } catch (err) {
-        console.error("Failed to load classes", err);
-      }
-    };
-    loadClasses();
-  }, [selectedAcademicYearId]);
-
-  const handleAcademicYearChange = (value: string) => {
-    setSelectedAcademicYearId(value);
-    setSelectedClassName(""); // Clear class selection when year changes
-    setPage(0);
-  };
-
-  const handleClassChange = (value: string) => {
-    setSelectedClassName(value);
-    setPage(0);
-  };
-
-
-  // -- Handlers --
-  const handleAddClick = () => {
-    navigate("/fees/setup/add");
-  };
-
-  const handleEditClick = (structure: FeeStructure) => {
-    navigate(`/fees/setup/${structure.id}/edit`);
-  };
-
-  const handleDeleteClick = (id: number) => {
-    setStructureToDelete(id);
-    setConfirmOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!structureToDelete) return;
-    try {
-      setDeleteLoading(true);
-      await feeService.deleteFeeStructure(structureToDelete);
-      setConfirmOpen(false);
-      fetchData();
-    } catch (err: any) {
-      let msg = err.message || "Failed to delete structure.";
-      if (err?.response?.status === 409 || msg.toLowerCase().includes("process") || msg.toLowerCase().includes("pay")) {
-        msg = "Cannot delete structure: Payments have already been processed";
-      } else if (msg.toLowerCase().includes("already exists")) {
-        msg = "Fee structure already exists for this class and category";
-      }
-      setError(msg);
-    } finally {
-      setDeleteLoading(false);
-      setStructureToDelete(null);
-    }
-  };
-
-  // -- Table Config --
-  const columns = useMemo(() => [
-    { id: "class", label: "Class", render: (s: FeeStructure) => s.class_name || "N/A" },
-    { id: "category", label: "Category", render: (s: FeeStructure) => s.fee_category_name || "N/A" },
-    { id: "ay", label: "Academic Year", render: (s: FeeStructure) => s.academic_year_name || "N/A" },
-    { id: "amount", label: "Total Amount", render: (s: FeeStructure) => `₹${Number(s.total_amount).toLocaleString()}` },
-    { id: "type", label: "Installment Type", render: (s: FeeStructure) => s.installment_type },
-    { id: "status", label: "Status", render: (s: FeeStructure) => <StatusChip status={s.is_active ? "ACTIVE" : "INACTIVE"} /> },
-  ], []);
-
-  const rangeStart = totalRecords > 0 ? page * rowsPerPage + 1 : 0;
-  const rangeEnd = Math.min((page + 1) * rowsPerPage, totalRecords);
+  const rangeStart =
+    controller.totalRecords > 0
+      ? controller.listState.page * controller.listState.rowsPerPage + 1
+      : 0;
+  const rangeEnd = Math.min(
+    (controller.listState.page + 1) * controller.listState.rowsPerPage,
+    controller.totalRecords
+  );
 
   return (
     <ListPageLayout
@@ -204,13 +47,15 @@ const FeeStructureSetup = () => {
           homePath="/"
           actions={
             <ListPageToolbar
-              searchValue={search}
-              onSearchChange={handleSearchChange} // Trigger search with pagination reset
+              searchValue={controller.listState.search}
+              onSearchChange={controller.listState.setSearch}
               renderActions={
-                <> {/* Custom filters rendered here (Filter > Search > Add) */}
+                <>
                   <Select
-                    value={selectedClassName}
-                    onChange={(e) => handleClassChange(e.target.value as string)}
+                    value={controller.listState.filters.className}
+                    onChange={(e) =>
+                      controller.listState.setFilter("className", e.target.value as string)
+                    }
                     displayEmpty
                     size="small"
                     sx={{
@@ -227,15 +72,17 @@ const FeeStructureSetup = () => {
                         Class
                       </Typography>
                     </MenuItem>
-                    {uniqueClasses.map((cls) => (
+                    {controller.uniqueClasses.map((cls) => (
                       <MenuItem key={cls.id} value={cls.name}>
                         {cls.name}
                       </MenuItem>
                     ))}
                   </Select>
                   <Select
-                    value={selectedAcademicYearId}
-                    onChange={(e) => handleAcademicYearChange(e.target.value as string)}
+                    value={controller.listState.filters.academicYearId}
+                    onChange={(e) =>
+                      controller.listState.setFilter("academicYearId", e.target.value as string)
+                    }
                     displayEmpty
                     size="small"
                     sx={{
@@ -252,7 +99,7 @@ const FeeStructureSetup = () => {
                         Academic Year
                       </Typography>
                     </MenuItem>
-                    {academicYears.map((ay) => (
+                    {controller.academicYears.map((ay) => (
                       <MenuItem key={ay.id} value={ay.id.toString()}>
                         {ay.name} ({ay.code})
                       </MenuItem>
@@ -260,7 +107,7 @@ const FeeStructureSetup = () => {
                   </Select>
                 </>
               }
-              onAddClick={handleAddClick}
+              onAddClick={() => navigate("/fees/setup/add")}
               addLabel="Setup Fee"
               searchPlaceholder="Search by class..."
             />
@@ -268,54 +115,50 @@ const FeeStructureSetup = () => {
         />
       }
     >
-      {error && (
-        <Box sx={{ p: 2, display: "flex", gap: 2, alignItems: "center", bgcolor: "error.light", mb: 2 }}>
-          <Typography color="error.main">{error}</Typography>
-          <Button size="small" variant="outlined" color="error" onClick={fetchData}>Retry</Button>
-        </Box>
+      {controller.error && (
+        <Alert
+          severity="error"
+          sx={{ m: 1, borderRadius: 2 }}
+          onClose={() => controller.setError(null)}
+        >
+          {controller.error}
+        </Alert>
       )}
 
-      {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <>
-          <DirectoryInfoBar
-            label="Structures"
-            rangeStart={rangeStart}
-            rangeEnd={rangeEnd}
-            total={totalRecords}
+      <DirectoryInfoBar
+        label={config.uiPolicy.title}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
+        total={controller.totalRecords}
+      />
+      <DataTable
+        columns={config.columns}
+        data={controller.structures}
+        loading={controller.loading}
+        emptyMessage={config.uiPolicy.emptyMessage}
+        renderRowActions={(s) => (
+          <TableRowActions
+            onEdit={() => config.rowActions.onEdit(s)}
+            onDelete={() => config.rowActions.onDelete(s)}
           />
-          <DataTable<FeeStructure & Record<string, any>>
-            columns={columns}
-            data={structures as (FeeStructure & Record<string, any>)[]}
-            renderRowActions={(s) => (
-              <TableRowActions
-                onEdit={() => handleEditClick(s)}
-                onDelete={() => handleDeleteClick(s.id)}
-              />
-            )}
-            emptyMessage="No fee structures found. Click 'Setup Fee' to begin."
-          />
-          <TablePaginationBar
-            page={page}
-            rowsPerPage={rowsPerPage}
-            totalRows={totalRecords}
-            onPageChange={setPage}
-            onRowsPerPageChange={setRowsPerPage}
-          />
-        </>
-      )}
+        )}
+      />
+      <TablePaginationBar
+        page={controller.listState.page}
+        rowsPerPage={controller.listState.rowsPerPage}
+        totalRows={controller.totalRecords}
+        onPageChange={controller.listState.setPage}
+        onRowsPerPageChange={controller.listState.onRowsPerPageChange}
+      />
 
       <ConfirmDialog
-        open={confirmOpen}
+        open={controller.confirmOpen}
         title="Delete Fee Structure?"
         message="This will remove the configuration and linked installment schedule. Are you sure?"
         confirmText="Delete"
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setConfirmOpen(false)}
-        loading={deleteLoading}
+        onConfirm={controller.handleConfirmDelete}
+        onCancel={() => controller.setConfirmOpen(false)}
+        loading={controller.deleteLoading}
       />
     </ListPageLayout>
   );
