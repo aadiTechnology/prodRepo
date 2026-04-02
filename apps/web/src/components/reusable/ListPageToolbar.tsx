@@ -29,6 +29,11 @@ export interface ListPageToolbarProps {
   renderActions?: ReactNode;
   /** Reusable dropdown filters */
   filters?: ToolbarFilter[];
+  /**
+   * When true, renderActions is placed AFTER the search field.
+   * Default (false) keeps original behaviour: renderActions before search.
+   */
+  actionsAfterSearch?: boolean;
 }
 
 export default function ListPageToolbar({
@@ -40,18 +45,20 @@ export default function ListPageToolbar({
   addIcon,
   renderActions,
   filters,
+  actionsAfterSearch = false,
 }: ListPageToolbarProps) {
   return (
     /* 
-      Arrangement: Filter (props/renderActions) > Search (Field) > Add (PrimaryActionButton)
-      Responsive: Column on xs, Row on sm; Stretch on xs for full-width touch targets
+      Arrangement: Filters > renderActions (default) > Search > Add
+      When actionsAfterSearch=true: Filters > Search > renderActions > Add
+      Responsive: Column on xs, Row on sm
     */
-    <Box sx={{ 
-      display: "flex", 
-      alignItems: { xs: "stretch", sm: "center" }, 
+    <Box sx={{
+      display: "flex",
+      alignItems: { xs: "stretch", sm: "center" },
       flexDirection: { xs: "column", sm: "row" },
-      gap: 2, 
-      width: { xs: "100%", sm: "auto" }, 
+      gap: 2,
+      width: { xs: "100%", sm: "auto" },
       flexWrap: "wrap",
       justifyContent: "flex-end"
     }}>
@@ -87,7 +94,8 @@ export default function ListPageToolbar({
           ))}
         </Stack>
       )}
-      {renderActions != null && (
+      {/* renderActions BEFORE search (default behaviour — preserves all existing pages) */}
+      {!actionsAfterSearch && renderActions != null && (
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
           {renderActions}
         </Stack>
@@ -119,6 +127,12 @@ export default function ListPageToolbar({
           },
         })}
       />
+      {/* renderActions AFTER search (opt-in via actionsAfterSearch prop) */}
+      {actionsAfterSearch && renderActions != null && (
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
+          {renderActions}
+        </Stack>
+      )}
       {onAddClick != null && (
         <PrimaryActionButton
           onClick={onAddClick}

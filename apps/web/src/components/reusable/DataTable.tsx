@@ -25,6 +25,12 @@ export interface DataTableColumn<T> {
   render?: (row: T) => ReactNode;
   /** Field key when render is not provided. Defaults to id. */
   field?: keyof T | string;
+  /** Custom header render. If provided, overrides label in header. */
+  renderHeader?: () => ReactNode;
+  /** Optional width for column. */
+  width?: string | number;
+  /** Optional alignment for header. */
+  headerAlign?: "left" | "right" | "center";
 }
 
 export interface DataTableProps<T> {
@@ -81,8 +87,9 @@ export default function DataTable<T extends object>({
               {columns.map((col) => (
                 <TableCell
                   key={col.id}
-                  align={col.align}
+                  align={col.headerAlign ?? col.align}
                   sx={(theme) => ({
+                    width: col.width,
                     fontWeight: 800,
                     color: "#ffffff",
                     fontSize: "0.85rem",
@@ -95,7 +102,7 @@ export default function DataTable<T extends object>({
                     letterSpacing: '0.5px'
                   })}
                 >
-                  {col.label}
+                  {col.renderHeader ? col.renderHeader() : col.label}
                 </TableCell>
               ))}
               {hasActions && (
@@ -145,6 +152,7 @@ export default function DataTable<T extends object>({
                       key={col.id}
                       align={col.align}
                       sx={(theme) => ({
+                        width: col.width,
                         color: colorTokens.text.secondary,
                         py: 1.5,
                         px: 2,
