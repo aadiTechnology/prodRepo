@@ -7,7 +7,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Select, and_, exists, select
+from sqlalchemy import Select, and_, exists, func, select
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
@@ -195,6 +195,53 @@ def fetch_filter_options(db: Session) -> dict[str, Any]:
         ],
         "sprints": [{"id": r[0], "label": r[1] or f"Sprint {r[0]}"} for r in sprints],
     }
+
+
+def resolve_task_category_id_by_name(db: Session, category_name: str) -> int | None:
+    """Match PT_TaskCategories.CategoryName case-insensitively."""
+    if not category_name or not category_name.strip():
+        return None
+    key = category_name.strip().lower()
+    row = db.execute(
+        select(pt_task_categories.c.CategoryId).where(func.lower(pt_task_categories.c.CategoryName) == key)
+    ).first()
+    return int(row[0]) if row else None
+
+
+def fetch_sprintwise_efforts_for_category(
+    db: Session,
+    *,
+    category_id: int,
+    owner_ids: list[int] | None,
+) -> dict[int, Decimal]:
+    """Sum normalized timesheet efforts per sprint for tasks mapped to the given category."""
+    ts = pt_timesheets
+    m = pt_task_category_mapping
+    cat_match = exists().where(and_(m.c.TaskId == ts.c.TaskId, m.c.CategoryId == category_id))
+    stmt = (
+        select(ts.c.SprintId, func.sum(ts.c.Efforts))
+        .select_from(ts)
+        .where(cat_match)
+        .group_by(ts.c.SprintId)
+    )
+    if owner_ids:
+        stmt = stmt.where(ts.c.OwnerId.in_(owner_ids))
+    result: dict[int, Decimal] = {}
+    for row in db.execute(stmt):
+        sid, total = row[0], row[1]
+        if sid is None:
+            continue
+        result[int(sid)] = Decimal(str(total)) if total is not None else Decimal("0")
+    return result
+
+
+def fetch_sprint_labels(db: Session, sprint_ids: list[int]) -> dict[int, str]:
+    if not sprint_ids:
+        return {}
+    rows = db.execute(
+        select(pt_sprints.c.SprintId, pt_sprints.c.SprintName).where(pt_sprints.c.SprintId.in_(sprint_ids))
+    ).all()
+    return {int(r[0]): (str(r[1]).strip() if r[1] else f"Sprint {r[0]}") for r in rows}
 
 
 def compute_aggregations(rows: list[dict[str, Any]]) -> dict[str, Any]:

@@ -48,6 +48,7 @@ const PermissionManagementPage = lazy(() => import("../pages/admin/PermissionMan
 const FeeInstallmentStatus = lazy(() => import("../pages/Fees/FeeInstallmentStatus"));
 const CollectPaymentPage = lazy(() => import("../pages/Fees/CollectPaymentPage"));
 const SprintPerformanceReportPage = lazy(() => import("../pages/reports/SprintPerformanceReportPage"));
+const SprintwisePerformanceReportPage = lazy(() => import("../pages/reports/SprintwisePerformanceReportPage"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -90,6 +91,14 @@ export default function AppRoutes() {
             element={
               <ProtectedRoute>
                 <SprintPerformanceReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/sprintwise-performance"
+            element={
+              <ProtectedRoute>
+                <SprintwisePerformanceReportPage />
               </ProtectedRoute>
             }
           />

@@ -12,8 +12,9 @@ from app.schemas.sprint_performance_report_schema import (
     SprintPerformanceFilterOptionsResponse,
     SprintPerformanceReportResponse,
 )
+from app.schemas.sprintwise_performance_report_schema import SprintwisePerformanceReportResponse
 from app.repositories.timesheet_report_repository import fetch_filter_options
-from app.services import sprint_performance_report_service
+from app.services import sprint_performance_report_service, sprintwise_performance_report_service
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -74,3 +75,17 @@ def get_sprint_performance_filter_options(
     _current_user: CurrentUser = Depends(get_current_user),
 ) -> SprintPerformanceFilterOptionsResponse:
     return SprintPerformanceFilterOptionsResponse.model_validate(fetch_filter_options(db))
+
+
+@router.get("/sprintwise-performance", response_model=SprintwisePerformanceReportResponse)
+def get_sprintwise_performance(
+    member_ids: list[int] | None = Query(
+        default=None,
+        description="PT_Owners.OwnerId values; omit or leave empty for all members.",
+    ),
+    db: Session = Depends(get_db),
+    _current_user: CurrentUser = Depends(get_current_user),
+) -> SprintwisePerformanceReportResponse:
+    """Aggregated billable vs page-development effort per sprint (normalized PT timesheets)."""
+    mids = member_ids if member_ids else None
+    return sprintwise_performance_report_service.get_sprintwise_performance_report(db, member_ids=mids)

@@ -253,7 +253,8 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
       { id: "theme-studio", label: "Theme Studio", path: "/admin/theme-studio" },
       { id: "ai-review", label: "AI Review", path: "/ai/review" },
       { id: "story-generation", label: "Story Generation", path: "/ai/generate" },
-      { id: "sprint-performance", label: "Sprint Performance", path: "/reports/sprint-performance" }
+      { id: "sprint-performance", label: "Sprint Performance", path: "/reports/sprint-performance" },
+      { id: "sprintwise-performance", label: "Sprintwise Performance", path: "/reports/sprintwise-performance" }
     ]
   }
 ];
