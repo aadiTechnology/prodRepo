@@ -7,7 +7,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Select, and_, func, select
+from sqlalchemy import Select, and_, exists, select
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,8 @@ from app.models.pt_timesheet import (
     pt_pages,
     pt_sprints,
     pt_subtasks,
+    pt_task_categories,
+    pt_task_category_mapping,
     pt_tasks,
     pt_timesheets,
 )
@@ -66,6 +68,7 @@ def build_filtered_query(
     feature_id: int | None = None,
     owner_id: int | None = None,
     task_id: int | None = None,
+    category_ids: list[int] | None = None,
     # Legacy / fallback filters (kept for backward compatibility)
     sprint_name: str | None,
     team_name: str | None,
@@ -103,6 +106,12 @@ def build_filtered_query(
         pat = f"%{activity_type.strip()}%"
         conditions.append(pt_tasks.c.TaskName.like(pat))
 
+    if category_ids:
+        m = pt_task_category_mapping
+        conditions.append(
+            exists().where(and_(m.c.TaskId == ts.c.TaskId, m.c.CategoryId.in_(category_ids)))
+        )
+
     if from_date is not None:
         start = datetime.combine(from_date, time.min)
         conditions.append(ts.c.ActivityDate >= start)
@@ -124,6 +133,7 @@ def fetch_entries(
     feature_id: int | None = None,
     owner_id: int | None = None,
     task_id: int | None = None,
+    category_ids: list[int] | None = None,
     sprint_name: str | None,
     team_name: str | None,
     owner_name: str | None,
@@ -136,6 +146,7 @@ def fetch_entries(
         feature_id=feature_id,
         owner_id=owner_id,
         task_id=task_id,
+        category_ids=category_ids,
         sprint_name=sprint_name,
         team_name=team_name,
         owner_name=owner_name,
@@ -159,10 +170,29 @@ def fetch_filter_options(db: Session) -> dict[str, Any]:
         select(pt_sprints.c.SprintId, pt_sprints.c.SprintName).order_by(pt_sprints.c.SprintId.asc())
     ).all()
 
+    categories = db.execute(
+        select(pt_task_categories.c.CategoryId, pt_task_categories.c.CategoryName).order_by(
+            pt_task_categories.c.CategoryName.asc()
+        )
+    ).all()
+
+    task_ids = [r[0] for r in tasks]
+    cats_by_task: dict[int, list[int]] = {tid: [] for tid in task_ids}
+    if task_ids:
+        m = pt_task_category_mapping
+        rows = db.execute(
+            select(m.c.TaskId, m.c.CategoryId).where(m.c.TaskId.in_(task_ids))
+        ).all()
+        for tid, cid in rows:
+            cats_by_task[tid].append(cid)
+
     return {
         "owners": [{"id": r[0], "label": r[1]} for r in owners],
         "features": [{"id": r[0], "label": r[1]} for r in features],
-        "tasks": [{"id": r[0], "label": r[1]} for r in tasks],
+        "categories": [{"id": r[0], "label": r[1] or f"Category {r[0]}"} for r in categories],
+        "tasks": [
+            {"id": r[0], "label": r[1], "category_ids": cats_by_task.get(r[0], [])} for r in tasks
+        ],
         "sprints": [{"id": r[0], "label": r[1] or f"Sprint {r[0]}"} for r in sprints],
     }
 

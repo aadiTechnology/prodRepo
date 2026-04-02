@@ -5,7 +5,7 @@ These tables are created/migrated via SQL scripts in Product/document.
 We map them as SQLAlchemy Core Tables for read-heavy queries.
 """
 
-from sqlalchemy import Column, Date, DateTime, Integer, Numeric, String, Table
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Table, UniqueConstraint
 
 from app.core.database import Base
 
@@ -28,12 +28,27 @@ pt_features = Table(
     Column("CreatedOn", DateTime),
 )
 
+pt_task_categories = Table(
+    "PT_TaskCategories",
+    Base.metadata,
+    Column("CategoryId", Integer, primary_key=True),
+    Column("CategoryName", String(100)),
+)
+
 pt_tasks = Table(
     "PT_Tasks",
     Base.metadata,
     Column("TaskId", Integer, primary_key=True),
     Column("TaskName", String(100)),
-    Column("CategoryId", Integer),
+)
+
+pt_task_category_mapping = Table(
+    "PT_TaskCategoryMapping",
+    Base.metadata,
+    Column("TaskCategoryMappingId", Integer, primary_key=True, autoincrement=True),
+    Column("TaskId", Integer, ForeignKey("PT_Tasks.TaskId"), nullable=False),
+    Column("CategoryId", Integer, ForeignKey("PT_TaskCategories.CategoryId"), nullable=False),
+    UniqueConstraint("TaskId", "CategoryId", name="UQ_PT_TaskCategoryMapping_Task_Category"),
 )
 
 pt_sprints = Table(

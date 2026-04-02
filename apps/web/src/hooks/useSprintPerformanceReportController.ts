@@ -14,6 +14,7 @@ const initialFilters: SprintReportFilters = {
   featureId: null,
   ownerId: null,
   taskId: null,
+  categoryIds: [],
   fromDate: "",
   toDate: "",
 };
@@ -33,6 +34,7 @@ export function useSprintPerformanceReportController() {
     sprints: [],
     owners: [],
     features: [],
+    categories: [],
     tasks: [],
   });
 
@@ -49,7 +51,7 @@ export function useSprintPerformanceReportController() {
         if (!cancelled) setOptions(res);
       } catch {
         if (!cancelled) {
-          setOptions({ sprints: [], owners: [], features: [], tasks: [] });
+          setOptions({ sprints: [], owners: [], features: [], categories: [], tasks: [] });
         }
       } finally {
         if (!cancelled) setOptionsLoading(false);

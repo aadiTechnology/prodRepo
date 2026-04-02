@@ -4,12 +4,27 @@ import type {
   SprintPerformanceReportResponse,
   SprintReportFilters,
 } from "../../types/sprintPerformanceReport";
-function buildParams(filters: SprintReportFilters): Record<string, string | number> {
-  const p: Record<string, string | number> = {};
+
+function sprintReportParamsSerializer(params: Record<string, unknown>): string {
+  const usp = new URLSearchParams();
+  for (const [key, raw] of Object.entries(params)) {
+    if (raw === undefined || raw === null || raw === "") continue;
+    if (Array.isArray(raw)) {
+      for (const v of raw) usp.append(key, String(v));
+    } else {
+      usp.append(key, String(raw));
+    }
+  }
+  return usp.toString();
+}
+
+function buildParams(filters: SprintReportFilters): Record<string, string | number | number[]> {
+  const p: Record<string, string | number | number[]> = {};
   if (filters.sprintId != null) p.sprint_id = filters.sprintId;
   if (filters.featureId != null) p.feature_id = filters.featureId;
   if (filters.ownerId != null) p.owner_id = filters.ownerId;
   if (filters.taskId != null) p.task_id = filters.taskId;
+  if (filters.categoryIds.length) p.category_ids = filters.categoryIds;
   if (filters.fromDate) p.from_date = filters.fromDate;
   if (filters.toDate) p.to_date = filters.toDate;
 
@@ -20,6 +35,7 @@ export const sprintPerformanceReportService = {
   async fetchReport(filters: SprintReportFilters): Promise<SprintPerformanceReportResponse> {
     const response = await apiClient.get<SprintPerformanceReportResponse>("/reports/sprint-performance", {
       params: buildParams(filters),
+      paramsSerializer: sprintReportParamsSerializer,
     });
     return response.data;
   },

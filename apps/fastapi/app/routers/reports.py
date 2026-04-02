@@ -24,6 +24,10 @@ def get_sprint_performance(
     feature_id: int | None = Query(default=None, description="PT_Features.FeatureId"),
     owner_id: int | None = Query(default=None, description="PT_Owners.OwnerId"),
     task_id: int | None = Query(default=None, description="PT_Tasks.TaskId"),
+    category_ids: list[int] | None = Query(
+        default=None,
+        description="PT_TaskCategories.CategoryId; task must map to any selected category.",
+    ),
     sprint_name: str | None = Query(
         default=None,
         description="Legacy: sprint number as string. Prefer sprint_id.",
@@ -53,6 +57,7 @@ def get_sprint_performance(
         feature_id=feature_id,
         owner_id=owner_id,
         task_id=task_id,
+        category_ids=category_ids,
         sprint_name=sprint_name,
         team_name=team_name,
         employee_id=employee_id,

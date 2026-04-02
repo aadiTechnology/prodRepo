@@ -1,4 +1,5 @@
-import { Box, Button, TextField, Typography } from "../primitives";
+import { Autocomplete, Box, Button, TextField, Typography } from "../primitives";
+import type { ReportOption } from "../../types/sprintPerformanceReport";
 import type { SprintReportFilters } from "../../types/sprintPerformanceReport";
 import type { SprintPerformanceFilterOptionsResponse } from "../../types/sprintPerformanceReport";
 import { SearchableSelect } from "../semantic";
@@ -20,6 +21,8 @@ export default function ReportFilterBar({
   options,
   optionsLoading,
 }: ReportFilterBarProps) {
+  const categoryValue = options.categories.filter((c) => filters.categoryIds.includes(c.id));
+
   return (
     <Box
       sx={{
@@ -70,6 +73,25 @@ export default function ReportFilterBar({
           placeholder={optionsLoading ? "Loading..." : "Select owner"}
           disabled={optionsLoading}
           fullWidth={false}
+        />
+      </Box>
+      <Box sx={{ minWidth: 220 }}>
+        <Typography variant="caption" color="text.secondary" display="block">
+          Task categories
+        </Typography>
+        <Autocomplete<ReportOption, true, false, false>
+          multiple
+          disableCloseOnSelect
+          options={options.categories}
+          value={categoryValue}
+          disabled={optionsLoading}
+          getOptionLabel={(o) => o.label}
+          isOptionEqualToValue={(a, b) => a.id === b.id}
+          onChange={(_e, v) => onChange({ categoryIds: v.map((x) => x.id) })}
+          renderInput={(params) => (
+            <TextField {...params} placeholder={optionsLoading ? "Loading..." : "Categories"} size="small" />
+          )}
+          sx={{ minWidth: 220 }}
         />
       </Box>
       <Box>

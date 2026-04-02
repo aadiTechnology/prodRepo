@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TimesheetEntryRow(BaseModel):
@@ -36,8 +36,13 @@ class ReportOption(BaseModel):
     label: str
 
 
+class TaskReportOption(ReportOption):
+    category_ids: list[int] = Field(default_factory=list)
+
+
 class SprintPerformanceFilterOptionsResponse(BaseModel):
     sprints: list[ReportOption]
     owners: list[ReportOption]
     features: list[ReportOption]
-    tasks: list[ReportOption]
+    categories: list[ReportOption]
+    tasks: list[TaskReportOption]

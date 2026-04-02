@@ -27,15 +27,19 @@ export type SprintReportFilters = {
   featureId: number | null;
   ownerId: number | null;
   taskId: number | null;
+  categoryIds: number[];
   fromDate: string;
   toDate: string;
 };
 
 export type ReportOption = { id: number; label: string };
 
+export type TaskReportOption = ReportOption & { category_ids: number[] };
+
 export interface SprintPerformanceFilterOptionsResponse {
   sprints: ReportOption[];
   owners: ReportOption[];
   features: ReportOption[];
-  tasks: ReportOption[];
+  categories: ReportOption[];
+  tasks: TaskReportOption[];
 }
