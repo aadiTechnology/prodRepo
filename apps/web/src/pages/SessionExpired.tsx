@@ -64,13 +64,13 @@ const SessionExpired: React.FC = () => {
                         to reconnect to the portal.
                     </Typography>
 
-                    {/* Logo and Branding Section */}
+                    {/* Logo Only, no highlighted text */}
                     <Box
                         sx={{
                             display: "flex",
                             flexDirection: "column",
                             alignItems: "center",
-                            gap: 2,
+                            gap: 0,
                         }}
                     >
                         <Box
@@ -81,23 +81,12 @@ const SessionExpired: React.FC = () => {
                                 width: { xs: "200px", md: "250px" },
                                 height: "auto",
                                 filter: "drop-shadow(0px 4px 8px rgba(0,0,0,0.1))",
+                                mb: 4, // Add margin below logo for spacing
                             }}
                             onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                // If logo fails to load (missing file), show a generic placeholder icon or initials
                                 e.currentTarget.style.display = "none";
                             }}
                         />
-                        <Typography
-                            variant="h3"
-                            sx={{
-                                fontWeight: 800,
-                                color: "#38b2ac", // Teal/Cyan color from logo
-                                fontSize: { xs: "1.8rem", md: "2.5rem" },
-                                letterSpacing: "-0.01em",
-                            }}
-                        >
-                            Aadi Technology
-                        </Typography>
                     </Box>
 
                     {/* Footer Section */}
@@ -132,11 +121,11 @@ const SessionExpired: React.FC = () => {
                         <Typography
                             variant="body2"
                             sx={{
-                                color: "#a0aec0",
+                                color: "#080909",
                                 fontSize: "0.85rem",
                             }}
                         >
-                            All rights reserved &copy; 2007 - 2026, Aaditi Technology.
+                            All rights reserved &copy; 2007 - 2026, Aadi Technology.
                         </Typography>
                     </Box>
                 </Box>
