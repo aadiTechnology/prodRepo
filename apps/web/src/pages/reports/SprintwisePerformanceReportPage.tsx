@@ -1,15 +1,9 @@
 /**
- * Sprintwise performance — billable vs page-development effort by sprint (pivot-style table).
+ * Sprintwise performance — billable vs page-development effort by sprint (pivot tables + bar chart).
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import Paper from "@mui/material/Paper";
+import Grid from "@mui/material/Grid2";
 import {
   Autocomplete,
   Box,
@@ -22,12 +16,12 @@ import {
 } from "../../components/primitives";
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout } from "../../components/reusable";
+import SprintwiseEffortBarChart from "../../components/reports/SprintwiseEffortBarChart";
+import SprintwisePivotTable from "../../components/reports/SprintwisePivotTable";
 import sprintPerformanceReportService from "../../api/services/sprintPerformanceReportService";
 import sprintwisePerformanceReportService from "../../api/services/sprintwisePerformanceReportService";
 import type { ReportOption, SprintPerformanceFilterOptionsResponse } from "../../types/sprintPerformanceReport";
-import type { SprintwiseSprintTotals } from "../../types/sprintwisePerformanceReport";
-import { buildSprintwiseMetricRows } from "../../utils/sprintwisePerformanceReportTransform";
-import { formatHours } from "../../utils/formatters";
+import type { SprintwiseReportSlice } from "../../types/sprintwisePerformanceReport";
 
 export default function SprintwisePerformanceReportPage() {
   const [options, setOptions] = useState<SprintPerformanceFilterOptionsResponse>({
@@ -39,7 +33,7 @@ export default function SprintwisePerformanceReportPage() {
   });
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [selectedOwners, setSelectedOwners] = useState<ReportOption[]>([]);
-  const [sprints, setSprints] = useState<SprintwiseSprintTotals[]>([]);
+  const [slices, setSlices] = useState<SprintwiseReportSlice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [appliedOnce, setAppliedOnce] = useState(false);
@@ -72,19 +66,34 @@ export default function SprintwisePerformanceReportPage() {
     try {
       const memberIds = allMembersSelected ? null : selectedOwners.map((o) => o.id);
       const res = await sprintwisePerformanceReportService.fetchReport(memberIds);
-      setSprints(res.sprints);
+      setSlices(res.slices ?? []);
       setAppliedOnce(true);
     } catch (err: unknown) {
       const e = err as { message?: string };
       setError(e.message ?? "Unable to load report.");
-      setSprints([]);
+      setSlices([]);
       setAppliedOnce(true);
     } finally {
       setLoading(false);
     }
   }, [allMembersSelected, selectedOwners]);
 
-  const metricRows = useMemo(() => buildSprintwiseMetricRows(sprints), [sprints]);
+  const hasData = useMemo(() => slices.some((s) => s.sprints.length > 0), [slices]);
+  const isMultiMember = useMemo(() => slices.some((s) => s.slice_key === "total"), [slices]);
+  const totalSlice = useMemo(() => slices.find((s) => s.slice_key === "total"), [slices]);
+  const memberOnlySlices = useMemo(() => slices.filter((s) => s.slice_key !== "total"), [slices]);
+
+  const chartSprints = useMemo(() => {
+    if (totalSlice?.sprints.length) return totalSlice.sprints;
+    return memberOnlySlices[0]?.sprints ?? [];
+  }, [totalSlice, memberOnlySlices]);
+
+  const primaryTableSlice = useMemo(() => {
+    if (isMultiMember && totalSlice) return { title: "Total", sprints: totalSlice.sprints };
+    const first = memberOnlySlices[0];
+    if (first) return { title: first.label, sprints: first.sprints };
+    return null;
+  }, [isMultiMember, totalSlice, memberOnlySlices]);
 
   return (
     <ListPageLayout
@@ -178,41 +187,52 @@ export default function SprintwisePerformanceReportPage() {
           </Typography>
         )}
 
-        {!loading && appliedOnce && sprints.length === 0 && !error && (
+        {!loading && appliedOnce && !hasData && !error && (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             No data for the current filters (no matching effort in Billable or PageDevelopment categories).
           </Typography>
         )}
 
-        {sprints.length > 0 && (
-          <TableContainer component={Paper} variant="outlined" sx={{ maxWidth: "100%", overflow: "auto" }}>
-            <Table size="small" stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 600 }}>Metric</TableCell>
-                  {sprints.map((s) => (
-                    <TableCell key={s.sprint_id} align="right" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                      {s.sprint_label}
-                    </TableCell>
+        {hasData && primaryTableSlice && (
+          <>
+            <Grid container spacing={2} alignItems="stretch">
+              <Grid size={{ xs: 12, md: 5 }}>
+                <SprintwiseEffortBarChart sprints={chartSprints} />
+              </Grid>
+              <Grid size={{ xs: 12, md: 7 }}>
+                <SprintwisePivotTable title={primaryTableSlice.title} sprints={primaryTableSlice.sprints} />
+              </Grid>
+            </Grid>
+
+            {isMultiMember && memberOnlySlices.length > 0 && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
+                  By member
+                </Typography>
+                <Grid container spacing={3}>
+                  {memberOnlySlices.map((sl) => (
+                    <Grid key={sl.slice_key} size={{ xs: 12 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                        {sl.label}
+                      </Typography>
+                      <Grid container spacing={2} alignItems="stretch">
+                        <Grid size={{ xs: 12, md: 5 }}>
+                          <SprintwiseEffortBarChart
+                            sprints={sl.sprints}
+                            title="Billable vs page effort by sprint"
+                            compact
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 7 }}>
+                          <SprintwisePivotTable title={sl.label} sprints={sl.sprints} showTitle={false} />
+                        </Grid>
+                      </Grid>
+                    </Grid>
                   ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {metricRows.map((row) => (
-                  <TableRow key={row.id} hover>
-                    <TableCell component="th" scope="row">
-                      {row.label}
-                    </TableCell>
-                    {row.values.map((v, i) => (
-                      <TableCell key={sprints[i].sprint_id} align="right">
-                        {formatHours(v)}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </Grid>
+              </Box>
+            )}
+          </>
         )}
       </Box>
     </ListPageLayout>

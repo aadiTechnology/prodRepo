@@ -235,6 +235,27 @@ def fetch_sprintwise_efforts_for_category(
     return result
 
 
+def fetch_sprintwise_total_efforts(
+    db: Session,
+    *,
+    owner_ids: list[int] | None,
+) -> dict[int, Decimal]:
+    """Sum all dbo.PT_Timesheets.Efforts per sprint (no task-category / mapping filter)."""
+    ts = pt_timesheets
+    per_row_effort = func.coalesce(ts.c.Efforts, 0)
+    effort_total = func.coalesce(func.sum(per_row_effort), 0).label("effort_total")
+    stmt = select(ts.c.SprintId, effort_total).select_from(ts).group_by(ts.c.SprintId)
+    if owner_ids:
+        stmt = stmt.where(ts.c.OwnerId.in_(owner_ids))
+    result: dict[int, Decimal] = {}
+    for row in db.execute(stmt):
+        sid, total = row[0], row[1]
+        if sid is None:
+            continue
+        result[int(sid)] = Decimal(str(total)) if total is not None else Decimal("0")
+    return result
+
+
 def fetch_sprint_labels(db: Session, sprint_ids: list[int]) -> dict[int, str]:
     if not sprint_ids:
         return {}
@@ -242,6 +263,15 @@ def fetch_sprint_labels(db: Session, sprint_ids: list[int]) -> dict[int, str]:
         select(pt_sprints.c.SprintId, pt_sprints.c.SprintName).where(pt_sprints.c.SprintId.in_(sprint_ids))
     ).all()
     return {int(r[0]): (str(r[1]).strip() if r[1] else f"Sprint {r[0]}") for r in rows}
+
+
+def fetch_owner_labels(db: Session, owner_ids: list[int]) -> dict[int, str]:
+    if not owner_ids:
+        return {}
+    rows = db.execute(
+        select(pt_owners.c.OwnerId, pt_owners.c.OwnerName).where(pt_owners.c.OwnerId.in_(owner_ids))
+    ).all()
+    return {int(r[0]): (str(r[1]).strip() if r[1] else f"Owner {r[0]}") for r in rows}
 
 
 def compute_aggregations(rows: list[dict[str, Any]]) -> dict[str, Any]:

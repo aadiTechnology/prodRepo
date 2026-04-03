@@ -10,6 +10,8 @@ from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, Numeric, Str
 from app.core.database import Base
 
 
+_SCHEMA = "dbo"
+
 pt_owners = Table(
     "PT_Owners",
     Base.metadata,
@@ -17,6 +19,7 @@ pt_owners = Table(
     Column("OwnerName", String(100)),
     Column("IsActive", Integer),
     Column("CreatedOn", DateTime),
+    schema=_SCHEMA,
 )
 
 pt_features = Table(
@@ -26,6 +29,7 @@ pt_features = Table(
     Column("FeatureName", String(200)),
     Column("IsActive", Integer),
     Column("CreatedOn", DateTime),
+    schema=_SCHEMA,
 )
 
 pt_task_categories = Table(
@@ -33,6 +37,7 @@ pt_task_categories = Table(
     Base.metadata,
     Column("CategoryId", Integer, primary_key=True),
     Column("CategoryName", String(100)),
+    schema=_SCHEMA,
 )
 
 pt_tasks = Table(
@@ -40,6 +45,7 @@ pt_tasks = Table(
     Base.metadata,
     Column("TaskId", Integer, primary_key=True),
     Column("TaskName", String(100)),
+    schema=_SCHEMA,
 )
 
 pt_task_category_mapping = Table(
@@ -49,6 +55,7 @@ pt_task_category_mapping = Table(
     Column("TaskId", Integer, ForeignKey("PT_Tasks.TaskId"), nullable=False),
     Column("CategoryId", Integer, ForeignKey("PT_TaskCategories.CategoryId"), nullable=False),
     UniqueConstraint("TaskId", "CategoryId", name="UQ_PT_TaskCategoryMapping_Task_Category"),
+    schema=_SCHEMA,
 )
 
 pt_sprints = Table(
@@ -60,6 +67,7 @@ pt_sprints = Table(
     Column("EndDate", Date),
     Column("IsActive", Integer),
     Column("CreatedOn", DateTime),
+    schema=_SCHEMA,
 )
 
 pt_pages = Table(
@@ -68,6 +76,7 @@ pt_pages = Table(
     Column("PageId", Integer, primary_key=True),
     Column("FeatureId", Integer),
     Column("PageName", String(200)),
+    schema=_SCHEMA,
 )
 
 pt_subtasks = Table(
@@ -76,6 +85,7 @@ pt_subtasks = Table(
     Column("SubtaskId", Integer, primary_key=True),
     Column("TaskId", Integer),
     Column("SubtaskName", String(200)),
+    schema=_SCHEMA,
 )
 
 pt_timesheets = Table(
@@ -92,5 +102,6 @@ pt_timesheets = Table(
     Column("Efforts", Numeric(5, 2)),
     Column("ActivityDate", DateTime),
     Column("CreatedOn", DateTime),
+    schema=_SCHEMA,
 )
 
