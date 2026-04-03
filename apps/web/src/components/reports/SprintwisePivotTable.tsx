@@ -7,19 +7,29 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Paper from "@mui/material/Paper";
 import { Typography } from "../primitives";
-import type { SprintwiseSprintTotals } from "../../types/sprintwisePerformanceReport";
-import { buildSprintwiseMetricRows } from "../../utils/sprintwisePerformanceReportTransform";
+import type { SprintwiseMetricKey, SprintwiseSprintTotals } from "../../types/sprintwisePerformanceReport";
+import { buildFullPivotRows, buildPivotRowsForMetric } from "../../utils/sprintwisePerformanceReportTransform";
 import { formatHours } from "../../utils/formatters";
 
 export interface SprintwisePivotTableProps {
   title: string;
   sprints: SprintwiseSprintTotals[];
-  /** Hide the title when a parent heading already names the slice (e.g. member + chart row). */
   showTitle?: boolean;
+  variant?: "summary" | "singleMetric";
+  metric?: SprintwiseMetricKey;
 }
 
-export default function SprintwisePivotTable({ title, sprints, showTitle = true }: SprintwisePivotTableProps) {
-  const metricRows = useMemo(() => buildSprintwiseMetricRows(sprints), [sprints]);
+export default function SprintwisePivotTable({
+  title,
+  sprints,
+  showTitle = true,
+  variant = "singleMetric",
+  metric = "billable",
+}: SprintwisePivotTableProps) {
+  const metricRows = useMemo(
+    () => (variant === "summary" ? buildFullPivotRows(sprints) : buildPivotRowsForMetric(sprints, metric)),
+    [sprints, variant, metric]
+  );
 
   return (
     <Paper variant="outlined" sx={{ p: 1.5, height: "100%" }}>

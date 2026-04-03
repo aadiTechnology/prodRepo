@@ -213,6 +213,7 @@ def fetch_sprintwise_efforts_for_category(
     *,
     category_id: int,
     owner_ids: list[int] | None,
+    sprint_ids: list[int] | None = None,
 ) -> dict[int, Decimal]:
     """Sum normalized timesheet efforts per sprint for tasks mapped to the given category."""
     ts = pt_timesheets
@@ -226,6 +227,8 @@ def fetch_sprintwise_efforts_for_category(
     )
     if owner_ids:
         stmt = stmt.where(ts.c.OwnerId.in_(owner_ids))
+    if sprint_ids:
+        stmt = stmt.where(ts.c.SprintId.in_(sprint_ids))
     result: dict[int, Decimal] = {}
     for row in db.execute(stmt):
         sid, total = row[0], row[1]
@@ -239,6 +242,7 @@ def fetch_sprintwise_total_efforts(
     db: Session,
     *,
     owner_ids: list[int] | None,
+    sprint_ids: list[int] | None = None,
 ) -> dict[int, Decimal]:
     """Sum all dbo.PT_Timesheets.Efforts per sprint (no task-category / mapping filter)."""
     ts = pt_timesheets
@@ -247,6 +251,8 @@ def fetch_sprintwise_total_efforts(
     stmt = select(ts.c.SprintId, effort_total).select_from(ts).group_by(ts.c.SprintId)
     if owner_ids:
         stmt = stmt.where(ts.c.OwnerId.in_(owner_ids))
+    if sprint_ids:
+        stmt = stmt.where(ts.c.SprintId.in_(sprint_ids))
     result: dict[int, Decimal] = {}
     for row in db.execute(stmt):
         sid, total = row[0], row[1]
@@ -254,6 +260,102 @@ def fetch_sprintwise_total_efforts(
             continue
         result[int(sid)] = Decimal(str(total)) if total is not None else Decimal("0")
     return result
+
+
+def fetch_sprint_ids_ordered(db: Session) -> list[int]:
+    rows = db.execute(select(pt_sprints.c.SprintId).order_by(pt_sprints.c.SprintId.asc())).all()
+    return [int(r[0]) for r in rows]
+
+
+def _fetch_category_sums_by_owner_sprint(
+    db: Session,
+    *,
+    category_id: int,
+    owner_ids: list[int] | None,
+    sprint_ids: list[int] | None,
+) -> dict[tuple[int, int], Decimal]:
+    ts = pt_timesheets
+    m = pt_task_category_mapping
+    cat_match = exists().where(and_(m.c.TaskId == ts.c.TaskId, m.c.CategoryId == category_id))
+    per_row = func.coalesce(ts.c.Efforts, 0)
+    stmt = (
+        select(ts.c.OwnerId, ts.c.SprintId, func.coalesce(func.sum(per_row), 0))
+        .select_from(ts)
+        .where(cat_match)
+        .where(ts.c.OwnerId.isnot(None))
+        .group_by(ts.c.OwnerId, ts.c.SprintId)
+    )
+    if owner_ids:
+        stmt = stmt.where(ts.c.OwnerId.in_(owner_ids))
+    if sprint_ids:
+        stmt = stmt.where(ts.c.SprintId.in_(sprint_ids))
+    out: dict[tuple[int, int], Decimal] = {}
+    for row in db.execute(stmt):
+        oid, sid, val = int(row[0]), int(row[1]), row[2]
+        out[(oid, sid)] = Decimal(str(val)) if val is not None else Decimal("0")
+    return out
+
+
+def _fetch_total_sums_by_owner_sprint(
+    db: Session,
+    *,
+    owner_ids: list[int] | None,
+    sprint_ids: list[int] | None,
+) -> dict[tuple[int, int], Decimal]:
+    ts = pt_timesheets
+    per_row = func.coalesce(ts.c.Efforts, 0)
+    stmt = (
+        select(ts.c.OwnerId, ts.c.SprintId, func.coalesce(func.sum(per_row), 0))
+        .select_from(ts)
+        .where(ts.c.OwnerId.isnot(None))
+        .group_by(ts.c.OwnerId, ts.c.SprintId)
+    )
+    if owner_ids:
+        stmt = stmt.where(ts.c.OwnerId.in_(owner_ids))
+    if sprint_ids:
+        stmt = stmt.where(ts.c.SprintId.in_(sprint_ids))
+    out: dict[tuple[int, int], Decimal] = {}
+    for row in db.execute(stmt):
+        oid, sid, val = int(row[0]), int(row[1]), row[2]
+        out[(oid, sid)] = Decimal(str(val)) if val is not None else Decimal("0")
+    return out
+
+
+def fetch_member_sprint_metric_pairs(
+    db: Session,
+    *,
+    owner_ids: list[int] | None,
+    sprint_ids: list[int] | None,
+    billable_category_id: int | None,
+    productive_category_id: int | None,
+) -> dict[tuple[int, int], tuple[Decimal, Decimal, Decimal]]:
+    """(OwnerId, SprintId) -> billable, productive (PageDevelopment), uncategorized total."""
+    bill: dict[tuple[int, int], Decimal] = {}
+    prod: dict[tuple[int, int], Decimal] = {}
+    if billable_category_id is not None:
+        bill = _fetch_category_sums_by_owner_sprint(
+            db,
+            category_id=billable_category_id,
+            owner_ids=owner_ids,
+            sprint_ids=sprint_ids,
+        )
+    if productive_category_id is not None:
+        prod = _fetch_category_sums_by_owner_sprint(
+            db,
+            category_id=productive_category_id,
+            owner_ids=owner_ids,
+            sprint_ids=sprint_ids,
+        )
+    tot = _fetch_total_sums_by_owner_sprint(db, owner_ids=owner_ids, sprint_ids=sprint_ids)
+    keys = set(bill.keys()) | set(prod.keys()) | set(tot.keys())
+    merged: dict[tuple[int, int], tuple[Decimal, Decimal, Decimal]] = {}
+    for k in keys:
+        merged[k] = (
+            bill.get(k, Decimal("0")),
+            prod.get(k, Decimal("0")),
+            tot.get(k, Decimal("0")),
+        )
+    return merged
 
 
 def fetch_sprint_labels(db: Session, sprint_ids: list[int]) -> dict[int, str]:

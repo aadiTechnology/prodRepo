@@ -83,9 +83,23 @@ def get_sprintwise_performance(
         default=None,
         description="PT_Owners.OwnerId values; omit or leave empty for all members.",
     ),
+    sprint_ids: list[int] | None = Query(
+        default=None,
+        description="PT_Sprints.SprintId values; omit or leave empty for all sprints.",
+    ),
+    include_detail: bool = Query(
+        default=False,
+        description="When true, include per-sprint member breakdown tables.",
+    ),
     db: Session = Depends(get_db),
     _current_user: CurrentUser = Depends(get_current_user),
 ) -> SprintwisePerformanceReportResponse:
-    """Aggregated billable vs page-development effort per sprint (normalized PT timesheets)."""
+    """Aggregated billable vs productive vs total effort by sprint (normalized PT timesheets)."""
     mids = member_ids if member_ids else None
-    return sprintwise_performance_report_service.get_sprintwise_performance_report(db, member_ids=mids)
+    sids = sprint_ids if sprint_ids else None
+    return sprintwise_performance_report_service.get_sprintwise_performance_report(
+        db,
+        member_ids=mids,
+        sprint_ids=sids,
+        include_detail=include_detail,
+    )
