@@ -157,7 +157,7 @@ const AddAcademicYear = () => {
         ],
         homePath: "/",
         cancelTooltip: "Cancel",
-        saveTooltipCreate: "Finish & Create",
+        saveTooltipCreate: "Save",
         saveTooltipEdit: "Save Changes",
       }}
       onCancelNavigate={() => navigate("/academic-years")}
@@ -166,7 +166,7 @@ const AddAcademicYear = () => {
           ? "Are you sure you want to update this academic year?"
           : "Are you sure you want to create this academic year?"
       }
-      submitLabelCreate="Finish & Create"
+      submitLabelCreate="Save"
       submitLabelEdit="Save Changes"
     />
   );
