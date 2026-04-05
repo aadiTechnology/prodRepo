@@ -40,8 +40,8 @@ pt_task_categories = Table(
     schema=_SCHEMA,
 )
 
-pt_tasks = Table(
-    "PT_Tasks",
+pt_task_type = Table(
+    "PT_TaskType",
     Base.metadata,
     Column("TaskId", Integer, primary_key=True),
     Column("TaskName", String(100)),
@@ -52,7 +52,7 @@ pt_task_category_mapping = Table(
     "PT_TaskCategoryMapping",
     Base.metadata,
     Column("TaskCategoryMappingId", Integer, primary_key=True, autoincrement=True),
-    Column("TaskId", Integer, ForeignKey("PT_Tasks.TaskId"), nullable=False),
+    Column("TaskId", Integer, ForeignKey("PT_TaskType.TaskId"), nullable=False),
     Column("CategoryId", Integer, ForeignKey("PT_TaskCategories.CategoryId"), nullable=False),
     UniqueConstraint("TaskId", "CategoryId", name="UQ_PT_TaskCategoryMapping_Task_Category"),
     schema=_SCHEMA,

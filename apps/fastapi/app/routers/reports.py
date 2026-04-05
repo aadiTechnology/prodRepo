@@ -24,7 +24,7 @@ def get_sprint_performance(
     sprint_id: int | None = Query(default=None, description="PT_Sprints.SprintId"),
     feature_id: int | None = Query(default=None, description="PT_Features.FeatureId"),
     owner_id: int | None = Query(default=None, description="PT_Owners.OwnerId"),
-    task_id: int | None = Query(default=None, description="PT_Tasks.TaskId"),
+    task_id: int | None = Query(default=None, description="PT_TaskType.TaskId"),
     category_ids: list[int] | None = Query(
         default=None,
         description="PT_TaskCategories.CategoryId; task must map to any selected category.",

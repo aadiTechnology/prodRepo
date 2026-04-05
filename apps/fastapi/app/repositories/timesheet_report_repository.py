@@ -19,7 +19,7 @@ from app.models.pt_timesheet import (
     pt_subtasks,
     pt_task_categories,
     pt_task_category_mapping,
-    pt_tasks,
+    pt_task_type,
     pt_timesheets,
 )
 
@@ -45,7 +45,7 @@ def _base_select() -> Select:
             pt_owners.c.OwnerName,
             pt_features.c.FeatureName,
             pt_pages.c.PageName,
-            pt_tasks.c.TaskName,
+            pt_task_type.c.TaskName,
             pt_subtasks.c.SubtaskName,
             ts.c.Description,
             ts.c.Efforts,
@@ -55,7 +55,7 @@ def _base_select() -> Select:
             ts.join(pt_owners, pt_owners.c.OwnerId == ts.c.OwnerId)
             .join(pt_features, pt_features.c.FeatureId == ts.c.FeatureId)
             .join(pt_pages, pt_pages.c.PageId == ts.c.PageId)
-            .join(pt_tasks, pt_tasks.c.TaskId == ts.c.TaskId)
+            .join(pt_task_type, pt_task_type.c.TaskId == ts.c.TaskId)
             .join(pt_subtasks, pt_subtasks.c.SubtaskId == ts.c.SubtaskId)
             .join(pt_sprints, pt_sprints.c.SprintId == ts.c.SprintId)
         )
@@ -104,7 +104,7 @@ def build_filtered_query(
         conditions.append(ts.c.TaskId == task_id)
     elif activity_type and activity_type.strip():
         pat = f"%{activity_type.strip()}%"
-        conditions.append(pt_tasks.c.TaskName.like(pat))
+        conditions.append(pt_task_type.c.TaskName.like(pat))
 
     if category_ids:
         m = pt_task_category_mapping
@@ -165,7 +165,9 @@ def fetch_filter_options(db: Session) -> dict[str, Any]:
     features = db.execute(
         select(pt_features.c.FeatureId, pt_features.c.FeatureName).order_by(pt_features.c.FeatureName.asc())
     ).all()
-    tasks = db.execute(select(pt_tasks.c.TaskId, pt_tasks.c.TaskName).order_by(pt_tasks.c.TaskName.asc())).all()
+    tasks = db.execute(
+        select(pt_task_type.c.TaskId, pt_task_type.c.TaskName).order_by(pt_task_type.c.TaskName.asc())
+    ).all()
     sprints = db.execute(
         select(pt_sprints.c.SprintId, pt_sprints.c.SprintName).order_by(pt_sprints.c.SprintId.asc())
     ).all()
