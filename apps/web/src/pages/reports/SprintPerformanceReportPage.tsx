@@ -20,6 +20,10 @@ import { formatHours } from "../../utils/formatters";
 export default function SprintPerformanceReportPage() {
   const {
     listConfig,
+    projectId,
+    setProjectId,
+    projects,
+    projectsLoading,
     filters,
     patchFilters,
     runReport,
@@ -51,6 +55,10 @@ export default function SprintPerformanceReportPage() {
           />
           <Box sx={{ px: 2, pb: 1 }}>
             <ReportFilterBar
+              projectId={projectId}
+              projects={projects}
+              projectsLoading={projectsLoading}
+              onProjectIdChange={setProjectId}
               filters={filters}
               onChange={patchFilters}
               onRunReport={runReport}

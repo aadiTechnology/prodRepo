@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.repositories.timesheet_report_repository import compute_aggregations, fetch_entries
 from app.models.user import User
+from app.services.report_project_service import assert_can_access_pt_project
 from app.schemas.sprint_performance_report_schema import (
     SprintPerformanceAggregations,
     SprintPerformanceReportResponse,
@@ -17,6 +18,8 @@ from app.schemas.sprint_performance_report_schema import (
 def get_sprint_performance_report(
     db: Session,
     *,
+    project_id: int,
+    user_tenant_id: int | None,
     sprint_id: int | None = None,
     feature_id: int | None = None,
     owner_id: int | None = None,
@@ -30,6 +33,8 @@ def get_sprint_performance_report(
     from_date: date | None,
     to_date: date | None,
 ) -> SprintPerformanceReportResponse:
+    assert_can_access_pt_project(db, project_id, user_tenant_id)
+
     resolved_owner: str | None = None
     if employee_id is not None:
         user = db.query(User).filter(User.id == employee_id, User.is_deleted == False).first()
@@ -41,6 +46,7 @@ def get_sprint_performance_report(
 
     raw_rows = fetch_entries(
         db,
+        project_id=project_id,
         sprint_id=sprint_id,
         feature_id=feature_id,
         owner_id=owner_id,

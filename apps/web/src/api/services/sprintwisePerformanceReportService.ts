@@ -21,6 +21,7 @@ function paramsSerializer(params: Record<string, unknown>): string {
 }
 
 export interface SprintwiseReportRequestParams {
+  projectId: number;
   memberIds: number[] | null;
   sprintIds: number[] | null;
   includeDetail: boolean;
@@ -28,7 +29,10 @@ export interface SprintwiseReportRequestParams {
 
 export const sprintwisePerformanceReportService = {
   async fetchReport(params: SprintwiseReportRequestParams): Promise<SprintwisePerformanceReportResponse> {
-    const q: Record<string, unknown> = { include_detail: params.includeDetail };
+    const q: Record<string, unknown> = {
+      project_id: params.projectId,
+      include_detail: params.includeDetail,
+    };
     if (params.memberIds != null && params.memberIds.length > 0) q.member_ids = params.memberIds;
     if (params.sprintIds != null && params.sprintIds.length > 0) q.sprint_ids = params.sprintIds;
     const response = await apiClient.get<SprintwisePerformanceReportResponse>("/reports/sprintwise-performance", {

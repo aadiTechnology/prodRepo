@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.schemas.auth import CurrentUser
+from app.schemas.report_project_schema import ReportProjectOptionResponse
 from app.schemas.sprint_performance_report_schema import (
     SprintPerformanceFilterOptionsResponse,
     SprintPerformanceReportResponse,
@@ -15,12 +16,24 @@ from app.schemas.sprint_performance_report_schema import (
 from app.schemas.sprintwise_performance_report_schema import SprintwisePerformanceReportResponse
 from app.repositories.timesheet_report_repository import fetch_filter_options
 from app.services import sprint_performance_report_service, sprintwise_performance_report_service
+from app.services.report_project_service import assert_can_access_pt_project, list_accessible_report_projects
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
 
+@router.get("/projects", response_model=list[ReportProjectOptionResponse])
+def list_report_projects(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> list[ReportProjectOptionResponse]:
+    """Projects visible to the current user (scoped by tenant when user belongs to a tenant)."""
+    rows = list_accessible_report_projects(db, current_user.tenant_id)
+    return [ReportProjectOptionResponse.model_validate(r) for r in rows]
+
+
 @router.get("/sprint-performance", response_model=SprintPerformanceReportResponse)
 def get_sprint_performance(
+    project_id: int = Query(..., description="PT_Project.Id; required. Tenant enforced from auth."),
     sprint_id: int | None = Query(default=None, description="PT_Sprints.SprintId"),
     feature_id: int | None = Query(default=None, description="PT_Features.FeatureId"),
     owner_id: int | None = Query(default=None, description="PT_Owners.OwnerId"),
@@ -49,11 +62,13 @@ def get_sprint_performance(
     from_date: date | None = Query(default=None),
     to_date: date | None = Query(default=None),
     db: Session = Depends(get_db),
-    _current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> SprintPerformanceReportResponse:
     """Full timesheet rows for the report (no pagination) plus rollups."""
     return sprint_performance_report_service.get_sprint_performance_report(
         db,
+        project_id=project_id,
+        user_tenant_id=current_user.tenant_id,
         sprint_id=sprint_id,
         feature_id=feature_id,
         owner_id=owner_id,
@@ -71,14 +86,17 @@ def get_sprint_performance(
 
 @router.get("/sprint-performance/options", response_model=SprintPerformanceFilterOptionsResponse)
 def get_sprint_performance_filter_options(
+    project_id: int = Query(..., description="PT_Project.Id; filter dropdowns to this project."),
     db: Session = Depends(get_db),
-    _current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> SprintPerformanceFilterOptionsResponse:
-    return SprintPerformanceFilterOptionsResponse.model_validate(fetch_filter_options(db))
+    assert_can_access_pt_project(db, project_id, current_user.tenant_id)
+    return SprintPerformanceFilterOptionsResponse.model_validate(fetch_filter_options(db, project_id))
 
 
 @router.get("/sprintwise-performance", response_model=SprintwisePerformanceReportResponse)
 def get_sprintwise_performance(
+    project_id: int = Query(..., description="PT_Project.Id; required. Tenant enforced from auth."),
     member_ids: list[int] | None = Query(
         default=None,
         description="PT_Owners.OwnerId values; omit or leave empty for all members.",
@@ -92,13 +110,15 @@ def get_sprintwise_performance(
         description="When true, include per-sprint member breakdown tables.",
     ),
     db: Session = Depends(get_db),
-    _current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> SprintwisePerformanceReportResponse:
     """Aggregated billable vs productive vs total effort by sprint (normalized PT timesheets)."""
     mids = member_ids if member_ids else None
     sids = sprint_ids if sprint_ids else None
     return sprintwise_performance_report_service.get_sprintwise_performance_report(
         db,
+        project_id=project_id,
+        user_tenant_id=current_user.tenant_id,
         member_ids=mids,
         sprint_ids=sids,
         include_detail=include_detail,

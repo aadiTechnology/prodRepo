@@ -2,9 +2,14 @@ import { Autocomplete, Box, Button, TextField, Typography } from "../primitives"
 import type { ReportOption } from "../../types/sprintPerformanceReport";
 import type { SprintReportFilters } from "../../types/sprintPerformanceReport";
 import type { SprintPerformanceFilterOptionsResponse } from "../../types/sprintPerformanceReport";
+import type { ReportProjectOption } from "../../api/services/reportProjectService";
 import { SearchableSelect } from "../semantic";
 
 export interface ReportFilterBarProps {
+  projectId: number | null;
+  projects: ReportProjectOption[];
+  projectsLoading: boolean;
+  onProjectIdChange: (id: number | null) => void;
   filters: SprintReportFilters;
   onChange: (patch: Partial<SprintReportFilters>) => void;
   onRunReport: () => void;
@@ -14,6 +19,10 @@ export interface ReportFilterBarProps {
 }
 
 export default function ReportFilterBar({
+  projectId,
+  projects,
+  projectsLoading,
+  onProjectIdChange,
   filters,
   onChange,
   onRunReport,
@@ -22,6 +31,7 @@ export default function ReportFilterBar({
   optionsLoading,
 }: ReportFilterBarProps) {
   const categoryValue = options.categories.filter((c) => filters.categoryIds.includes(c.id));
+  const filtersDisabled = projectId == null || optionsLoading;
 
   return (
     <Box
@@ -33,6 +43,20 @@ export default function ReportFilterBar({
         py: 1,
       }}
     >
+      <Box sx={{ minWidth: 240 }}>
+        <Typography variant="caption" color="text.secondary" display="block">
+          Project
+        </Typography>
+        <SearchableSelect
+          label=""
+          valueId={projectId}
+          options={projects}
+          onChangeId={(id) => onProjectIdChange(id)}
+          placeholder={projectsLoading ? "Loading…" : "Select project"}
+          disabled={projectsLoading}
+          fullWidth={false}
+        />
+      </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" display="block">
           Sprint
@@ -42,8 +66,8 @@ export default function ReportFilterBar({
           valueId={filters.sprintId}
           options={options.sprints}
           onChangeId={(id) => onChange({ sprintId: id })}
-          placeholder={optionsLoading ? "Loading..." : "Select sprint"}
-          disabled={optionsLoading}
+          placeholder={optionsLoading ? "Loading…" : "Select sprint"}
+          disabled={filtersDisabled}
           fullWidth={false}
         />
       </Box>
@@ -56,8 +80,8 @@ export default function ReportFilterBar({
           valueId={filters.featureId}
           options={options.features}
           onChangeId={(id) => onChange({ featureId: id })}
-          placeholder={optionsLoading ? "Loading..." : "Select feature"}
-          disabled={optionsLoading}
+          placeholder={optionsLoading ? "Loading…" : "Select feature"}
+          disabled={filtersDisabled}
           fullWidth={false}
         />
       </Box>
@@ -70,8 +94,8 @@ export default function ReportFilterBar({
           valueId={filters.ownerId}
           options={options.owners}
           onChangeId={(id) => onChange({ ownerId: id })}
-          placeholder={optionsLoading ? "Loading..." : "Select owner"}
-          disabled={optionsLoading}
+          placeholder={optionsLoading ? "Loading…" : "Select owner"}
+          disabled={filtersDisabled}
           fullWidth={false}
         />
       </Box>
@@ -84,12 +108,12 @@ export default function ReportFilterBar({
           disableCloseOnSelect
           options={options.categories}
           value={categoryValue}
-          disabled={optionsLoading}
+          disabled={filtersDisabled}
           getOptionLabel={(o) => o.label}
           isOptionEqualToValue={(a, b) => a.id === b.id}
           onChange={(_e, v) => onChange({ categoryIds: v.map((x) => x.id) })}
           renderInput={(params) => (
-            <TextField {...params} placeholder={optionsLoading ? "Loading..." : "Categories"} size="small" />
+            <TextField {...params} placeholder={optionsLoading ? "Loading…" : "Categories"} size="small" />
           )}
           sx={{ minWidth: 220 }}
         />
@@ -103,8 +127,8 @@ export default function ReportFilterBar({
           valueId={filters.taskId}
           options={options.tasks}
           onChangeId={(id) => onChange({ taskId: id })}
-          placeholder={optionsLoading ? "Loading..." : "Select task"}
-          disabled={optionsLoading}
+          placeholder={optionsLoading ? "Loading…" : "Select task"}
+          disabled={filtersDisabled}
           fullWidth={false}
         />
       </Box>
@@ -134,7 +158,7 @@ export default function ReportFilterBar({
           sx={{ width: 160 }}
         />
       </Box>
-      <Button variant="contained" onClick={onRunReport} disabled={loading}>
+      <Button variant="contained" onClick={onRunReport} disabled={loading || projectId == null}>
         {loading ? "Loading…" : "Run report"}
       </Button>
     </Box>

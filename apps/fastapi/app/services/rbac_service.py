@@ -3,6 +3,7 @@
 from enum import Enum
 from typing import List, Tuple, Dict, Any, Optional
 
+from sqlalchemy import insert
 from sqlalchemy.orm import Session
 
 from app.core.logging_config import get_logger
@@ -379,3 +380,111 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
         raise
 
 
+def backfill_role_menu_permissions_from_role_menus(
+    db: Session, *, created_by: int | None = None
+) -> int:
+    """
+    Insert RoleMenuPermission for each role_menus pair that has no matching row.
+    Grants full menu CRUD (same default as tenant provisioning). Safe to re-run; skips existing pairs.
+    """
+    pairs = (
+        db.query(role_menus.c.role_id, role_menus.c.menu_id, Role.tenant_id)
+        .join(Role, Role.id == role_menus.c.role_id)
+        .outerjoin(
+            RoleMenuPermission,
+            (RoleMenuPermission.role_id == role_menus.c.role_id)
+            & (RoleMenuPermission.menu_id == role_menus.c.menu_id),
+        )
+        .filter(
+            RoleMenuPermission.id.is_(None),
+            Role.is_deleted == False,  # noqa: E712
+        )
+        .all()
+    )
+    if not pairs:
+        return 0
+    for role_id, menu_id, tenant_id in pairs:
+        db.add(
+            RoleMenuPermission(
+                role_id=role_id,
+                tenant_id=tenant_id,
+                menu_id=menu_id,
+                can_view=True,
+                can_create=True,
+                can_edit=True,
+                can_delete=True,
+                created_by=created_by,
+            )
+        )
+    db.commit()
+    logger.info("[RBAC] Backfilled %s role_menu_permissions from role_menus", len(pairs))
+    return len(pairs)
+
+
+def sync_global_menus_to_tenant_admin_roles(db: Session, *, created_by: int | None = None) -> tuple[int, int]:
+    """
+    Ensure each tenant-scoped ADMIN role is linked to every active global menu (tenant_id NULL)
+    via role_menus and RoleMenuPermission. Use after adding new catalog menus (e.g. seed_rbac).
+    Returns (role_menus_rows_inserted, role_menu_permissions_rows_inserted).
+    """
+    global_menu_ids = [
+        row[0]
+        for row in db.query(Menu.id).filter(
+            Menu.tenant_id.is_(None),
+            Menu.is_active == True,  # noqa: E712
+            Menu.is_deleted == False,  # noqa: E712
+        ).all()
+    ]
+    if not global_menu_ids:
+        return (0, 0)
+
+    admin_roles = (
+        db.query(Role)
+        .filter(
+            Role.code == "ADMIN",
+            Role.tenant_id.isnot(None),
+            Role.is_deleted == False,  # noqa: E712
+        )
+        .all()
+    )
+    rm_inserts = 0
+    rmp_inserts = 0
+    for role in admin_roles:
+        existing_rm = {
+            r[0]
+            for r in db.query(role_menus.c.menu_id).filter(role_menus.c.role_id == role.id).all()
+        }
+        existing_rmp = {
+            r[0]
+            for r in db.query(RoleMenuPermission.menu_id).filter(RoleMenuPermission.role_id == role.id).all()
+        }
+        for mid in global_menu_ids:
+            if mid not in existing_rm:
+                db.execute(
+                    insert(role_menus),
+                    [{"role_id": role.id, "menu_id": mid}],
+                )
+                rm_inserts += 1
+            if mid not in existing_rmp:
+                db.add(
+                    RoleMenuPermission(
+                        role_id=role.id,
+                        tenant_id=role.tenant_id,
+                        menu_id=mid,
+                        can_view=True,
+                        can_create=True,
+                        can_edit=True,
+                        can_delete=True,
+                        created_by=created_by,
+                    )
+                )
+                rmp_inserts += 1
+                existing_rmp.add(mid)
+    if rm_inserts or rmp_inserts:
+        db.commit()
+    logger.info(
+        "[RBAC] sync_global_menus_to_tenant_admin_roles: role_menus +%s, role_menu_permissions +%s",
+        rm_inserts,
+        rmp_inserts,
+    )
+    return (rm_inserts, rmp_inserts)

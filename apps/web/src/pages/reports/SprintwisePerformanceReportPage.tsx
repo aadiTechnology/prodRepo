@@ -30,8 +30,12 @@ import { PageHeader } from "../../components/layout";
 import { ListPageLayout } from "../../components/reusable";
 import SprintwiseEffortBarChart from "../../components/reports/SprintwiseEffortBarChart";
 import SprintwisePivotTable from "../../components/reports/SprintwisePivotTable";
+import reportProjectService from "../../api/services/reportProjectService";
 import sprintPerformanceReportService from "../../api/services/sprintPerformanceReportService";
 import sprintwisePerformanceReportService from "../../api/services/sprintwisePerformanceReportService";
+import { useReportProjectSelection } from "../../hooks/useReportProjectSelection";
+import { SearchableSelect } from "../../components/semantic";
+import type { ReportProjectOption } from "../../api/services/reportProjectService";
 import type { ReportOption, SprintPerformanceFilterOptionsResponse } from "../../types/sprintPerformanceReport";
 import type {
   MemberSprintMetrics,
@@ -218,14 +222,19 @@ function OverallSummaryTableSummary({ members }: { members: MemberSprintMetrics[
   );
 }
 
+const emptyFilterOptions: SprintPerformanceFilterOptionsResponse = {
+  sprints: [],
+  owners: [],
+  features: [],
+  categories: [],
+  tasks: [],
+};
+
 export default function SprintwisePerformanceReportPage() {
-  const [options, setOptions] = useState<SprintPerformanceFilterOptionsResponse>({
-    sprints: [],
-    owners: [],
-    features: [],
-    categories: [],
-    tasks: [],
-  });
+  const { projectId, setProjectId } = useReportProjectSelection();
+  const [projects, setProjects] = useState<ReportProjectOption[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [options, setOptions] = useState<SprintPerformanceFilterOptionsResponse>(emptyFilterOptions);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [selectedOwners, setSelectedOwners] = useState<ReportOption[]>([]);
   const [selectedSprints, setSelectedSprints] = useState<ReportOption[]>([]);
@@ -241,16 +250,14 @@ export default function SprintwisePerformanceReportPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setOptionsLoading(true);
+      setProjectsLoading(true);
       try {
-        const res = await sprintPerformanceReportService.fetchOptions();
-        if (!cancelled) setOptions(res);
+        const list = await reportProjectService.listProjects();
+        if (!cancelled) setProjects(list);
       } catch {
-        if (!cancelled) {
-          setOptions({ sprints: [], owners: [], features: [], categories: [], tasks: [] });
-        }
+        if (!cancelled) setProjects([]);
       } finally {
-        if (!cancelled) setOptionsLoading(false);
+        if (!cancelled) setProjectsLoading(false);
       }
     })();
     return () => {
@@ -258,16 +265,49 @@ export default function SprintwisePerformanceReportPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (projectId != null || projects.length !== 1) return;
+    setProjectId(projects[0].id);
+  }, [projectId, projects, setProjectId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (projectId == null) {
+      setOptions(emptyFilterOptions);
+      setOptionsLoading(false);
+      return;
+    }
+    (async () => {
+      setOptionsLoading(true);
+      try {
+        const res = await sprintPerformanceReportService.fetchOptions(projectId);
+        if (!cancelled) setOptions(res);
+      } catch {
+        if (!cancelled) setOptions(emptyFilterOptions);
+      } finally {
+        if (!cancelled) setOptionsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
   const allMembersSelected = selectedOwners.length === 0;
   const allSprintsSelected = selectedSprints.length === 0;
 
   const applyReport = useCallback(async () => {
+    if (projectId == null) {
+      setError("Select a project.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const memberIds = allMembersSelected ? null : selectedOwners.map((o) => o.id);
       const sprintIds = allSprintsSelected ? null : selectedSprints.map((s) => s.id);
       const res = await sprintwisePerformanceReportService.fetchReport({
+        projectId,
         memberIds,
         sprintIds,
         includeDetail: true,
@@ -286,7 +326,7 @@ export default function SprintwisePerformanceReportPage() {
     } finally {
       setLoading(false);
     }
-  }, [allMembersSelected, selectedOwners, allSprintsSelected, selectedSprints]);
+  }, [allMembersSelected, allSprintsSelected, projectId, selectedOwners, selectedSprints]);
 
   const hasData = useMemo(() => slices.some((s) => s.sprints.length > 0), [slices]);
   const isMultiMember = useMemo(() => slices.some((s) => s.slice_key === "total"), [slices]);
@@ -327,6 +367,20 @@ export default function SprintwisePerformanceReportPage() {
               alignItems: "flex-end",
             }}
           >
+            <Box sx={{ minWidth: 240 }}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Project
+              </Typography>
+              <SearchableSelect
+                label=""
+                valueId={projectId}
+                options={projects}
+                onChangeId={(id) => setProjectId(id)}
+                placeholder={projectsLoading ? "Loading…" : "Select project"}
+                disabled={projectsLoading}
+                fullWidth={false}
+              />
+            </Box>
             <Box sx={{ minWidth: 260 }}>
               <Typography variant="caption" color="text.secondary" display="block">
                 Sprints
@@ -345,7 +399,7 @@ export default function SprintwisePerformanceReportPage() {
               <Autocomplete<ReportOption, true, false, false>
                 multiple
                 disableCloseOnSelect
-                disabled={optionsLoading}
+                disabled={optionsLoading || projectId == null}
                 options={options.sprints}
                 value={selectedSprints}
                 onChange={(_e, v) => setSelectedSprints(v)}
@@ -381,7 +435,7 @@ export default function SprintwisePerformanceReportPage() {
               <Autocomplete<ReportOption, true, false, false>
                 multiple
                 disableCloseOnSelect
-                disabled={optionsLoading}
+                disabled={optionsLoading || projectId == null}
                 options={options.owners}
                 value={selectedOwners}
                 onChange={(_e, v) => setSelectedOwners(v)}
@@ -421,7 +475,7 @@ export default function SprintwisePerformanceReportPage() {
               control={<Switch checked={showDetails} onChange={(_, v) => setShowDetails(v)} size="small" />}
               label="Show details"
             />
-            <Button variant="contained" onClick={applyReport} disabled={loading}>
+            <Button variant="contained" onClick={applyReport} disabled={loading || projectId == null}>
               {loading ? "Loading…" : "Apply"}
             </Button>
           </Box>

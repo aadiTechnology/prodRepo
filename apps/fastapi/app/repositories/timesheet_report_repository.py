@@ -1,13 +1,14 @@
 """Persistence access for sprint performance report queries (SQLAlchemy Core).
 
 Uses normalized PT_* master tables (see Product/document SQL scripts).
+All report data is scoped by PT_Features.ProjectId (and tenant enforced in the service layer).
 """
 
 from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Select, and_, exists, func, select
+from sqlalchemy import Select, and_, exists, func, or_, select
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
@@ -64,6 +65,7 @@ def _base_select() -> Select:
 
 def build_filtered_query(
     *,
+    project_id: int,
     sprint_id: int | None = None,
     feature_id: int | None = None,
     owner_id: int | None = None,
@@ -78,7 +80,7 @@ def build_filtered_query(
     to_date: date | None,
 ) -> Select:
     stmt = _base_select()
-    conditions = []
+    conditions = [pt_features.c.ProjectId == project_id]
 
     ts = pt_timesheets
 
@@ -120,8 +122,7 @@ def build_filtered_query(
         end = datetime.combine(to_date, time(23, 59, 59))
         conditions.append(ts.c.ActivityDate <= end)
 
-    if conditions:
-        stmt = stmt.where(and_(*conditions))
+    stmt = stmt.where(and_(*conditions))
 
     return stmt.order_by(ts.c.ActivityDate.desc(), ts.c.SprintId.asc())
 
@@ -129,6 +130,7 @@ def build_filtered_query(
 def fetch_entries(
     db: Session,
     *,
+    project_id: int,
     sprint_id: int | None = None,
     feature_id: int | None = None,
     owner_id: int | None = None,
@@ -142,6 +144,7 @@ def fetch_entries(
     to_date: date | None,
 ) -> list[dict[str, Any]]:
     stmt = build_filtered_query(
+        project_id=project_id,
         sprint_id=sprint_id,
         feature_id=feature_id,
         owner_id=owner_id,
@@ -158,18 +161,41 @@ def fetch_entries(
     return [_row_to_dict(row._mapping) for row in result]
 
 
-def fetch_filter_options(db: Session) -> dict[str, Any]:
-    owners = db.execute(
-        select(pt_owners.c.OwnerId, pt_owners.c.OwnerName).order_by(pt_owners.c.OwnerName.asc())
+def fetch_filter_options(db: Session, project_id: int) -> dict[str, Any]:
+    ts = pt_timesheets
+    feat = pt_features
+    tt = pt_task_type
+
+    owner_rows = db.execute(
+        select(pt_owners.c.OwnerId, pt_owners.c.OwnerName)
+        .select_from(ts.join(feat, feat.c.FeatureId == ts.c.FeatureId).join(pt_owners, pt_owners.c.OwnerId == ts.c.OwnerId))
+        .where(feat.c.ProjectId == project_id)
+        .distinct()
+        .order_by(pt_owners.c.OwnerName.asc())
     ).all()
+
     features = db.execute(
-        select(pt_features.c.FeatureId, pt_features.c.FeatureName).order_by(pt_features.c.FeatureName.asc())
+        select(pt_features.c.FeatureId, pt_features.c.FeatureName)
+        .where(pt_features.c.ProjectId == project_id)
+        .order_by(pt_features.c.FeatureName.asc())
     ).all()
+
+    used_task_subq = (
+        select(ts.c.TaskId)
+        .select_from(ts.join(feat, feat.c.FeatureId == ts.c.FeatureId))
+        .where(feat.c.ProjectId == project_id)
+        .distinct()
+    )
     tasks = db.execute(
-        select(pt_task_type.c.TaskId, pt_task_type.c.TaskName).order_by(pt_task_type.c.TaskName.asc())
+        select(tt.c.TaskId, tt.c.TaskName)
+        .where(or_(tt.c.ProjectId == project_id, tt.c.TaskId.in_(used_task_subq)))
+        .order_by(tt.c.TaskName.asc())
     ).all()
+
     sprints = db.execute(
-        select(pt_sprints.c.SprintId, pt_sprints.c.SprintName).order_by(pt_sprints.c.SprintId.asc())
+        select(pt_sprints.c.SprintId, pt_sprints.c.SprintName)
+        .where(pt_sprints.c.ProjectId == project_id)
+        .order_by(pt_sprints.c.SprintId.asc())
     ).all()
 
     categories = db.execute(
@@ -182,14 +208,12 @@ def fetch_filter_options(db: Session) -> dict[str, Any]:
     cats_by_task: dict[int, list[int]] = {tid: [] for tid in task_ids}
     if task_ids:
         m = pt_task_category_mapping
-        rows = db.execute(
-            select(m.c.TaskId, m.c.CategoryId).where(m.c.TaskId.in_(task_ids))
-        ).all()
+        rows = db.execute(select(m.c.TaskId, m.c.CategoryId).where(m.c.TaskId.in_(task_ids))).all()
         for tid, cid in rows:
             cats_by_task[tid].append(cid)
 
     return {
-        "owners": [{"id": r[0], "label": r[1]} for r in owners],
+        "owners": [{"id": r[0], "label": r[1]} for r in owner_rows],
         "features": [{"id": r[0], "label": r[1]} for r in features],
         "categories": [{"id": r[0], "label": r[1] or f"Category {r[0]}"} for r in categories],
         "tasks": [
@@ -210,9 +234,15 @@ def resolve_task_category_id_by_name(db: Session, category_name: str) -> int | N
     return int(row[0]) if row else None
 
 
+def _timesheets_join_features():
+    ts = pt_timesheets
+    return ts.join(pt_features, pt_features.c.FeatureId == ts.c.FeatureId)
+
+
 def fetch_sprintwise_efforts_for_category(
     db: Session,
     *,
+    project_id: int,
     category_id: int,
     owner_ids: list[int] | None,
     sprint_ids: list[int] | None = None,
@@ -223,7 +253,8 @@ def fetch_sprintwise_efforts_for_category(
     cat_match = exists().where(and_(m.c.TaskId == ts.c.TaskId, m.c.CategoryId == category_id))
     stmt = (
         select(ts.c.SprintId, func.sum(ts.c.Efforts))
-        .select_from(ts)
+        .select_from(_timesheets_join_features())
+        .where(pt_features.c.ProjectId == project_id)
         .where(cat_match)
         .group_by(ts.c.SprintId)
     )
@@ -243,6 +274,7 @@ def fetch_sprintwise_efforts_for_category(
 def fetch_sprintwise_total_efforts(
     db: Session,
     *,
+    project_id: int,
     owner_ids: list[int] | None,
     sprint_ids: list[int] | None = None,
 ) -> dict[int, Decimal]:
@@ -250,7 +282,12 @@ def fetch_sprintwise_total_efforts(
     ts = pt_timesheets
     per_row_effort = func.coalesce(ts.c.Efforts, 0)
     effort_total = func.coalesce(func.sum(per_row_effort), 0).label("effort_total")
-    stmt = select(ts.c.SprintId, effort_total).select_from(ts).group_by(ts.c.SprintId)
+    stmt = (
+        select(ts.c.SprintId, effort_total)
+        .select_from(_timesheets_join_features())
+        .where(pt_features.c.ProjectId == project_id)
+        .group_by(ts.c.SprintId)
+    )
     if owner_ids:
         stmt = stmt.where(ts.c.OwnerId.in_(owner_ids))
     if sprint_ids:
@@ -264,14 +301,21 @@ def fetch_sprintwise_total_efforts(
     return result
 
 
-def fetch_sprint_ids_ordered(db: Session) -> list[int]:
-    rows = db.execute(select(pt_sprints.c.SprintId).order_by(pt_sprints.c.SprintId.asc())).all()
+def fetch_sprint_ids_ordered(db: Session, project_id: int) -> list[int]:
+    rows = (
+        db.execute(
+            select(pt_sprints.c.SprintId)
+            .where(pt_sprints.c.ProjectId == project_id)
+            .order_by(pt_sprints.c.SprintId.asc())
+        ).all()
+    )
     return [int(r[0]) for r in rows]
 
 
 def _fetch_category_sums_by_owner_sprint(
     db: Session,
     *,
+    project_id: int,
     category_id: int,
     owner_ids: list[int] | None,
     sprint_ids: list[int] | None,
@@ -282,7 +326,8 @@ def _fetch_category_sums_by_owner_sprint(
     per_row = func.coalesce(ts.c.Efforts, 0)
     stmt = (
         select(ts.c.OwnerId, ts.c.SprintId, func.coalesce(func.sum(per_row), 0))
-        .select_from(ts)
+        .select_from(_timesheets_join_features())
+        .where(pt_features.c.ProjectId == project_id)
         .where(cat_match)
         .where(ts.c.OwnerId.isnot(None))
         .group_by(ts.c.OwnerId, ts.c.SprintId)
@@ -301,6 +346,7 @@ def _fetch_category_sums_by_owner_sprint(
 def _fetch_total_sums_by_owner_sprint(
     db: Session,
     *,
+    project_id: int,
     owner_ids: list[int] | None,
     sprint_ids: list[int] | None,
 ) -> dict[tuple[int, int], Decimal]:
@@ -308,7 +354,8 @@ def _fetch_total_sums_by_owner_sprint(
     per_row = func.coalesce(ts.c.Efforts, 0)
     stmt = (
         select(ts.c.OwnerId, ts.c.SprintId, func.coalesce(func.sum(per_row), 0))
-        .select_from(ts)
+        .select_from(_timesheets_join_features())
+        .where(pt_features.c.ProjectId == project_id)
         .where(ts.c.OwnerId.isnot(None))
         .group_by(ts.c.OwnerId, ts.c.SprintId)
     )
@@ -326,6 +373,7 @@ def _fetch_total_sums_by_owner_sprint(
 def fetch_member_sprint_metric_pairs(
     db: Session,
     *,
+    project_id: int,
     owner_ids: list[int] | None,
     sprint_ids: list[int] | None,
     billable_category_id: int | None,
@@ -337,6 +385,7 @@ def fetch_member_sprint_metric_pairs(
     if billable_category_id is not None:
         bill = _fetch_category_sums_by_owner_sprint(
             db,
+            project_id=project_id,
             category_id=billable_category_id,
             owner_ids=owner_ids,
             sprint_ids=sprint_ids,
@@ -344,11 +393,12 @@ def fetch_member_sprint_metric_pairs(
     if productive_category_id is not None:
         prod = _fetch_category_sums_by_owner_sprint(
             db,
+            project_id=project_id,
             category_id=productive_category_id,
             owner_ids=owner_ids,
             sprint_ids=sprint_ids,
         )
-    tot = _fetch_total_sums_by_owner_sprint(db, owner_ids=owner_ids, sprint_ids=sprint_ids)
+    tot = _fetch_total_sums_by_owner_sprint(db, project_id=project_id, owner_ids=owner_ids, sprint_ids=sprint_ids)
     keys = set(bill.keys()) | set(prod.keys()) | set(tot.keys())
     merged: dict[tuple[int, int], tuple[Decimal, Decimal, Decimal]] = {}
     for k in keys:

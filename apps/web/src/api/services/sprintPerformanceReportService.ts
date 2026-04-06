@@ -18,8 +18,11 @@ function sprintReportParamsSerializer(params: Record<string, unknown>): string {
   return usp.toString();
 }
 
-function buildParams(filters: SprintReportFilters): Record<string, string | number | number[]> {
-  const p: Record<string, string | number | number[]> = {};
+function buildParams(
+  projectId: number,
+  filters: SprintReportFilters
+): Record<string, string | number | number[]> {
+  const p: Record<string, string | number | number[]> = { project_id: projectId };
   if (filters.sprintId != null) p.sprint_id = filters.sprintId;
   if (filters.featureId != null) p.feature_id = filters.featureId;
   if (filters.ownerId != null) p.owner_id = filters.ownerId;
@@ -32,15 +35,17 @@ function buildParams(filters: SprintReportFilters): Record<string, string | numb
 }
 
 export const sprintPerformanceReportService = {
-  async fetchReport(filters: SprintReportFilters): Promise<SprintPerformanceReportResponse> {
+  async fetchReport(projectId: number, filters: SprintReportFilters): Promise<SprintPerformanceReportResponse> {
     const response = await apiClient.get<SprintPerformanceReportResponse>("/reports/sprint-performance", {
-      params: buildParams(filters),
+      params: buildParams(projectId, filters),
       paramsSerializer: sprintReportParamsSerializer,
     });
     return response.data;
   },
-  async fetchOptions(): Promise<SprintPerformanceFilterOptionsResponse> {
-    const response = await apiClient.get<SprintPerformanceFilterOptionsResponse>("/reports/sprint-performance/options");
+  async fetchOptions(projectId: number): Promise<SprintPerformanceFilterOptionsResponse> {
+    const response = await apiClient.get<SprintPerformanceFilterOptionsResponse>("/reports/sprint-performance/options", {
+      params: { project_id: projectId },
+    });
     return response.data;
   },
 };

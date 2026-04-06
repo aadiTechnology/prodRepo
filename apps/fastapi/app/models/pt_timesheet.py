@@ -12,6 +12,17 @@ from app.core.database import Base
 
 _SCHEMA = "dbo"
 
+pt_project = Table(
+    "PT_Project",
+    Base.metadata,
+    Column("Id", Integer, primary_key=True),
+    Column("TenantId", Integer, ForeignKey("tenants.id"), nullable=False),
+    Column("ProjectName", String(200), nullable=False),
+    Column("IsActive", Integer),
+    Column("CreatedOn", DateTime),
+    schema=_SCHEMA,
+)
+
 pt_owners = Table(
     "PT_Owners",
     Base.metadata,
@@ -29,6 +40,7 @@ pt_features = Table(
     Column("FeatureName", String(200)),
     Column("IsActive", Integer),
     Column("CreatedOn", DateTime),
+    Column("ProjectId", Integer, ForeignKey("PT_Project.Id"), nullable=False),
     schema=_SCHEMA,
 )
 
@@ -45,16 +57,18 @@ pt_task_type = Table(
     Base.metadata,
     Column("TaskId", Integer, primary_key=True),
     Column("TaskName", String(100)),
+    Column("ProjectId", Integer, ForeignKey("PT_Project.Id")),
     schema=_SCHEMA,
 )
 
 pt_task_category_mapping = Table(
     "PT_TaskCategoryMapping",
     Base.metadata,
-    Column("TaskCategoryMappingId", Integer, primary_key=True, autoincrement=True),
+    Column("Id", Integer, primary_key=True, autoincrement=True),
     Column("TaskId", Integer, ForeignKey("PT_TaskType.TaskId"), nullable=False),
     Column("CategoryId", Integer, ForeignKey("PT_TaskCategories.CategoryId"), nullable=False),
-    UniqueConstraint("TaskId", "CategoryId", name="UQ_PT_TaskCategoryMapping_Task_Category"),
+    Column("CreatedOn", DateTime),
+    UniqueConstraint("TaskId", "CategoryId", name="UQ_Task_Category"),
     schema=_SCHEMA,
 )
 
@@ -67,6 +81,7 @@ pt_sprints = Table(
     Column("EndDate", Date),
     Column("IsActive", Integer),
     Column("CreatedOn", DateTime),
+    Column("ProjectId", Integer, ForeignKey("PT_Project.Id")),
     schema=_SCHEMA,
 )
 
@@ -76,6 +91,7 @@ pt_pages = Table(
     Column("PageId", Integer, primary_key=True),
     Column("FeatureId", Integer),
     Column("PageName", String(200)),
+    Column("ProjectId", Integer, ForeignKey("PT_Project.Id"), nullable=False),
     schema=_SCHEMA,
 )
 
@@ -102,6 +118,7 @@ pt_timesheets = Table(
     Column("Efforts", Numeric(5, 2)),
     Column("ActivityDate", DateTime),
     Column("CreatedOn", DateTime),
+    Column("ProjectId", Integer, ForeignKey("PT_Project.Id")),
     schema=_SCHEMA,
 )
 

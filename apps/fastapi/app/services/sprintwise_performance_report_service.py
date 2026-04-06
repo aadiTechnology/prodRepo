@@ -14,6 +14,7 @@ from app.repositories.timesheet_report_repository import (
     fetch_sprintwise_total_efforts,
     resolve_task_category_id_by_name,
 )
+from app.services.report_project_service import assert_can_access_pt_project
 from app.schemas.sprintwise_performance_report_schema import (
     MemberSprintMetrics,
     OverallMemberSummary,
@@ -32,12 +33,14 @@ def _merge_maps(target: dict[int, Decimal], source: dict[int, Decimal]) -> None:
         target[sid] = target.get(sid, Decimal("0")) + val
 
 
-def _resolve_sprint_order(db: Session, key_set: set[int], sprint_filter: list[int] | None) -> list[int]:
+def _resolve_sprint_order(
+    db: Session, project_id: int, key_set: set[int], sprint_filter: list[int] | None
+) -> list[int]:
     if not key_set:
         return []
     if sprint_filter:
         return [s for s in sprint_filter if s in key_set]
-    full = fetch_sprint_ids_ordered(db)
+    full = fetch_sprint_ids_ordered(db, project_id)
     return [s for s in full if s in key_set]
 
 
@@ -125,10 +128,14 @@ def _build_detail_and_overall(
 def get_sprintwise_performance_report(
     db: Session,
     *,
+    project_id: int,
+    user_tenant_id: int | None,
     member_ids: list[int] | None,
     sprint_ids: list[int] | None,
     include_detail: bool,
 ) -> SprintwisePerformanceReportResponse:
+    assert_can_access_pt_project(db, project_id, user_tenant_id)
+
     billable_cat_id = resolve_task_category_id_by_name(db, _BILLABLE)
     page_cat_id = resolve_task_category_id_by_name(db, _PAGE_DEVELOPMENT)
 
@@ -145,17 +152,28 @@ def get_sprintwise_performance_report(
         page_m: dict[int, Decimal] = {}
         if billable_cat_id is not None:
             bill_m = fetch_sprintwise_efforts_for_category(
-                db, category_id=billable_cat_id, owner_ids=of, sprint_ids=sprint_filter
+                db,
+                project_id=project_id,
+                category_id=billable_cat_id,
+                owner_ids=of,
+                sprint_ids=sprint_filter,
             )
         if page_cat_id is not None:
             page_m = fetch_sprintwise_efforts_for_category(
-                db, category_id=page_cat_id, owner_ids=of, sprint_ids=sprint_filter
+                db,
+                project_id=project_id,
+                category_id=page_cat_id,
+                owner_ids=of,
+                sprint_ids=sprint_filter,
             )
-        tot_m = fetch_sprintwise_total_efforts(db, owner_ids=of, sprint_ids=sprint_filter)
+        tot_m = fetch_sprintwise_total_efforts(
+            db, project_id=project_id, owner_ids=of, sprint_ids=sprint_filter
+        )
         return bill_m, page_m, tot_m
 
     pair_totals = fetch_member_sprint_metric_pairs(
         db,
+        project_id=project_id,
         owner_ids=owner_filter,
         sprint_ids=sprint_filter,
         billable_category_id=billable_cat_id,
@@ -163,7 +181,7 @@ def get_sprintwise_performance_report(
     )
 
     sprint_ids_in_pairs = {sid for (_, sid) in pair_totals.keys()}
-    sprint_order_common = _resolve_sprint_order(db, sprint_ids_in_pairs, sprint_filter)
+    sprint_order_common = _resolve_sprint_order(db, project_id, sprint_ids_in_pairs, sprint_filter)
 
     if owner_filter:
         owner_label_scope = fetch_owner_labels(db, owner_filter)
@@ -181,7 +199,9 @@ def get_sprintwise_performance_report(
 
     if not owner_filter:
         bill_map, page_map, total_map = fetch_triple(None)
-        so = _resolve_sprint_order(db, set(bill_map) | set(page_map) | set(total_map), sprint_filter)
+        so = _resolve_sprint_order(
+            db, project_id, set(bill_map) | set(page_map) | set(total_map), sprint_filter
+        )
         sprints = _maps_to_sprints(db, bill_map, page_map, total_map, so)
         return SprintwisePerformanceReportResponse(
             slices=[
@@ -199,7 +219,9 @@ def get_sprintwise_performance_report(
     if len(owner_filter) == 1:
         oid = owner_filter[0]
         bill_map, page_map, total_map = fetch_triple([oid])
-        so = _resolve_sprint_order(db, set(bill_map) | set(page_map) | set(total_map), sprint_filter)
+        so = _resolve_sprint_order(
+            db, project_id, set(bill_map) | set(page_map) | set(total_map), sprint_filter
+        )
         sprints = _maps_to_sprints(db, bill_map, page_map, total_map, so)
         labels_o = fetch_owner_labels(db, [oid])
         return SprintwisePerformanceReportResponse(
@@ -226,7 +248,9 @@ def get_sprintwise_performance_report(
         _merge_maps(combined_bill, bill_map)
         _merge_maps(combined_page, page_map)
         _merge_maps(combined_total, total_map)
-        so = _resolve_sprint_order(db, set(bill_map) | set(page_map) | set(total_map), sprint_filter)
+        so = _resolve_sprint_order(
+            db, project_id, set(bill_map) | set(page_map) | set(total_map), sprint_filter
+        )
         member_sprints = _maps_to_sprints(db, bill_map, page_map, total_map, so)
         slices.append(
             SprintwiseReportSlice(
@@ -237,7 +261,9 @@ def get_sprintwise_performance_report(
             )
         )
 
-    so_t = _resolve_sprint_order(db, set(combined_bill) | set(combined_page) | set(combined_total), sprint_filter)
+    so_t = _resolve_sprint_order(
+        db, project_id, set(combined_bill) | set(combined_page) | set(combined_total), sprint_filter
+    )
     total_sprints = _maps_to_sprints(db, combined_bill, combined_page, combined_total, so_t)
     slices.append(
         SprintwiseReportSlice(

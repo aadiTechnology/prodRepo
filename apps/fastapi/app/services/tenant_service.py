@@ -11,6 +11,7 @@ from app.models.tenant import Tenant
 from app.models.user import User, UserRole
 from app.models.role import Role, user_roles, role_menus
 from app.models.menu import Menu
+from app.models.role_menu_permission import RoleMenuPermission
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantProvision
 from app.utils.security import hash_password
 
@@ -109,6 +110,22 @@ def provision_tenant(db: Session, data: TenantProvision, created_by: int | None 
             menu_ids = [m.id for m in active_menus]
             mappings = [{"role_id": admin_role.id, "menu_id": mid} for mid in menu_ids]
             db.execute(insert(role_menus), mappings)
+            # Login and sidebar use RoleMenuPermission, not role_menus alone.
+            db.add_all(
+                [
+                    RoleMenuPermission(
+                        role_id=admin_role.id,
+                        tenant_id=new_tenant.id,
+                        menu_id=m.id,
+                        can_view=True,
+                        can_create=True,
+                        can_edit=True,
+                        can_delete=True,
+                        created_by=created_by,
+                    )
+                    for m in active_menus
+                ]
+            )
 
         admin_user = User(
             email=data.email.lower(),

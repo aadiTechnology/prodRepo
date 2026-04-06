@@ -81,6 +81,8 @@ def seed_rbac_data():
                 "name": "Reports", "level": 1, "icon": "reportsIcon", "sort_order": 6,
                 "children": [
                     {"name": "General Reports", "path": "/reports/general", "feature": "REPORTS_MGMT"},
+                    {"name": "Sprint Performance", "path": "/reports/sprint-performance", "feature": "REPORTS_MGMT"},
+                    {"name": "Sprintwise Performance", "path": "/reports/sprintwise-performance", "feature": "REPORTS_MGMT"},
                 ]
             },
             {
