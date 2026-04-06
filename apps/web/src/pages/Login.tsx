@@ -1,93 +1,133 @@
 /**
  * Login Page - User authentication interface
  * Handles email/password login with RBAC context integration
- * Includes form validation, error handling, and loading states
  */
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   Box,
-  Paper,
   Typography,
   Alert,
   Link as MuiLink,
   Grid,
-  Zoom,
   Fade,
 } from "@mui/material";
-import { TextField, Button, InputAdornment, IconButton, CircularProgress } from "../components/primitives";
+import { Button, CircularProgress } from "../components/primitives";
 import { EmailInput, PasswordInput } from "../components/semantic";
-import {
-  Email as EmailIcon,
-  Lock as LockIcon,
-  Visibility,
-  VisibilityOff,
-  Login as LoginIcon,
-  AccountCircle,
-  Dashboard as DashboardIcon,
-  Storage as StorageIcon,
-  Security as SecurityIcon,
-  People as PeopleIcon,
-  ArrowForward as ArrowForwardIcon,
-  Info as InfoIcon,
-} from "@mui/icons-material";
+import { Info as InfoIcon } from "@mui/icons-material";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 import { LoginRequest } from "../types/auth";
 
+// ── Design tokens ─────────────────────────────────────────────────────────
+const T = {
+  primary: "#1976d2",
+  primaryDark: "#1565c0",
+  error: "#d32f2f",
+  errorBg: "rgba(211, 47, 47, 0.04)",
+  textPrimary: "#0f172a",
+  textSecondary: "#64748b",
+  disabledBg: "#f1f5f9",
+  disabledText: "#94a3b8",
+  infoIcon: "#0288d1",
+  bgPage: "#ffffff",
+} as const;
 
+// ── Global Custom Animations ──────────────────────────────────────────────
+const globalAnimations = `
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-30px); filter: blur(4px); }
+    to   { opacity: 1; transform: translateX(0); filter: blur(0); }
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(93,202,165, 0.4); }
+    50% { opacity: 0.5; box-shadow: 0 0 0 6px rgba(93,202,165, 0); }
+  }
+  @keyframes orbFloat1 {
+    0% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(40px, -60px) scale(1.1); }
+    66% { transform: translate(-20px, 30px) scale(0.9); }
+    100% { transform: translate(0, 0) scale(1); }
+  }
+  @keyframes orbFloat2 {
+    0% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(-50px, 50px) scale(1.2); }
+    66% { transform: translate(30px, -20px) scale(0.8); }
+    100% { transform: translate(0, 0) scale(1); }
+  }
+`;
+
+// ── Right Side Product SVGs ───────────────────────────────────────────────
+const ErpSvg = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="#85B7EB" strokeWidth="1.8" strokeLinecap="round" style={{ width: 22, height: 22 }}>
+    <rect x="2" y="3" width="20" height="14" rx="2" />
+    <path d="M8 21h8M12 17v4" />
+    <path d="M7 8h4M7 11h2" />
+  </svg>
+);
+
+const LearningSvg = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="#5DCAA5" strokeWidth="1.8" strokeLinecap="round" style={{ width: 22, height: 22 }}>
+    <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" />
+    <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
+  </svg>
+);
+
+const CctvSvg = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="#FAC775" strokeWidth="1.8" strokeLinecap="round" style={{ width: 22, height: 22 }}>
+    <path d="M23 7l-7 5 7 5V7z" />
+    <rect x="1" y="5" width="15" height="14" rx="2" />
+  </svg>
+);
+
+const MobileSvg = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="#85B7EB" strokeWidth="1.8" strokeLinecap="round" style={{ width: 22, height: 22 }}>
+    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+    <line x1="12" y1="18" x2="12.01" y2="18" strokeWidth="2" />
+  </svg>
+);
+
+const MarketingSvg = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="#ED93B1" strokeWidth="1.8" strokeLinecap="round" style={{ width: 22, height: 22 }}>
+    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+  </svg>
+);
+
+// ── Component ────────────────────────────────────────────────────────────────
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { loginWithContext, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { loginWithContext, isAuthenticated } = useAuth();
   const { setRBACData } = useRBAC();
 
-  const [formData, setFormData] = useState<LoginRequest>({
-    email: "",
-    password: "",
-  });
+  const [formData, setFormData] = useState<LoginRequest>({ email: "", password: "" });
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      let from = "/";
       const statePath = (location.state as { from?: Location })?.from?.pathname;
-      if (statePath && statePath.startsWith("/") && !statePath.includes("http")) {
-        from = statePath;
-      }
+      const from = statePath && statePath.startsWith("/") && !statePath.includes("http") ? statePath : "/";
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, location]);
 
-  // Clear sensitive data on unmount for security
-  useEffect(() => {
-    return () => {
-      setFormData({ email: "", password: "" });
-      setErrors({});
-      setError(null);
-    };
-  }, []);
-
   const validate = (): boolean => {
     const newErrors: { email?: string; password?: string } = {};
-
-    // Email validation - stricter pattern and length check
     if (!formData.email.trim()) {
       newErrors.email = "Please enter Email Address.";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) || formData.email.length > 254) {
       newErrors.email = "Please enter a valid Email Address.";
     }
-
-    // Password validation
     if (!formData.password) {
       newErrors.password = "Please enter Password.";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -95,128 +135,102 @@ export default function Login() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear field errors as user types
-    if (errors[name as keyof typeof errors]) {
-      setErrors((prev) => ({ ...prev, [name]: undefined }));
-    }
+    if (errors[name as keyof typeof errors]) setErrors((prev) => ({ ...prev, [name]: undefined }));
     setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
     if (!validate()) return;
-
     setIsSubmitting(true);
-
     try {
-      // 1. Authenticate & Get Context (RBAC data included in response)
       const response = await loginWithContext(formData);
-
-      // 2. Set RBAC Data (Roles and Menus)
-      setRBACData({
-        roles: response.roles,
-        menus: response.menus,
-        permissions: response.permissions,
-      });
-
-      // 3. Navigation happens via useEffect or explicitly here
-      // Validate redirect pathname to prevent open redirect attacks
-      let from = "/";
-      const statePath = (location.state as { from?: Location })?.from?.pathname;
-      if (statePath && statePath.startsWith("/") && !statePath.includes("http")) {
-        from = statePath;
-      }
-      navigate(from, { replace: true });
-    } catch (err: any) {
-      // Generic error handling - do NOT leak account status information (prevents account enumeration attacks)
+      setRBACData({ roles: response.roles, menus: response.menus, permissions: response.permissions });
+    } catch {
       setError("Invalid credentials.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
-
-  // Button disabled until both fields filled
   const isButtonDisabled = !formData.email.trim() || !formData.password || isSubmitting;
-
-  // Don't render login form if already authenticated (while redirecting)
   if (isAuthenticated) return null;
 
-  const actionItems = [
-    {
-      icon: <DashboardIcon sx={{ color: "#ffffff" }} />,
-      title: "Platform Dashboard",
-      desc: "Monitor tenant health and system performance."
-    },
-    {
-      icon: <StorageIcon sx={{ color: "#ffffff" }} />,
-      title: "Resource Orchestration",
-      desc: "Manage intelligent cloud resource allocation."
-    },
-    {
-      icon: <SecurityIcon sx={{ color: "#ffffff" }} />,
-      title: "Security & Compliance",
-      desc: "Review logs and manage encryption protocols."
-    },
-    {
-      icon: <PeopleIcon sx={{ color: "#ffffff" }} />,
-      title: "Identity & RBAC",
-      desc: "Configure cross-tenant roles and permissions."
-    }
-  ];
-
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#ffffff" }}>
-      <Grid container>
-        {/* Left Side: Login Form */}
+    <Box sx={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", backgroundColor: T.bgPage }}>
+      <style>{globalAnimations}</style>
+      <Grid container sx={{ flex: 1, height: "100%" }}>
+
+        {/* ── LEFT: Login Form (Premium Translucent Context) ─────────────────────── */}
         <Grid
           item
           xs={12}
           md={6}
           sx={{
+            height: "100%",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            p: { xs: 4, md: 8, lg: 12 },
+            px: { xs: 4, md: 7, lg: 10 },
+            py: { xs: 4, md: 6 },
+            backgroundColor: "#ffffff", // Pure ultra-clean white
+            position: "relative",
+            zIndex: 2,
           }}
         >
-          <Box sx={{ maxWidth: 440, width: "100%" }}>
-            {/* Logo/Brand Section */}
-            <Box sx={{ mb: 4 }}>
+          {/* Subtle light orbs for the left side background to make it less stark */}
+          <Box sx={{ position: "absolute", top: "-10%", left: "-10%", width: "60%", height: "60%", background: "radial-gradient(circle, rgba(25,118,210,0.04) 0%, transparent 60%)", filter: "blur(60px)", zIndex: 0, pointerEvents: "none", animation: "orbFloat1 24s infinite ease-in-out" }} />
+          <Box sx={{ position: "absolute", bottom: "-10%", right: "-10%", width: "60%", height: "60%", background: "radial-gradient(circle, rgba(93,202,165,0.04) 0%, transparent 60%)", filter: "blur(60px)", zIndex: 0, pointerEvents: "none", animation: "orbFloat2 28s infinite ease-in-out" }} />
+
+          <Box sx={{ 
+            width: "100%", 
+            maxWidth: 480, // Matched closer to the right-side 520px to balance visual weight
+            animation: "fadeUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) both",
+            position: "relative",
+            zIndex: 1,
+          }}>
+            
+            {/* Brand */}
+            <Box sx={{ mb: 4, textAlign: "left" }}>
               <Box
                 component="img"
                 src="/aadi-logo.png"
-                alt="Aadi Logo"
-                sx={{ width: 120, height: "auto", mb: 2 }}
+                alt="Aadi Technology"
+                sx={{ height: 76, width: "auto", mb: 3.5, display: "block",  }}
               />
-              <Typography variant="subtitle2" sx={{ color: "#64748b", fontWeight: 700, mb: 1, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                Login Platform
+              <Typography
+                variant="h5"
+                sx={{
+                  fontWeight: 800,
+                  color: "#0a1532",
+                  mb: 1,
+                  letterSpacing: "-0.02em",
+                  lineHeight: 1.3,
+                  fontFamily: "'Sora', sans-serif"
+                }}
+              >
+                Sign in to your account
               </Typography>
-              <Typography variant="h3" sx={{ fontWeight: 800, color: "#0f172a", mb: 1.5, letterSpacing: "-0.02em" }}>
-                Welcome back
-              </Typography>
-              <Typography variant="body1" sx={{ color: "#64748b" }}>
-                Please enter your credentials to access the core platform.
+              <Typography variant="body1" sx={{ color: "#6b7a99", lineHeight: 1.6, fontWeight: 500 }}>
+                Enter your credentials to access the platform.
               </Typography>
             </Box>
 
+            {/* Error alert */}
             {error && (
               <Fade in>
                 <Alert
                   severity="error"
                   variant="outlined"
                   sx={{
-                    mb: 4,
-                    borderRadius: 1,
-                    borderColor: "#ef4444",
-                    backgroundColor: "rgba(239, 68, 68, 0.02)",
-                    color: "#b91c1c"
+                    mb: 3,
+                    borderRadius: 1.5,
+                    borderColor: T.error,
+                    backgroundColor: T.errorBg,
+                    color: T.error,
+                    "& .MuiAlert-icon": { color: T.error },
                   }}
                 >
                   {error}
@@ -224,14 +238,19 @@ export default function Login() {
               </Fade>
             )}
 
-            <Box component="form" onSubmit={handleSubmit} noValidate sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <Box>
-                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
-                  Email Address <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
-                </Typography>
+            {/* Form */}
+            <Box
+              component="form"
+              onSubmit={handleSubmit}
+              noValidate
+              sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
+            >
+              {/* Email */}
+              <Box sx={{ animation: "fadeUp 0.5s 0.1s ease both" }}>
                 <EmailInput
                   name="email"
-                  placeholder="Enter Your Email"
+                  placeholder="Enter your email"
+                  label="Email Address"
                   value={formData.email}
                   onChange={handleChange}
                   error={!!errors.email}
@@ -239,93 +258,31 @@ export default function Login() {
                   fullWidth
                   autoComplete="email"
                   autoFocus
-                  inputProps={{
-                    style: { 
-                      padding: "12px 16px",
-                    }
-                  }}
-                  InputProps={{
-                    sx: {
-                      borderRadius: "8px",
-                      backgroundColor: "#ffffff",
-                      height: "50px",
-                      transition: "all 0.2s",
-                      border: "1px solid #cbd5e1",
-                      boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-                      "& fieldset": { border: "none" },
-                      "&:hover": {
-                        borderColor: "#94a3b8",
-                      },
-                      "&.Mui-focused": { 
-                        borderColor: "#14b8a6", 
-                        boxShadow: "0 0 0 4px rgba(20, 184, 166, 0.1)",
-                      },
-                      "& input": { 
-                        color: "#0f172a",
-                        fontSize: "0.95rem",
-                      },
-                      "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus": {
-                        WebkitBoxShadow: "0 0 0 1000px #ffffff inset !important",
-                        WebkitTextFillColor: "#0f172a !important",
-                        transition: "background-color 5000s ease-in-out 0s",
-                      },
-                    }
-                  }}
+                  required
                 />
               </Box>
 
-              <Box>
-                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
-                  Password <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
-                </Typography>
+              {/* Password */}
+              <Box sx={{ animation: "fadeUp 0.5s 0.18s ease both" }}>
                 <PasswordInput
                   name="password"
-                  placeholder="Enter Your Password"
+                  placeholder="Enter your password"
+                  label="Password"
                   value={formData.password}
                   onChange={handleChange}
                   error={!!errors.password}
                   helperText={errors.password}
                   fullWidth
                   autoComplete="current-password"
-                  inputProps={{
-                    style: { 
-                      padding: "12px 16px",
-                    }
-                  }}
-                  InputProps={{
-                    sx: {
-                      borderRadius: "8px",
-                      backgroundColor: "#ffffff",
-                      height: "50px",
-                      transition: "all 0.2s",
-                      border: "1px solid #cbd5e1",
-                      boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-                      "& fieldset": { border: "none" },
-                      "&:hover": {
-                        borderColor: "#94a3b8",
-                      },
-                      "&.Mui-focused": { 
-                        borderColor: "#14b8a6", 
-                        boxShadow: "0 0 0 4px rgba(20, 184, 166, 0.1)",
-                      },
-                      "& input": { 
-                        color: "#0f172a",
-                        fontSize: "0.95rem",
-                      },
-                      "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus": {
-                        WebkitBoxShadow: "0 0 0 1000px #ffffff inset !important",
-                        WebkitTextFillColor: "#0f172a !important",
-                        transition: "background-color 5000s ease-in-out 0s",
-                      },
-                    }
-                  }}
+                  required
                 />
               </Box>
 
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <InfoIcon sx={{ fontSize: "1.2rem", color: "#3b82f6" }} />
-                  <Typography variant="body2" sx={{ color: "#1e293b", fontWeight: 600, fontSize: "0.875rem" }}>
+              {/* Info row */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", animation: "fadeUp 0.5s 0.25s ease both" }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                  <InfoIcon sx={{ fontSize: "1.1rem", color: T.infoIcon }} />
+                  <Typography variant="body2" sx={{ color: T.textPrimary, fontWeight: 500, fontSize: "0.82rem" }}>
                     Password is case-sensitive
                   </Typography>
                 </Box>
@@ -333,53 +290,66 @@ export default function Login() {
                   component={Link}
                   to="/forgot-password"
                   sx={{
-                    color: "#1e293b",
+                    color: T.primary,
                     textDecoration: "none",
                     fontWeight: 600,
-                    fontSize: "0.875rem",
-                    "&:hover": { color: "#14b8a6" }
+                    fontSize: "0.82rem",
+                    "&:hover": { color: T.primaryDark, textDecoration: "underline" },
                   }}
                 >
                   Forgot password?
                 </MuiLink>
               </Box>
 
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                disabled={isButtonDisabled}
-                sx={{
-                  mt: 0.5,
-                  height: "56px",
-                  borderRadius: 1.5,
-                  backgroundColor: "#0f172a",
-                  textTransform: "none",
-                  fontWeight: 700,
-                  fontSize: "1rem",
-                  "&:hover": {
-                    backgroundColor: "#1e293b",
-                  },
-                  "&.Mui-disabled": {
-                    backgroundColor: "#f1f5f9",
-                    color: "#94a3b8"
-                  }
-                }}
-              >
-                {isSubmitting ? <CircularProgress size={24} sx={{ color: "#ffffff" }} /> : "Log In"}
-              </Button>
+              {/* Submit */}
+              <Box sx={{ animation: "fadeUp 0.5s 0.3s ease both" }}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  fullWidth
+                  disabled={isButtonDisabled}
+                  sx={{
+                    mt: 1,
+                    height: "54px",
+                    borderRadius: "14px",
+                    background: "linear-gradient(135deg, #1976d2 0%, #115293 100%)",
+                    textTransform: "none",
+                    fontWeight: 800,
+                    fontSize: "1.05rem",
+                    letterSpacing: "0.01em",
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    boxShadow: "0 8px 24px rgba(25,118,210,0.25), inset 0 1px 0 rgba(255,255,255,0.15)",
+                    transition: "all 0.3s ease",
+                    "&:hover": {
+                      background: "linear-gradient(135deg, #1565c0 0%, #0a3375 100%)",
+                      boxShadow: "0 12px 32px rgba(25,118,210,0.35), inset 0 1px 0 rgba(255,255,255,0.1)",
+                      transform: "translateY(-2px)"
+                    },
+                    "&.Mui-disabled": {
+                      background: "rgba(25,118,210,0.4)",
+                      color: "rgba(255,255,255,0.6)",
+                      boxShadow: "none",
+                    },
+                  }}
+                >
+                  {isSubmitting
+                    ? <CircularProgress size={22} sx={{ color: "rgba(255,255,255,0.8)" }} />
+                    : "Sign In"}
+                </Button>
+              </Box>
 
-              <Box sx={{ mt: 1, textAlign: "center" }}>
-                <Typography variant="body2" sx={{ color: "#64748b" }}>
+              {/* Register link */}
+              <Box sx={{ textAlign: "center", animation: "fadeUp 0.5s 0.35s ease both" }}>
+                <Typography variant="body2" sx={{ color: T.textSecondary }}>
                   Don't have an account?{" "}
                   <MuiLink
                     component={Link}
                     to="/register"
                     sx={{
-                      color: "#14b8a6",
+                      color: T.primary,
                       textDecoration: "none",
                       fontWeight: 700,
-                      "&:hover": { textDecoration: "underline" }
+                      "&:hover": { textDecoration: "underline", color: T.primaryDark },
                     }}
                   >
                     Register
@@ -390,234 +360,169 @@ export default function Login() {
           </Box>
         </Grid>
 
-        {/* Right Side: Product Logo Showcase */}
+        {/* ── RIGHT: Product Suite (Premium SaaS Translucent Context) ─────────────── */}
         <Grid
           item
           xs={false}
           md={6}
           sx={{
-            position: "relative",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundImage: "url('/login-bg.jpg')",
             display: { xs: "none", md: "flex" },
             flexDirection: "column",
             justifyContent: "center",
-            alignItems: "center",
-            p: { md: 6, lg: 8 },
+            padding: { md: "40px 60px", lg: "40px 80px" },
+            height: "100%",
+            position: "relative",
             overflow: "hidden",
-            "&::before": {
-              content: '""',
-              position: "absolute",
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: "rgba(10, 18, 40, 0.72)",
-              backdropFilter: "blur(18px)",
-              zIndex: 1,
-            }
+            background: "#060b19", // Ultra deep premium space blue
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
           }}
         >
-          <Box sx={{ position: "relative", zIndex: 2, width: "100%", maxWidth: 460, mx: "auto" }}>
+          {/* Animated blurred orbs for premium translucent effect */}
+          <Box
+            sx={{
+              position: "absolute",
+              top: "-15%",
+              left: "-15%",
+              width: "60%",
+              height: "60%",
+              background: "radial-gradient(circle, rgba(25,118,210,0.35) 0%, transparent 60%)",
+              filter: "blur(80px)",
+              animation: "orbFloat1 20s infinite ease-in-out",
+              zIndex: 1,
+            }}
+          />
+          <Box
+            sx={{
+              position: "absolute",
+              bottom: "-15%",
+              right: "-10%",
+              width: "70%",
+              height: "70%",
+              background: "radial-gradient(circle, rgba(93,202,165,0.25) 0%, transparent 65%)",
+              filter: "blur(80px)",
+              animation: "orbFloat2 24s infinite ease-in-out",
+              zIndex: 1,
+            }}
+          />
 
-            {/* Header label */}
-            <Typography sx={{
-              color: "rgba(255,255,255,0.4)",
-              fontSize: "0.65rem",
-              fontWeight: 700,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              textAlign: "center",
-              mb: 2,
-            }}>
-              Our Product Suite
+          <Box sx={{ position: "relative", zIndex: 2, maxWidth: 520, mx: "auto", width: "100%" }}>
+            
+            <Typography
+              variant="h3"
+              sx={{
+                fontWeight: 800,
+                color: "#ffffff",
+                lineHeight: 1.25,
+                mb: 1.5,
+                animation: "fadeUp 0.8s 0.1s cubic-bezier(0.4, 0, 0.2, 1) both",
+                fontFamily: "'Sora', sans-serif",
+                fontSize: { md: "2rem", lg: "2.4rem" },
+                letterSpacing: "-0.03em",
+              }}
+            >
+              One platform.<br />Total campus control.
+            </Typography>
+            <Typography
+              variant="body1"
+              sx={{
+                color: "rgba(255,255,255,0.65)",
+                mb: 5,
+                animation: "fadeUp 0.8s 0.2s cubic-bezier(0.4, 0, 0.2, 1) both",
+                fontSize: "1.05rem",
+                fontWeight: 500,
+              }}
+            >
+              Trusted by 500+ schools across Maharashtra.
             </Typography>
 
-            {/* ── ERP Management ── */}
-            <Box sx={{
-              display: "flex", alignItems: "center", gap: 2,
-              px: 2.5, py: 1.8, mb: 1.5, borderRadius: 2,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              backdropFilter: "blur(10px)",
-              transition: "all 0.25s ease", cursor: "pointer",
-              "&:hover": { background: "rgba(255,255,255,0.11)", borderColor: "rgba(30,90,200,0.5)", transform: "translateY(-2px)", boxShadow: "0 8px 28px rgba(0,0,0,0.25)" }
-            }}>
-              <Box sx={{ flexShrink: 0, width: 48, height: 48 }}>
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="24" cy="24" r="22" fill="rgba(21,101,192,0.15)" stroke="#1565c0" strokeWidth="1.5" />
-                  {/* Gear teeth */}
-                  <path d="M24 6 L26 2 L28 2 L30 6 L34 7 L37 4 L39 6 L37 10 L38 14 L42 15 L42 17 L42 19 L38 20 L37 24 L39 28 L37 30 L34 27 L30 28 L28 32 L26 32 L24 32 L22 28 L18 27 L15 30 L13 28 L15 24 L14 20 L10 19 L10 17 L10 15 L14 14 L15 10 L13 6 L15 4 L18 7 L22 6 Z" fill="rgba(21,101,192,0.25)" stroke="#1e88e5" strokeWidth="1" strokeLinejoin="round" />
-                  <circle cx="24" cy="17" r="5.5" fill="rgba(21,101,192,0.3)" stroke="#42a5f5" strokeWidth="1.5" />
-                  <path d="M27 14 A4 4 0 1 0 27 20" stroke="#90caf9" strokeWidth="2" strokeLinecap="round" fill="none" />
-                  <rect x="8" y="32" width="32" height="11" rx="3" fill="rgba(21,101,192,0.25)" stroke="#1565c0" strokeWidth="1" />
-                  <text x="24" y="41" textAnchor="middle" fill="#90caf9" fontSize="7.5" fontWeight="bold" fontFamily="Arial, sans-serif">ERP</text>
-                </svg>
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
-                  <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: "1.05rem", lineHeight: 1 }}>ERP</Typography>
-                  <Typography sx={{ color: "#90caf9", fontWeight: 700, fontSize: "0.95rem", lineHeight: 1 }}>Management</Typography>
+            {/* Feature Cards Sequence */}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2.2 }}>
+              {[
+                { name: "ERP Management", desc: "Fees, payroll, inventory & HR — unified.", icon: <ErpSvg />, bg: "rgba(25,118,210,0.2)", dot: true, tag: "Live", delay: "0.25s" },
+                { name: "Learning Platform", desc: "Assignments, tests & live classes in one place.", icon: <LearningSvg />, bg: "rgba(93,202,165,0.15)", dot: true, tag: "Live", delay: "0.35s" },
+                { name: "CCTV Security", desc: "Live campus feeds, motion alerts & recordings.", icon: <CctvSvg />, bg: "rgba(239,159,39,0.15)", dot: false, tag: "New", delay: "0.45s" },
+                { name: "Mobile Apps", desc: "Parent & student apps for Android and iOS.", icon: <MobileSvg />, bg: "rgba(133,183,235,0.15)", dot: true, tag: "Live", delay: "0.55s" },
+                { name: "Digital Marketing", desc: "Admission campaigns, SEO & social outreach.", icon: <MarketingSvg />, bg: "rgba(212,83,126,0.15)", dot: false, tag: "New", delay: "0.65s" },
+              ].map((item: any, i: number) => (
+                <Box
+                  key={i}
+                  sx={{
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    borderRadius: "16px",
+                    padding: "16px 22px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2.5,
+                    backdropFilter: "blur(24px)",
+                    WebkitBackdropFilter: "blur(24px)",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                    transition: "all 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+                    cursor: "pointer",
+                    animation: `slideIn 0.7s ${item.delay} cubic-bezier(0.4, 0, 0.2, 1) both`,
+                    "&:hover": {
+                      background: "rgba(255,255,255,0.06)",
+                      borderColor: "rgba(25,118,210,0.5)",
+                      transform: "translateX(8px) scale(1.01)",
+                      boxShadow: "0 16px 48px rgba(0,0,0,0.25)",
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: "12px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      background: item.bg,
+                      boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.1)",
+                    }}
+                  >
+                    {item.icon}
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography sx={{ fontSize: "1rem", fontWeight: 700, color: "#fff", mb: 0.25, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      {item.name}
+                    </Typography>
+                    <Typography sx={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.55)", lineHeight: 1.4, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      {item.desc}
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      padding: "4px 12px",
+                      borderRadius: "20px",
+                      flexShrink: 0,
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      background: item.tag === "Live" ? "rgba(15,110,86,0.25)" : "rgba(25,118,210,0.2)",
+                      color: item.tag === "Live" ? "#5DCAA5" : "#85B7EB",
+                      border: `1px solid ${item.tag === "Live" ? "rgba(93,202,165,0.4)" : "rgba(133,183,235,0.4)"}`,
+                      boxShadow: item.tag === "Live" ? "0 0 12px rgba(93,202,165,0.1)" : "0 0 12px rgba(133,183,235,0.1)",
+                    }}
+                  >
+                    {item.dot && (
+                      <Box component="span" sx={{ width: 6, height: 6, backgroundColor: "#5DCAA5", borderRadius: "50%", display: "inline-block", mr: 1, animation: "pulseDot 2s infinite" }} />
+                    )}
+                    {item.tag}
+                  </Box>
                 </Box>
-                <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", mt: 0.4 }}>Enterprise Resource Planning</Typography>
-              </Box>
-              <ArrowForwardIcon sx={{ color: "rgba(255,255,255,0.2)", fontSize: "0.9rem", flexShrink: 0 }} />
+              ))}
             </Box>
 
-            {/* ── Learning Platform ── */}
-            <Box sx={{
-              display: "flex", alignItems: "center", gap: 2,
-              px: 2.5, py: 1.8, mb: 1.5, borderRadius: 2,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              backdropFilter: "blur(10px)",
-              transition: "all 0.25s ease", cursor: "pointer",
-              "&:hover": { background: "rgba(255,255,255,0.11)", borderColor: "rgba(33,150,243,0.5)", transform: "translateY(-2px)", boxShadow: "0 8px 28px rgba(0,0,0,0.25)" }
-            }}>
-              <Box sx={{ flexShrink: 0, width: 48, height: 48 }}>
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="24" cy="24" r="22" fill="rgba(25,118,210,0.12)" stroke="#1976d2" strokeWidth="1.5" />
-                  {/* Graduation cap */}
-                  <polygon points="24,8 36,14 24,20 12,14" fill="#1976d2" />
-                  <rect x="22" y="14" width="4" height="5" rx="0.8" fill="#42a5f5" fillOpacity="0.9" />
-                  <circle cx="36" cy="14" r="1.5" fill="#42a5f5" />
-                  <line x1="36" y1="14" x2="36" y2="20" stroke="#42a5f5" strokeWidth="1.5" strokeLinecap="round" />
-                  <line x1="34" y1="20" x2="38" y2="20" stroke="#42a5f5" strokeWidth="1.5" strokeLinecap="round" />
-                  {/* Open book */}
-                  <path d="M9 26 Q9 40 24 42 Q39 40 39 26 L39 24 Q39 24 24 26 Q9 24 9 24 Z" fill="#1976d2" fillOpacity="0.2" stroke="#1976d2" strokeWidth="1.3" />
-                  <line x1="24" y1="26" x2="24" y2="42" stroke="#1976d2" strokeWidth="1.2" strokeDasharray="2 2" />
-                  <line x1="12" y1="30" x2="21" y2="29" stroke="#90caf9" strokeWidth="1" strokeLinecap="round" />
-                  <line x1="12" y1="33" x2="21" y2="32" stroke="#90caf9" strokeWidth="1" strokeLinecap="round" />
-                  <line x1="27" y1="29" x2="36" y2="30" stroke="#90caf9" strokeWidth="1" strokeLinecap="round" />
-                  <line x1="27" y1="32" x2="36" y2="33" stroke="#90caf9" strokeWidth="1" strokeLinecap="round" />
-                </svg>
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
-                  <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: "1.05rem", lineHeight: 1 }}>Learning</Typography>
-                  <Typography sx={{ color: "#42a5f5", fontWeight: 700, fontSize: "0.95rem", lineHeight: 1 }}>Platform</Typography>
-                </Box>
-                <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", mt: 0.4 }}>Smart Education Management</Typography>
-              </Box>
-              <ArrowForwardIcon sx={{ color: "rgba(255,255,255,0.2)", fontSize: "0.9rem", flexShrink: 0 }} />
+            {/* Pagination dots */}
+            <Box sx={{ display: "flex", gap: 1.5, mt: 5, animation: "fadeUp 0.8s 0.8s cubic-bezier(0.4, 0, 0.2, 1) both" }}>
+              <Box sx={{ width: 28, height: 6, borderRadius: 2, background: T.primary, boxShadow: "0 0 12px rgba(25,118,210,0.4)" }} />
+              <Box sx={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.2)", transition: "0.3s", "&:hover": { background: "rgba(255,255,255,0.5)" } }} />
+              <Box sx={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.2)", transition: "0.3s", "&:hover": { background: "rgba(255,255,255,0.5)" } }} />
             </Box>
-
-            {/* ── CCTV Security ── */}
-            <Box sx={{
-              display: "flex", alignItems: "center", gap: 2,
-              px: 2.5, py: 1.8, mb: 1.5, borderRadius: 2,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              backdropFilter: "blur(10px)",
-              transition: "all 0.25s ease", cursor: "pointer",
-              "&:hover": { background: "rgba(255,255,255,0.11)", borderColor: "rgba(13,71,161,0.6)", transform: "translateY(-2px)", boxShadow: "0 8px 28px rgba(0,0,0,0.25)" }
-            }}>
-              <Box sx={{ flexShrink: 0, width: 48, height: 48 }}>
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* Shield */}
-                  <path d="M24 4 L40 10 L40 26 C40 35 24 44 24 44 C24 44 8 35 8 26 L8 10 Z" fill="rgba(13,71,161,0.25)" stroke="#1565c0" strokeWidth="2" strokeLinejoin="round" />
-                  <path d="M24 8 L36 13 L36 26 C36 33 24 40 24 40 C24 40 12 33 12 26 L12 13 Z" fill="rgba(21,101,192,0.15)" stroke="#42a5f5" strokeWidth="1" strokeLinejoin="round" />
-                  {/* Camera body */}
-                  <rect x="14" y="19" width="16" height="10" rx="3" fill="#1565c0" fillOpacity="0.8" stroke="#64b5f6" strokeWidth="1" />
-                  {/* Camera lens */}
-                  <circle cx="22" cy="24" r="4" fill="rgba(100,181,246,0.3)" stroke="#90caf9" strokeWidth="1.5" />
-                  <circle cx="22" cy="24" r="2" fill="#42a5f5" fillOpacity="0.7" />
-                  {/* Camera tail */}
-                  <path d="M30 21 L36 18 L36 30 L30 27 Z" fill="#1565c0" fillOpacity="0.7" stroke="#64b5f6" strokeWidth="0.8" />
-                </svg>
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
-                  <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: "1.05rem", lineHeight: 1 }}>CCTV</Typography>
-                  <Typography sx={{ color: "#64b5f6", fontWeight: 700, fontSize: "0.95rem", lineHeight: 1 }}>Security</Typography>
-                </Box>
-                <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", mt: 0.4 }}>Surveillance & Access Control</Typography>
-              </Box>
-              <ArrowForwardIcon sx={{ color: "rgba(255,255,255,0.2)", fontSize: "0.9rem", flexShrink: 0 }} />
-            </Box>
-
-            {/* ── Mobile App ── */}
-            <Box sx={{
-              display: "flex", alignItems: "center", gap: 2,
-              px: 2.5, py: 1.8, mb: 1.5, borderRadius: 2,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              backdropFilter: "blur(10px)",
-              transition: "all 0.25s ease", cursor: "pointer",
-              "&:hover": { background: "rgba(255,255,255,0.11)", borderColor: "rgba(56,142,60,0.5)", transform: "translateY(-2px)", boxShadow: "0 8px 28px rgba(0,0,0,0.25)" }
-            }}>
-              <Box sx={{ flexShrink: 0, width: 48, height: 48 }}>
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* Phone body */}
-                  <rect x="13" y="4" width="22" height="36" rx="4" fill="rgba(56,142,60,0.15)" stroke="#388e3c" strokeWidth="1.8" />
-                  <rect x="16" y="8" width="16" height="22" rx="2" fill="rgba(76,175,80,0.2)" stroke="#66bb6a" strokeWidth="1" />
-                  {/* Screen content lines */}
-                  <rect x="18" y="11" width="12" height="2" rx="1" fill="#81c784" fillOpacity="0.8" />
-                  <rect x="18" y="15" width="12" height="2" rx="1" fill="#81c784" fillOpacity="0.6" />
-                  <rect x="18" y="19" width="7" height="5" rx="1" fill="#66bb6a" fillOpacity="0.5" />
-                  <rect x="27" y="19" width="3" height="5" rx="1" fill="#66bb6a" fillOpacity="0.4" />
-                  {/* Home button */}
-                  <circle cx="24" cy="36" r="2" fill="#388e3c" fillOpacity="0.6" stroke="#66bb6a" strokeWidth="1" />
-                  {/* Swirl arrow */}
-                  <path d="M8 36 Q4 28 10 22 Q16 16 20 20" stroke="#43a047" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-                  <polygon points="19,17 22,22 16,21" fill="#43a047" />
-                  {/* Green dot accent */}
-                  <rect x="22" y="6" width="4" height="1.5" rx="0.75" fill="#66bb6a" />
-                </svg>
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
-                  <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: "1.05rem", lineHeight: 1 }}>Mobile</Typography>
-                  <Typography sx={{ color: "#81c784", fontWeight: 700, fontSize: "0.95rem", lineHeight: 1 }}>Apps</Typography>
-                </Box>
-                <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", mt: 0.4 }}>Cross-Platform App Development</Typography>
-              </Box>
-              <ArrowForwardIcon sx={{ color: "rgba(255,255,255,0.2)", fontSize: "0.9rem", flexShrink: 0 }} />
-            </Box>
-
-            {/* ── Digital Marketing ── */}
-            <Box sx={{
-              display: "flex", alignItems: "center", gap: 2,
-              px: 2.5, py: 1.8, borderRadius: 2,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              backdropFilter: "blur(10px)",
-              transition: "all 0.25s ease", cursor: "pointer",
-              "&:hover": { background: "rgba(255,255,255,0.11)", borderColor: "rgba(46,125,50,0.5)", transform: "translateY(-2px)", boxShadow: "0 8px 28px rgba(0,0,0,0.25)" }
-            }}>
-              <Box sx={{ flexShrink: 0, width: 48, height: 48 }}>
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* Megaphone body */}
-                  <path d="M8 18 L8 30 L14 30 L30 38 L30 10 L14 18 Z" fill="rgba(46,125,50,0.25)" stroke="#388e3c" strokeWidth="1.8" strokeLinejoin="round" />
-                  <rect x="8" y="18" width="6" height="12" rx="1" fill="rgba(76,175,80,0.3)" stroke="#66bb6a" strokeWidth="1" />
-                  {/* Sound waves */}
-                  <path d="M34 16 Q38 20 38 24 Q38 28 34 32" stroke="#43a047" strokeWidth="2" strokeLinecap="round" fill="none" />
-                  <path d="M36 13 Q42 18 42 24 Q42 30 36 35" stroke="#66bb6a" strokeWidth="1.5" strokeLinecap="round" fill="none" strokeOpacity="0.6" />
-                  {/* Swirl arrow at bottom */}
-                  <path d="M10 36 Q14 44 22 42 Q28 40 28 36" stroke="#43a047" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-                  <polygon points="28,32 30,37 24,36" fill="#43a047" />
-                  {/* Light rays */}
-                  <line x1="33" y1="10" x2="36" y2="7" stroke="#81c784" strokeWidth="1.5" strokeLinecap="round" />
-                  <line x1="37" y1="14" x2="41" y2="12" stroke="#81c784" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
-                  <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: "1.05rem", lineHeight: 1 }}>Digital</Typography>
-                  <Typography sx={{ color: "#81c784", fontWeight: 700, fontSize: "0.95rem", lineHeight: 1 }}>Marketing</Typography>
-                </Box>
-                <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", mt: 0.4 }}>SEO · Social · Growth Strategy</Typography>
-              </Box>
-              <ArrowForwardIcon sx={{ color: "rgba(255,255,255,0.2)", fontSize: "0.9rem", flexShrink: 0 }} />
-            </Box>
-
-            {/* Footer */}
-            <Typography sx={{ mt: 2, textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: "0.62rem", letterSpacing: "0.08em" }}>
-              One platform · Five powerful solutions
-            </Typography>
-
           </Box>
         </Grid>
       </Grid>
     </Box>
   );
 }
-//

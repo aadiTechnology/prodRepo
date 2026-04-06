@@ -118,7 +118,7 @@ const AddAcademicYear = () => {
         await academicYearService.create(payload);
         setSnackbar("Academic Year created successfully.");
       }
-      setTimeout(() => navigate("/academic-years"), 1000);
+      navigate("/academic-years");
     } catch (err: unknown) {
       const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
       if (apiFieldErrors) {

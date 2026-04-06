@@ -14,7 +14,7 @@ export interface PasswordInputProps extends Omit<TextFieldProps, "type"> {
 }
 
 export default function PasswordInput({
-  label = "Password",
+  label,
   placeholder = "Enter password",
   name = "password",
   fullWidth = true,

@@ -35,6 +35,12 @@ export default function TextField({ sx, label, required, ...props }: TextFieldPr
               WebkitTextFillColor: theme.palette.grey[600],
               bgcolor: theme.palette.background.paper ,
             },
+            // Fix Chrome autofill background mismatch with Input Adornments (Eye Icon)
+            "& input:-webkit-autofill": {
+              WebkitBoxShadow: `0 0 0 1000px ${theme.palette.background.paper} inset !important`,
+              WebkitTextFillColor: `${theme.palette.text.primary} !important`,
+              backgroundClip: "content-box",
+            },
           },
           "& .MuiFormLabel-asterisk": {
             color: theme.palette.error.main,

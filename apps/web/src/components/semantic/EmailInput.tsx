@@ -7,7 +7,7 @@ export interface EmailInputProps extends Omit<TextFieldProps, "type"> {
 
 export default function EmailInput({
   type = "email",
-  label = "Email Address",
+  label,
   placeholder = "Enter email address",
   name = "email",
   fullWidth = true,
