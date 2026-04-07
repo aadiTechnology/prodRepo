@@ -1,28 +1,14 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-    Box,
-    Typography,
-    Alert,
-    CircularProgress,
-    Snackbar,
-    IconButton,
-    Tooltip,
-} from "@mui/material";
+import { useState, useEffect, useCallback } from "react";
+import { Alert, Snackbar } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import {
-    Edit as EditIcon,
-    Delete as DeleteIcon,
-} from "@mui/icons-material";
 import feeDiscountService from "../../api/services/feeDiscountService";
-import { useAuth } from "../../context/AuthContext";
-import { enqueueSnackbar } from "notistack";
 import {
-    ListPageLayout,
-    ListPageToolbar,
-    DirectoryInfoBar,
-    DataTable,
-    TableRowActions,
-    TablePaginationBar
+  ListPageLayout,
+  ListPageToolbar,
+  DirectoryInfoBar,
+  DataTable,
+  TableRowActions,
+  TablePaginationBar,
 } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
 import StatusChip from "../../components/roles/StatusChip";
@@ -41,7 +27,7 @@ export interface FeeDiscount {
 
 const FeeDiscountList = () => {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    // Removed unused user variable
     const [discounts, setDiscounts] = useState<FeeDiscount[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -99,13 +85,14 @@ const FeeDiscountList = () => {
             fetchDiscounts();
         } catch (err: any) {
             setError(err?.message || "Unable to delete discount. Please try again.");
+            setConfirmDialogOpen(false); // Close dialog on error for better UX
         } finally {
             setDeleteLoading(false);
         }
     };
 
-    // Table columns
-    const columns = [
+    // Table columns config extracted for reusability
+    const getFeeDiscountColumns = () => ([
         { id: "discount_name", label: "Discount Name" },
         { id: "discount_type", label: "Type" },
         {
@@ -125,7 +112,8 @@ const FeeDiscountList = () => {
                 <StatusChip status={row.status ? "ACTIVE" : "INACTIVE"} />
             ),
         },
-    ];
+    ]);
+    const columns = getFeeDiscountColumns();
 
     // Calculate range for DirectoryInfoBar
     const rangeStart = totalDiscounts > 0 ? Math.min(page * rowsPerPage + 1, totalDiscounts) : 0;
@@ -139,13 +127,8 @@ const FeeDiscountList = () => {
                         links={[{ title: "Fee Discounts", path: "#" }]}
                         homePath="/"
                         actions={
-                            <ListPageToolbar
-                                searchValue={search}
-                                onSearchChange={setSearch}
-                                searchPlaceholder="Search discounts by name"
-                                onAddClick={() => { /* open create modal */ }}
-                                addLabel="Create Discount"
-                            />
+                            // Hide add button until implemented
+                            null
                         }
                     />
                     {error && (
@@ -158,15 +141,15 @@ const FeeDiscountList = () => {
         >
             {!loading && totalDiscounts > 0 && (
                 <DirectoryInfoBar
-                    label="Tenant Scope"
+                    label="Discounts"
                     rangeStart={rangeStart}
                     rangeEnd={rangeEnd}
                     total={totalDiscounts}
                 />
             )}
-            <DataTable<FeeDiscount & Record<string, unknown>>
+            <DataTable<FeeDiscount>
                 columns={columns}
-                data={discounts as (FeeDiscount & Record<string, unknown>)[]}
+                data={discounts}
                 loading={loading}
                 emptyMessage="No discounts available."
                 renderRowActions={(row) => (
@@ -193,10 +176,17 @@ const FeeDiscountList = () => {
             <ConfirmDialog
                 open={confirmDialogOpen}
                 title="Delete Discount"
-                message={`Are you sure you want to delete the discount ${discountToDelete?.discount_name}?`}
+                message={
+                    error && confirmDialogOpen
+                        ? error
+                        : `Are you sure you want to delete the discount ${discountToDelete?.discount_name}?`
+                }
                 confirmText={deleteLoading ? "Deleting..." : "Delete"}
                 onConfirm={handleConfirmDelete}
-                onCancel={() => setConfirmDialogOpen(false)}
+                onCancel={() => {
+                    setConfirmDialogOpen(false);
+                    setError(null);
+                }}
                 loading={deleteLoading}
             />
             <Snackbar
