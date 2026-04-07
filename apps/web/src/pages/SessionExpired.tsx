@@ -107,17 +107,7 @@ const SessionExpired: React.FC = () => {
                                 mb: 2,
                             }}
                         />
-                        <Typography
-                            variant="subtitle1"
-                            sx={{
-                                fontWeight: 700,
-                                color: "#4a5568",
-                                fontSize: "1rem",
-                                mb: 0.5,
-                            }}
-                        >
-                            Information Technologies
-                        </Typography>
+                        {/* ...removed 'Information Technologies' as requested... */}
                         <Typography
                             variant="body2"
                             sx={{
