@@ -9,6 +9,7 @@ import { Add as AddIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout, ListPageToolbar, EntityTableSection } from "../../components/reusable";
+import TableRowActions from "../../components/reusable/TableRowActions";
 import { type AcademicYear } from "../../api/services/academicYearService";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { useAcademicYearListController } from "../../hooks/useAcademicYearListController";
@@ -44,8 +45,9 @@ const AcademicYearList = () => {
         />
       }
     >
+
       {controller.error && (
-        <Alert severity="error" sx={{ m: 2 }} onClose={() => controller.setError?.(null)}>
+        <Alert severity="error" sx={{ m: 2 }} onClose={() => controller.setError(null)}>
           {controller.error}
         </Alert>
       )}
@@ -61,7 +63,10 @@ const AcademicYearList = () => {
         data={controller.data}
         loading={controller.loading}
         emptyMessage={listConfig.uiPolicy.emptyMessage}
-        rowActions={listConfig.actions.rowActions}
+        renderRowActions={(row) => {
+          const actions = listConfig.actions.rowActions(row);
+          return actions ? <TableRowActions {...actions} /> : null;
+        }}
         stickyHeader
         size="small"
       />
