@@ -25,6 +25,7 @@ def seed_rbac_data():
             {"code": "STAFF_MGMT", "name": "Staff Management", "category": "HR"},
             {"code": "REPORTS_MGMT", "name": "Reports Management", "category": "Reports"},
             {"code": "SYSTEM_CONFIG", "name": "System Configuration", "category": "System"},
+            {"code": "SPRINT_MGMT", "name": "Sprint Management", "category": "System"},
         ]
         
         feature_map = {}
@@ -90,6 +91,7 @@ def seed_rbac_data():
                 "children": [
                     {"name": "Theme Studio", "path": "/admin/theme-studio", "feature": "SYSTEM_CONFIG"},
                     {"name": "Permission Mapping", "path": "/roles/permissions", "feature": "SYSTEM_CONFIG"},
+                    {"name": "Sprints", "path": "/sprints", "feature": "SPRINT_MGMT"},
                 ]
             }
         ]
