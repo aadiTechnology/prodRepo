@@ -1,17 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-    Box,
-    Typography,
-    Alert,
-    CircularProgress,
-    Snackbar,
-    IconButton,
-    Tooltip,
-} from "@mui/material";
+import { Alert, Snackbar } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import {
-    Edit as EditIcon,
-} from "@mui/icons-material";
 import { classFeeStructureAssignmentService } from "../../api/services/classFeeStructureAssignmentService";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -25,14 +14,19 @@ import {
 import { PageHeader } from "../../components/layout";
 import StatusChip from "../../components/roles/StatusChip";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
-import AssignmentModal from "./AssignmentModal";
 import { ClassFeeStructureAssignment } from "../../api/services/classFeeStructureAssignmentService";
 import { classService, academicYearService, feeStructureService } from "../../api/services/dropdownServices";
+ // Removed unused AssignmentModal import
 
 const ClassFeeStructureAssignmentList = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
-    const [assignments, setAssignments] = useState<ClassFeeStructureAssignment[]>([]);
+    interface MappedAssignment extends ClassFeeStructureAssignment {
+        class_name: string;
+        fee_structure_name: string;
+        academic_year: string;
+    }
+    const [assignments, setAssignments] = useState<MappedAssignment[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [search, setSearch] = useState("");
@@ -48,23 +42,36 @@ const ClassFeeStructureAssignmentList = () => {
     // Always show newest fee structure assignments first (by fee_structure_id)
 
     // State for dropdown data
-    const [classList, setClassList] = useState<any[]>([]);
-    const [academicYearList, setAcademicYearList] = useState<any[]>([]);
-    const [feeStructureList, setFeeStructureList] = useState<any[]>([]);
+    const [classList, setClassList] = useState<DropdownItem[]>([]);
+    const [academicYearList, setAcademicYearList] = useState<DropdownItem[]>([]);
+    const [feeStructureList, setFeeStructureList] = useState<FeeStructureDropdownItem[]>([]);
 
     // Fetch dropdown data
     useEffect(() => {
         async function fetchDropdowns() {
             try {
-                const [classRes, yearRes, feeRes] = await Promise.all([
+                const [classRes, yearRes] = await Promise.all([
                     classService.list(),
                     academicYearService.list(),
-                    feeStructureService.list(),
                 ]);
                 setClassList(classRes.data || classRes || []);
                 setAcademicYearList(yearRes.data || yearRes || []);
+                // For initial load, use the first academic year and class if available, and a dummy tenantId (or get from user context)
+                const academicYear = (yearRes.data?.[0]?.id || yearRes?.[0]?.id || "");
+                const classId = (classRes.data?.[0]?.id || classRes?.[0]?.id || "");
+                // Use tenantId from user context, show error if missing
+                const tenantId = user?.tenant_id;
+                if (!tenantId) {
+                    setError("Tenant ID is required to load fee structures.");
+                    setFeeStructureList([]);
+                    return;
+                }
+                let feeList = [];
+                if (academicYear && classId && tenantId) {
+                    const feeRes = await feeStructureService.list({ academicYear, classId, tenantId });
+                    feeList = feeRes.data || feeRes || [];
+                }
                 // Sort fee structures by id descending (newest first)
-                const feeList = feeRes.data || feeRes || [];
                 feeList.sort(function(a: any, b: any) { return (b.id || 0) - (a.id || 0); });
                 setFeeStructureList(feeList);
             } catch (err) {
@@ -79,9 +86,23 @@ const ClassFeeStructureAssignmentList = () => {
         const found = classList.find(c => c.id === id);
         return found ? found.name : `Class ${id}`;
     };
+    // Define interfaces for dropdowns
+    interface DropdownItem {
+        id: number | string;
+        name: string;
+        [key: string]: any;
+    }
+    interface FeeStructureDropdownItem extends DropdownItem {
+        fee_category_id?: string;
+        fee_structure_name?: string;
+    }
     const getFeeStructureName = (id: number | string) => {
         const found = feeStructureList.find(f => f.id == id);
-        return found ? found.fee_category_id : '';
+        // Prefer a descriptive name if available
+        if (found) {
+            return found.fee_structure_name || found.name || found.fee_category_id || id;
+        }
+        return id;
     };
     const getAcademicYearName = (value: number | string | { id?: number | string; name?: string }) => {
         // Try to match by id (number or string, loose equality)
@@ -101,7 +122,7 @@ const ClassFeeStructureAssignmentList = () => {
                 limit: rowsPerPage,
             });
             // Only map if dropdowns are loaded
-            let mapped = data.items.map((item: any) => {
+            let mapped: MappedAssignment[] = data.items.map((item: any) => {
                 // Try all possible keys for academic year
                 const classId = item.class_id ?? item.classId;
                 const feeId = item.fee_structure_id ?? item.feeStructureId;
@@ -234,9 +255,9 @@ const ClassFeeStructureAssignmentList = () => {
                     total={totalAssignments}
                 />
             )}
-            <DataTable<ClassFeeStructureAssignment & Record<string, unknown>>
+            <DataTable<MappedAssignment>
                 columns={assignmentColumns}
-                data={assignments as (ClassFeeStructureAssignment & Record<string, unknown>)[]}
+                data={assignments}
                 loading={loading}
                 emptyMessage="No assignments available."
                 stickyHeader
