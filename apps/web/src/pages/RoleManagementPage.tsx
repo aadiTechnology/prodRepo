@@ -18,12 +18,13 @@ import { type Role } from "../types/role.types";
 const RoleManagementPage = () => {
   const navigate = useNavigate();
   const { hasPermission } = useRBAC();
+
+  // Restore permission logic and config creation to component
   const canCreateRole = hasPermission("ADMIN_MGMT:create");
   const canEditRole = hasPermission("ADMIN_MGMT:edit");
   const canDeleteRole = hasPermission("ADMIN_MGMT:delete");
 
   const controller = useRolesListController();
-  
   const listConfig = createRoleListConfig({
     navigate,
     onDeleteClick: controller.handleDeleteClick,
@@ -40,20 +41,22 @@ const RoleManagementPage = () => {
           links={[{ title: "Role Management", path: "#" }]}
           homePath="/"
           actions={
-            <ListPageToolbar
-              searchValue={controller.search}
-              onSearchChange={controller.setSearch}
-              searchPlaceholder="Search roles..."
-              onAddClick={canCreateRole ? () => navigate("/roles/create") : undefined}
-              addLabel={canCreateRole ? "Add Role" : undefined}
-              addIcon={canCreateRole ? <AddIcon sx={{ fontSize: 24 }} /> : undefined}
-            />
+            canCreateRole ? (
+              <ListPageToolbar
+                searchValue={controller.search}
+                onSearchChange={controller.setSearch}
+                searchPlaceholder="Search roles..."
+                onAddClick={() => navigate("/roles/create")}
+                addLabel="Add Role"
+                addIcon={<AddIcon sx={{ fontSize: 24 }} />}
+              />
+            ) : null
           }
         />
       }
     >
       {controller.error && (
-        <Alert severity="error" sx={{ m: 2 }} onClose={() => controller.setError?.(null)}>
+        <Alert severity="error" sx={{ m: 2 }} onClose={() => controller.setError(null)}>
           {controller.error}
         </Alert>
       )}
@@ -85,7 +88,7 @@ const RoleManagementPage = () => {
       />
 
       <Snackbar
-        open={!!controller.snackbar}
+        open={Boolean(controller.snackbar && controller.snackbar.length > 0)}
         autoHideDuration={3000}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
         onClose={() => controller.setSnackbar(null)}
