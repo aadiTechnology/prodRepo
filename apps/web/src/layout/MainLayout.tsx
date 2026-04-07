@@ -144,7 +144,7 @@ function MainLayout() {
   const COLLAPSED_DRAWER_WIDTH = 80;
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
+    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       {/* Sidebar */}
       <Sidebar
         mobileOpen={mobileMenuOpen}
@@ -159,6 +159,7 @@ function MainLayout() {
           display: "flex",
           flexDirection: "column",
           flexGrow: 1,
+          height: "100%",
           width: {
             md: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)`
           },
@@ -448,6 +449,8 @@ function MainLayout() {
         <Box
           component="main"
           sx={{
+            display: "flex",
+            flexDirection: "column",
             flexGrow: 1,
             overflow: "auto",
             minHeight: 0, // CRITICAL: ensures flex child doesn't overflow parent incorrectly

@@ -62,11 +62,11 @@ export default function PageHeader({
         pb: 1.5,
         width: "100%",
         display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
+        flexDirection: { xs: "column", sm: "row" },
+        alignItems: { xs: "flex-start", sm: "center" },
         justifyContent: "space-between",
-        gap: 2,
-        overflowX: "hidden",
+        gap: { xs: 1.5, sm: 2 },
+        flexWrap: "wrap",
       }}
     >
       <Stack
@@ -124,7 +124,12 @@ export default function PageHeader({
           direction="row"
           gap={1}
           alignItems="center"
-          sx={{ flexShrink: 0, marginLeft: "auto" }}
+          flexWrap="wrap"
+          sx={{
+            flexShrink: 0,
+            marginLeft: { xs: 0, sm: "auto" },
+            width: { xs: "100%", sm: "auto" },
+          }}
         >
           {actions}
         </Stack>

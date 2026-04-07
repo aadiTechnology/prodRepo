@@ -18,10 +18,12 @@ export default function DirectoryInfoBar({ label, rangeStart, rangeEnd, total }:
     <Box
       sx={(theme) => ({
         py: 1.5,
-        px: 3,
+        px: { xs: 2, sm: 3 },
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
+        flexWrap: "wrap",
+        gap: 0.5,
         borderBottom: `1px solid ${colorTokens.border.subtle}`,
         bgcolor: colorTokens.background.default,
       })}

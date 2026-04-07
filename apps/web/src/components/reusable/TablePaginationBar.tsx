@@ -32,18 +32,20 @@ export default function TablePaginationBar({
   return (
     <Box
       sx={(theme) => ({
-        px: 2,
+        px: { xs: 1.5, sm: 2 },
         py: 1,
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
+        flexWrap: "wrap",
+        gap: 1,
         borderTop: 1,
         borderColor: theme.palette.divider,
         bgcolor: theme.palette.background.default,
       })}
     >
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <Typography variant="body2" sx={(t) => ({ fontWeight: t.typography.fontWeightMedium, color: t.palette.text.secondary })}>
+        <Typography variant="body2" sx={(t) => ({ fontWeight: t.typography.fontWeightMedium, color: t.palette.text.secondary, display: { xs: "none", sm: "block" } })}>
           Rows per page
         </Typography>
         <Select

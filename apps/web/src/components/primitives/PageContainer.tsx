@@ -32,7 +32,8 @@ export default function PageContainer({
           width: "100%",
         },
         pageBackground && {
-          minHeight: "100%",
+          height: "100%",
+          overflow: "hidden",
           display: "flex",
           flexDirection: "column",
         },

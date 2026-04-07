@@ -71,17 +71,17 @@ export default function DataTable<T extends object>({
   getRowKey,
   getRowSx,
 }: DataTableProps<T>) {
- const hasActions = renderRowActions != null;
+  const hasActions = renderRowActions != null;
   // Defensive: always use an array
   const safeData = Array.isArray(data) ? data : [];
   return (
-    <TableContainer sx={{ maxHeight: maxHeight ?? undefined }}>
+    <TableContainer sx={{ flex: 1, minHeight: 0, maxHeight: maxHeight ?? undefined, overflowX: 'auto', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
           <CircularProgress sx={(t) => ({ color: t.palette.primary.main })} />
         </Box>
       ) : (
-        <Table size={size} stickyHeader={stickyHeader} sx={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+        <Table size={size} stickyHeader={stickyHeader} sx={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: { xs: 'max-content', sm: 'auto' } }}>
           <TableHead>
             <TableRow>
               {columns.map((col) => (
@@ -117,7 +117,8 @@ export default function DataTable<T extends object>({
                     background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
                     borderBottom: `1px solid ${colorTokens.border.default}`,
                     textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
+                    letterSpacing: '0.5px',
+                    whiteSpace: 'nowrap'
                   })}
                 >
                   Actions
@@ -138,7 +139,7 @@ export default function DataTable<T extends object>({
                   key={getRowKey ? getRowKey(row, idx) : idx}
                   hover
                   sx={(theme) => ({
-                    "&.MuiTableRow-hover:hover": { 
+                    "&.MuiTableRow-hover:hover": {
                       bgcolor: alpha(colorTokens.background.default, 0.6),
                     },
                     cursor: onRowClick ? "pointer" : "default",
@@ -159,13 +160,14 @@ export default function DataTable<T extends object>({
                         fontSize: "0.875rem",
                         borderBottom: `1px solid ${colorTokens.border.subtle}`,
                         fontWeight: 500,
+                        whiteSpace: { xs: 'nowrap', sm: 'normal' },
                       })}
                     >
                       {col.render ? col.render(row) : getCellValue(row, (col.field as string) ?? col.id)}
                     </TableCell>
                   ))}
                   {hasActions && (
-                    <TableCell align="center" sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${colorTokens.border.subtle}` }}>
+                    <TableCell align="center" sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${colorTokens.border.subtle}`, whiteSpace: { xs: 'nowrap', sm: 'normal' } }}>
                       {renderRowActions(row)}
                     </TableCell>
                   )}
