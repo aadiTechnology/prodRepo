@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import schoolClassService from "../../api/services/schoolClassService";
 import academicYearService, { type AcademicYear } from "../../api/services/academicYearService";
@@ -17,6 +17,8 @@ export default function AddClass() {
     const [error, setError] = useState<string | null>(null);
     const [snackbar, setSnackbar] = useState<string | null>(null);
     const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+    const [academicYearLoadFailed, setAcademicYearLoadFailed] = useState(false);
+    const lastAcademicYears = useRef<AcademicYear[]>([]);
 
     const initialValues = useMemo<AddClassFormData>(() => ({
         academic_year_id: "",
@@ -65,8 +67,10 @@ export default function AddClass() {
         try {
             const years = await academicYearService.getAll();
             setAcademicYears(years);
+            setAcademicYearLoadFailed(false);
         } catch (err: any) {
             setError(err?.message || "Failed to load academic years.");
+            setAcademicYearLoadFailed(true);
         }
     }, []);
 
@@ -101,8 +105,10 @@ export default function AddClass() {
 
     useEffect(() => {
         if (isEditMode || formData.academic_year_id || academicYears.length === 0) return;
+        if (JSON.stringify(lastAcademicYears.current) === JSON.stringify(academicYears)) return;
         const currentYear = academicYears.find((year) => year.is_active) || academicYears[0];
         setFormData((prev) => ({ ...prev, academic_year_id: currentYear.id }));
+        lastAcademicYears.current = academicYears;
     }, [academicYears, formData.academic_year_id, isEditMode, setFormData]);
 
     const handleConfirmSubmit = async () => {
@@ -110,18 +116,20 @@ export default function AddClass() {
             setError("No active academic year found. Please create an academic year first.");
             return;
         }
-
+        if (!/^[1-9][0-9]*$/.test(formData.capacity)) {
+            setError("Capacity must be a positive number.");
+            return;
+        }
         setLoading(true);
         setError(null);
         try {
             const payload = {
                 academic_year_id: Number(formData.academic_year_id),
                 name: formData.name.trim(),
-                section: formData.section.trim() || undefined,
-                capacity: formData.capacity ? Number(formData.capacity) : undefined,
+                section: formData.section.trim(), // always present, required
+                capacity: Number(formData.capacity),
                 is_active: formData.is_active,
             };
-
             if (isEditMode && id && id !== "new") {
                 await schoolClassService.update(Number(id), payload);
                 setSnackbar("Class updated successfully.");
