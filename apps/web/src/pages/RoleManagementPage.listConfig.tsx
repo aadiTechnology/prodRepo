@@ -55,7 +55,7 @@ export const createRoleListConfig = ({
   },
   actions: {
     rowActions: (role: Role) => ({
-      onEdit: canEditRole ? () => navigate(`/roles/create?id=${role.id}`) : undefined,
+      onEdit: canEditRole ? () => navigate(`/roles/${role.id}/edit`) : undefined,
       onDelete: canDeleteRole && onDeleteClick ? () => onDeleteClick(role) : undefined,
     }),
   },

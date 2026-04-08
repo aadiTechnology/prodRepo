@@ -36,7 +36,6 @@ const CreateUser = lazy(() => import("../pages/CreateUser"));
 const ThemeStudioPage = lazy(() => import("../pages/admin/ThemeStudioPage"));
 const RoleManagementPage = lazy(() => import("../pages/RoleManagementPage"));
 const AddRole = lazy(() => import("../pages/AddRole"));
-const EditRole = lazy(() => import("../pages/EditRole"));
 const FeeStructureSetup = lazy(() => import("../pages/Fees/FeeStructureSetup"));
 const FeeStructureForm = lazy(() => import("../pages/Fees/FeeStructureForm"));
 const AcademicYearList = lazy(() => import("../pages/academics/AcademicYearList"));
@@ -117,7 +116,7 @@ export default function AppRoutes() {
           {/* Role Management */}
           <Route path="/roles" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:view"><RoleManagementPage /></ProtectedRoute>} />
           <Route path="/roles/create" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:create"><AddRole /></ProtectedRoute>} />
-          <Route path="/roles/:id/edit" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:edit"><EditRole /></ProtectedRoute>} />
+          <Route path="/roles/:id/edit" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:edit"><AddRole /></ProtectedRoute>} />
           <Route path="/roles/edit/:id" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:edit"><AddRole /></ProtectedRoute>} />
           <Route path="/roles/permissions" element={<ProtectedRoute requiredPermissions={["ADMIN_MGMT:view", "SYSTEM_CONFIG:view"]}><PermissionManagementPage /></ProtectedRoute>} />
 

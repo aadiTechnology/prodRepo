@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import roleService from "../api/services/roleService";
 import { useAuth } from "../context/AuthContext";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../utils/formValidation";
@@ -14,19 +14,20 @@ const emptyForm = (): AddRoleFormData => ({
   is_active: true,
 });
 
-export default function AddRole() {
+export default function RolePage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { id } = useParams<{ id?: string }>();
+  const isEditMode = Boolean(id);
   const auth = useAuth();
   const tenantId = auth?.user?.tenant_id;
   const userRole = auth?.user?.role;
-  const roleId = searchParams.get("id");
-  const isEditMode = !!roleId;
 
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [permissionGroups, setPermissionGroups] = useState<any[]>([]);
+  const [tenants, setTenants] = useState<{ id: string; name: string }[]>([]);
 
   const initialValues = useMemo(() => emptyForm(), []);
 
@@ -60,28 +61,73 @@ export default function AddRole() {
     [isEditMode]
   );
 
-  const fetchRole = useCallback(async () => {
-    if (!roleId) return;
-    try {
-      setFetchLoading(true);
-      const data = await roleService.getRoleById(roleId);
-      setFormData({
-        name: data.name || "",
-        code: data.code || "",
-        description: data.description || "",
-        is_active: data.is_active ?? true,
-      });
-    } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || "Failed to load role.";
-      setError(msg);
-    } finally {
-      setFetchLoading(false);
-    }
-  }, [roleId, setFormData]);
 
+  // Fetch permission groups and tenants (if needed)
   useEffect(() => {
-    if (isEditMode) fetchRole();
-  }, [fetchRole, isEditMode]);
+    (async () => {
+      const apiBase = "http://localhost:8022";
+      // Get token from localStorage or context
+      const token = auth?.token || localStorage.getItem("auth_token");
+      const authHeaders: Record<string, string> = {
+        "Content-Type": "application/json"
+      };
+      if (token) {
+        authHeaders["Authorization"] = `Bearer ${token}`;
+      }
+
+      // Fetch permission groups
+      let permsResp = [];
+      try {
+        const resp = await fetch(`${apiBase}/rbac/permissions/groups`, { headers: authHeaders, credentials: "include" });
+        permsResp = await resp.json();
+      } catch (e) {
+        permsResp = [];
+      }
+      // Ensure all permission IDs are strings for matching
+      const normalizedGroups = (permsResp.items || (Array.isArray(permsResp) ? permsResp : [])).map((group: any) => ({
+        ...group,
+        permissions: Array.isArray(group.permissions)
+          ? group.permissions.map((p: any) => ({ ...p, id: String(p.id) }))
+          : [],
+      }));
+      setPermissionGroups(normalizedGroups);
+
+      // Fetch tenants
+      let tenantRes = [];
+      try {
+        const resp = await fetch(`${apiBase}/tenants`, { headers: authHeaders, credentials: "include" });
+        tenantRes = await resp.json();
+      } catch (e) {
+        tenantRes = [];
+      }
+      setTenants(
+        Array.isArray(tenantRes)
+          ? tenantRes.map((t: any) => ({ id: String(t.id), name: t.name }))
+          : (tenantRes.items || []).map((t: any) => ({ id: String(t.id), name: t.name }))
+      );
+    })();
+  }, [auth]);
+
+  // Fetch role data if editing
+  useEffect(() => {
+    if (isEditMode && id) {
+      setFetchLoading(true);
+      roleService.getRoleById(id)
+        .then((data) => {
+          setFormData({
+            name: data.name || "",
+            code: data.code || "",
+            description: data.description || "",
+            is_active: data.is_active ?? true,
+          });
+        })
+        .catch((err) => {
+          const msg = (err as { message?: string })?.message || "Failed to load role.";
+          setError(msg);
+        })
+        .finally(() => setFetchLoading(false));
+    }
+  }, [isEditMode, id, setFormData]);
 
   const handleConfirmSubmit = async () => {
     setLoading(true);
@@ -96,7 +142,7 @@ export default function AddRole() {
         code: formData.code,
         description: formData.description,
         is_active: formData.is_active,
-        permission_ids: [],
+        permission_ids: [], // TODO: add permission selection support
       };
 
       if (userRole === "SUPER_ADMIN") {
@@ -107,8 +153,8 @@ export default function AddRole() {
         payload.tenant_id = tenantId;
       }
 
-      if (isEditMode && roleId) {
-        await roleService.updateRole(roleId, payload);
+      if (isEditMode && id) {
+        await roleService.updateRole(id, payload);
         setSnackbar("Role updated successfully.");
       } else {
         await roleService.createRole(payload);
