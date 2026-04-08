@@ -44,6 +44,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
   confirmMessage,
   submitLabelCreate = "Save",
   submitLabelEdit = "Save",
+  formTopSlot,
 }: BaseFormProps<T>) {
   const formId = useId();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -134,6 +135,9 @@ export default function BaseForm<T extends Record<string, unknown>>({
         }
       >
         <form id={formId} onSubmit={handleFormSubmit} autoComplete="off">
+          {formTopSlot ? (
+            <Box sx={{ mb: 2, px: { xs: 0, sm: 1 } }}>{formTopSlot}</Box>
+          ) : null}
           <Grid container spacing={3}>
             {formConfig.layoutRows.map((row, idx) => {
               const show = row.show?.(layoutCtx) ?? true;

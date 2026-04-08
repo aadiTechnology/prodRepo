@@ -129,12 +129,12 @@ export function useSprintListController({ navigate }: UseSprintListControllerOpt
   }, [listState.sortBy, listState.sortOrder, sprints]);
 
   const onAdd = useCallback(() => {
-    if (projectId == null) {
-      setError("Please select a project first.");
+    if (projects.length === 0) {
+      setError("No projects are available for your account.");
       return;
     }
     navigate("/sprints/add");
-  }, [navigate, projectId]);
+  }, [navigate, projects.length]);
 
   return {
     projectId,

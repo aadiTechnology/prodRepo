@@ -1,13 +1,20 @@
 import type { FormConfig } from "../../components/reusable/formFramework.types";
+import LabeledSwitch from "../../components/semantic/LabeledSwitch";
 
 export type SprintFormData = {
   sprint_name: string;
   start_date: string;
   end_date: string;
   is_active: boolean;
+  is_completed: boolean;
 };
 
-export function createSprintFormConfig(): FormConfig<SprintFormData> {
+export type SprintLifecycleHandlers = {
+  onActiveChange: (value: boolean) => void;
+  onCompletedChange: (value: boolean) => void;
+};
+
+export function createSprintFormConfig(handlers: SprintLifecycleHandlers): FormConfig<SprintFormData> {
   return {
     fields: {
       sprint_name: {
@@ -45,12 +52,39 @@ export function createSprintFormConfig(): FormConfig<SprintFormData> {
       },
       is_active: {
         name: "is_active",
-        label: "Active",
-        type: "switch",
+        label: "Active (only one per project)",
+        type: "custom",
+        render: (ctx) => (
+          <LabeledSwitch
+            label="Active (only one per project)"
+            name="is_active"
+            checked={Boolean(ctx.formData.is_active)}
+            disabled={Boolean(ctx.formData.is_completed)}
+            onChange={(e) => handlers.onActiveChange(e.target.checked)}
+          />
+        ),
+      },
+      is_completed: {
+        name: "is_completed",
+        label: "Completed",
+        type: "custom",
+        render: (ctx) => (
+          <LabeledSwitch
+            label="Completed"
+            name="is_completed"
+            checked={Boolean(ctx.formData.is_completed)}
+            disabled={Boolean(ctx.formData.is_active)}
+            onChange={(e) => handlers.onCompletedChange(e.target.checked)}
+          />
+        ),
       },
     },
     layoutRows: [
-      { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["sprint_name", "is_active"] },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["sprint_name", "is_active", "is_completed"],
+      },
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["start_date", "end_date"] },
     ],
   };

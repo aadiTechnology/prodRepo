@@ -48,10 +48,14 @@ export default function SprintList() {
       { key: "start_date", label: "Start", minWidth: 120, render: (r: any) => r.start_date || "—" },
       { key: "end_date", label: "End", minWidth: 120, render: (r: any) => r.end_date || "—" },
       {
-        key: "is_active",
-        label: "Active",
-        minWidth: 90,
-        render: (r: any) => (r.is_active == null ? "—" : r.is_active ? "Yes" : "No"),
+        key: "lifecycle",
+        label: "Status",
+        minWidth: 110,
+        render: (r: any) => {
+          if (r.is_completed) return "Completed";
+          if (r.is_active) return "Active";
+          return "Inactive";
+        },
       },
     ],
     []

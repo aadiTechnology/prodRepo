@@ -80,6 +80,7 @@ pt_sprints = Table(
     Column("StartDate", Date),
     Column("EndDate", Date),
     Column("IsActive", Integer),
+    Column("IsCompleted", Integer),
     Column("CreatedOn", DateTime),
     Column("ProjectId", Integer, ForeignKey("PT_Project.Id")),
     schema=_SCHEMA,

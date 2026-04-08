@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -50,7 +52,11 @@ def get_sprint(
 @router.post("/", response_model=SprintResponse, status_code=status.HTTP_201_CREATED)
 def create_sprint(
     data: SprintCreate,
-    project_id: int = Query(..., description="PT_Project.Id (selected project)"),
+    project_id: Optional[int] = Query(
+        None,
+        description="PT_Project.Id. Required when the user has access to more than one project; "
+        "omitted when only one project is available (it is assigned automatically).",
+    ),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> SprintResponse:

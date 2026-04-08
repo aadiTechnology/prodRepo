@@ -10,6 +10,8 @@ export interface LabeledSwitchProps {
   onChange: (event: React.ChangeEvent<HTMLInputElement>, checked: boolean) => void;
   /** Name for the underlying input (e.g. "is_active"). */
   name?: string;
+  /** Disable toggling (field still visible). */
+  disabled?: boolean;
   /** Switch size. */
   size?: "small" | "medium";
   /** Switch color. */
@@ -23,6 +25,7 @@ export default function LabeledSwitch({
   checked,
   onChange,
   name,
+  disabled = false,
   size = "small",
   color = "primary",
   sx,
@@ -56,6 +59,7 @@ export default function LabeledSwitch({
         checked={checked}
         onChange={onChange}
         name={name}
+        disabled={disabled}
         size={size}
         color={color}
       />

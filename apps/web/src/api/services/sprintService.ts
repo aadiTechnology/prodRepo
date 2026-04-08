@@ -16,9 +16,12 @@ export const sprintService = {
     return res.data;
   },
 
-  create: async (projectId: number, data: SprintCreate): Promise<Sprint> => {
+  /**
+   * When the user has exactly one accessible project, projectId may be omitted (backend assigns it).
+   */
+  create: async (data: SprintCreate, projectId?: number | null): Promise<Sprint> => {
     const res = await apiClient.post<Sprint>("/sprints/", data, {
-      params: { project_id: projectId },
+      params: projectId != null ? { project_id: projectId } : {},
     });
     return res.data;
   },

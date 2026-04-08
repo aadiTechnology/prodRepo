@@ -101,4 +101,6 @@ export type BaseFormProps<T extends Record<string, unknown>> = {
   /** Bottom actions + optional header save use the same labels. */
   submitLabelCreate?: string;
   submitLabelEdit?: string;
+  /** Rendered inside the form above the main field grid (e.g. contextual selectors). */
+  formTopSlot?: ReactNode;
 };

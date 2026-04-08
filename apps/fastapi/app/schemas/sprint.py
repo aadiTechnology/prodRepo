@@ -7,6 +7,7 @@ class SprintBase(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     is_active: bool | None = None
+    is_completed: bool | None = None
 
 
 class SprintCreate(SprintBase):
@@ -18,6 +19,7 @@ class SprintUpdate(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     is_active: bool | None = None
+    is_completed: bool | None = None
 
 
 class SprintResponse(BaseModel):
@@ -26,6 +28,7 @@ class SprintResponse(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     is_active: bool | None = None
+    is_completed: bool = False
     created_on: datetime | None = None
     project_id: int | None = None
 
