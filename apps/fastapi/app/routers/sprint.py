@@ -9,6 +9,8 @@ from app.schemas.auth import CurrentUser
 from app.schemas.sprint import (
     OptionItem,
     SprintAssignmentOptionsResponse,
+    SprintAssignmentsResponse,
+    SprintAssignmentsWrite,
     SprintCreate,
     SprintListResponse,
     SprintResponse,
@@ -68,6 +70,58 @@ def list_pages_for_feature(
     """Pages for a feature (project-scoped)."""
     sprint_service.assert_can_access(db, project_id=project_id, user_tenant_id=current_user.tenant_id)
     return sprint_service.list_feature_pages(db, project_id=project_id, feature_id=feature_id)
+
+
+@router.get("/{sprint_id}/assignments", response_model=SprintAssignmentsResponse)
+def get_sprint_assignments(
+    sprint_id: int,
+    project_id: int = Query(..., description="PT_Project.Id (selected project)"),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> SprintAssignmentsResponse:
+    return sprint_service.get_sprint_assignments(
+        db,
+        project_id=project_id,
+        sprint_id=sprint_id,
+        user_tenant_id=current_user.tenant_id,
+    )
+
+
+@router.put("/{sprint_id}/assignments", response_model=SprintAssignmentsResponse)
+def save_sprint_assignments(
+    sprint_id: int,
+    data: SprintAssignmentsWrite,
+    project_id: int = Query(..., description="PT_Project.Id (selected project)"),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> SprintAssignmentsResponse:
+    return sprint_service.save_sprint_assignments(
+        db,
+        project_id=project_id,
+        sprint_id=sprint_id,
+        user_tenant_id=current_user.tenant_id,
+        data=data,
+    )
+
+
+@router.delete("/{sprint_id}/assignments/page", status_code=status.HTTP_204_NO_CONTENT)
+def delete_sprint_page_assignments(
+    sprint_id: int,
+    project_id: int = Query(..., description="PT_Project.Id (selected project)"),
+    feature_id: int = Query(..., description="PT_Features.FeatureId"),
+    page_id: int = Query(..., description="PT_Pages.PageId"),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> None:
+    sprint_service.delete_sprint_page_assignments(
+        db,
+        project_id=project_id,
+        sprint_id=sprint_id,
+        feature_id=feature_id,
+        page_id=page_id,
+        user_tenant_id=current_user.tenant_id,
+    )
+    return None
 
 
 @router.post("", response_model=SprintResponse, status_code=status.HTTP_201_CREATED)

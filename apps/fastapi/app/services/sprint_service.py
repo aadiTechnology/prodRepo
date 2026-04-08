@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ValidationException
 from app.repositories import sprint_repository
-from app.schemas.sprint import SprintCreate, SprintUpdate
+from app.schemas.sprint import SprintAssignmentsWrite, SprintCreate, SprintUpdate
 from app.services.report_project_service import assert_can_access_pt_project, list_accessible_report_projects
 
 
@@ -118,42 +118,39 @@ def _normalize_assignments(
     project_id: int,
     sprint_id: int,
     feature_assignments: list[dict],
-) -> tuple[list[int], list[tuple[int, int]], list[tuple[int, int, int]]]:
+) -> list[tuple[int, int, int]]:
     """
     Validate and normalize request payload for Feature -> Page -> User assignment.
-    Returns:
-      - feature_ids: [feature_id]
-      - feature_pages: [(feature_id, page_id)]
-      - page_users: [(feature_id, page_id, owner_id)]
+    Returns list of (feature_id, page_id, user_id) triples to persist.
     """
     if feature_assignments is None:
-        return [], [], []
+        return []
 
-    feature_ids: set[int] = set()
-    feature_pages: set[tuple[int, int]] = set()
     page_users: set[tuple[int, int, int]] = set()
 
     all_page_ids: set[int] = set()
     all_user_ids: set[int] = set()
+    all_feature_ids: set[int] = set()
 
     for f in feature_assignments:
         fid = int(f.get("feature_id"))
-        feature_ids.add(fid)
+        all_feature_ids.add(fid)
         pages = f.get("pages") or []
         for p in pages:
             pid = int(p.get("page_id"))
             all_page_ids.add(pid)
-            feature_pages.add((fid, pid))
             user_ids = p.get("user_ids") or []
+            if not user_ids:
+                raise ValidationException("Cannot assign a page without at least one user.")
             for uid in user_ids:
                 all_user_ids.add(int(uid))
                 page_users.add((fid, pid, int(uid)))
 
     # Cross-entity validation (project scoping and referential intent).
     valid_features = sprint_repository.resolve_project_feature_ids(
-        db, project_id=project_id, feature_ids=sorted(feature_ids)
+        db, project_id=project_id, feature_ids=sorted(all_feature_ids)
     )
-    missing_features = sorted(feature_ids - valid_features)
+    missing_features = sorted(all_feature_ids - valid_features)
     if missing_features:
         raise ValidationException("One or more selected features do not belong to the selected project.")
 
@@ -165,7 +162,7 @@ def _normalize_assignments(
         raise ValidationException("One or more selected pages do not belong to the selected project.")
 
     # Ensure each page belongs to the declared feature.
-    for (fid, pid) in feature_pages:
+    for (fid, pid, _uid) in page_users:
         row = pages_map.get(pid)
         if not row:
             continue
@@ -181,12 +178,7 @@ def _normalize_assignments(
         if missing_users:
             raise ValidationException("One or more selected users do not belong to the selected project.")
 
-    # deterministic ordering for bulk insert
-    return (
-        sorted(feature_ids),
-        sorted(feature_pages),
-        sorted(page_users),
-    )
+    return sorted(page_users)
 
 
 def list_sprints(
@@ -223,9 +215,6 @@ def get_sprint(
     row = sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id)
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sprint not found")
-    row["feature_assignments"] = sprint_repository.fetch_sprint_assignments(
-        db, project_id=project_id, sprint_id=sprint_id
-    )
     return row
 
 
@@ -263,31 +252,12 @@ def create_sprint(
         is_completed=completed_out,
     )
 
-    # assignments
-    feature_ids, feature_pages, page_users = _normalize_assignments(
-        db,
-        project_id=resolved_project_id,
-        sprint_id=int(row["sprint_id"]),
-        feature_assignments=[fa.model_dump() for fa in (data.feature_assignments or [])],
-    )
-    sprint_repository.replace_sprint_assignments(
-        db,
-        project_id=resolved_project_id,
-        sprint_id=int(row["sprint_id"]),
-        feature_ids=feature_ids,
-        feature_pages=feature_pages,
-        page_users=page_users,
-    )
-
     if active_out is True:
         sprint_repository.deactivate_other_active_sprints(
             db, project_id=resolved_project_id, exclude_sprint_id=int(row["sprint_id"])
         )
 
     db.commit()
-    row["feature_assignments"] = sprint_repository.fetch_sprint_assignments(
-        db, project_id=resolved_project_id, sprint_id=int(row["sprint_id"])
-    )
     return row
 
 
@@ -308,17 +278,9 @@ def update_sprint(
     if "sprint_name" in patch and patch["sprint_name"] is not None:
         patch["sprint_name"] = patch["sprint_name"].strip()
 
-    # pull assignments out of scalar patch; handled separately (delete + bulk insert)
-    assignments_patch = patch.pop("feature_assignments", None) if "feature_assignments" in patch else None
-
     patch = _merge_lifecycle_for_update(existing, patch)
     if not patch:
-        # still allow assignments-only updates
-        if assignments_patch is None:
-            existing["feature_assignments"] = sprint_repository.fetch_sprint_assignments(
-                db, project_id=project_id, sprint_id=sprint_id
-            )
-            return existing
+        return existing
 
     start = patch.get("start_date", existing.get("start_date"))
     end = patch.get("end_date", existing.get("end_date"))
@@ -335,22 +297,6 @@ def update_sprint(
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sprint not found")
 
-    if assignments_patch is not None:
-        feature_ids, feature_pages, page_users = _normalize_assignments(
-            db,
-            project_id=project_id,
-            sprint_id=sprint_id,
-            feature_assignments=assignments_patch if assignments_patch else [],
-        )
-        sprint_repository.replace_sprint_assignments(
-            db,
-            project_id=project_id,
-            sprint_id=sprint_id,
-            feature_ids=feature_ids,
-            feature_pages=feature_pages,
-            page_users=page_users,
-        )
-
     eff_active = row.get("is_active")
     if eff_active is True:
         sprint_repository.deactivate_other_active_sprints(
@@ -358,11 +304,7 @@ def update_sprint(
         )
 
     db.commit()
-    out = sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id) or row
-    out["feature_assignments"] = sprint_repository.fetch_sprint_assignments(
-        db, project_id=project_id, sprint_id=sprint_id
-    )
-    return out
+    return sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id) or row
 
 
 def delete_sprint(
@@ -393,3 +335,71 @@ def list_feature_pages(db: Session, *, project_id: int, feature_id: int) -> list
 
 def list_project_users(db: Session, *, project_id: int) -> list[dict]:
     return sprint_repository.list_project_users(db, project_id=project_id)
+
+
+def get_sprint_assignments(
+    db: Session,
+    *,
+    project_id: int,
+    sprint_id: int,
+    user_tenant_id: int | None,
+) -> dict:
+    assert_can_access_pt_project(db, project_id, user_tenant_id)
+    s = sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id)
+    if not s:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sprint not found")
+    return {
+        "sprint_id": sprint_id,
+        "project_id": project_id,
+        "feature_assignments": sprint_repository.fetch_sprint_assignments(
+            db, project_id=project_id, sprint_id=sprint_id
+        ),
+    }
+
+
+def save_sprint_assignments(
+    db: Session,
+    *,
+    project_id: int,
+    sprint_id: int,
+    user_tenant_id: int | None,
+    data: SprintAssignmentsWrite,
+) -> dict:
+    assert_can_access_pt_project(db, project_id, user_tenant_id)
+    s = sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id)
+    if not s:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sprint not found")
+
+    triples = _normalize_assignments(
+        db,
+        project_id=project_id,
+        sprint_id=sprint_id,
+        feature_assignments=[fa.model_dump() for fa in (data.feature_assignments or [])],
+    )
+    sprint_repository.replace_sprint_page_users(
+        db, project_id=project_id, sprint_id=sprint_id, page_users=triples
+    )
+    db.commit()
+    return get_sprint_assignments(
+        db, project_id=project_id, sprint_id=sprint_id, user_tenant_id=user_tenant_id
+    )
+
+
+def delete_sprint_page_assignments(
+    db: Session,
+    *,
+    project_id: int,
+    sprint_id: int,
+    feature_id: int,
+    page_id: int,
+    user_tenant_id: int | None,
+) -> None:
+    assert_can_access_pt_project(db, project_id, user_tenant_id)
+    sprint_repository.delete_sprint_page_assignments(
+        db,
+        project_id=project_id,
+        sprint_id=sprint_id,
+        feature_id=feature_id,
+        page_id=page_id,
+    )
+    db.commit()

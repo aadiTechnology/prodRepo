@@ -7,6 +7,10 @@ class OptionItem(BaseModel):
     label: str
 
 
+class SprintAssignmentsWrite(BaseModel):
+    feature_assignments: list["SprintFeatureAssignmentWrite"] = Field(default_factory=list)
+
+
 class SprintAssignedUser(BaseModel):
     user_id: int
     user_name: str | None = None
@@ -40,7 +44,6 @@ class SprintBase(BaseModel):
     end_date: date | None = None
     is_active: bool | None = None
     is_completed: bool | None = None
-    feature_assignments: list[SprintFeatureAssignmentWrite] = Field(default_factory=list)
 
 
 class SprintCreate(SprintBase):
@@ -53,7 +56,6 @@ class SprintUpdate(BaseModel):
     end_date: date | None = None
     is_active: bool | None = None
     is_completed: bool | None = None
-    feature_assignments: list[SprintFeatureAssignmentWrite] | None = None
 
 
 class SprintResponse(BaseModel):
@@ -65,7 +67,6 @@ class SprintResponse(BaseModel):
     is_completed: bool = False
     created_on: datetime | None = None
     project_id: int | None = None
-    feature_assignments: list[SprintFeatureAssignment] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -79,4 +80,10 @@ class SprintListResponse(BaseModel):
 class SprintAssignmentOptionsResponse(BaseModel):
     features: list[OptionItem]
     users: list[OptionItem]
+
+
+class SprintAssignmentsResponse(BaseModel):
+    sprint_id: int
+    project_id: int
+    feature_assignments: list[SprintFeatureAssignment] = Field(default_factory=list)
 

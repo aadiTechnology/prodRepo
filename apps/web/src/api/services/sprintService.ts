@@ -3,6 +3,8 @@ import type {
   OptionItem,
   Sprint,
   SprintAssignmentOptionsResponse,
+  SprintAssignmentsResponse,
+  SprintAssignmentsWrite,
   SprintCreate,
   SprintUpdate,
 } from "../../types/sprint";
@@ -55,6 +57,35 @@ export const sprintService = {
       params: { project_id: projectId, feature_id: featureId },
     });
     return res.data;
+  },
+
+  getAssignments: async (projectId: number, sprintId: number): Promise<SprintAssignmentsResponse> => {
+    const res = await apiClient.get<SprintAssignmentsResponse>(`/sprints/${sprintId}/assignments`, {
+      params: { project_id: projectId },
+    });
+    return res.data;
+  },
+
+  saveAssignments: async (
+    projectId: number,
+    sprintId: number,
+    data: SprintAssignmentsWrite
+  ): Promise<SprintAssignmentsResponse> => {
+    const res = await apiClient.put<SprintAssignmentsResponse>(`/sprints/${sprintId}/assignments`, data, {
+      params: { project_id: projectId },
+    });
+    return res.data;
+  },
+
+  deletePageAssignments: async (
+    projectId: number,
+    sprintId: number,
+    featureId: number,
+    pageId: number
+  ): Promise<void> => {
+    await apiClient.delete(`/sprints/${sprintId}/assignments/page`, {
+      params: { project_id: projectId, feature_id: featureId, page_id: pageId },
+    });
   },
 };
 

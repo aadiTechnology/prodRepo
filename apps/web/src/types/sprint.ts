@@ -7,7 +7,6 @@ export type Sprint = {
   is_completed?: boolean | null;
   created_on?: string | null;
   project_id?: number | null;
-  feature_assignments?: SprintFeatureAssignment[] | null;
 };
 
 export type OptionItem = { id: number; label: string };
@@ -45,7 +44,6 @@ export type SprintCreate = {
   end_date?: string | null;
   is_active?: boolean | null;
   is_completed?: boolean | null;
-  feature_assignments?: SprintFeatureAssignmentWrite[];
 };
 
 export type SprintUpdate = Partial<SprintCreate>;
@@ -53,5 +51,15 @@ export type SprintUpdate = Partial<SprintCreate>;
 export type SprintAssignmentOptionsResponse = {
   features: OptionItem[];
   users: OptionItem[];
+};
+
+export type SprintAssignmentsWrite = {
+  feature_assignments: SprintFeatureAssignmentWrite[];
+};
+
+export type SprintAssignmentsResponse = {
+  sprint_id: number;
+  project_id: number;
+  feature_assignments: SprintFeatureAssignment[];
 };
 

@@ -50,6 +50,7 @@ const SprintPerformanceReportPage = lazy(() => import("../pages/reports/SprintPe
 const SprintwisePerformanceReportPage = lazy(() => import("../pages/reports/SprintwisePerformanceReportPage"));
 const SprintList = lazy(() => import("../pages/sprints/SprintList"));
 const SprintForm = lazy(() => import("../pages/sprints/SprintForm"));
+const SprintAssignmentsPage = lazy(() => import("../pages/sprints/SprintAssignmentsPage"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -148,6 +149,7 @@ export default function AppRoutes() {
           <Route path="/sprints" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><SprintList /></ProtectedRoute>} />
           <Route path="/sprints/add" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><SprintForm /></ProtectedRoute>} />
           <Route path="/sprints/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><SprintForm /></ProtectedRoute>} />
+          <Route path="/sprints/assignments" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><SprintAssignmentsPage /></ProtectedRoute>} />
           
           {/* Fee Management */}
           <Route path="/fees/setup" element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeStructureSetup /></ProtectedRoute>} />
