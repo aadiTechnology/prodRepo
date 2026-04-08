@@ -32,6 +32,7 @@ export default function SprintList() {
     loading,
     error,
     snackbar,
+    fetchSprints,
     closeSnackbar,
     confirmDialogOpen,
     sprintToDelete,
@@ -116,7 +117,7 @@ export default function SprintList() {
                 variant="outlined"
                 color="error"
                 size="small"
-                onClick={() => void fetchSprints()}
+                onClick={fetchSprints}
                 disabled={loading}
               >
                 {listConfig.uiPolicy.retryLabel}
