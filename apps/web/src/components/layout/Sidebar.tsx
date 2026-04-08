@@ -318,6 +318,11 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
     }));
   };
 
+  const handleMenuNavigate = (path: string) => {
+    navigate(path);
+    onMobileClose();
+  };
+
   const filteredItems = useMemo(() => {
     if (!searchTerm) return menuItems;
     const term = searchTerm.toLowerCase();
@@ -402,7 +407,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                         if (collapsed) onToggleCollapse();
                         toggleSection(item.id, isActive);
                       } else if (item.path) {
-                        navigate(item.path);
+                        handleMenuNavigate(item.path);
                       }
                     }}
                     active={isActive}
@@ -440,7 +445,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                         return (
                           <SubNavItem
                             key={child.id}
-                            onClick={() => navigate(child.path)}
+                            onClick={() => handleMenuNavigate(child.path)}
                             active={isChildActive}
                           >
                             <ListItemText
