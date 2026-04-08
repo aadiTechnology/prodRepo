@@ -12,7 +12,8 @@ import {
 const AddAcademicYear = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id?: string }>();
-  const isEditMode = Boolean(id && id !== "new");
+  const isEditMode = !!id && id !== "new";
+  const validId = !!id && id !== "new";
 
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
@@ -46,7 +47,7 @@ const AddAcademicYear = () => {
         {
           type: "custom",
           validate: (data) =>
-            data.start_date && data.end_date && new Date(data.end_date) <= new Date(data.start_date)
+            data.start_date && data.end_date && new Date(data.end_date) < new Date(data.start_date)
               ? "End date must be after start date."
               : "",
         },
@@ -69,13 +70,14 @@ const AddAcademicYear = () => {
     onClearError: () => setError(null),
   });
 
+  // Show is_active in both add and edit modes (if desired by business logic)
   const formConfig = useMemo(
-    () => createAddAcademicYearFormConfig({ isEditMode }),
-    [isEditMode]
+    () => createAddAcademicYearFormConfig({ isEditMode: true }), // always show is_active
+    []
   );
 
   const fetchAcademicYear = useCallback(async () => {
-    if (!id || id === "new") return;
+    if (!validId) return;
     try {
       setFetchLoading(true);
       const data = await academicYearService.getById(Number(id));
@@ -87,11 +89,16 @@ const AddAcademicYear = () => {
         is_active: data.is_active ?? true,
       });
     } catch (err: any) {
-      setError(err?.message || "Failed to load academic year.");
+      let message = "Failed to load academic year.";
+      if (err && typeof err === "object") {
+        if ("message" in err && typeof err.message === "string") message = err.message;
+        else if (typeof err.toString === "function") message = err.toString();
+      }
+      setError(message);
     } finally {
       setFetchLoading(false);
     }
-  }, [id, setFormData]);
+  }, [id, setFormData, validId]);
 
   useEffect(() => {
     if (isEditMode) {
@@ -111,7 +118,7 @@ const AddAcademicYear = () => {
         is_active: formData.is_active,
       };
 
-      if (isEditMode && id && id !== "new") {
+      if (validId) {
         await academicYearService.update(Number(id), payload);
         setSnackbar("Academic Year updated successfully.");
       } else {
@@ -120,7 +127,14 @@ const AddAcademicYear = () => {
       }
       navigate("/academic-years");
     } catch (err: unknown) {
-      const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
+      let apiFieldErrors, message;
+      try {
+        const mapped = mapApiErrorsToFields(err);
+        apiFieldErrors = mapped.fieldErrors;
+        message = mapped.message;
+      } catch {
+        message = (err && typeof err === "object" && "message" in err && typeof err.message === "string") ? err.message : "An unknown error occurred.";
+      }
       if (apiFieldErrors) {
         setFieldErrors((prev) => ({ ...prev, ...apiFieldErrors }));
       }
