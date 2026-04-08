@@ -254,7 +254,8 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
       { id: "ai-review", label: "AI Review", path: "/ai/review" },
       { id: "story-generation", label: "Story Generation", path: "/ai/generate" },
       { id: "sprint-performance", label: "Sprint Performance", path: "/reports/sprint-performance" },
-      { id: "sprintwise-performance", label: "Sprintwise Performance", path: "/reports/sprintwise-performance" }
+      { id: "sprintwise-performance", label: "Sprintwise Performance", path: "/reports/sprintwise-performance" },
+      { id: "sprints", label: "Sprints", path: "/sprints" }
     ]
   }
 ];
