@@ -93,10 +93,22 @@ export default function AddFeeDiscount() {
     setLoading(true);
     setError(null);
     try {
+      // Ensure discountAmount is a valid number
+      const discountValue =
+        formData.discountAmount !== "" && !isNaN(Number(formData.discountAmount))
+          ? Number(formData.discountAmount)
+          : null;
+
+      if (discountValue === null) {
+        setError("Discount Amount is required and must be a number.");
+        setLoading(false);
+        return;
+      }
+
       const payload = {
         discount_name: formData.discountName,
         discount_type: formData.discountType,
-        discount_value: typeof formData.discountAmount === "number" ? formData.discountAmount : 0,
+        discount_value: discountValue,
         fee_category: formData.feeCategory,
         applicable_class: formData.applicableClass,
         description: formData.description,
