@@ -8,11 +8,17 @@ import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/for
 import { useReportProjectSelection } from "../../hooks/useReportProjectSelection";
 import reportProjectService, { type ReportProjectOption } from "../../api/services/reportProjectService";
 import sprintService from "../../api/services/sprintService";
+import SprintAssignmentsSection from "./SprintAssignmentsSection";
 import {
   createSprintFormConfig,
   type SprintFormData,
   type SprintLifecycleHandlers,
 } from "./SprintForm.formConfig";
+import type {
+  OptionItem,
+  SprintAssignmentOptionsResponse,
+  SprintFeatureAssignmentWrite,
+} from "../../types/sprint";
 
 const emptyForm = (): SprintFormData => ({
   sprint_name: "",
@@ -36,6 +42,14 @@ export default function SprintForm() {
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+
+  const [assignmentOptions, setAssignmentOptions] = useState<SprintAssignmentOptionsResponse>({
+    features: [],
+    users: [],
+  });
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [pagesByFeatureId, setPagesByFeatureId] = useState<Record<number, OptionItem[]>>({});
+  const [featureAssignments, setFeatureAssignments] = useState<SprintFeatureAssignmentWrite[]>([]);
 
   const initialValues = useMemo(() => emptyForm(), []);
 
@@ -104,7 +118,53 @@ export default function SprintForm() {
     [setFormData]
   );
 
-  const formConfig = useMemo(() => createSprintFormConfig(lifecycleHandlers), [lifecycleHandlers]);
+  const effectiveProjectId = useMemo(() => {
+    if (isEditMode) return projectId ?? null;
+    if (projects.length === 1) return projects[0].id;
+    return formProjectId ?? null;
+  }, [formProjectId, isEditMode, projectId, projects]);
+
+  const requestPages = useCallback(
+    async (featureId: number) => {
+      if (!effectiveProjectId) return;
+      if (pagesByFeatureId[featureId]?.length) return;
+      try {
+        const pages = await sprintService.listFeaturePages(effectiveProjectId, featureId);
+        setPagesByFeatureId((p) => ({ ...p, [featureId]: pages }));
+      } catch {
+        setPagesByFeatureId((p) => ({ ...p, [featureId]: [] }));
+      }
+    },
+    [effectiveProjectId, pagesByFeatureId]
+  );
+
+  const assignmentsSection = useMemo(() => {
+    return (
+      <SprintAssignmentsSection
+        disabled={loading || effectiveProjectId == null || optionsLoading}
+        features={assignmentOptions.features}
+        users={assignmentOptions.users}
+        pagesByFeatureId={pagesByFeatureId}
+        value={featureAssignments}
+        onChange={setFeatureAssignments}
+        onRequestPages={requestPages}
+      />
+    );
+  }, [
+    assignmentOptions.features,
+    assignmentOptions.users,
+    effectiveProjectId,
+    featureAssignments,
+    loading,
+    optionsLoading,
+    pagesByFeatureId,
+    requestPages,
+  ]);
+
+  const formConfig = useMemo(
+    () => createSprintFormConfig(lifecycleHandlers, { assignmentsSection }),
+    [assignmentsSection, lifecycleHandlers]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -151,16 +211,47 @@ export default function SprintForm() {
         is_active: Boolean(s.is_active),
         is_completed: Boolean(s.is_completed),
       });
+
+      const hydrated: SprintFeatureAssignmentWrite[] = (s.feature_assignments || []).map((f) => ({
+        feature_id: f.feature_id,
+        pages: (f.pages || []).map((p) => ({
+          page_id: p.page_id,
+          user_ids: (p.assigned_users || []).map((u) => u.user_id),
+        })),
+      }));
+      setFeatureAssignments(hydrated);
+
+      // Preload page options for features present in the sprint (improves edit UX).
+      await Promise.all(hydrated.map((fa) => requestPages(fa.feature_id)));
     } catch (err: unknown) {
       setError((err as { message?: string })?.message || "Failed to load sprint.");
     } finally {
       setFetchLoading(false);
     }
-  }, [id, isEditMode, projectId, setFormData]);
+  }, [id, isEditMode, projectId, requestPages, setFormData]);
 
   useEffect(() => {
     fetchSprint();
   }, [fetchSprint]);
+
+  useEffect(() => {
+    if (!effectiveProjectId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setOptionsLoading(true);
+        const opt = await sprintService.getAssignmentOptions(effectiveProjectId);
+        if (!cancelled) setAssignmentOptions(opt);
+      } catch {
+        if (!cancelled) setAssignmentOptions({ features: [], users: [] });
+      } finally {
+        if (!cancelled) setOptionsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveProjectId]);
 
   const handleConfirmSubmit = async () => {
     if (isEditMode) {
@@ -188,6 +279,7 @@ export default function SprintForm() {
         end_date: formData.end_date || null,
         is_active: formData.is_active,
         is_completed: formData.is_completed,
+        feature_assignments: featureAssignments,
       };
       if (isEditMode && id) {
         await sprintService.update(projectId!, Number(id), payload);

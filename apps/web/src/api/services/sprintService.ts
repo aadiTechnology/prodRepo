@@ -1,5 +1,11 @@
 import { apiClient } from "../client";
-import type { Sprint, SprintCreate, SprintUpdate } from "../../types/sprint";
+import type {
+  OptionItem,
+  Sprint,
+  SprintAssignmentOptionsResponse,
+  SprintCreate,
+  SprintUpdate,
+} from "../../types/sprint";
 
 export const sprintService = {
   list: async (projectId: number, params?: { page?: number; page_size?: number; search?: string }) => {
@@ -35,6 +41,20 @@ export const sprintService = {
 
   delete: async (projectId: number, sprintId: number): Promise<void> => {
     await apiClient.delete(`/sprints/${sprintId}`, { params: { project_id: projectId } });
+  },
+
+  getAssignmentOptions: async (projectId: number): Promise<SprintAssignmentOptionsResponse> => {
+    const res = await apiClient.get<SprintAssignmentOptionsResponse>("/sprints/assignment-options", {
+      params: { project_id: projectId },
+    });
+    return res.data;
+  },
+
+  listFeaturePages: async (projectId: number, featureId: number): Promise<OptionItem[]> => {
+    const res = await apiClient.get<OptionItem[]>("/sprints/assignment-pages", {
+      params: { project_id: projectId, feature_id: featureId },
+    });
+    return res.data;
   },
 };
 

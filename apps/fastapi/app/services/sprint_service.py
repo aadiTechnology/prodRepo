@@ -112,6 +112,83 @@ def _merge_lifecycle_for_update(existing: dict, patch: dict) -> dict:
     return out
 
 
+def _normalize_assignments(
+    db: Session,
+    *,
+    project_id: int,
+    sprint_id: int,
+    feature_assignments: list[dict],
+) -> tuple[list[int], list[tuple[int, int]], list[tuple[int, int, int]]]:
+    """
+    Validate and normalize request payload for Feature -> Page -> User assignment.
+    Returns:
+      - feature_ids: [feature_id]
+      - feature_pages: [(feature_id, page_id)]
+      - page_users: [(feature_id, page_id, owner_id)]
+    """
+    if feature_assignments is None:
+        return [], [], []
+
+    feature_ids: set[int] = set()
+    feature_pages: set[tuple[int, int]] = set()
+    page_users: set[tuple[int, int, int]] = set()
+
+    all_page_ids: set[int] = set()
+    all_user_ids: set[int] = set()
+
+    for f in feature_assignments:
+        fid = int(f.get("feature_id"))
+        feature_ids.add(fid)
+        pages = f.get("pages") or []
+        for p in pages:
+            pid = int(p.get("page_id"))
+            all_page_ids.add(pid)
+            feature_pages.add((fid, pid))
+            user_ids = p.get("user_ids") or []
+            for uid in user_ids:
+                all_user_ids.add(int(uid))
+                page_users.add((fid, pid, int(uid)))
+
+    # Cross-entity validation (project scoping and referential intent).
+    valid_features = sprint_repository.resolve_project_feature_ids(
+        db, project_id=project_id, feature_ids=sorted(feature_ids)
+    )
+    missing_features = sorted(feature_ids - valid_features)
+    if missing_features:
+        raise ValidationException("One or more selected features do not belong to the selected project.")
+
+    pages_map = sprint_repository.resolve_project_pages(
+        db, project_id=project_id, page_ids=sorted(all_page_ids)
+    )
+    missing_pages = sorted(all_page_ids - set(pages_map.keys()))
+    if missing_pages:
+        raise ValidationException("One or more selected pages do not belong to the selected project.")
+
+    # Ensure each page belongs to the declared feature.
+    for (fid, pid) in feature_pages:
+        row = pages_map.get(pid)
+        if not row:
+            continue
+        if int(row["feature_id"]) != int(fid):
+            raise ValidationException("Selected page does not belong to the selected feature.")
+
+    # Users (owners) must be from the project users list.
+    if all_user_ids:
+        valid_user_ids = sprint_repository.resolve_project_user_ids(
+            db, project_id=project_id, user_ids=sorted(all_user_ids)
+        )
+        missing_users = sorted(all_user_ids - valid_user_ids)
+        if missing_users:
+            raise ValidationException("One or more selected users do not belong to the selected project.")
+
+    # deterministic ordering for bulk insert
+    return (
+        sorted(feature_ids),
+        sorted(feature_pages),
+        sorted(page_users),
+    )
+
+
 def list_sprints(
     db: Session,
     *,
@@ -120,9 +197,19 @@ def list_sprints(
     search: str | None,
     page: int,
     page_size: int,
+    include_assignments: bool = False,
 ) -> tuple[list[dict], int]:
     assert_can_access_pt_project(db, project_id, user_tenant_id)
-    return sprint_repository.list_sprints(db, project_id=project_id, search=search, page=page, page_size=page_size)
+    items, total = sprint_repository.list_sprints(
+        db, project_id=project_id, search=search, page=page, page_size=page_size
+    )
+    if include_assignments and items:
+        sids = [int(i["sprint_id"]) for i in items if i.get("sprint_id") is not None]
+        amap = sprint_repository.fetch_sprint_assignments_bulk(db, project_id=project_id, sprint_ids=sids)
+        for i in items:
+            sid = int(i["sprint_id"])
+            i["feature_assignments"] = amap.get(sid, [])
+    return items, total
 
 
 def get_sprint(
@@ -136,6 +223,9 @@ def get_sprint(
     row = sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id)
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sprint not found")
+    row["feature_assignments"] = sprint_repository.fetch_sprint_assignments(
+        db, project_id=project_id, sprint_id=sprint_id
+    )
     return row
 
 
@@ -173,12 +263,31 @@ def create_sprint(
         is_completed=completed_out,
     )
 
+    # assignments
+    feature_ids, feature_pages, page_users = _normalize_assignments(
+        db,
+        project_id=resolved_project_id,
+        sprint_id=int(row["sprint_id"]),
+        feature_assignments=[fa.model_dump() for fa in (data.feature_assignments or [])],
+    )
+    sprint_repository.replace_sprint_assignments(
+        db,
+        project_id=resolved_project_id,
+        sprint_id=int(row["sprint_id"]),
+        feature_ids=feature_ids,
+        feature_pages=feature_pages,
+        page_users=page_users,
+    )
+
     if active_out is True:
         sprint_repository.deactivate_other_active_sprints(
             db, project_id=resolved_project_id, exclude_sprint_id=int(row["sprint_id"])
         )
 
     db.commit()
+    row["feature_assignments"] = sprint_repository.fetch_sprint_assignments(
+        db, project_id=resolved_project_id, sprint_id=int(row["sprint_id"])
+    )
     return row
 
 
@@ -199,9 +308,17 @@ def update_sprint(
     if "sprint_name" in patch and patch["sprint_name"] is not None:
         patch["sprint_name"] = patch["sprint_name"].strip()
 
+    # pull assignments out of scalar patch; handled separately (delete + bulk insert)
+    assignments_patch = patch.pop("feature_assignments", None) if "feature_assignments" in patch else None
+
     patch = _merge_lifecycle_for_update(existing, patch)
     if not patch:
-        return existing
+        # still allow assignments-only updates
+        if assignments_patch is None:
+            existing["feature_assignments"] = sprint_repository.fetch_sprint_assignments(
+                db, project_id=project_id, sprint_id=sprint_id
+            )
+            return existing
 
     start = patch.get("start_date", existing.get("start_date"))
     end = patch.get("end_date", existing.get("end_date"))
@@ -218,6 +335,22 @@ def update_sprint(
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sprint not found")
 
+    if assignments_patch is not None:
+        feature_ids, feature_pages, page_users = _normalize_assignments(
+            db,
+            project_id=project_id,
+            sprint_id=sprint_id,
+            feature_assignments=assignments_patch if assignments_patch else [],
+        )
+        sprint_repository.replace_sprint_assignments(
+            db,
+            project_id=project_id,
+            sprint_id=sprint_id,
+            feature_ids=feature_ids,
+            feature_pages=feature_pages,
+            page_users=page_users,
+        )
+
     eff_active = row.get("is_active")
     if eff_active is True:
         sprint_repository.deactivate_other_active_sprints(
@@ -225,7 +358,11 @@ def update_sprint(
         )
 
     db.commit()
-    return sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id) or row
+    out = sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id) or row
+    out["feature_assignments"] = sprint_repository.fetch_sprint_assignments(
+        db, project_id=project_id, sprint_id=sprint_id
+    )
+    return out
 
 
 def delete_sprint(
@@ -240,3 +377,19 @@ def delete_sprint(
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sprint not found")
     db.commit()
+
+
+def assert_can_access(db: Session, *, project_id: int, user_tenant_id: int | None) -> None:
+    assert_can_access_pt_project(db, project_id, user_tenant_id)
+
+
+def list_project_features(db: Session, *, project_id: int) -> list[dict]:
+    return sprint_repository.list_project_features(db, project_id=project_id)
+
+
+def list_feature_pages(db: Session, *, project_id: int, feature_id: int) -> list[dict]:
+    return sprint_repository.list_feature_pages(db, project_id=project_id, feature_id=feature_id)
+
+
+def list_project_users(db: Session, *, project_id: int) -> list[dict]:
+    return sprint_repository.list_project_users(db, project_id=project_id)

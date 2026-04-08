@@ -1,13 +1,22 @@
-"""Persistence access for dbo.PT_Sprints (project-scoped)."""
+"""Persistence access for dbo.PT_Sprints and sprint assignment mappings (project-scoped)."""
 
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import and_, func, insert, select, update, delete
+from sqlalchemy import and_, delete, func, insert, select, update
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
-from app.models.pt_timesheet import pt_sprints
+from app.models.pt_timesheet import (
+    pt_features,
+    pt_project_users,
+    pt_pages,
+    pt_sprint_feature_pages,
+    pt_sprint_features,
+    pt_sprint_page_users,
+    pt_sprints,
+)
+from app.models.user import User
 
 
 def _row_to_dict(row: RowMapping) -> dict[str, Any]:
@@ -207,4 +216,286 @@ def delete_sprint(db: Session, *, project_id: int, sprint_id: int) -> bool:
         delete(pt_sprints).where(and_(pt_sprints.c.ProjectId == project_id, pt_sprints.c.SprintId == sprint_id))
     )
     return (res.rowcount or 0) > 0
+
+
+# --- options for sprint assignment UI ---
+def list_project_features(db: Session, *, project_id: int) -> list[dict[str, Any]]:
+    rows = db.execute(
+        select(pt_features.c.FeatureId, pt_features.c.FeatureName)
+        .where(pt_features.c.ProjectId == project_id)
+        .order_by(func.lower(pt_features.c.FeatureName).asc(), pt_features.c.FeatureId.asc())
+    ).all()
+    return [{"id": int(r[0]), "label": (r[1] or f"Feature {r[0]}")} for r in rows]
+
+
+def list_feature_pages(db: Session, *, project_id: int, feature_id: int) -> list[dict[str, Any]]:
+    rows = db.execute(
+        select(pt_pages.c.PageId, pt_pages.c.PageName)
+        .where(and_(pt_pages.c.ProjectId == project_id, pt_pages.c.FeatureId == feature_id))
+        .order_by(func.lower(pt_pages.c.PageName).asc(), pt_pages.c.PageId.asc())
+    ).all()
+    return [{"id": int(r[0]), "label": (r[1] or f"Page {r[0]}")} for r in rows]
+
+
+def list_project_users(db: Session, *, project_id: int) -> list[dict[str, Any]]:
+    """
+    Return project users from dbo.PT_ProjectUsers joined to app users.
+    """
+    rows = db.execute(
+        select(pt_project_users.c.UserId, User.full_name)
+        .select_from(pt_project_users.join(User, User.id == pt_project_users.c.UserId))
+        .where(pt_project_users.c.ProjectId == project_id)
+        .order_by(func.lower(User.full_name).asc(), pt_project_users.c.UserId.asc())
+    ).all()
+    return [{"id": int(r[0]), "label": (r[1] or f"User {r[0]}")} for r in rows]
+
+
+def resolve_project_feature_ids(db: Session, *, project_id: int, feature_ids: list[int]) -> set[int]:
+    if not feature_ids:
+        return set()
+    rows = db.execute(
+        select(pt_features.c.FeatureId)
+        .where(and_(pt_features.c.ProjectId == project_id, pt_features.c.FeatureId.in_(feature_ids)))
+    ).all()
+    return {int(r[0]) for r in rows}
+
+
+def resolve_project_pages(db: Session, *, project_id: int, page_ids: list[int]) -> dict[int, dict[str, Any]]:
+    if not page_ids:
+        return {}
+    rows = db.execute(
+        select(pt_pages.c.PageId, pt_pages.c.FeatureId, pt_pages.c.ProjectId)
+        .where(and_(pt_pages.c.ProjectId == project_id, pt_pages.c.PageId.in_(page_ids)))
+    ).all()
+    return {int(r[0]): {"page_id": int(r[0]), "feature_id": int(r[1]), "project_id": int(r[2])} for r in rows}
+
+
+def resolve_project_user_ids(db: Session, *, project_id: int, user_ids: list[int]) -> set[int]:
+    if not user_ids:
+        return set()
+    rows = db.execute(
+        select(pt_project_users.c.UserId)
+        .where(pt_project_users.c.ProjectId == project_id)
+        .where(pt_project_users.c.UserId.in_(user_ids))
+    ).all()
+    return {int(r[0]) for r in rows if r[0] is not None}
+
+
+# --- sprint assignment persistence ---
+def clear_sprint_assignments(db: Session, *, project_id: int, sprint_id: int) -> None:
+    cond = and_(pt_sprint_features.c.ProjectId == project_id, pt_sprint_features.c.SprintId == sprint_id)
+    db.execute(delete(pt_sprint_page_users).where(and_(pt_sprint_page_users.c.ProjectId == project_id, pt_sprint_page_users.c.SprintId == sprint_id)))
+    db.execute(delete(pt_sprint_feature_pages).where(and_(pt_sprint_feature_pages.c.ProjectId == project_id, pt_sprint_feature_pages.c.SprintId == sprint_id)))
+    db.execute(delete(pt_sprint_features).where(cond))
+
+
+def replace_sprint_assignments(
+    db: Session,
+    *,
+    project_id: int,
+    sprint_id: int,
+    feature_ids: list[int],
+    feature_pages: list[tuple[int, int]],  # (feature_id, page_id)
+    page_users: list[tuple[int, int, int]],  # (feature_id, page_id, user_id)
+) -> None:
+    """
+    Transaction-safe replacement strategy:
+    - delete existing mappings for sprint
+    - bulk insert new rows (deduped by caller)
+    """
+    clear_sprint_assignments(db, project_id=project_id, sprint_id=sprint_id)
+
+    if feature_ids:
+        db.execute(
+            insert(pt_sprint_features),
+            [{"SprintId": sprint_id, "FeatureId": fid, "ProjectId": project_id} for fid in feature_ids],
+        )
+    if feature_pages:
+        db.execute(
+            insert(pt_sprint_feature_pages),
+            [
+                {
+                    "SprintId": sprint_id,
+                    "FeatureId": fid,
+                    "PageId": pid,
+                    "ProjectId": project_id,
+                }
+                for (fid, pid) in feature_pages
+            ],
+        )
+    if page_users:
+        db.execute(
+            insert(pt_sprint_page_users),
+            [
+                {
+                    "SprintId": sprint_id,
+                    "FeatureId": fid,
+                    "PageId": pid,
+                    "UserId": uid,
+                    "ProjectId": project_id,
+                }
+                for (fid, pid, uid) in page_users
+            ],
+        )
+
+
+def fetch_sprint_assignments(db: Session, *, project_id: int, sprint_id: int) -> list[dict[str, Any]]:
+    """
+    Return assignment hierarchy (Feature -> Page -> Users) for a sprint.
+    Single query, then assembled in Python (avoids N+1).
+    """
+    sf = pt_sprint_features
+    sp = pt_sprint_feature_pages
+    su = pt_sprint_page_users
+    f = pt_features
+    p = pt_pages
+    u = User
+
+    rows = db.execute(
+        select(
+            sf.c.FeatureId.label("feature_id"),
+            f.c.FeatureName.label("feature_name"),
+            sp.c.PageId.label("page_id"),
+            p.c.PageName.label("page_name"),
+            su.c.UserId.label("user_id"),
+            u.full_name.label("user_name"),
+        )
+        .select_from(
+            sf.join(f, f.c.FeatureId == sf.c.FeatureId)
+            .outerjoin(sp, and_(sp.c.SprintId == sf.c.SprintId, sp.c.FeatureId == sf.c.FeatureId, sp.c.ProjectId == sf.c.ProjectId))
+            .outerjoin(p, p.c.PageId == sp.c.PageId)
+            .outerjoin(
+                su,
+                and_(
+                    su.c.SprintId == sf.c.SprintId,
+                    su.c.FeatureId == sf.c.FeatureId,
+                    su.c.PageId == sp.c.PageId,
+                    su.c.ProjectId == sf.c.ProjectId,
+                ),
+            )
+            .outerjoin(u, u.id == su.c.UserId)
+        )
+        .where(and_(sf.c.ProjectId == project_id, sf.c.SprintId == sprint_id))
+        .order_by(
+            func.lower(f.c.FeatureName).asc(),
+            sf.c.FeatureId.asc(),
+            func.lower(p.c.PageName).asc(),
+            sp.c.PageId.asc(),
+            func.lower(u.full_name).asc(),
+            su.c.UserId.asc(),
+        )
+    ).all()
+
+    # Assemble hierarchy.
+    by_feature: dict[int, dict[str, Any]] = {}
+    for r in rows:
+        fid = int(r.feature_id)
+        fnode = by_feature.get(fid)
+        if fnode is None:
+            fnode = {"feature_id": fid, "feature_name": r.feature_name, "pages": []}
+            by_feature[fid] = fnode
+
+        # page_id may be None if only feature selected
+        if r.page_id is None:
+            continue
+        pid = int(r.page_id)
+        pages = fnode["pages"]
+        pnode = next((x for x in pages if x["page_id"] == pid), None)
+        if pnode is None:
+            pnode = {"page_id": pid, "page_name": r.page_name, "assigned_users": []}
+            pages.append(pnode)
+
+        if r.user_id is None:
+            continue
+        uid = int(r.user_id)
+        # avoid duplicates
+        if not any(x["user_id"] == uid for x in pnode["assigned_users"]):
+            pnode["assigned_users"].append({"user_id": uid, "user_name": r.user_name})
+
+    return list(by_feature.values())
+
+
+def fetch_sprint_assignments_bulk(
+    db: Session, *, project_id: int, sprint_ids: list[int]
+) -> dict[int, list[dict[str, Any]]]:
+    """Bulk variant of fetch_sprint_assignments for list pages."""
+    if not sprint_ids:
+        return {}
+
+    sf = pt_sprint_features
+    sp = pt_sprint_feature_pages
+    su = pt_sprint_page_users
+    f = pt_features
+    p = pt_pages
+    u = User
+
+    rows = db.execute(
+        select(
+            sf.c.SprintId.label("sprint_id"),
+            sf.c.FeatureId.label("feature_id"),
+            f.c.FeatureName.label("feature_name"),
+            sp.c.PageId.label("page_id"),
+            p.c.PageName.label("page_name"),
+            su.c.UserId.label("user_id"),
+            u.full_name.label("user_name"),
+        )
+        .select_from(
+            sf.join(f, f.c.FeatureId == sf.c.FeatureId)
+            .outerjoin(
+                sp,
+                and_(
+                    sp.c.SprintId == sf.c.SprintId,
+                    sp.c.FeatureId == sf.c.FeatureId,
+                    sp.c.ProjectId == sf.c.ProjectId,
+                ),
+            )
+            .outerjoin(p, p.c.PageId == sp.c.PageId)
+            .outerjoin(
+                su,
+                and_(
+                    su.c.SprintId == sf.c.SprintId,
+                    su.c.FeatureId == sf.c.FeatureId,
+                    su.c.PageId == sp.c.PageId,
+                    su.c.ProjectId == sf.c.ProjectId,
+                ),
+            )
+            .outerjoin(u, u.id == su.c.UserId)
+        )
+        .where(and_(sf.c.ProjectId == project_id, sf.c.SprintId.in_(sprint_ids)))
+        .order_by(
+            sf.c.SprintId.asc(),
+            func.lower(f.c.FeatureName).asc(),
+            sf.c.FeatureId.asc(),
+            func.lower(p.c.PageName).asc(),
+            sp.c.PageId.asc(),
+            func.lower(u.full_name).asc(),
+            su.c.UserId.asc(),
+        )
+    ).all()
+
+    out: dict[int, dict[int, dict[str, Any]]] = {}
+    for r in rows:
+        sid = int(r.sprint_id)
+        fid = int(r.feature_id)
+        fnode = out.setdefault(sid, {}).get(fid)
+        if fnode is None:
+            fnode = {"feature_id": fid, "feature_name": r.feature_name, "pages": []}
+            out[sid][fid] = fnode
+
+        if r.page_id is None:
+            continue
+        pid = int(r.page_id)
+        pages = fnode["pages"]
+        pnode = next((x for x in pages if x["page_id"] == pid), None)
+        if pnode is None:
+            pnode = {"page_id": pid, "page_name": r.page_name, "assigned_users": []}
+            pages.append(pnode)
+
+        if r.user_id is None:
+            continue
+        uid = int(r.user_id)
+        if not any(x["user_id"] == uid for x in pnode["assigned_users"]):
+            pnode["assigned_users"].append({"user_id": uid, "user_name": r.user_name})
+
+    return {sid: list(fmap.values()) for sid, fmap in out.items()}
 

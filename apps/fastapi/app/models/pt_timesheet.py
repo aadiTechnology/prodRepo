@@ -33,6 +33,18 @@ pt_owners = Table(
     schema=_SCHEMA,
 )
 
+pt_project_users = Table(
+    "PT_ProjectUsers",
+    Base.metadata,
+    Column("Id", Integer, primary_key=True, autoincrement=True),
+    Column("ProjectId", Integer, ForeignKey("PT_Project.Id"), nullable=False),
+    Column("UserId", Integer, ForeignKey("users.id"), nullable=False),
+    Column("IsActive", Integer),
+    Column("CreatedOn", DateTime),
+    UniqueConstraint("ProjectId", "UserId", name="UQ_PT_ProjectUsers_Project_User"),
+    schema=_SCHEMA,
+)
+
 pt_features = Table(
     "PT_Features",
     Base.metadata,
@@ -120,6 +132,49 @@ pt_timesheets = Table(
     Column("ActivityDate", DateTime),
     Column("CreatedOn", DateTime),
     Column("ProjectId", Integer, ForeignKey("PT_Project.Id")),
+    schema=_SCHEMA,
+)
+
+# --- Sprint assignment mappings (Feature -> Page -> Owner) ---
+pt_sprint_features = Table(
+    "PT_SprintFeatures",
+    Base.metadata,
+    Column("Id", Integer, primary_key=True, autoincrement=True),
+    Column("SprintId", Integer, ForeignKey("PT_Sprints.SprintId", ondelete="CASCADE"), nullable=False),
+    Column("FeatureId", Integer, ForeignKey("PT_Features.FeatureId", ondelete="CASCADE"), nullable=False),
+    Column("ProjectId", Integer, ForeignKey("PT_Project.Id", ondelete="CASCADE"), nullable=False),
+    UniqueConstraint("SprintId", "FeatureId", name="UQ_PT_SprintFeatures_Sprint_Feature"),
+    schema=_SCHEMA,
+)
+
+pt_sprint_feature_pages = Table(
+    "PT_SprintFeaturePages",
+    Base.metadata,
+    Column("Id", Integer, primary_key=True, autoincrement=True),
+    Column("SprintId", Integer, ForeignKey("PT_Sprints.SprintId", ondelete="CASCADE"), nullable=False),
+    Column("FeatureId", Integer, ForeignKey("PT_Features.FeatureId", ondelete="CASCADE"), nullable=False),
+    Column("PageId", Integer, ForeignKey("PT_Pages.PageId", ondelete="CASCADE"), nullable=False),
+    Column("ProjectId", Integer, ForeignKey("PT_Project.Id", ondelete="CASCADE"), nullable=False),
+    UniqueConstraint("SprintId", "FeatureId", "PageId", name="UQ_PT_SprintFeaturePages_Sprint_Feature_Page"),
+    schema=_SCHEMA,
+)
+
+pt_sprint_page_users = Table(
+    "PT_SprintPageUsers",
+    Base.metadata,
+    Column("Id", Integer, primary_key=True, autoincrement=True),
+    Column("SprintId", Integer, ForeignKey("PT_Sprints.SprintId", ondelete="CASCADE"), nullable=False),
+    Column("FeatureId", Integer, ForeignKey("PT_Features.FeatureId", ondelete="CASCADE"), nullable=False),
+    Column("PageId", Integer, ForeignKey("PT_Pages.PageId", ondelete="CASCADE"), nullable=False),
+    Column("UserId", Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+    Column("ProjectId", Integer, ForeignKey("PT_Project.Id", ondelete="CASCADE"), nullable=False),
+    UniqueConstraint(
+        "SprintId",
+        "FeatureId",
+        "PageId",
+        "UserId",
+        name="UQ_PT_SprintPageUsers_Sprint_Feature_Page_User",
+    ),
     schema=_SCHEMA,
 )
 

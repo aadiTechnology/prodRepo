@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { FormConfig } from "../../components/reusable/formFramework.types";
 import LabeledSwitch from "../../components/semantic/LabeledSwitch";
 
@@ -14,7 +15,10 @@ export type SprintLifecycleHandlers = {
   onCompletedChange: (value: boolean) => void;
 };
 
-export function createSprintFormConfig(handlers: SprintLifecycleHandlers): FormConfig<SprintFormData> {
+export function createSprintFormConfig(
+  handlers: SprintLifecycleHandlers,
+  extra?: { assignmentsSection?: ReactNode }
+): FormConfig<SprintFormData> {
   return {
     fields: {
       sprint_name: {
@@ -86,6 +90,16 @@ export function createSprintFormConfig(handlers: SprintLifecycleHandlers): FormC
         fieldNames: ["sprint_name", "is_active", "is_completed"],
       },
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["start_date", "end_date"] },
+      ...(extra?.assignmentsSection
+        ? ([
+            {
+              kind: "custom",
+              grid: { xs: 12 },
+              show: () => true,
+              render: () => extra.assignmentsSection as any,
+            },
+          ] as any)
+        : []),
     ],
   };
 }
