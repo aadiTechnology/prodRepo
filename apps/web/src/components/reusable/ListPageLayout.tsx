@@ -44,14 +44,17 @@ export default function ListPageLayout({
     ? {
         flex: 1,
         minHeight: 0,
+        minWidth: 0,
         display: "flex",
         flexDirection: "column",
         overflow: "auto",
+        WebkitOverflowScrolling: "touch",
         p: { xs: 2, sm: 3, md: 5 },
       }
     : {
         flex: 1,
         minHeight: 0,
+        minWidth: 0,
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -66,8 +69,9 @@ export default function ListPageLayout({
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          overflow: "hidden",
+          minWidth: 0,
           minHeight: 0,
+          overflow: "hidden",
           border: `1px solid ${colorTokens.border.default}`,
         }}
       >

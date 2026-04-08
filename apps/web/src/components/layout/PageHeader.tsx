@@ -129,6 +129,8 @@ export default function PageHeader({
             flexShrink: 0,
             marginLeft: { xs: 0, sm: "auto" },
             width: { xs: "100%", sm: "auto" },
+            minWidth: 0,
+            maxWidth: "100%",
           }}
         >
           {actions}

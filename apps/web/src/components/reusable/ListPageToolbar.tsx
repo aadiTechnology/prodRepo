@@ -59,6 +59,8 @@ export default function ListPageToolbar({
       flexDirection: { xs: "column", sm: "row" },
       gap: 2,
       width: { xs: "100%", sm: "auto" },
+      minWidth: 0,
+      maxWidth: "100%",
       flexWrap: "wrap",
       justifyContent: "flex-end"
     }}>
@@ -96,7 +98,12 @@ export default function ListPageToolbar({
       )}
       {/* renderActions BEFORE search (default behaviour — preserves all existing pages) */}
       {!actionsAfterSearch && renderActions != null && (
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          sx={{ minWidth: 0, maxWidth: "100%", alignSelf: { xs: "stretch", sm: "auto" } }}
+        >
           {renderActions}
         </Stack>
       )}
@@ -129,7 +136,12 @@ export default function ListPageToolbar({
       />
       {/* renderActions AFTER search (opt-in via actionsAfterSearch prop) */}
       {actionsAfterSearch && renderActions != null && (
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          sx={{ minWidth: 0, maxWidth: "100%", alignSelf: { xs: "stretch", sm: "auto" } }}
+        >
           {renderActions}
         </Stack>
       )}

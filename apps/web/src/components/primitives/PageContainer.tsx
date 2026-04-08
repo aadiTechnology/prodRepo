@@ -33,7 +33,10 @@ export default function PageContainer({
         },
         pageBackground && {
           height: "100%",
-          overflow: "hidden",
+          minWidth: 0,
+          // Allow horizontal pan/scroll; overflow hidden on both axes clips toolbar + tables on narrow viewports.
+          overflowX: "auto",
+          overflowY: "hidden",
           display: "flex",
           flexDirection: "column",
         },

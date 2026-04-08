@@ -29,7 +29,11 @@ export default function PageLayout({
 }: PageLayoutProps) {
   return (
     <PageContainer maxWidth={maxWidth} pageBackground={pageBackground}>
-      <Stack direction="column" spacing={spacing} sx={{ flex: 1, minHeight: 0 }}>
+      <Stack
+        direction="column"
+        spacing={spacing}
+        sx={{ flex: 1, minHeight: 0, minWidth: 0, width: "100%" }}
+      >
         {header}
         {children}
       </Stack>

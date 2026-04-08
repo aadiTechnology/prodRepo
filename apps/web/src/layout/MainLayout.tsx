@@ -159,6 +159,7 @@ function MainLayout() {
           display: "flex",
           flexDirection: "column",
           flexGrow: 1,
+          minWidth: 0,
           height: "100%",
           width: {
             md: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)`
@@ -452,8 +453,10 @@ function MainLayout() {
             display: "flex",
             flexDirection: "column",
             flexGrow: 1,
+            minWidth: 0,
             overflow: "auto",
             minHeight: 0, // CRITICAL: ensures flex child doesn't overflow parent incorrectly
+            WebkitOverflowScrolling: "touch",
           }}
         >
           <PageContainer
@@ -462,6 +465,8 @@ function MainLayout() {
               px: { xs: 1, sm: 2, md: 2, lg: 3, xl: 4 },
               py: { xs: 0.5, sm: 1 }, // Compact padding
               maxWidth: "100% !important",
+              minWidth: 0,
+              width: "100%",
             }}
           >
             <Outlet />

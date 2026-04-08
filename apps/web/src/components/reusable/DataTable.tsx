@@ -75,7 +75,18 @@ export default function DataTable<T extends object>({
   // Defensive: always use an array
   const safeData = Array.isArray(data) ? data : [];
   return (
-    <TableContainer sx={{ flex: 1, minHeight: 0, maxHeight: maxHeight ?? undefined, overflowX: 'auto', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+    <TableContainer
+      sx={{
+        flex: 1,
+        minHeight: 0,
+        // Allow shrinking on flex axes so overflowX can scroll (default min-width: auto prevents this).
+        minWidth: 0,
+        maxHeight: maxHeight ?? undefined,
+        overflowX: "auto",
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
           <CircularProgress sx={(t) => ({ color: t.palette.primary.main })} />

@@ -100,7 +100,7 @@ export default function SprintList() {
                   },
                 ]}
                 renderActions={
-                  <Box sx={{ minWidth: 240 }}>
+                  <Box sx={{ minWidth: 0, width: "100%", maxWidth: "100%" }}>
                     <Typography variant="caption" color="text.secondary" display="block">
                       Project
                     </Typography>
@@ -111,7 +111,6 @@ export default function SprintList() {
                       onChangeId={(id) => setProjectId(id)}
                       placeholder={projectsLoading ? "Loading…" : "Select project"}
                       disabled={projectsLoading}
-                      fullWidth={false}
                     />
                   </Box>
                 }
