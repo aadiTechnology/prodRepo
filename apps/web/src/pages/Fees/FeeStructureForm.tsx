@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Box } from "@mui/material";
 import feeService from "../../api/services/feeService";
 import BaseForm from "../../components/reusable/BaseForm";
 import { useFormManager } from "../../hooks/useFormManager";
@@ -10,6 +9,29 @@ import {
   type FeeInstallmentPreview,
 } from "./FeeStructure.formConfig";
 import { type FeeCategory, type AcademicYear, type ClassEntity } from "../../types/fee";
+
+// Local utility: calculateInstallments
+function calculateInstallments({ total, count, type, startDate }: {
+  total: number;
+  count: number;
+  type: "MONTHLY" | "QUARTERLY" | "YEARLY";
+  startDate: Date;
+}): FeeInstallmentPreview[] {
+  if (count <= 0 || total <= 0) return [];
+  const perInstallment = Math.floor((total / count) * 100) / 100;
+  const remainder = Math.round((total - perInstallment * count) * 100) / 100;
+  const monthStep = type === "MONTHLY" ? 1 : type === "QUARTERLY" ? 3 : 12;
+  return Array.from({ length: count }, (_, i) => {
+    const dueDate = new Date(startDate);
+    dueDate.setMonth(dueDate.getMonth() + i * monthStep);
+    return {
+      installment_number: i + 1,
+      amount: i === count - 1 ? Math.round((perInstallment + remainder) * 100) / 100 : perInstallment,
+      due_date: dueDate.toISOString().split("T")[0],
+    };
+  });
+}
+import { type FormValidationConfig } from "../../utils/formValidation";
 
 const FeeStructureForm = () => {
   const navigate = useNavigate();
@@ -41,9 +63,24 @@ const FeeStructureForm = () => {
     []
   );
 
+  // Field-level validation config
+  const validationConfig: FormValidationConfig<FeeStructureFormData> = {
+    academic_year_id: [ { type: "required", message: "Academic year is required." } ],
+    class_id: [ { type: "required", message: "Class is required." } ],
+    fee_category_id: [ { type: "required", message: "Fee category is required." } ],
+    total_amount: [
+      { type: "required", message: "Total amount is required." },
+      { type: "pattern", regex: /^\d+(\.\d{1,2})?$/, message: "Enter a valid amount." },
+    ],
+    num_installments: [
+      { type: "required", message: "Number of installments is required." },
+      { type: "pattern", regex: /^\d+$/, message: "Enter a valid number." },
+    ],
+  };
+
   const formManager = useFormManager<FeeStructureFormData>({
     initialValues,
-    validationConfig: {}, // We'll rely on server-side or add UI-side validation if needed
+    validationConfig,
   });
 
   const { formData, setFormData, handleFieldValueChange } = formManager;
@@ -111,39 +148,33 @@ const FeeStructureForm = () => {
     if (isEditMode) fetchStructure();
   }, [isEditMode, fetchStructure]);
 
-  // Installment preview logic
+  // Installment preview logic (extracted, improved date logic)
   useEffect(() => {
-    const count = parseInt(formData.num_installments.toString()) || 0;
-    const total = parseFloat(formData.total_amount.toString()) || 0;
-
+    const count = parseInt(formData.num_installments?.toString() || "0", 10);
+    const total = parseFloat(formData.total_amount?.toString() || "0");
+    // Use academic year start date if available, else today
+    let startDate = new Date();
+    const selectedYear = academicYears.find((y) => y.id === Number(formData.academic_year_id));
+    // Type guard for start_date (not in AcademicYear interface, but may be present)
+    if (selectedYear && (selectedYear as any).start_date && typeof (selectedYear as any).start_date === 'string') {
+      const parsed = Date.parse((selectedYear as any).start_date);
+      if (!isNaN(parsed)) {
+        startDate = new Date(parsed);
+      }
+    }
     if (count > 0 && total > 0) {
-      const perInstallment = Math.floor((total / count) * 100) / 100;
-      const remainder = Math.round((total - perInstallment * count) * 100) / 100;
-
-      const monthStep =
-        formData.installment_type === "MONTHLY"
-          ? 1
-          : formData.installment_type === "QUARTERLY"
-          ? 3
-          : 12;
-
-      const newInstallments = Array.from({ length: count }, (_, i) => {
-        const dueDate = new Date();
-        dueDate.setMonth(dueDate.getMonth() + i * monthStep);
-        return {
-          installment_number: i + 1,
-          amount:
-            i === count - 1
-              ? Math.round((perInstallment + remainder) * 100) / 100
-              : perInstallment,
-          due_date: dueDate.toISOString().split("T")[0],
-        };
-      });
-      setInstallments(newInstallments);
+      setInstallments(
+        calculateInstallments({
+          total,
+          count,
+          type: formData.installment_type as "MONTHLY" | "QUARTERLY" | "YEARLY",
+          startDate,
+        })
+      );
     } else {
       setInstallments([]);
     }
-  }, [formData.num_installments, formData.total_amount, formData.installment_type]);
+  }, [formData.num_installments, formData.total_amount, formData.installment_type, formData.academic_year_id, academicYears]);
 
   const formConfig = useMemo(() => {
     const cfg = createFeeStructureFormConfig({
@@ -165,20 +196,29 @@ const FeeStructureForm = () => {
     setLoading(true);
     setError(null);
     try {
+      // Ensure all required fields are numbers for API
+      const academic_year_id = Number(formData.academic_year_id);
+      const class_id = Number(formData.class_id);
+      const total_amount = Number(formData.total_amount);
+      const num_installments = Number(formData.num_installments);
       const payload = {
         ...formData,
+        academic_year_id,
+        class_id,
+        total_amount,
+        num_installments,
         installments: installments.map((inst) => ({
           ...inst,
-          late_fee_applicable: true,
-          late_fee_amount: 100,
+          late_fee_applicable: true, // TODO: make configurable if needed
+          late_fee_amount: 100, // TODO: make configurable if needed
         })),
       };
 
       if (isEditMode && id) {
-        await feeService.updateFeeStructure(Number(id), payload as any);
+        await feeService.updateFeeStructure(Number(id), payload);
         setSnackbar("Fee structure updated successfully!");
       } else {
-        await feeService.createFeeStructure(payload as any);
+        await feeService.createFeeStructure(payload);
         setSnackbar("Fee structure created successfully!");
       }
       setTimeout(() => navigate("/fees/setup"), 1000);
@@ -187,7 +227,12 @@ const FeeStructureForm = () => {
       if (err?.response?.status === 409 || msg.toLowerCase().includes("exists")) {
         msg = "Fee structure already exists for this class and category";
       }
-      setError(msg);
+      // Map server-side validation errors to form fields if possible
+      if (err?.response?.data?.fieldErrors) {
+        formManager.setFieldErrors(err.response.data.fieldErrors);
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
