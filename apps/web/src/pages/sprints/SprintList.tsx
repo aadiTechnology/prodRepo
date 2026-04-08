@@ -1,11 +1,12 @@
 import { useMemo } from "react";
-import { Alert, Box, Snackbar, Typography } from "@mui/material";
+import { Alert, Box, Button, Snackbar, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { ListPageLayout, ListPageToolbar, EntityTableSection } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import { SearchableSelect } from "../../components/semantic";
 import { useSprintListController } from "../../hooks/useSprintListController";
+import { createSprintListConfig, renderSprintRowActions } from "./SprintList.listConfig";
 
 export default function SprintList() {
   const navigate = useNavigate();
@@ -41,24 +42,13 @@ export default function SprintList() {
     onAdd,
   } = useSprintListController({ navigate });
 
-  const columns = useMemo(
-    () => [
-      { key: "sprint_id", label: "ID", minWidth: 60, render: (r: any) => r.sprint_id },
-      { key: "sprint_name", label: "Name", minWidth: 220, render: (r: any) => r.sprint_name || "—" },
-      { key: "start_date", label: "Start", minWidth: 120, render: (r: any) => r.start_date || "—" },
-      { key: "end_date", label: "End", minWidth: 120, render: (r: any) => r.end_date || "—" },
-      {
-        key: "lifecycle",
-        label: "Status",
-        minWidth: 110,
-        render: (r: any) => {
-          if (r.is_completed) return "Completed";
-          if (r.is_active) return "Active";
-          return "Inactive";
-        },
-      },
-    ],
-    []
+  const listConfig = useMemo(
+    () =>
+      createSprintListConfig({
+        navigate,
+        onDeleteClick: openDeleteConfirm,
+      }),
+    [navigate, openDeleteConfirm]
   );
 
   return (
@@ -104,11 +94,7 @@ export default function SprintList() {
                   },
                 ]}
                 renderActions={
-                  <Box sx={{ minWidth: 0, width: "100%", maxWidth: "100%" }}>
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      Project
-                    </Typography>
-                    <SearchableSelect
+                  <Box sx={{ minWidth: 0, width: "100%", maxWidth: "100%" }}><SearchableSelect
                       label=""
                       valueId={projectId}
                       options={projects}
@@ -122,8 +108,19 @@ export default function SprintList() {
             }
           />
           {error && (
-            <Box sx={{ m: 2 }}>
-              <Alert severity="error">{error}</Alert>
+            <Box sx={{ m: 2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Typography variant="body2" color="error">
+                {error}
+              </Typography>
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                onClick={() => void fetchSprints()}
+                disabled={loading}
+              >
+                {listConfig.uiPolicy.retryLabel}
+              </Button>
             </Box>
           )}
         </>
@@ -136,29 +133,17 @@ export default function SprintList() {
         rowsPerPage={rowsPerPage}
         onPageChange={setPage}
         onRowsPerPageChange={onRowsPerPageChange}
-        columns={columns as any}
+        columns={listConfig.columns as any}
         data={sprints as any}
         loading={loading}
-        emptyMessage={projectId == null ? "Select a project to view sprints." : "No sprints found."}
-        renderRowActions={(row: any) => (
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <Typography
-              variant="body2"
-              sx={{ cursor: "pointer", textDecoration: "underline" }}
-              onClick={() => navigate(`/sprints/${row.sprint_id}/edit`)}
-            >
-              Edit
-            </Typography>
-            <Typography
-              variant="body2"
-              color="error"
-              sx={{ cursor: "pointer", textDecoration: "underline" }}
-              onClick={() => openDeleteConfirm(row)}
-            >
-              Delete
-            </Typography>
-          </Box>
-        )}
+        emptyMessage={projectId == null ? "Select a project to view sprints." : listConfig.uiPolicy.emptyMessage}
+        renderRowActions={(row: any) =>
+          renderSprintRowActions({
+            row,
+            onEdit: () => navigate(`/sprints/${row.sprint_id}/edit`),
+            onDelete: () => openDeleteConfirm(row),
+          })
+        }
         stickyHeader
         size="small"
       />
