@@ -1,6 +1,7 @@
 from datetime import datetime
 import re
 from fastapi import HTTPException
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 from app.models import SchoolClass, AcademicYear, ClassDivision
 from app.schemas.school_class_schema import SchoolClassCreate, SchoolClassUpdate
@@ -35,8 +36,10 @@ def _check_duplicate_code(
 
 
 
-def _generate_default_code(name: str) -> str:
+def _generate_default_code(name: str, section: str | None = None) -> str:
     raw = name.strip().upper()
+    if section:
+        raw += f"-{section.strip().upper()}"
     normalized = re.sub(r"[^A-Z0-9]+", "-", raw).strip("-")
     return normalized[:40] or "CLASS"
 
@@ -54,12 +57,15 @@ def _ensure_academic_year_exists(db: Session, tenant_id: int, academic_year_id: 
 def get_all_classes(
     db: Session,
     tenant_id: int,
+    academic_year_id: int | None = None,
     search: str | None = None,
 ):
     query = db.query(SchoolClass).filter(
         SchoolClass.tenant_id == tenant_id,
         SchoolClass.is_deleted == False,
     )
+    if academic_year_id:
+        query = query.filter(SchoolClass.academic_year_id == academic_year_id)
 
     if search:
         text = f"%{search.strip()}%"
@@ -93,7 +99,7 @@ def create_class(
     normalized_name = data.name.strip()
     normalized_code = _normalize_text(data.code)
     _ensure_academic_year_exists(db, tenant_id, data.academic_year_id)
-    final_code = normalized_code or _generate_default_code(normalized_name)
+    final_code = normalized_code or _generate_default_code(normalized_name, data.section)
     _check_duplicate_code(db, tenant_id, final_code)
 
     db_obj = SchoolClass(
@@ -108,6 +114,19 @@ def create_class(
         created_at=datetime.utcnow(),
     )
     db.add(db_obj)
+    db.flush()  # To get db_obj.id
+
+    # Create default division if section provided
+    normalized_section = _normalize_text(data.section)
+    if normalized_section:
+        division = ClassDivision(
+            class_id=db_obj.id,
+            division_name=normalized_section,
+            capacity=data.capacity,
+            is_active=data.is_active
+        )
+        db.add(division)
+
     db.commit()
     db.refresh(db_obj)
     return db_obj
@@ -146,6 +165,22 @@ def update_class(
             update_data.pop("code")
     if "description" in update_data:
         update_data["description"] = _normalize_text(update_data["description"])
+
+    # Handle automated division update if section provided
+    if "section" in update_data:
+        normalized_section = _normalize_text(update_data.pop("section"))
+        if normalized_section:
+            # Update first division or create if none exists
+            if db_obj.divisions:
+                db_obj.divisions[0].division_name = normalized_section
+            else:
+                division = ClassDivision(
+                    class_id=db_obj.id,
+                    division_name=normalized_section,
+                    capacity=db_obj.capacity,
+                    is_active=db_obj.is_active
+                )
+                db.add(division)
 
     for key, value in update_data.items():
         setattr(db_obj, key, value)

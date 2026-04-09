@@ -46,32 +46,16 @@ def create_academic_year(db: Session, obj_in: AcademicYearCreate, tenant_id: int
     return db_obj
 
 def get_classes(db: Session, tenant_id: int, academic_year_id: int = None) -> list[SchoolClass]:
-    query = db.query(SchoolClass).filter(
-        SchoolClass.tenant_id == tenant_id,
-        SchoolClass.is_deleted == False
-    )
-    if academic_year_id:
-        query = query.filter(SchoolClass.academic_year_id == academic_year_id)
-    return query.options(joinedload(SchoolClass.divisions)).all()
+    return school_class_service.get_all_classes(db, tenant_id, academic_year_id=academic_year_id)
 
 def get_class(db: Session, class_id: int, tenant_id: int) -> SchoolClass:
-    obj = db.query(SchoolClass).filter(
-        SchoolClass.id == class_id,
-        SchoolClass.tenant_id == tenant_id,
-        SchoolClass.is_deleted == False
-    ).first()
-    if not obj:
-        raise NotFoundException("Class", class_id)
-    return obj
+    return school_class_service.get_class_by_id(db, class_id, tenant_id)
 
 def create_class(db: Session, obj_in: ClassCreate, tenant_id: int, user_id: int) -> SchoolClass:
-    # Convert ClassCreate (from academic schema) to SchoolClassCreate (from school_class schema)
-    # to utilize the unified creation logic in school_class_service
-    creation_data = SchoolClassCreate(**obj_in.model_dump())
-    
+    # Use the unified creation logic in school_class_service
     return school_class_service.create_class(
         db=db,
-        data=creation_data,
+        data=obj_in,
         tenant_id=tenant_id,
         created_by=user_id
     )

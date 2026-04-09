@@ -31,11 +31,12 @@ export default function AddClass() {
     const validationConfig = useMemo<FormValidationConfig<AddClassFormData>>(() => ({
         name: [
             { type: "required", message: "Class Name is required." },
-            { type: "minLength", value: 2, message: "Min 2 characters." },
+            { type: "minLength", value: 1, message: "Min 1 character." },
             { type: "maxLength", value: 100, message: "Max 100 characters." },
         ],
         section: [
-            { type: "required", message: "Section is required." },
+            { type: "required", message: "Division is required." },
+            { type: "minLength", value: 1, message: "Min 1 character." },
             { type: "maxLength", value: 50, message: "Max 50 characters." },
         ],
         capacity: [
@@ -82,7 +83,7 @@ export default function AddClass() {
             setFormData({
                 academic_year_id: data.academic_year_id || "",
                 name: data.name || "",
-                section: data.section || "",
+                section: data.divisions?.[0]?.division_name || "",
                 capacity: data.capacity ? String(data.capacity) : "",
                 is_active: data.is_active ?? true,
             });
