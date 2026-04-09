@@ -3,6 +3,7 @@ import type { User as AuthUser } from "../types/auth";
 import type { UserResponse } from "../types/user";
 import userService from "../api/services/userService";
 import authService from "../api/services/authService";
+import roleService from "../api/services/roleService";
 import { useListManager, type UseListManagerResult } from "./useListManager";
 import type { NavigateFunction } from "react-router-dom";
 import type { LoginContextResponse } from "../types/rbac";
@@ -21,7 +22,8 @@ type UseUsersListControllerResult = {
   listState: UseListManagerResult<UsersFilters, UsersSortBy>;
   filteredUsers: AuthUser[];
   paginatedUsers: AuthUser[];
-  uniqueRoles: string[];
+  uniqueRoles: string[]; // fallback
+  roleFilterOptions: { label: string; value: string }[];
   loading: boolean;
   error: string | null;
   snackbar: string | null;
@@ -59,6 +61,7 @@ export function useUsersListController({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [allRoles, setAllRoles] = useState<any[]>([]);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<AuthUser | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -79,8 +82,14 @@ export function useUsersListController({
     try {
       setLoading(true);
       setError(null);
-      const data = await userService.getAllUsers();
-      setUsers(mapUsers(data as UserResponse[]));
+      const [usersData, rolesData] = await Promise.all([
+        userService.getAllUsers(),
+        roleService.getRoles({ pageSize: 1000 })
+      ]);
+      setUsers(mapUsers(usersData as UserResponse[]));
+      if (rolesData && rolesData.items) {
+        setAllRoles(rolesData.items);
+      }
     } catch (err: unknown) {
       const errorObject = err as { message?: string; detail?: string };
       setError(errorObject.message || errorObject.detail || "Failed to fetch users.");
@@ -164,6 +173,22 @@ export function useUsersListController({
     [users]
   );
 
+  const roleFilterOptions = useMemo(() => {
+    if (allRoles.length > 0) {
+      return allRoles.map((r) => ({ label: r.name, value: r.code }));
+    }
+    // Fallback if role fetch fails
+    return uniqueRoles.map(role => {
+      return {
+        label: role
+          .toLowerCase()
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (char) => char.toUpperCase()),
+        value: role
+      };
+    });
+  }, [allRoles, uniqueRoles]);
+
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
       const matchesTenant =
@@ -215,6 +240,7 @@ export function useUsersListController({
     filteredUsers,
     paginatedUsers,
     uniqueRoles,
+    roleFilterOptions,
     loading,
     error,
     snackbar,

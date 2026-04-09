@@ -50,6 +50,7 @@ const Users = () => {
     },
     filteredUsers,
     paginatedUsers,
+    roleFilterOptions,
     uniqueRoles,
     loading,
     error,
@@ -95,9 +96,7 @@ const Users = () => {
                     label: "Role",
                     value: filters.role,
                     onChange: (val) => setFilter("role", val),
-                    options: [
-                      ...uniqueRoles.map((role) => ({ label: toRoleLabel(role), value: role }))
-                    ]
+                    options: roleFilterOptions
                   },
                   {
                     label: "Status",
