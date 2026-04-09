@@ -49,10 +49,10 @@ export function createFeeStructureFormConfig({
         type: "select",
         required: true,
         props: {
-          options: classes.map((c) => ({ 
-            value: c.id, 
-            label: c.code && c.code !== c.name ? `${c.name} (${c.code})` : c.name 
-          })),
+          // Deduplicate by name — each class shown once regardless of how many sections exist
+          options: classes
+            .filter((c, idx, arr) => arr.findIndex((x) => x.name.toLowerCase() === c.name.toLowerCase()) === idx)
+            .map((c) => ({ value: c.id, label: c.name })),
           disabled: classes.length === 0,
         },
       },

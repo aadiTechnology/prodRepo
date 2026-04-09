@@ -12,7 +12,6 @@ from datetime import datetime
 # School Class Models - Request/Response validation
 # ═══════════════════════════════════════════════════════════════════════════
 class SchoolClassBase(BaseModel):
-    academic_year_id: int
     name: str = Field(min_length=1, max_length=100)
     section: Optional[str] = Field(None, min_length=1, max_length=50)
     code: Optional[str] = Field(None, min_length=1, max_length=50)
@@ -26,7 +25,6 @@ class SchoolClassCreate(SchoolClassBase):
 
 
 class SchoolClassUpdate(BaseModel):
-    academic_year_id: Optional[int] = None
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     section: Optional[str] = Field(None, min_length=1, max_length=50)
     code: Optional[str] = Field(None, min_length=1, max_length=50)

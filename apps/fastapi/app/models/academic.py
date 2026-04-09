@@ -25,7 +25,7 @@ class AcademicYear(Base):
     deleted_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Relationships
-    classes = relationship("SchoolClass", back_populates="academic_year", cascade="all, delete-orphan")
+    # classes relationship removed — SchoolClass is now a year-independent master
 
 
 class SchoolClass(Base):
@@ -34,7 +34,6 @@ class SchoolClass(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
-    academic_year_id = Column(Integer, ForeignKey("academic_years.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(100), nullable=False)
     code = Column(String(50), nullable=False)
     description = Column(String(500), nullable=True)
@@ -51,7 +50,6 @@ class SchoolClass(Base):
     deleted_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Relationships
-    academic_year = relationship("AcademicYear", back_populates="classes")
     divisions = relationship("ClassDivision", back_populates="class_model", cascade="all, delete-orphan")
     fee_structures = relationship("FeeStructure", back_populates="class_model", cascade="all, delete-orphan")
     students = relationship("Student", back_populates="class_model", overlaps="students")

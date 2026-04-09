@@ -170,60 +170,71 @@ def get_fee_structure(db: Session, structure_id: int, tenant_id: int) -> FeeStru
     return obj
 
 def create_fee_structure(db: Session, obj_in: FeeStructureCreate, tenant_id: int, user_id: int) -> FeeStructure:
-    # 1. Look up the designated class to get its name
+    # Verify the class exists for this tenant
     target_class = db.query(SchoolClass).filter(
-        SchoolClass.id == obj_in.class_id, 
-        SchoolClass.tenant_id == tenant_id
-    ).first()
-    
-    if not target_class:
-        raise NotFoundException("SchoolClass", obj_in.class_id)
-        
-    # Find all classes with same name and academic year
-    matching_classes = db.query(SchoolClass).filter(
-        SchoolClass.name == target_class.name,
-        SchoolClass.academic_year_id == obj_in.academic_year_id,
+        SchoolClass.id == obj_in.class_id,
         SchoolClass.tenant_id == tenant_id,
         SchoolClass.is_deleted == False
-    ).all()
-    
-    if not matching_classes:
-        raise NotFoundException("SchoolClass matching name and academic year", target_class.name)
-        
-    # Check if ANY of these already have a fee structure for this category
-    class_ids = [c.id for c in matching_classes]
+    ).first()
+
+    if not target_class:
+        raise NotFoundException("SchoolClass", obj_in.class_id)
+
+    # Check if a fee structure already exists for this class + category + year
     existing = db.query(FeeStructure).filter(
         FeeStructure.tenant_id == tenant_id,
-        FeeStructure.class_id.in_(class_ids),
+        FeeStructure.class_id == obj_in.class_id,
         FeeStructure.fee_category_id == obj_in.fee_category_id,
         FeeStructure.academic_year_id == obj_in.academic_year_id,
         FeeStructure.is_deleted == False
     ).first()
-    
+
     if existing:
         raise ConflictException("Fee structure already exists for this class, category, and year.")
 
-    # Create one FeeStructure per section
-    created_structures = []
-    
-    for cls in matching_classes:
-        db_obj = FeeStructure(
-            tenant_id=tenant_id,
-            class_id=cls.id,
-            fee_category_id=obj_in.fee_category_id,
-            academic_year_id=obj_in.academic_year_id,
-            total_amount=obj_in.total_amount,
-            installment_type=obj_in.installment_type,
-            num_installments=obj_in.num_installments,
-            description=obj_in.description,
-            name="",  # Providing default to avoid NOT NULL constraint on SQL Server
-            is_active=obj_in.is_active,
+    db_obj = FeeStructure(
+        tenant_id=tenant_id,
+        class_id=obj_in.class_id,
+        fee_category_id=obj_in.fee_category_id,
+        academic_year_id=obj_in.academic_year_id,
+        total_amount=obj_in.total_amount,
+        installment_type=obj_in.installment_type,
+        num_installments=obj_in.num_installments,
+        description=obj_in.description,
+        name="",
+        is_active=obj_in.is_active,
+        created_by=user_id
+    )
+    db.add(db_obj)
+    db.flush()  # Get ID
+
+    for inst_in in obj_in.installments:
+        inst_data = inst_in.model_dump()
+        if not inst_data.get("fee_category_id"):
+            inst_data["fee_category_id"] = db_obj.fee_category_id
+        inst_db = FeeInstallment(
+            fee_structure_id=db_obj.id,
+            **inst_data,
             created_by=user_id
         )
-        db.add(db_obj)
-        db.flush() # Get ID
-        
-        # Handle installments
+        db.add(inst_db)
+
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+
+def update_fee_structure(db: Session, structure_id: int, obj_in: FeeStructureUpdate, tenant_id: int, user_id: int) -> FeeStructure:
+    db_obj = get_fee_structure(db, structure_id, tenant_id)
+
+    update_data = obj_in.model_dump(exclude={"installments"}, exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_obj, field, value)
+
+    db_obj.updated_at = datetime.utcnow()
+    db_obj.updated_by = user_id
+
+    if obj_in.installments is not None:
+        db.query(FeeInstallment).filter(FeeInstallment.fee_structure_id == db_obj.id).delete()
         for inst_in in obj_in.installments:
             inst_data = inst_in.model_dump()
             if not inst_data.get("fee_category_id"):
@@ -234,110 +245,23 @@ def create_fee_structure(db: Session, obj_in: FeeStructureCreate, tenant_id: int
                 created_by=user_id
             )
             db.add(inst_db)
-            
-        created_structures.append(db_obj)
-        
-    db.commit()
-    for s in created_structures:
-        db.refresh(s)
-        
-    # Return the one that matches the requested class_id exactly
-    for s in created_structures:
-        if s.class_id == obj_in.class_id:
-            return s
-            
-    return created_structures[0] if created_structures else None
 
-def update_fee_structure(db: Session, structure_id: int, obj_in: FeeStructureUpdate, tenant_id: int, user_id: int) -> FeeStructure:
-    db_obj = get_fee_structure(db, structure_id, tenant_id)
-    
-    # We update ALL structures that share the same class_name, category, and academic_year
-    target_class = db.query(SchoolClass).filter(
-        SchoolClass.id == db_obj.class_id, SchoolClass.tenant_id == tenant_id
-    ).first()
-    
-    matching_classes = db.query(SchoolClass).filter(
-        SchoolClass.name == target_class.name,
-        SchoolClass.academic_year_id == db_obj.academic_year_id,
-        SchoolClass.tenant_id == tenant_id,
-        SchoolClass.is_deleted == False
-    ).all()
-    
-    class_ids = [c.id for c in matching_classes]
-    
-    structures_to_update = db.query(FeeStructure).filter(
-        FeeStructure.tenant_id == tenant_id,
-        FeeStructure.class_id.in_(class_ids),
-        FeeStructure.fee_category_id == db_obj.fee_category_id,
-        FeeStructure.academic_year_id == db_obj.academic_year_id,
-        FeeStructure.is_deleted == False
-    ).all()
-    
-    update_data = obj_in.model_dump(exclude={"installments"}, exclude_unset=True)
-    
-    for struct in structures_to_update:
-        for field, value in update_data.items():
-            setattr(struct, field, value)
-        
-        struct.updated_at = datetime.utcnow()
-        struct.updated_by = user_id
-        
-        if obj_in.installments is not None:
-            # Delete existing and add new
-            db.query(FeeInstallment).filter(FeeInstallment.fee_structure_id == struct.id).delete()
-            for inst_in in obj_in.installments:
-                inst_data = inst_in.model_dump()
-                if not inst_data.get("fee_category_id"):
-                    inst_data["fee_category_id"] = struct.fee_category_id
-                inst_db = FeeInstallment(
-                    fee_structure_id=struct.id,
-                    **inst_data,
-                    created_by=user_id
-                )
-                db.add(inst_db)
-                
     db.commit()
-    for struct in structures_to_update:
-        db.refresh(struct)
-        
     db.refresh(db_obj)
     return db_obj
 
 def delete_fee_structure(db: Session, structure_id: int, tenant_id: int, user_id: int) -> None:
     db_obj = get_fee_structure(db, structure_id, tenant_id)
-    
-    # We delete ALL structures that share the same class_name, category, and academic_year
-    target_class = db.query(SchoolClass).filter(
-        SchoolClass.id == db_obj.class_id, SchoolClass.tenant_id == tenant_id
-    ).first()
-    
-    matching_classes = db.query(SchoolClass).filter(
-        SchoolClass.name == target_class.name,
-        SchoolClass.academic_year_id == db_obj.academic_year_id,
-        SchoolClass.tenant_id == tenant_id,
-        SchoolClass.is_deleted == False
-    ).all()
-    
-    class_ids = [c.id for c in matching_classes]
-    
-    structures_to_delete = db.query(FeeStructure).filter(
-        FeeStructure.tenant_id == tenant_id,
-        FeeStructure.class_id.in_(class_ids),
-        FeeStructure.fee_category_id == db_obj.fee_category_id,
-        FeeStructure.academic_year_id == db_obj.academic_year_id,
-        FeeStructure.is_deleted == False
-    ).all()
-    
-    for struct in structures_to_delete:
-        struct.is_deleted = True
-        struct.deleted_at = datetime.utcnow()
-        struct.deleted_by = user_id
-        
-        # Soft delete installments too
-        db.query(FeeInstallment).filter(FeeInstallment.fee_structure_id == struct.id).update({
-            "is_deleted": True,
-            "deleted_at": datetime.utcnow(),
-            "deleted_by": user_id
-        })
-    
+
+    db_obj.is_deleted = True
+    db_obj.deleted_at = datetime.utcnow()
+    db_obj.deleted_by = user_id
+
+    # Soft delete installments too
+    db.query(FeeInstallment).filter(FeeInstallment.fee_structure_id == db_obj.id).update({
+        "is_deleted": True,
+        "deleted_at": datetime.utcnow(),
+        "deleted_by": user_id
+    })
+
     db.commit()

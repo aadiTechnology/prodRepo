@@ -3,7 +3,7 @@ import re
 from fastapi import HTTPException
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
-from app.models import SchoolClass, AcademicYear, ClassDivision
+from app.models import SchoolClass, ClassDivision
 from app.schemas.school_class_schema import SchoolClassCreate, SchoolClassUpdate
 
 
@@ -44,15 +44,6 @@ def _generate_default_code(name: str, section: str | None = None) -> str:
     return normalized[:40] or "CLASS"
 
 
-def _ensure_academic_year_exists(db: Session, tenant_id: int, academic_year_id: int) -> None:
-    year = db.query(AcademicYear).filter(
-        AcademicYear.id == academic_year_id,
-        AcademicYear.tenant_id == tenant_id,
-        AcademicYear.is_deleted == False,
-    ).first()
-    if not year:
-        raise HTTPException(status_code=400, detail="Invalid academic year for this tenant")
-
 
 def get_all_classes(
     db: Session,
@@ -64,8 +55,6 @@ def get_all_classes(
         SchoolClass.tenant_id == tenant_id,
         SchoolClass.is_deleted == False,
     )
-    if academic_year_id:
-        query = query.filter(SchoolClass.academic_year_id == academic_year_id)
 
     if search:
         text = f"%{search.strip()}%"
@@ -98,13 +87,11 @@ def create_class(
 ):
     normalized_name = data.name.strip()
     normalized_code = _normalize_text(data.code)
-    _ensure_academic_year_exists(db, tenant_id, data.academic_year_id)
     final_code = normalized_code or _generate_default_code(normalized_name, data.section)
     _check_duplicate_code(db, tenant_id, final_code)
 
     db_obj = SchoolClass(
         tenant_id=tenant_id,
-        academic_year_id=data.academic_year_id,
         name=normalized_name,
         code=final_code,
         description=_normalize_text(data.description),
@@ -141,8 +128,6 @@ def update_class(
 ):
     db_obj = get_class_by_id(db, class_id, tenant_id)
     update_data = data.model_dump(exclude_unset=True)
-    if "academic_year_id" in update_data and update_data["academic_year_id"] is not None:
-        _ensure_academic_year_exists(db, tenant_id, update_data["academic_year_id"])
 
     new_code = update_data.get("code", db_obj.code)
     normalized_code = new_code.strip() if isinstance(new_code, str) else new_code
