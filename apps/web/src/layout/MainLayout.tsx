@@ -16,13 +16,14 @@ import AIAssistant from "../components/AIAssistant";
 import profileService from "../api/services/profileService";
 import { apiBaseUrl } from "../config";
 import { colorTokens } from "../tokens/colors";
+import { toRoleLabel } from "../utils/formatters";
 
 function MainLayout() {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAuthenticated, exitImpersonation } = useAuth();
-  const { clearRBACData } = useRBAC();
+  const { roles: rbacRoles, clearRBACData } = useRBAC();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -344,8 +345,8 @@ function MainLayout() {
                         fontWeight: 800,
                         textTransform: "uppercase",
                         letterSpacing: "0.5px",
-                        color: user.role === "SUPER_ADMIN" ? "#6366f1" : "text.secondary",
-                        backgroundColor: user.role === "SUPER_ADMIN" ? "rgba(99, 102, 241, 0.08)" : "rgba(0, 0, 0, 0.04)",
+                        color: rbacRoles.includes("super_admin") ? "#6366f1" : "text.secondary",
+                        backgroundColor: rbacRoles.includes("super_admin") ? "rgba(99, 102, 241, 0.08)" : "rgba(0, 0, 0, 0.04)",
                         px: 0.8,
                         py: 0.2,
                         borderRadius: "4px",
@@ -353,7 +354,7 @@ function MainLayout() {
                         display: "inline-block"
                       }}
                     >
-                      {user.role === "SUPER_ADMIN" ? "System Admin" : user.role || "User"}
+                      {rbacRoles.length > 0 ? toRoleLabel(rbacRoles[0]) : (user.role === "SUPER_ADMIN" ? "System Admin" : user.role || "User")}
                     </Box>
                   </Box>
                   <Avatar

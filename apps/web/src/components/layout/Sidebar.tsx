@@ -34,6 +34,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
 import { colorTokens } from "../../tokens/colors";
+import { toRoleLabel } from "../../utils/formatters";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Asset Icons - Menu item icons
@@ -264,7 +265,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { menus } = useRBAC();
+  const { menus, roles: rbacRoles } = useRBAC();
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [mounted, setMounted] = useState(false);
@@ -274,7 +275,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   }, []);
 
   const menuItems: MenuItemData[] = useMemo(() => {
-    if (user?.role === "SUPER_ADMIN") {
+    if (rbacRoles.includes("super_admin")) {
       return SYSTEM_ADMIN_MENU;
     }
 
@@ -511,7 +512,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                 letterSpacing: "0.5px"
               }}
             >
-              {user?.role || "Staff"}
+              {rbacRoles.length > 0 ? toRoleLabel(rbacRoles[0]) : (user?.role || "Staff")}
             </Typography>
           </Box>
         )}
