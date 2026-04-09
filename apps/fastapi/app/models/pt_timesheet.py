@@ -135,18 +135,7 @@ pt_timesheets = Table(
     schema=_SCHEMA,
 )
 
-# --- Sprint assignment mappings (Feature -> Page -> Owner) ---
-pt_sprint_features = Table(
-    "PT_SprintFeatures",
-    Base.metadata,
-    Column("Id", Integer, primary_key=True, autoincrement=True),
-    Column("SprintId", Integer, ForeignKey("PT_Sprints.SprintId", ondelete="CASCADE"), nullable=False),
-    Column("FeatureId", Integer, ForeignKey("PT_Features.FeatureId", ondelete="CASCADE"), nullable=False),
-    Column("ProjectId", Integer, ForeignKey("PT_Project.Id", ondelete="CASCADE"), nullable=False),
-    UniqueConstraint("SprintId", "FeatureId", name="UQ_PT_SprintFeatures_Sprint_Feature"),
-    schema=_SCHEMA,
-)
-
+# --- Sprint assignment mappings (Feature -> Page -> User) ---
 pt_sprint_feature_pages = Table(
     "PT_SprintFeaturePages",
     Base.metadata,

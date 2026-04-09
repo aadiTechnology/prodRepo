@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import and_, delete, func, insert, select, update
+from sqlalchemy import and_, delete, func, insert, select, text, update
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
@@ -592,6 +592,103 @@ def fetch_sprint_assignments_bulk(
                 pnode["primary_tester_id"] = pt["user_id"] if pt else None
         result[sid] = list(fmap.values())
     return result
+
+
+def create_default_pagedevelopment_timesheets(
+    db: Session,
+    *,
+    project_id: int,
+    sprint_id: int,
+    feature_id: int | None = None,
+) -> int:
+    """
+    Insert default PT_Timesheets rows for all assigned (Feature, Page, User) combinations
+    based on SubTasks mapped to CategoryName = 'PageDevelopment', avoiding duplicates.
+
+    PT_Timesheets.OwnerId is set to PT_SprintPageUsers.UserId (app user id); no PT_Owners row is required.
+
+    Returns the number of inserted rows.
+    """
+    params: dict[str, Any] = {"ProjectId": int(project_id), "SprintId": int(sprint_id)}
+    feature_filter_sql = ""
+    if feature_id is not None:
+        params["FeatureId"] = int(feature_id)
+        feature_filter_sql = " AND spu.FeatureId = :FeatureId "
+
+    stmt = text(
+        f"""
+        SET NOCOUNT ON;
+
+        DECLARE @CategoryId INT;
+        DECLARE @InsertedCount INT = 0;
+
+        SELECT TOP 1 @CategoryId = tc.CategoryId
+        FROM dbo.PT_TaskCategories tc
+        WHERE tc.CategoryName = 'PageDevelopment'
+          AND tc.IsActive = 1;
+
+        IF (@CategoryId IS NOT NULL)
+        BEGIN
+            DECLARE @Assignments TABLE (
+                SprintId INT NOT NULL,
+                ProjectId INT NOT NULL,
+                FeatureId INT NOT NULL,
+                PageId INT NOT NULL,
+                UserId INT NOT NULL
+            );
+
+            INSERT INTO @Assignments (SprintId, ProjectId, FeatureId, PageId, UserId)
+            SELECT DISTINCT
+                spu.SprintId,
+                spu.ProjectId,
+                spu.FeatureId,
+                spu.PageId,
+                spu.UserId
+            FROM dbo.PT_SprintPageUsers spu
+            WHERE spu.ProjectId = :ProjectId
+              AND spu.SprintId  = :SprintId
+              {feature_filter_sql};
+
+            INSERT INTO dbo.PT_Timesheets
+                (OwnerId, FeatureId, PageId, TaskId, SubtaskId, SprintId, ProjectId, Description, Efforts, ActivityDate, CreatedOn)
+            SELECT
+                a.UserId,
+                a.FeatureId,
+                a.PageId,
+                st.TaskId,
+                st.SubTaskId,
+                a.SprintId,
+                a.ProjectId,
+                'Auto-created during sprint planning',
+                NULL,
+                NULL,
+                GETDATE()
+            FROM @Assignments a
+            CROSS JOIN (
+                SELECT st.SubTaskId, st.TaskId
+                FROM dbo.PT_SubTasks st
+                INNER JOIN dbo.PT_SubTaskCategoryMapping scm
+                    ON scm.SubTaskId = st.SubTaskId
+                WHERE scm.CategoryId = @CategoryId
+            ) st
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM dbo.PT_Timesheets ts
+                WHERE ts.SprintId  = a.SprintId
+                  AND ts.PageId    = a.PageId
+                  AND ts.OwnerId   = a.UserId
+                  AND ts.SubtaskId = st.SubTaskId
+            );
+
+            SET @InsertedCount = @@ROWCOUNT;
+        END
+
+        SELECT CAST(@InsertedCount AS INT) AS inserted_count;
+        """
+    )
+
+    res = db.execute(stmt, params).scalar_one()
+    return int(res or 0)
 
 
 def list_project_feature_page_catalog(db: Session, *, project_id: int) -> list[dict[str, Any]]:

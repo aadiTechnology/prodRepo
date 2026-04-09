@@ -3,6 +3,7 @@
 from datetime import date, datetime, timezone
 from typing import Any
 
+import logging
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -404,24 +405,37 @@ def save_sprint_assignments(
     data: SprintAssignmentsWrite,
     acting_user_id: int | None = None,
 ) -> dict:
+    logger = logging.getLogger(__name__)
     assert_can_access_pt_project(db, project_id, user_tenant_id)
     s = sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id)
     if not s:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sprint not found")
 
-    rows = _normalize_assignments(
-        db,
-        project_id=project_id,
-        feature_assignments=[fa.model_dump() for fa in (data.feature_assignments or [])],
-    )
-    now = datetime.now(timezone.utc)
-    for r in rows:
-        r["UpdatedOn"] = now
-        r["UpdatedByUserId"] = acting_user_id
-    sprint_repository.replace_sprint_page_users(
-        db, project_id=project_id, sprint_id=sprint_id, rows=rows
-    )
-    db.commit()
+    try:
+        rows = _normalize_assignments(
+            db,
+            project_id=project_id,
+            feature_assignments=[fa.model_dump() for fa in (data.feature_assignments or [])],
+        )
+        now = datetime.now(timezone.utc)
+        for r in rows:
+            r["UpdatedOn"] = now
+            r["UpdatedByUserId"] = acting_user_id
+
+        sprint_repository.replace_sprint_page_users(db, project_id=project_id, sprint_id=sprint_id, rows=rows)
+
+        inserted = sprint_repository.create_default_pagedevelopment_timesheets(
+            db, project_id=project_id, sprint_id=sprint_id, feature_id=None
+        )
+        logger.debug(
+            "Default PageDevelopment Tasks Created (bulk save)",
+            extra={"project_id": project_id, "sprint_id": sprint_id, "inserted_count": inserted},
+        )
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     return get_sprint_assignments(
         db, project_id=project_id, sprint_id=sprint_id, user_tenant_id=user_tenant_id
     )
@@ -484,6 +498,7 @@ def save_sprint_feature_assignments(
     Partial save: only updates assignments for the specified feature.
     Expects payload in the same shape as full save (feature_assignments[]), but uses only that feature.
     """
+    logger = logging.getLogger(__name__)
     assert_can_access_pt_project(db, project_id, user_tenant_id)
     s = sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id)
     if not s:
@@ -495,19 +510,37 @@ def save_sprint_feature_assignments(
     if len(feature_payload) != 1 or int(feature_payload[0].get("feature_id")) != int(feature_id):
         raise ValidationException("Payload must contain exactly one feature_assignment matching feature_id.")
 
-    rows = _normalize_assignments(db, project_id=project_id, feature_assignments=feature_payload)
-    # ensure rows are only for this feature (defense-in-depth)
-    rows = [r for r in rows if int(r.get("FeatureId")) == int(feature_id)]
+    try:
+        rows = _normalize_assignments(db, project_id=project_id, feature_assignments=feature_payload)
+        # ensure rows are only for this feature (defense-in-depth)
+        rows = [r for r in rows if int(r.get("FeatureId")) == int(feature_id)]
 
-    now = datetime.now(timezone.utc)
-    for r in rows:
-        r["UpdatedOn"] = now
-        r["UpdatedByUserId"] = acting_user_id
+        now = datetime.now(timezone.utc)
+        for r in rows:
+            r["UpdatedOn"] = now
+            r["UpdatedByUserId"] = acting_user_id
 
-    sprint_repository.replace_sprint_page_users_for_feature(
-        db, project_id=project_id, sprint_id=sprint_id, feature_id=feature_id, rows=rows
-    )
-    db.commit()
+        sprint_repository.replace_sprint_page_users_for_feature(
+            db, project_id=project_id, sprint_id=sprint_id, feature_id=feature_id, rows=rows
+        )
+
+        inserted = sprint_repository.create_default_pagedevelopment_timesheets(
+            db, project_id=project_id, sprint_id=sprint_id, feature_id=feature_id
+        )
+        logger.debug(
+            "Default PageDevelopment Tasks Created",
+            extra={
+                "project_id": project_id,
+                "sprint_id": sprint_id,
+                "feature_id": feature_id,
+                "inserted_count": inserted,
+            },
+        )
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     return get_sprint_assignment_management_feature_grid(
         db,
         project_id=project_id,
