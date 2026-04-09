@@ -168,12 +168,18 @@ pt_sprint_page_users = Table(
     Column("PageId", Integer, ForeignKey("PT_Pages.PageId", ondelete="CASCADE"), nullable=False),
     Column("UserId", Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
     Column("ProjectId", Integer, ForeignKey("PT_Project.Id", ondelete="CASCADE"), nullable=False),
+    # 1 = Developer, 2 = Tester (legacy NULL treated as 1 in queries)
+    Column("AssignmentRole", Integer, nullable=True),
+    Column("IsPrimary", Integer, nullable=True),
+    Column("UpdatedOn", DateTime, nullable=True),
+    Column("UpdatedByUserId", Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
     UniqueConstraint(
         "SprintId",
         "FeatureId",
         "PageId",
         "UserId",
-        name="UQ_PT_SprintPageUsers_Sprint_Feature_Page_User",
+        "AssignmentRole",
+        name="UQ_PT_SprintPageUsers_Sprint_Feature_Page_User_Role",
     ),
     schema=_SCHEMA,
 )

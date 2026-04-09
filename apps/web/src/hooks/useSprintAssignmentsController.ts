@@ -4,11 +4,55 @@ import sprintService from "../api/services/sprintService";
 import type {
   OptionItem,
   Sprint,
+  SprintAssignmentManagementFeatureGridResponse,
   SprintAssignmentOptionsResponse,
-  SprintAssignmentsResponse,
   SprintFeatureAssignmentWrite,
 } from "../types/sprint";
 import { useReportProjectSelection } from "./useReportProjectSelection";
+
+export type PageDraftKey = string;
+
+export type PageAssignmentDraft = {
+  developer_ids: number[];
+  tester_ids: number[];
+};
+
+export function pageKey(featureId: number, pageId: number): PageDraftKey {
+  return `${featureId}:${pageId}`;
+}
+
+export function draftFromGridPage(p: {
+  developers: { user_id: number }[];
+  testers: { user_id: number }[];
+}): PageAssignmentDraft {
+  return {
+    developer_ids: p.developers.map((d) => d.user_id),
+    tester_ids: p.testers.map((t) => t.user_id),
+  };
+}
+
+function buildSavePayload(
+  featureGrid: SprintAssignmentManagementFeatureGridResponse,
+  draftByPage: Map<PageDraftKey, PageAssignmentDraft>
+): { feature_assignments: SprintFeatureAssignmentWrite[] } {
+  return {
+    feature_assignments: [
+      {
+        feature_id: featureGrid.feature.feature_id,
+        pages: featureGrid.feature.pages.map((p) => {
+          const k = pageKey(featureGrid.feature.feature_id, p.page_id);
+        const d = draftByPage.get(k) ?? draftFromGridPage(p);
+        return {
+          page_id: p.page_id,
+          user_ids: [],
+          developer_user_ids: d.developer_ids,
+          tester_user_ids: d.tester_ids,
+        };
+        }),
+      },
+    ],
+  };
+}
 
 export function useSprintAssignmentsController() {
   const { projectId, setProjectId } = useReportProjectSelection();
@@ -21,19 +65,30 @@ export function useSprintAssignmentsController() {
 
   const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
 
+  useEffect(() => {
+    setSelectedSprintId(null);
+  }, [projectId]);
+
+  const [selectedFeatureId, setSelectedFeatureId] = useState<number | null>(null);
+
   const [assignmentOptions, setAssignmentOptions] = useState<SprintAssignmentOptionsResponse>({
     features: [],
     users: [],
   });
   const [optionsLoading, setOptionsLoading] = useState(false);
-  const [pagesByFeatureId, setPagesByFeatureId] = useState<Record<number, OptionItem[]>>({});
 
-  const [saved, setSaved] = useState<SprintAssignmentsResponse | null>(null);
-  const [draft, setDraft] = useState<SprintFeatureAssignmentWrite[]>([]);
+  const [featureGrid, setFeatureGrid] = useState<SprintAssignmentManagementFeatureGridResponse | null>(null);
+  const [draftByPage, setDraftByPage] = useState<Map<PageDraftKey, PageAssignmentDraft>>(new Map());
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+
+  const [pageSearch, setPageSearch] = useState("");
+  const [filterDeveloperIds, setFilterDeveloperIds] = useState<number[]>([]);
+  const [filterTesterIds, setFilterTesterIds] = useState<number[]>([]);
+  const [showAssignedOnly, setShowAssignedOnly] = useState(false);
+  const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -56,8 +111,9 @@ export function useSprintAssignmentsController() {
     if (projectId == null) {
       setSprints([]);
       setSelectedSprintId(null);
-      setSaved(null);
-      setDraft([]);
+      setSelectedFeatureId(null);
+      setFeatureGrid(null);
+      setDraftByPage(new Map());
       return;
     }
     try {
@@ -79,6 +135,15 @@ export function useSprintAssignmentsController() {
     fetchSprints();
   }, [fetchSprints]);
 
+  useEffect(() => {
+    setSelectedFeatureId(null);
+  }, [selectedSprintId]);
+
+  useEffect(() => {
+    setFeatureGrid(null);
+    setDraftByPage(new Map());
+  }, [selectedFeatureId]);
+
   const fetchOptions = useCallback(async () => {
     if (projectId == null) return;
     try {
@@ -96,53 +161,38 @@ export function useSprintAssignmentsController() {
     fetchOptions();
   }, [fetchOptions]);
 
-  const requestPages = useCallback(
-    async (featureId: number) => {
-      if (projectId == null) return;
-      if (pagesByFeatureId[featureId]?.length) return;
-      try {
-        const pages = await sprintService.listFeaturePages(projectId, featureId);
-        setPagesByFeatureId((p) => ({ ...p, [featureId]: pages }));
-      } catch {
-        setPagesByFeatureId((p) => ({ ...p, [featureId]: [] }));
-      }
-    },
-    [pagesByFeatureId, projectId]
-  );
-
-  const fetchAssignments = useCallback(async () => {
-    if (projectId == null || selectedSprintId == null) {
-      setSaved(null);
-      setDraft([]);
+  const loadFeatureGrid = useCallback(async () => {
+    if (projectId == null || selectedSprintId == null || selectedFeatureId == null) {
+      setFeatureGrid(null);
+      setDraftByPage(new Map());
       return;
     }
     try {
       setLoading(true);
       setError(null);
-      const res = await sprintService.getAssignments(projectId, selectedSprintId);
-      setSaved(res);
-      setDraft(
-        res.feature_assignments.map((f) => ({
-          feature_id: f.feature_id,
-          pages: f.pages.map((p) => ({
-            page_id: p.page_id,
-            user_ids: p.assigned_users.map((u) => u.user_id),
-          })),
-        }))
+      const res = await sprintService.getAssignmentManagementFeatureGrid(
+        projectId,
+        selectedSprintId,
+        selectedFeatureId
       );
-      await Promise.all(res.feature_assignments.map((f) => requestPages(f.feature_id)));
+      setFeatureGrid(res);
+      const m = new Map<PageDraftKey, PageAssignmentDraft>();
+      for (const p of res.feature.pages) {
+        m.set(pageKey(res.feature.feature_id, p.page_id), draftFromGridPage(p));
+      }
+      setDraftByPage(m);
     } catch (e: unknown) {
-      setError((e as { message?: string })?.message || "Failed to load assignments.");
-      setSaved(null);
-      setDraft([]);
+      setError((e as { message?: string })?.message || "Failed to load feature pages.");
+      setFeatureGrid(null);
+      setDraftByPage(new Map());
     } finally {
       setLoading(false);
     }
-  }, [projectId, requestPages, selectedSprintId]);
+  }, [projectId, selectedSprintId, selectedFeatureId]);
 
   useEffect(() => {
-    fetchAssignments();
-  }, [fetchAssignments]);
+    loadFeatureGrid();
+  }, [loadFeatureGrid]);
 
   const sprintOptions = useMemo<OptionItem[]>(
     () =>
@@ -153,25 +203,102 @@ export function useSprintAssignmentsController() {
     [sprints]
   );
 
+  const dirty = useMemo(() => {
+    if (!featureGrid) return false;
+    const fid = featureGrid.feature.feature_id;
+    for (const p of featureGrid.feature.pages) {
+      const k = pageKey(fid, p.page_id);
+      const cur = draftByPage.get(k);
+      if (!cur) continue;
+      const base = draftFromGridPage(p);
+      if (
+        cur.developer_ids.join(",") !== base.developer_ids.join(",") ||
+        cur.tester_ids.join(",") !== base.tester_ids.join(",")
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [featureGrid, draftByPage]);
+
+  const setPageDraft = useCallback((featureId: number, pageId: number, next: PageAssignmentDraft) => {
+    const k = pageKey(featureId, pageId);
+    setDraftByPage((prev) => {
+      const copy = new Map(prev);
+      copy.set(k, next);
+      return copy;
+    });
+  }, []);
+
+  const setPrimaryDeveloper = useCallback(
+    (featureId: number, pageId: number, userId: number | null) => {
+      if (!featureGrid || featureGrid.feature.feature_id !== featureId) return;
+      const p = featureGrid.feature.pages.find((x) => x.page_id === pageId);
+      if (!p) return;
+      const k = pageKey(featureId, pageId);
+      const cur = draftByPage.get(k) ?? draftFromGridPage(p);
+      if (userId == null) {
+        setPageDraft(featureId, pageId, { ...cur, developer_ids: [] });
+        return;
+      }
+      const rest = cur.developer_ids.filter((id) => id !== userId);
+      setPageDraft(featureId, pageId, { ...cur, developer_ids: [userId, ...rest] });
+    },
+    [featureGrid, draftByPage, setPageDraft]
+  );
+
+  const setPrimaryTester = useCallback(
+    (featureId: number, pageId: number, userId: number | null) => {
+      if (!featureGrid || featureGrid.feature.feature_id !== featureId) return;
+      const p = featureGrid.feature.pages.find((x) => x.page_id === pageId);
+      if (!p) return;
+      const k = pageKey(featureId, pageId);
+      const cur = draftByPage.get(k) ?? draftFromGridPage(p);
+      if (userId == null) {
+        setPageDraft(featureId, pageId, { ...cur, tester_ids: [] });
+        return;
+      }
+      const rest = cur.tester_ids.filter((id) => id !== userId);
+      setPageDraft(featureId, pageId, { ...cur, tester_ids: [userId, ...rest] });
+    },
+    [featureGrid, draftByPage, setPageDraft]
+  );
+
+  const clearPageAssignments = useCallback(
+    (featureId: number, pageId: number) => {
+      setPageDraft(featureId, pageId, { developer_ids: [], tester_ids: [] });
+    },
+    [setPageDraft]
+  );
+
+  const resetDraftFromGrid = useCallback(() => {
+    if (!featureGrid) return;
+    const m = new Map<PageDraftKey, PageAssignmentDraft>();
+    const fid = featureGrid.feature.feature_id;
+    for (const p of featureGrid.feature.pages) {
+      m.set(pageKey(fid, p.page_id), draftFromGridPage(p));
+    }
+    setDraftByPage(m);
+  }, [featureGrid]);
+
   const onSave = useCallback(async () => {
-    if (projectId == null || selectedSprintId == null) {
+    if (projectId == null || selectedSprintId == null || selectedFeatureId == null || !featureGrid) {
       setError("Select project and sprint first.");
       return;
     }
     try {
       setLoading(true);
       setError(null);
-      const res = await sprintService.saveAssignments(projectId, selectedSprintId, {
-        feature_assignments: draft,
-      });
-      setSaved(res);
-      setSnackbar("Assignments saved successfully!");
+      const payload = buildSavePayload(featureGrid, draftByPage);
+      await sprintService.saveFeatureAssignments(projectId, selectedSprintId, selectedFeatureId, payload);
+      await loadFeatureGrid();
+      setSnackbar("Assignments saved successfully.");
     } catch (e: unknown) {
       setError((e as { message?: string })?.message || "Failed to save assignments.");
     } finally {
       setLoading(false);
     }
-  }, [draft, projectId, selectedSprintId]);
+  }, [draftByPage, featureGrid, loadFeatureGrid, projectId, selectedSprintId, selectedFeatureId]);
 
   const onDeletePage = useCallback(
     async (featureId: number, pageId: number) => {
@@ -180,16 +307,53 @@ export function useSprintAssignmentsController() {
         setLoading(true);
         setError(null);
         await sprintService.deletePageAssignments(projectId, selectedSprintId, featureId, pageId);
-        await fetchAssignments();
-        setSnackbar("Page assignments deleted.");
+        await loadFeatureGrid();
+        setSnackbar("Page assignments removed.");
       } catch (e: unknown) {
         setError((e as { message?: string })?.message || "Failed to delete page assignments.");
       } finally {
         setLoading(false);
       }
     },
-    [fetchAssignments, projectId, selectedSprintId]
+    [loadFeatureGrid, projectId, selectedSprintId]
   );
+
+  const filteredFeatures = useMemo(() => {
+    if (!featureGrid) return [];
+    const ps = pageSearch.trim().toLowerCase();
+
+    if (selectedFeatureId == null) return [];
+    const f = featureGrid.feature.feature_id === selectedFeatureId ? featureGrid.feature : null;
+    if (!f) return [];
+
+    return [f].flatMap((f) => {
+      const pages = f.pages.filter((p) => {
+        const pageOk = !ps || (p.page_name ?? "").toLowerCase().includes(ps) || String(p.page_id).includes(ps);
+        if (!pageOk) return false;
+        const k = pageKey(f.feature_id, p.page_id);
+        const d = draftByPage.get(k) ?? draftFromGridPage(p);
+        const devSet = new Set(d.developer_ids);
+        const tesSet = new Set(d.tester_ids);
+        if (filterDeveloperIds.length && !filterDeveloperIds.some((id) => devSet.has(id))) return false;
+        if (filterTesterIds.length && !filterTesterIds.some((id) => tesSet.has(id))) return false;
+        const assigned = d.developer_ids.length > 0 || d.tester_ids.length > 0;
+        if (showAssignedOnly && !assigned) return false;
+        if (showUnassignedOnly && assigned) return false;
+        return true;
+      });
+      if (!pages.length) return [];
+      return [{ ...f, pages }];
+    });
+  }, [
+    featureGrid,
+    draftByPage,
+    selectedFeatureId,
+    pageSearch,
+    filterDeveloperIds,
+    filterTesterIds,
+    showAssignedOnly,
+    showUnassignedOnly,
+  ]);
 
   return {
     projectId,
@@ -202,18 +366,33 @@ export function useSprintAssignmentsController() {
     setSelectedSprintId,
     assignmentOptions,
     optionsLoading,
-    pagesByFeatureId,
-    requestPages,
-    saved,
-    draft,
-    setDraft,
+    featureGrid,
+    draftByPage,
     loading,
     error,
     setError,
     snackbar,
     setSnackbar,
+    dirty,
+    selectedFeatureId,
+    setSelectedFeatureId,
+    pageSearch,
+    setPageSearch,
+    filterDeveloperIds,
+    setFilterDeveloperIds,
+    filterTesterIds,
+    setFilterTesterIds,
+    showAssignedOnly,
+    setShowAssignedOnly,
+    showUnassignedOnly,
+    setShowUnassignedOnly,
+    filteredFeatures,
+    setPrimaryDeveloper,
+    setPrimaryTester,
+    clearPageAssignments,
+    resetDraftFromGrid,
     onSave,
     onDeletePage,
+    refreshGrid: loadFeatureGrid,
   };
 }
-

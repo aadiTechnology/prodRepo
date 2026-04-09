@@ -16,10 +16,20 @@ class SprintAssignedUser(BaseModel):
     user_name: str | None = None
 
 
+class SprintAssignedUserDetail(BaseModel):
+    user_id: int
+    user_name: str | None = None
+    is_primary: bool = False
+
+
 class SprintPageAssignment(BaseModel):
     page_id: int
     page_name: str | None = None
     assigned_users: list[SprintAssignedUser] = Field(default_factory=list)
+    developers: list[SprintAssignedUserDetail] = Field(default_factory=list)
+    testers: list[SprintAssignedUserDetail] = Field(default_factory=list)
+    primary_developer_id: int | None = None
+    primary_tester_id: int | None = None
 
 
 class SprintFeatureAssignment(BaseModel):
@@ -31,6 +41,8 @@ class SprintFeatureAssignment(BaseModel):
 class SprintPageAssignmentWrite(BaseModel):
     page_id: int
     user_ids: list[int] = Field(default_factory=list)
+    developer_user_ids: list[int] | None = None
+    tester_user_ids: list[int] | None = None
 
 
 class SprintFeatureAssignmentWrite(BaseModel):
@@ -86,4 +98,46 @@ class SprintAssignmentsResponse(BaseModel):
     sprint_id: int
     project_id: int
     feature_assignments: list[SprintFeatureAssignment] = Field(default_factory=list)
+
+
+class SprintAssignmentGridPage(BaseModel):
+    page_id: int
+    page_name: str | None = None
+    developers: list[SprintAssignedUserDetail] = Field(default_factory=list)
+    testers: list[SprintAssignedUserDetail] = Field(default_factory=list)
+    assigned_users: list[SprintAssignedUser] = Field(default_factory=list)
+    primary_developer_id: int | None = None
+    primary_tester_id: int | None = None
+    last_updated_on: datetime | None = None
+    last_updated_by_user_id: int | None = None
+    last_updated_by_name: str | None = None
+    status: str = "unassigned"
+
+
+class SprintAssignmentGridFeature(BaseModel):
+    feature_id: int
+    feature_name: str | None = None
+    pages: list[SprintAssignmentGridPage] = Field(default_factory=list)
+
+
+class SprintAssignmentGridStats(BaseModel):
+    total_pages: int = 0
+    assigned_pages: int = 0
+    unassigned_pages: int = 0
+
+
+class SprintAssignmentManagementGridResponse(BaseModel):
+    sprint_id: int
+    project_id: int
+    sprint_name: str | None = None
+    features: list[SprintAssignmentGridFeature] = Field(default_factory=list)
+    stats: SprintAssignmentGridStats = Field(default_factory=SprintAssignmentGridStats)
+
+
+class SprintAssignmentManagementFeatureGridResponse(BaseModel):
+    sprint_id: int
+    project_id: int
+    sprint_name: str | None = None
+    feature: SprintAssignmentGridFeature
+    stats: SprintAssignmentGridStats = Field(default_factory=SprintAssignmentGridStats)
 

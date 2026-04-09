@@ -1,13 +1,20 @@
 """Service layer for Sprints CRUD (scoped to selected project)."""
 
-from datetime import date
+from datetime import date, datetime, timezone
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ValidationException
 from app.repositories import sprint_repository
-from app.schemas.sprint import SprintAssignmentsWrite, SprintCreate, SprintUpdate
+from app.schemas.sprint import (
+    SprintAssignmentManagementFeatureGridResponse,
+    SprintAssignmentManagementGridResponse,
+    SprintAssignmentsWrite,
+    SprintCreate,
+    SprintUpdate,
+)
 from app.services.report_project_service import assert_can_access_pt_project, list_accessible_report_projects
 
 
@@ -112,22 +119,31 @@ def _merge_lifecycle_for_update(existing: dict, patch: dict) -> dict:
     return out
 
 
+def _dedupe_int_order(ids: list[int]) -> list[int]:
+    seen: set[int] = set()
+    out: list[int] = []
+    for x in ids:
+        if x in seen:
+            continue
+        seen.add(x)
+        out.append(x)
+    return out
+
+
 def _normalize_assignments(
     db: Session,
     *,
     project_id: int,
-    sprint_id: int,
     feature_assignments: list[dict],
-) -> list[tuple[int, int, int]]:
+) -> list[dict[str, Any]]:
     """
-    Validate and normalize request payload for Feature -> Page -> User assignment.
-    Returns list of (feature_id, page_id, user_id) triples to persist.
+    Validate and normalize Feature -> Page -> (developers[], testers[]) for PT_SprintPageUsers.
+    Legacy payloads use user_ids only (treated as developers). Empty lists clear assignments for that page.
     """
-    if feature_assignments is None:
+    if not feature_assignments:
         return []
 
-    page_users: set[tuple[int, int, int]] = set()
-
+    rows_out: list[dict[str, Any]] = []
     all_page_ids: set[int] = set()
     all_user_ids: set[int] = set()
     all_feature_ids: set[int] = set()
@@ -139,14 +155,38 @@ def _normalize_assignments(
         for p in pages:
             pid = int(p.get("page_id"))
             all_page_ids.add(pid)
-            user_ids = p.get("user_ids") or []
-            if not user_ids:
-                raise ValidationException("Cannot assign a page without at least one user.")
-            for uid in user_ids:
-                all_user_ids.add(int(uid))
-                page_users.add((fid, pid, int(uid)))
+            dev_raw = p.get("developer_user_ids")
+            tes_raw = p.get("tester_user_ids")
+            legacy = p.get("user_ids")
+            if dev_raw is not None or tes_raw is not None:
+                dev_list = _dedupe_int_order([int(x) for x in (dev_raw or [])])
+                tes_list = _dedupe_int_order([int(x) for x in (tes_raw or [])])
+            else:
+                dev_list = _dedupe_int_order([int(x) for x in (legacy or [])])
+                tes_list = []
+            all_user_ids.update(dev_list)
+            all_user_ids.update(tes_list)
+            for i, uid in enumerate(dev_list):
+                rows_out.append(
+                    {
+                        "FeatureId": fid,
+                        "PageId": pid,
+                        "UserId": uid,
+                        "AssignmentRole": sprint_repository.ROLE_DEVELOPER,
+                        "IsPrimary": 1 if i == 0 else 0,
+                    }
+                )
+            for i, uid in enumerate(tes_list):
+                rows_out.append(
+                    {
+                        "FeatureId": fid,
+                        "PageId": pid,
+                        "UserId": uid,
+                        "AssignmentRole": sprint_repository.ROLE_TESTER,
+                        "IsPrimary": 1 if i == 0 else 0,
+                    }
+                )
 
-    # Cross-entity validation (project scoping and referential intent).
     valid_features = sprint_repository.resolve_project_feature_ids(
         db, project_id=project_id, feature_ids=sorted(all_feature_ids)
     )
@@ -161,15 +201,13 @@ def _normalize_assignments(
     if missing_pages:
         raise ValidationException("One or more selected pages do not belong to the selected project.")
 
-    # Ensure each page belongs to the declared feature.
-    for (fid, pid, _uid) in page_users:
+    for r in rows_out:
+        fid = int(r["FeatureId"])
+        pid = int(r["PageId"])
         row = pages_map.get(pid)
-        if not row:
-            continue
-        if int(row["feature_id"]) != int(fid):
+        if row and int(row["feature_id"]) != fid:
             raise ValidationException("Selected page does not belong to the selected feature.")
 
-    # Users (owners) must be from the project users list.
     if all_user_ids:
         valid_user_ids = sprint_repository.resolve_project_user_ids(
             db, project_id=project_id, user_ids=sorted(all_user_ids)
@@ -178,7 +216,7 @@ def _normalize_assignments(
         if missing_users:
             raise ValidationException("One or more selected users do not belong to the selected project.")
 
-    return sorted(page_users)
+    return rows_out
 
 
 def list_sprints(
@@ -364,26 +402,119 @@ def save_sprint_assignments(
     sprint_id: int,
     user_tenant_id: int | None,
     data: SprintAssignmentsWrite,
+    acting_user_id: int | None = None,
 ) -> dict:
     assert_can_access_pt_project(db, project_id, user_tenant_id)
     s = sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id)
     if not s:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sprint not found")
 
-    triples = _normalize_assignments(
+    rows = _normalize_assignments(
         db,
         project_id=project_id,
-        sprint_id=sprint_id,
         feature_assignments=[fa.model_dump() for fa in (data.feature_assignments or [])],
     )
+    now = datetime.now(timezone.utc)
+    for r in rows:
+        r["UpdatedOn"] = now
+        r["UpdatedByUserId"] = acting_user_id
     sprint_repository.replace_sprint_page_users(
-        db, project_id=project_id, sprint_id=sprint_id, page_users=triples
+        db, project_id=project_id, sprint_id=sprint_id, rows=rows
     )
     db.commit()
     return get_sprint_assignments(
         db, project_id=project_id, sprint_id=sprint_id, user_tenant_id=user_tenant_id
     )
 
+
+def get_sprint_assignment_management_grid(
+    db: Session,
+    *,
+    project_id: int,
+    sprint_id: int,
+    user_tenant_id: int | None,
+) -> SprintAssignmentManagementGridResponse:
+    assert_can_access_pt_project(db, project_id, user_tenant_id)
+    s = sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id)
+    if not s:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sprint not found")
+    raw = sprint_repository.fetch_sprint_assignment_management_grid(
+        db, project_id=project_id, sprint_id=sprint_id
+    )
+    payload = dict(raw)
+    payload["sprint_id"] = sprint_id
+    payload["project_id"] = project_id
+    payload["sprint_name"] = s.get("sprint_name")
+    return SprintAssignmentManagementGridResponse.model_validate(payload)
+
+
+def get_sprint_assignment_management_feature_grid(
+    db: Session,
+    *,
+    project_id: int,
+    sprint_id: int,
+    feature_id: int,
+    user_tenant_id: int | None,
+) -> SprintAssignmentManagementFeatureGridResponse:
+    assert_can_access_pt_project(db, project_id, user_tenant_id)
+    s = sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id)
+    if not s:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sprint not found")
+    raw = sprint_repository.fetch_sprint_assignment_management_feature_grid(
+        db, project_id=project_id, sprint_id=sprint_id, feature_id=feature_id
+    )
+    payload = dict(raw)
+    payload["sprint_id"] = sprint_id
+    payload["project_id"] = project_id
+    payload["sprint_name"] = s.get("sprint_name")
+    return SprintAssignmentManagementFeatureGridResponse.model_validate(payload)
+
+
+def save_sprint_feature_assignments(
+    db: Session,
+    *,
+    project_id: int,
+    sprint_id: int,
+    feature_id: int,
+    user_tenant_id: int | None,
+    acting_user_id: int | None,
+    data: SprintAssignmentsWrite,
+) -> SprintAssignmentManagementFeatureGridResponse:
+    """
+    Partial save: only updates assignments for the specified feature.
+    Expects payload in the same shape as full save (feature_assignments[]), but uses only that feature.
+    """
+    assert_can_access_pt_project(db, project_id, user_tenant_id)
+    s = sprint_repository.get_sprint(db, project_id=project_id, sprint_id=sprint_id)
+    if not s:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sprint not found")
+
+    feature_payload = [fa.model_dump() for fa in (data.feature_assignments or [])]
+    if not feature_payload:
+        raise ValidationException("feature_assignments is required.")
+    if len(feature_payload) != 1 or int(feature_payload[0].get("feature_id")) != int(feature_id):
+        raise ValidationException("Payload must contain exactly one feature_assignment matching feature_id.")
+
+    rows = _normalize_assignments(db, project_id=project_id, feature_assignments=feature_payload)
+    # ensure rows are only for this feature (defense-in-depth)
+    rows = [r for r in rows if int(r.get("FeatureId")) == int(feature_id)]
+
+    now = datetime.now(timezone.utc)
+    for r in rows:
+        r["UpdatedOn"] = now
+        r["UpdatedByUserId"] = acting_user_id
+
+    sprint_repository.replace_sprint_page_users_for_feature(
+        db, project_id=project_id, sprint_id=sprint_id, feature_id=feature_id, rows=rows
+    )
+    db.commit()
+    return get_sprint_assignment_management_feature_grid(
+        db,
+        project_id=project_id,
+        sprint_id=sprint_id,
+        feature_id=feature_id,
+        user_tenant_id=user_tenant_id,
+    )
 
 def delete_sprint_page_assignments(
     db: Session,

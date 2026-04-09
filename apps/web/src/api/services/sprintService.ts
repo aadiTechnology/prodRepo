@@ -2,6 +2,8 @@ import { apiClient } from "../client";
 import type {
   OptionItem,
   Sprint,
+  SprintAssignmentManagementGridResponse,
+  SprintAssignmentManagementFeatureGridResponse,
   SprintAssignmentOptionsResponse,
   SprintAssignmentsResponse,
   SprintAssignmentsWrite,
@@ -63,6 +65,43 @@ export const sprintService = {
     const res = await apiClient.get<SprintAssignmentsResponse>(`/sprints/${sprintId}/assignments`, {
       params: { project_id: projectId },
     });
+    return res.data;
+  },
+
+  getAssignmentManagementGrid: async (
+    projectId: number,
+    sprintId: number
+  ): Promise<SprintAssignmentManagementGridResponse> => {
+    const res = await apiClient.get<SprintAssignmentManagementGridResponse>(
+      `/sprints/${sprintId}/assignment-management/grid`,
+      { params: { project_id: projectId } }
+    );
+    return res.data;
+  },
+
+  getAssignmentManagementFeatureGrid: async (
+    projectId: number,
+    sprintId: number,
+    featureId: number
+  ): Promise<SprintAssignmentManagementFeatureGridResponse> => {
+    const res = await apiClient.get<SprintAssignmentManagementFeatureGridResponse>(
+      `/sprints/${sprintId}/assignment-management/feature/${featureId}`,
+      { params: { project_id: projectId } }
+    );
+    return res.data;
+  },
+
+  saveFeatureAssignments: async (
+    projectId: number,
+    sprintId: number,
+    featureId: number,
+    data: SprintAssignmentsWrite
+  ): Promise<SprintAssignmentManagementFeatureGridResponse> => {
+    const res = await apiClient.put<SprintAssignmentManagementFeatureGridResponse>(
+      `/sprints/${sprintId}/assignments/feature/${featureId}`,
+      data,
+      { params: { project_id: projectId } }
+    );
     return res.data;
   },
 

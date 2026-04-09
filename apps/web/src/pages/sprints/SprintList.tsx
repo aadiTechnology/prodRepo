@@ -60,6 +60,10 @@ export default function SprintList() {
             links={[{ title: "Sprints", path: "#" }]}
             homePath="/"
             actions={
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center", width: "100%" }}>
+                <Button variant="outlined" size="small" onClick={() => navigate("/sprints/assignments")}>
+                  Assignment management
+                </Button>
               <ListPageToolbar
                 searchValue={search}
                 onSearchChange={onSearchChange}
@@ -95,7 +99,8 @@ export default function SprintList() {
                   },
                 ]}
                 renderActions={
-                  <Box sx={{ minWidth: 0, width: "100%", maxWidth: "100%" }}><SearchableSelect
+                  <Box sx={{ minWidth: 0, width: "100%", maxWidth: "100%" }}>
+                    <SearchableSelect
                       label=""
                       valueId={projectId}
                       options={projects}
@@ -106,6 +111,7 @@ export default function SprintList() {
                   </Box>
                 }
               />
+              </Box>
             }
           />
           {error && (

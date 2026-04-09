@@ -41,6 +41,9 @@ export type { CheckboxProps } from "./Checkbox";
 export { default as Autocomplete } from "./Autocomplete";
 export type { AutocompleteProps } from "./Autocomplete";
 
+export { Accordion, AccordionSummary, AccordionDetails } from "./Accordion";
+export type { AccordionProps, AccordionSummaryProps, AccordionDetailsProps } from "./Accordion";
+
 export {
   Dialog,
   DialogTitle,
@@ -64,6 +67,21 @@ export type { IconButtonProps } from "./IconButton";
 
 export { default as FormHeaderIconAction } from "./FormHeaderIconAction";
 export type { FormHeaderIconActionProps } from "./FormHeaderIconAction";
+
+export { Alert, Snackbar } from "./Feedback";
+export type { AlertProps, SnackbarProps } from "./Feedback";
+
+export { Paper } from "./Surface";
+export type { PaperProps } from "./Surface";
+
+export { Table, TableHead, TableBody, TableRow, TableCell } from "./Table";
+export type { TableProps, TableHeadProps, TableBodyProps, TableRowProps, TableCellProps } from "./Table";
+
+export { Chip, Switch } from "./Controls";
+export type { ChipProps, SwitchProps } from "./Controls";
+
+export { Menu } from "./Menu";
+export type { MenuProps } from "./Menu";
 
 export { InputAdornment } from "./InputAdornment";
 export type { InputAdornmentProps } from "./InputAdornment";

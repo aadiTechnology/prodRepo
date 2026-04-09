@@ -8,6 +8,8 @@ from app.core.dependencies import get_current_user
 from app.schemas.auth import CurrentUser
 from app.schemas.sprint import (
     OptionItem,
+    SprintAssignmentManagementFeatureGridResponse,
+    SprintAssignmentManagementGridResponse,
     SprintAssignmentOptionsResponse,
     SprintAssignmentsResponse,
     SprintAssignmentsWrite,
@@ -72,6 +74,41 @@ def list_pages_for_feature(
     return sprint_service.list_feature_pages(db, project_id=project_id, feature_id=feature_id)
 
 
+@router.get("/{sprint_id}/assignment-management/grid", response_model=SprintAssignmentManagementGridResponse)
+def get_sprint_assignment_management_grid(
+    sprint_id: int,
+    project_id: int = Query(..., description="PT_Project.Id (selected project)"),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> SprintAssignmentManagementGridResponse:
+    return sprint_service.get_sprint_assignment_management_grid(
+        db,
+        project_id=project_id,
+        sprint_id=sprint_id,
+        user_tenant_id=current_user.tenant_id,
+    )
+
+
+@router.get(
+    "/{sprint_id}/assignment-management/feature/{feature_id}",
+    response_model=SprintAssignmentManagementFeatureGridResponse,
+)
+def get_sprint_assignment_management_feature_grid(
+    sprint_id: int,
+    feature_id: int,
+    project_id: int = Query(..., description="PT_Project.Id (selected project)"),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> SprintAssignmentManagementFeatureGridResponse:
+    return sprint_service.get_sprint_assignment_management_feature_grid(
+        db,
+        project_id=project_id,
+        sprint_id=sprint_id,
+        feature_id=feature_id,
+        user_tenant_id=current_user.tenant_id,
+    )
+
+
 @router.get("/{sprint_id}/assignments", response_model=SprintAssignmentsResponse)
 def get_sprint_assignments(
     sprint_id: int,
@@ -101,8 +138,31 @@ def save_sprint_assignments(
         sprint_id=sprint_id,
         user_tenant_id=current_user.tenant_id,
         data=data,
+        acting_user_id=current_user.id,
     )
 
+
+@router.put(
+    "/{sprint_id}/assignments/feature/{feature_id}",
+    response_model=SprintAssignmentManagementFeatureGridResponse,
+)
+def save_sprint_feature_assignments(
+    sprint_id: int,
+    feature_id: int,
+    data: SprintAssignmentsWrite,
+    project_id: int = Query(..., description="PT_Project.Id (selected project)"),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> SprintAssignmentManagementFeatureGridResponse:
+    return sprint_service.save_sprint_feature_assignments(
+        db,
+        project_id=project_id,
+        sprint_id=sprint_id,
+        feature_id=feature_id,
+        user_tenant_id=current_user.tenant_id,
+        acting_user_id=current_user.id,
+        data=data,
+    )
 
 @router.delete("/{sprint_id}/assignments/page", status_code=status.HTTP_204_NO_CONTENT)
 def delete_sprint_page_assignments(

@@ -10,6 +10,15 @@ from sqlalchemy.orm import Session
 from app.models.pt_timesheet import pt_features, pt_project_users, pt_pages, pt_sprint_page_users, pt_sprints
 from app.models.user import User
 
+ROLE_DEVELOPER = 1
+ROLE_TESTER = 2
+
+
+def _effective_role(raw: Any) -> int:
+    if raw is None:
+        return ROLE_DEVELOPER
+    return int(raw)
+
 
 def _row_to_dict(row: RowMapping) -> dict[str, Any]:
     ic = row.get("IsCompleted")
@@ -273,11 +282,25 @@ def resolve_project_user_ids(db: Session, *, project_id: int, user_ids: list[int
     return {int(r[0]) for r in rows if r[0] is not None}
 
 
-# --- sprint assignment persistence (save only final Feature-Page-User) ---
+# --- sprint assignment persistence (Feature-Page-User with Developer/Tester roles) ---
 def clear_sprint_page_users(db: Session, *, project_id: int, sprint_id: int) -> None:
     db.execute(
         delete(pt_sprint_page_users).where(
             and_(pt_sprint_page_users.c.ProjectId == project_id, pt_sprint_page_users.c.SprintId == sprint_id)
+        )
+    )
+
+
+def clear_sprint_page_users_for_feature(
+    db: Session, *, project_id: int, sprint_id: int, feature_id: int
+) -> None:
+    db.execute(
+        delete(pt_sprint_page_users).where(
+            and_(
+                pt_sprint_page_users.c.ProjectId == project_id,
+                pt_sprint_page_users.c.SprintId == sprint_id,
+                pt_sprint_page_users.c.FeatureId == feature_id,
+            )
         )
     )
 
@@ -287,24 +310,64 @@ def replace_sprint_page_users(
     *,
     project_id: int,
     sprint_id: int,
-    page_users: list[tuple[int, int, int]],  # (feature_id, page_id, user_id)
+    rows: list[dict[str, Any]],
 ) -> None:
+    """
+    rows: dict with keys FeatureId, PageId, UserId, AssignmentRole, IsPrimary,
+          UpdatedOn, UpdatedByUserId, ProjectId optional (filled from kwargs).
+    """
     clear_sprint_page_users(db, project_id=project_id, sprint_id=sprint_id)
-    if not page_users:
+    if not rows:
         return
-    db.execute(
-        insert(pt_sprint_page_users),
-        [
+    payload = []
+    for r in rows:
+        payload.append(
             {
                 "SprintId": sprint_id,
-                "FeatureId": fid,
-                "PageId": pid,
-                "UserId": uid,
+                "FeatureId": int(r["FeatureId"]),
+                "PageId": int(r["PageId"]),
+                "UserId": int(r["UserId"]),
                 "ProjectId": project_id,
+                "AssignmentRole": int(r["AssignmentRole"]),
+                "IsPrimary": int(r.get("IsPrimary") or 0),
+                "UpdatedOn": r.get("UpdatedOn"),
+                "UpdatedByUserId": r.get("UpdatedByUserId"),
             }
-            for (fid, pid, uid) in page_users
-        ],
-    )
+        )
+    db.execute(insert(pt_sprint_page_users), payload)
+
+
+def replace_sprint_page_users_for_feature(
+    db: Session,
+    *,
+    project_id: int,
+    sprint_id: int,
+    feature_id: int,
+    rows: list[dict[str, Any]],
+) -> None:
+    """
+    Like replace_sprint_page_users, but only replaces rows for a single feature.
+    Useful for on-demand / partial saves from the assignment management UI.
+    """
+    clear_sprint_page_users_for_feature(db, project_id=project_id, sprint_id=sprint_id, feature_id=feature_id)
+    if not rows:
+        return
+    payload = []
+    for r in rows:
+        payload.append(
+            {
+                "SprintId": sprint_id,
+                "FeatureId": feature_id,
+                "PageId": int(r["PageId"]),
+                "UserId": int(r["UserId"]),
+                "ProjectId": project_id,
+                "AssignmentRole": int(r["AssignmentRole"]),
+                "IsPrimary": int(r.get("IsPrimary") or 0),
+                "UpdatedOn": r.get("UpdatedOn"),
+                "UpdatedByUserId": r.get("UpdatedByUserId"),
+            }
+        )
+    db.execute(insert(pt_sprint_page_users), payload)
 
 
 def delete_sprint_page_assignments(
@@ -327,10 +390,35 @@ def delete_sprint_page_assignments(
     )
 
 
+def _sort_assigned_users(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(entries, key=lambda x: (-bool(x.get("is_primary")), int(x["user_id"])))
+
+
+def _append_role_user(
+    pnode: dict[str, Any],
+    *,
+    role: int,
+    user_id: int,
+    user_name: str | None,
+    is_primary: int,
+) -> None:
+    item = {"user_id": user_id, "user_name": user_name, "is_primary": bool(is_primary)}
+    if role == ROLE_TESTER:
+        key = "testers"
+        other = "developers"
+    else:
+        key = "developers"
+        other = "testers"
+    if not any(x["user_id"] == user_id for x in pnode[key]):
+        pnode[key].append(item)
+    # backward compat flat list
+    if not any(x["user_id"] == user_id for x in pnode["assigned_users"]):
+        pnode["assigned_users"].append({"user_id": user_id, "user_name": user_name})
+
+
 def fetch_sprint_assignments(db: Session, *, project_id: int, sprint_id: int) -> list[dict[str, Any]]:
     """
-    Return assignment hierarchy (Feature -> Page -> Users) for a sprint.
-    Single query, then assembled in Python (avoids N+1).
+    Feature -> Page -> developers[], testers[], assigned_users (legacy union), primary_* for UI.
     """
     su = pt_sprint_page_users
     f = pt_features
@@ -339,12 +427,15 @@ def fetch_sprint_assignments(db: Session, *, project_id: int, sprint_id: int) ->
 
     rows = db.execute(
         select(
+            su.c.Id,
             su.c.FeatureId.label("feature_id"),
             f.c.FeatureName.label("feature_name"),
             su.c.PageId.label("page_id"),
             p.c.PageName.label("page_name"),
             su.c.UserId.label("user_id"),
             u.full_name.label("user_name"),
+            su.c.AssignmentRole,
+            su.c.IsPrimary,
         )
         .select_from(
             su.join(f, f.c.FeatureId == su.c.FeatureId)
@@ -353,16 +444,14 @@ def fetch_sprint_assignments(db: Session, *, project_id: int, sprint_id: int) ->
         )
         .where(and_(su.c.ProjectId == project_id, su.c.SprintId == sprint_id))
         .order_by(
-            func.lower(f.c.FeatureName).asc(),
             su.c.FeatureId.asc(),
-            func.lower(p.c.PageName).asc(),
             su.c.PageId.asc(),
-            func.lower(u.full_name).asc(),
-            su.c.UserId.asc(),
+            su.c.AssignmentRole.asc(),
+            su.c.IsPrimary.desc(),
+            su.c.Id.asc(),
         )
     ).all()
 
-    # Assemble hierarchy.
     by_feature: dict[int, dict[str, Any]] = {}
     for r in rows:
         fid = int(r.feature_id)
@@ -375,15 +464,40 @@ def fetch_sprint_assignments(db: Session, *, project_id: int, sprint_id: int) ->
         pages = fnode["pages"]
         pnode = next((x for x in pages if x["page_id"] == pid), None)
         if pnode is None:
-            pnode = {"page_id": pid, "page_name": r.page_name, "assigned_users": []}
+            pnode = {
+                "page_id": pid,
+                "page_name": r.page_name,
+                "developers": [],
+                "testers": [],
+                "assigned_users": [],
+                "primary_developer_id": None,
+                "primary_tester_id": None,
+            }
             pages.append(pnode)
 
-        if r.user_id is None:
-            continue
-        uid = int(r.user_id)
-        # avoid duplicates
-        if not any(x["user_id"] == uid for x in pnode["assigned_users"]):
-            pnode["assigned_users"].append({"user_id": uid, "user_name": r.user_name})
+        role = _effective_role(getattr(r, "AssignmentRole", None))
+        ip = int(r.IsPrimary or 0) if r.IsPrimary is not None else 0
+        _append_role_user(
+            pnode,
+            role=role,
+            user_id=int(r.user_id),
+            user_name=r.user_name,
+            is_primary=ip,
+        )
+
+    for fnode in by_feature.values():
+        for pnode in fnode["pages"]:
+            pnode["developers"] = _sort_assigned_users(pnode["developers"])
+            pnode["testers"] = _sort_assigned_users(pnode["testers"])
+            pd = next((x for x in pnode["developers"] if x.get("is_primary")), None) or (
+                pnode["developers"][0] if pnode["developers"] else None
+            )
+            pt = next((x for x in pnode["testers"] if x.get("is_primary")), None) or (
+                pnode["testers"][0] if pnode["testers"] else None
+            )
+            pnode["primary_developer_id"] = pd["user_id"] if pd else None
+            pnode["primary_tester_id"] = pt["user_id"] if pt else None
+            # strip is_primary from nested if API wants leaner — keep for management UI
 
     return list(by_feature.values())
 
@@ -409,6 +523,8 @@ def fetch_sprint_assignments_bulk(
             p.c.PageName.label("page_name"),
             su.c.UserId.label("user_id"),
             u.full_name.label("user_name"),
+            su.c.AssignmentRole,
+            su.c.IsPrimary,
         )
         .select_from(
             su.join(f, f.c.FeatureId == su.c.FeatureId)
@@ -418,12 +534,11 @@ def fetch_sprint_assignments_bulk(
         .where(and_(su.c.ProjectId == project_id, su.c.SprintId.in_(sprint_ids)))
         .order_by(
             su.c.SprintId.asc(),
-            func.lower(f.c.FeatureName).asc(),
             su.c.FeatureId.asc(),
-            func.lower(p.c.PageName).asc(),
             su.c.PageId.asc(),
-            func.lower(u.full_name).asc(),
-            su.c.UserId.asc(),
+            su.c.AssignmentRole.asc(),
+            su.c.IsPrimary.desc(),
+            su.c.Id.asc(),
         )
     ).all()
 
@@ -436,20 +551,323 @@ def fetch_sprint_assignments_bulk(
             fnode = {"feature_id": fid, "feature_name": r.feature_name, "pages": []}
             out[sid][fid] = fnode
 
-        if r.page_id is None:
-            continue
         pid = int(r.page_id)
         pages = fnode["pages"]
         pnode = next((x for x in pages if x["page_id"] == pid), None)
         if pnode is None:
-            pnode = {"page_id": pid, "page_name": r.page_name, "assigned_users": []}
+            pnode = {
+                "page_id": pid,
+                "page_name": r.page_name,
+                "developers": [],
+                "testers": [],
+                "assigned_users": [],
+                "primary_developer_id": None,
+                "primary_tester_id": None,
+            }
             pages.append(pnode)
 
-        if r.user_id is None:
-            continue
-        uid = int(r.user_id)
-        if not any(x["user_id"] == uid for x in pnode["assigned_users"]):
-            pnode["assigned_users"].append({"user_id": uid, "user_name": r.user_name})
+        role = _effective_role(getattr(r, "AssignmentRole", None))
+        ip = int(r.IsPrimary or 0) if r.IsPrimary is not None else 0
+        _append_role_user(
+            pnode,
+            role=role,
+            user_id=int(r.user_id),
+            user_name=r.user_name,
+            is_primary=ip,
+        )
 
-    return {sid: list(fmap.values()) for sid, fmap in out.items()}
+    result: dict[int, list[dict[str, Any]]] = {}
+    for sid, fmap in out.items():
+        for fnode in fmap.values():
+            for pnode in fnode["pages"]:
+                pnode["developers"] = _sort_assigned_users(pnode["developers"])
+                pnode["testers"] = _sort_assigned_users(pnode["testers"])
+                pd = next((x for x in pnode["developers"] if x.get("is_primary")), None) or (
+                    pnode["developers"][0] if pnode["developers"] else None
+                )
+                pt = next((x for x in pnode["testers"] if x.get("is_primary")), None) or (
+                    pnode["testers"][0] if pnode["testers"] else None
+                )
+                pnode["primary_developer_id"] = pd["user_id"] if pd else None
+                pnode["primary_tester_id"] = pt["user_id"] if pt else None
+        result[sid] = list(fmap.values())
+    return result
+
+
+def list_project_feature_page_catalog(db: Session, *, project_id: int) -> list[dict[str, Any]]:
+    """All Feature → Page rows for a project (for assignment grid)."""
+    rows = db.execute(
+        select(
+            pt_features.c.FeatureId,
+            pt_features.c.FeatureName,
+            pt_pages.c.PageId,
+            pt_pages.c.PageName,
+        )
+        .select_from(
+            pt_features.join(
+                pt_pages,
+                and_(pt_pages.c.FeatureId == pt_features.c.FeatureId, pt_pages.c.ProjectId == pt_features.c.ProjectId),
+            )
+        )
+        .where(pt_features.c.ProjectId == project_id)
+        .order_by(
+            func.lower(pt_features.c.FeatureName).asc(),
+            pt_features.c.FeatureId.asc(),
+            func.lower(pt_pages.c.PageName).asc(),
+            pt_pages.c.PageId.asc(),
+        )
+    ).all()
+    return [
+        {
+            "feature_id": int(r[0]),
+            "feature_name": r[1],
+            "page_id": int(r[2]),
+            "page_name": r[3],
+        }
+        for r in rows
+    ]
+
+
+def list_project_feature_page_catalog_for_feature(
+    db: Session, *, project_id: int, feature_id: int
+) -> list[dict[str, Any]]:
+    """All Page rows for a single feature in a project (for on-demand grid)."""
+    rows = db.execute(
+        select(
+            pt_features.c.FeatureId,
+            pt_features.c.FeatureName,
+            pt_pages.c.PageId,
+            pt_pages.c.PageName,
+        )
+        .select_from(
+            pt_features.join(
+                pt_pages,
+                and_(pt_pages.c.FeatureId == pt_features.c.FeatureId, pt_pages.c.ProjectId == pt_features.c.ProjectId),
+            )
+        )
+        .where(and_(pt_features.c.ProjectId == project_id, pt_features.c.FeatureId == feature_id))
+        .order_by(
+            func.lower(pt_pages.c.PageName).asc(),
+            pt_pages.c.PageId.asc(),
+        )
+    ).all()
+    return [
+        {
+            "feature_id": int(r[0]),
+            "feature_name": r[1],
+            "page_id": int(r[2]),
+            "page_name": r[3],
+        }
+        for r in rows
+    ]
+
+
+def fetch_sprint_assignment_management_grid(
+    db: Session, *, project_id: int, sprint_id: int
+) -> dict[str, Any]:
+    """
+    Full project catalog merged with sprint assignments + summary stats.
+    """
+    catalog = list_project_feature_page_catalog(db, project_id=project_id)
+    assign_tree = fetch_sprint_assignments(db, project_id=project_id, sprint_id=sprint_id)
+    by_f: dict[int, dict[str, Any]] = {f["feature_id"]: f for f in assign_tree}
+    by_fp: dict[tuple[int, int], dict[str, Any]] = {}
+    for f in assign_tree:
+        for p in f["pages"]:
+            by_fp[(f["feature_id"], p["page_id"])] = p
+
+    features_out: list[dict[str, Any]] = []
+    current_fid: int | None = None
+    current_fnode: dict[str, Any] | None = None
+
+    total_pages = 0
+    assigned_pages = 0
+
+    for row in catalog:
+        fid = row["feature_id"]
+        pid = row["page_id"]
+        total_pages += 1
+        p_saved = by_fp.get((fid, pid))
+        has_assign = bool(
+            p_saved
+            and (
+                (p_saved.get("developers") and len(p_saved["developers"]) > 0)
+                or (p_saved.get("testers") and len(p_saved["testers"]) > 0)
+            )
+        )
+        if has_assign:
+            assigned_pages += 1
+
+        pnode = {
+            "page_id": pid,
+            "page_name": row["page_name"],
+            "developers": (p_saved or {}).get("developers") or [],
+            "testers": (p_saved or {}).get("testers") or [],
+            "assigned_users": (p_saved or {}).get("assigned_users") or [],
+            "primary_developer_id": (p_saved or {}).get("primary_developer_id"),
+            "primary_tester_id": (p_saved or {}).get("primary_tester_id"),
+            "last_updated_on": None,
+            "last_updated_by_user_id": None,
+            "last_updated_by_name": None,
+            "status": "saved" if has_assign else "unassigned",
+        }
+        if current_fid != fid:
+            meta = by_f.get(fid)
+            current_fnode = {
+                "feature_id": fid,
+                "feature_name": meta["feature_name"] if meta else row["feature_name"],
+                "pages": [],
+            }
+            features_out.append(current_fnode)
+            current_fid = fid
+        assert current_fnode is not None
+        current_fnode["pages"].append(pnode)
+
+    # enrich last_updated per page from raw SQL aggregate
+    su = pt_sprint_page_users
+    uu = User
+    agg = db.execute(
+        select(
+            su.c.FeatureId,
+            su.c.PageId,
+            func.max(su.c.UpdatedOn).label("mx"),
+        )
+        .where(and_(su.c.ProjectId == project_id, su.c.SprintId == sprint_id))
+        .group_by(su.c.FeatureId, su.c.PageId)
+    ).all()
+    last_on: dict[tuple[int, int], Any] = {(int(r[0]), int(r[1])): r[2] for r in agg}
+
+    last_by_rows = db.execute(
+        select(
+            su.c.FeatureId,
+            su.c.PageId,
+            su.c.UpdatedOn,
+            su.c.UpdatedByUserId,
+            uu.full_name,
+        )
+        .select_from(su.outerjoin(uu, uu.id == su.c.UpdatedByUserId))
+        .where(and_(su.c.ProjectId == project_id, su.c.SprintId == sprint_id))
+        .order_by(su.c.FeatureId, su.c.PageId, su.c.UpdatedOn.desc())
+    ).all()
+    last_detail: dict[tuple[int, int], tuple[Any, int | None, str | None]] = {}
+    for r in last_by_rows:
+        key = (int(r[0]), int(r[1]))
+        if key not in last_detail and r[2] is not None:
+            last_detail[key] = (r[2], int(r[3]) if r[3] is not None else None, r[4])
+
+    for fnode in features_out:
+        for pnode in fnode["pages"]:
+            key = (fnode["feature_id"], pnode["page_id"])
+            if key in last_detail:
+                pnode["last_updated_on"] = last_detail[key][0]
+                pnode["last_updated_by_user_id"] = last_detail[key][1]
+                pnode["last_updated_by_name"] = last_detail[key][2]
+            elif key in last_on:
+                pnode["last_updated_on"] = last_on[key]
+
+    return {
+        "features": features_out,
+        "stats": {
+            "total_pages": total_pages,
+            "assigned_pages": assigned_pages,
+            "unassigned_pages": total_pages - assigned_pages,
+        },
+    }
+
+
+def fetch_sprint_assignment_management_feature_grid(
+    db: Session, *, project_id: int, sprint_id: int, feature_id: int
+) -> dict[str, Any]:
+    """
+    Feature-scoped grid: project feature catalog for one feature merged with sprint assignments.
+    Returns a single feature node plus stats for that feature.
+    """
+    catalog = list_project_feature_page_catalog_for_feature(db, project_id=project_id, feature_id=feature_id)
+    assign_tree = fetch_sprint_assignments(db, project_id=project_id, sprint_id=sprint_id)
+    f_saved = next((f for f in assign_tree if int(f.get("feature_id")) == int(feature_id)), None)
+    by_page: dict[int, dict[str, Any]] = {}
+    if f_saved:
+        for p in f_saved.get("pages") or []:
+            by_page[int(p["page_id"])] = p
+
+    pages_out: list[dict[str, Any]] = []
+    total_pages = 0
+    assigned_pages = 0
+    feature_name: str | None = None
+
+    for row in catalog:
+        total_pages += 1
+        feature_name = row.get("feature_name") or feature_name
+        pid = int(row["page_id"])
+        p_saved = by_page.get(pid)
+        has_assign = bool(
+            p_saved
+            and (
+                (p_saved.get("developers") and len(p_saved["developers"]) > 0)
+                or (p_saved.get("testers") and len(p_saved["testers"]) > 0)
+            )
+        )
+        if has_assign:
+            assigned_pages += 1
+        pages_out.append(
+            {
+                "page_id": pid,
+                "page_name": row.get("page_name"),
+                "developers": (p_saved or {}).get("developers") or [],
+                "testers": (p_saved or {}).get("testers") or [],
+                "assigned_users": (p_saved or {}).get("assigned_users") or [],
+                "primary_developer_id": (p_saved or {}).get("primary_developer_id"),
+                "primary_tester_id": (p_saved or {}).get("primary_tester_id"),
+                "last_updated_on": None,
+                "last_updated_by_user_id": None,
+                "last_updated_by_name": None,
+                "status": "saved" if has_assign else "unassigned",
+            }
+        )
+
+    # enrich last_updated per page (feature-scoped)
+    su = pt_sprint_page_users
+    uu = User
+    last_by_rows = db.execute(
+        select(
+            su.c.PageId,
+            su.c.UpdatedOn,
+            su.c.UpdatedByUserId,
+            uu.full_name,
+        )
+        .select_from(su.outerjoin(uu, uu.id == su.c.UpdatedByUserId))
+        .where(
+            and_(
+                su.c.ProjectId == project_id,
+                su.c.SprintId == sprint_id,
+                su.c.FeatureId == feature_id,
+            )
+        )
+        .order_by(su.c.PageId, su.c.UpdatedOn.desc())
+    ).all()
+    last_detail: dict[int, tuple[Any, int | None, str | None]] = {}
+    for r in last_by_rows:
+        pid = int(r[0])
+        if pid not in last_detail and r[1] is not None:
+            last_detail[pid] = (r[1], int(r[2]) if r[2] is not None else None, r[3])
+
+    for p in pages_out:
+        pid = int(p["page_id"])
+        if pid in last_detail:
+            p["last_updated_on"] = last_detail[pid][0]
+            p["last_updated_by_user_id"] = last_detail[pid][1]
+            p["last_updated_by_name"] = last_detail[pid][2]
+
+    return {
+        "feature": {
+            "feature_id": int(feature_id),
+            "feature_name": feature_name,
+            "pages": pages_out,
+        },
+        "stats": {
+            "total_pages": total_pages,
+            "assigned_pages": assigned_pages,
+            "unassigned_pages": total_pages - assigned_pages,
+        },
+    }
 
