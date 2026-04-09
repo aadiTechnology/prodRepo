@@ -15,7 +15,7 @@ from app.models.revoked_token import RevokedToken
 from app.models.ai_entities import Requirement, UserStory, TestCase, DevelopmentTask
 from app.models.theme_template import ThemeTemplate
 from app.models.class_fee_structure_assignment import ClassFeeStructureAssignment, AssignmentStatus
-from app.models.academic import AcademicYear, SchoolClass
+from app.models.academic import AcademicYear, SchoolClass, ClassDivision
 # from app.models.school_class import SchoolClass
 from app.models.fee import FeeCategory, FeeStructure, FeeInstallment
 from app.models.fee_discount import FeeDiscount
@@ -52,6 +52,7 @@ __all__ = [
     "DevelopmentTask",
     "ThemeTemplate",
     "SchoolClass",
+    "ClassDivision",
     "FeeStructure",
     "AcademicYear",
     "FeeCategory",

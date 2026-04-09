@@ -22,7 +22,10 @@ export const createClassListConfig = ({
       id: "section",
       label: "Section",
       align: "center",
-      render: (row: SchoolClass) => row.section || "-",
+      render: (row: SchoolClass) => 
+        row.divisions && row.divisions.length > 0 
+          ? row.divisions.map(d => d.division_name).join(", ") 
+          : "-",
     },
     {
       id: "capacity",

@@ -7,6 +7,7 @@ Used for request/response serialization in FastAPI endpoints
 from datetime import date, datetime
 from typing import Optional, List
 from pydantic import BaseModel, constr, Field
+from app.schemas.school_class_schema import ClassDivisionResponse
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Academic Year Models
@@ -63,6 +64,7 @@ class ClassUpdate(BaseModel):
 class ClassResponse(ClassBase):
     id: int
     tenant_id: int
+    divisions: list[ClassDivisionResponse] = []
     created_at: datetime
     updated_at: Optional[datetime] = None
 

@@ -1,9 +1,8 @@
 from datetime import datetime
 import re
 from fastapi import HTTPException
-from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
-from app.models import SchoolClass, AcademicYear
+from sqlalchemy.orm import Session, joinedload
+from app.models import SchoolClass, AcademicYear, ClassDivision
 from app.schemas.school_class_schema import SchoolClassCreate, SchoolClassUpdate
 
 
@@ -35,31 +34,11 @@ def _check_duplicate_code(
         )
 
 
-def _build_code_seed(name: str, section: str | None) -> str:
-    raw = f"{name} {section or ''}".strip().upper()
+
+def _generate_default_code(name: str) -> str:
+    raw = name.strip().upper()
     normalized = re.sub(r"[^A-Z0-9]+", "-", raw).strip("-")
     return normalized[:40] or "CLASS"
-
-
-def _generate_unique_code(
-    db: Session,
-    tenant_id: int,
-    name: str,
-    section: str | None,
-) -> str:
-    seed = _build_code_seed(name, section)
-    query = db.query(SchoolClass.code).filter(
-        SchoolClass.tenant_id == tenant_id,
-        SchoolClass.is_deleted == False,
-    )
-    existing_codes = {row[0].lower() for row in query.all() if row[0]}
-
-    candidate = seed
-    suffix = 2
-    while candidate.lower() in existing_codes:
-        candidate = f"{seed}-{suffix}"[:50]
-        suffix += 1
-    return candidate
 
 
 def _ensure_academic_year_exists(db: Session, tenant_id: int, academic_year_id: int) -> None:
@@ -88,15 +67,14 @@ def get_all_classes(
             or_(
                 SchoolClass.name.ilike(text),
                 SchoolClass.code.ilike(text),
-                SchoolClass.section.ilike(text),
             )
         )
 
-    return query.order_by(SchoolClass.name.asc(), SchoolClass.section.asc()).distinct().all()
+    return query.options(joinedload(SchoolClass.divisions)).order_by(SchoolClass.name.asc()).distinct().all()
 
 
 def get_class_by_id(db: Session, class_id: int, tenant_id: int):
-    db_obj = db.query(SchoolClass).filter(
+    db_obj = db.query(SchoolClass).options(joinedload(SchoolClass.divisions)).filter(
         SchoolClass.id == class_id,
         SchoolClass.tenant_id == tenant_id,
         SchoolClass.is_deleted == False,
@@ -113,15 +91,9 @@ def create_class(
     created_by: int,
 ):
     normalized_name = data.name.strip()
-    normalized_section = _normalize_text(data.section)
     normalized_code = _normalize_text(data.code)
     _ensure_academic_year_exists(db, tenant_id, data.academic_year_id)
-    final_code = normalized_code or _generate_unique_code(
-        db=db,
-        tenant_id=tenant_id,
-        name=normalized_name,
-        section=normalized_section,
-    )
+    final_code = normalized_code or _generate_default_code(normalized_name)
     _check_duplicate_code(db, tenant_id, final_code)
 
     db_obj = SchoolClass(
@@ -130,7 +102,6 @@ def create_class(
         name=normalized_name,
         code=final_code,
         description=_normalize_text(data.description),
-        section=normalized_section,
         capacity=data.capacity,
         is_active=data.is_active,
         created_by=created_by,
@@ -175,8 +146,6 @@ def update_class(
             update_data.pop("code")
     if "description" in update_data:
         update_data["description"] = _normalize_text(update_data["description"])
-    if "section" in update_data:
-        update_data["section"] = _normalize_text(update_data["section"])
 
     for key, value in update_data.items():
         setattr(db_obj, key, value)

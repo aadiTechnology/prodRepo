@@ -38,7 +38,6 @@ class SchoolClass(Base):
     name = Column(String(100), nullable=False)
     code = Column(String(50), nullable=False)
     description = Column(String(500), nullable=True)
-    section = Column(String(50), nullable=True)
     capacity = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
 
@@ -53,5 +52,19 @@ class SchoolClass(Base):
 
     # Relationships
     academic_year = relationship("AcademicYear", back_populates="classes")
+    divisions = relationship("ClassDivision", back_populates="class_model", cascade="all, delete-orphan")
     fee_structures = relationship("FeeStructure", back_populates="class_model", cascade="all, delete-orphan")
     students = relationship("Student", back_populates="class_model", overlaps="students")
+
+
+class ClassDivision(Base):
+    __tablename__ = "class_divisions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    class_id = Column(Integer, ForeignKey("classes.id", ondelete="CASCADE"), nullable=False)
+    division_name = Column(String(100), nullable=False)
+    capacity = Column(Integer, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    # Relationships
+    class_model = relationship("SchoolClass", back_populates="divisions")

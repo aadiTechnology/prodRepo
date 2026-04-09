@@ -2,6 +2,7 @@ import React from "react";
 import { type FormConfig, type FormRenderContext } from "../../components/reusable/formFramework.types";
 import { DataTable } from "../../components/reusable";
 import { Box, Typography } from "@mui/material";
+import { type ClassEntity } from "../../types/fee";
 
 export interface FeeStructureFormData extends Record<string, unknown> {
   academic_year_id: number | "";
@@ -28,7 +29,7 @@ export function createFeeStructureFormConfig({
 }: {
   isEditMode: boolean;
   academicYears: { id: number; name: string }[];
-  classes: { id: number; name: string }[];
+  classes: ClassEntity[];
   installments: FeeInstallmentPreview[];
 }): FormConfig<FeeStructureFormData> {
   return {
@@ -48,7 +49,10 @@ export function createFeeStructureFormConfig({
         type: "select",
         required: true,
         props: {
-          options: classes.map((c) => ({ value: c.id, label: c.name })),
+          options: classes.map((c) => ({ 
+            value: c.id, 
+            label: c.code && c.code !== c.name ? `${c.name} (${c.code})` : c.name 
+          })),
           disabled: classes.length === 0,
         },
       },

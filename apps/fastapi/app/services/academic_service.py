@@ -5,8 +5,8 @@ Handles database queries, data validation, and error handling
 """
 
 from datetime import datetime
-from sqlalchemy.orm import Session
-from app.models.academic import AcademicYear, SchoolClass
+from sqlalchemy.orm import Session, joinedload
+from app.models.academic import AcademicYear, SchoolClass, ClassDivision
 from app.schemas.academic import AcademicYearCreate, ClassCreate, AcademicYearUpdate, ClassUpdate
 from app.schemas.school_class_schema import SchoolClassCreate
 from app.services import school_class_service
@@ -52,7 +52,7 @@ def get_classes(db: Session, tenant_id: int, academic_year_id: int = None) -> li
     )
     if academic_year_id:
         query = query.filter(SchoolClass.academic_year_id == academic_year_id)
-    return query.all()
+    return query.options(joinedload(SchoolClass.divisions)).all()
 
 def get_class(db: Session, class_id: int, tenant_id: int) -> SchoolClass:
     obj = db.query(SchoolClass).filter(

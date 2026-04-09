@@ -34,6 +34,7 @@ export interface ClassEntity {
   id: number;
   name: string;
   code: string;
+  divisions?: any[];
   section?: string;
 }
 

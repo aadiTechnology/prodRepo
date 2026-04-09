@@ -9,6 +9,14 @@ import apiClient from "../client";
 // ═══════════════════════════════════════════════════════════════════════════
 // Type Definitions
 // ═══════════════════════════════════════════════════════════════════════════
+export interface ClassDivision {
+  id: number;
+  class_id: number;
+  division_name: string;
+  capacity?: number | null;
+  is_active: boolean;
+}
+
 export interface SchoolClass {
   id: number;
   tenant_id: number;
@@ -16,9 +24,9 @@ export interface SchoolClass {
   name: string;
   code: string;
   description?: string | null;
-  section?: string | null;
   capacity?: number | null;
   is_active: boolean;
+  divisions: ClassDivision[];
   created_at?: string;
   created_by?: number | null;
   updated_at?: string | null;
@@ -33,7 +41,6 @@ export interface SchoolClassCreate {
   name: string;
   code?: string;
   description?: string;
-  section?: string;
   capacity?: number;
   is_active: boolean;
 }
