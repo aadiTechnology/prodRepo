@@ -16,7 +16,7 @@ import AddEditFeeCategory from "../pages/Fees/AddEditFeeCategory";
 import FeeDiscountsPage from "../pages/Fees/FeeDiscountsPage";
 import AddFeeDiscount from "../pages/AddFeeDiscount";
 import StudentFeeLedger from "../pages/StudentFeeLedger";
-
+import StudentList from "../pages/students/StudentList";
 // ═══════════════════════════════════════════════════════════════════════════
 // Lazy-loaded Pages - Code splitting for better performance
 // ═══════════════════════════════════════════════════════════════════════════
@@ -87,7 +87,7 @@ export default function AppRoutes() {
         {/* Protected routes with layout */}
         <Route element={<MainLayout />}>
           <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-
+          <Route path="/students" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:view"><StudentList /></ProtectedRoute>} />
           {/* User Management */}
           <Route
             path="/reports/sprint-performance"

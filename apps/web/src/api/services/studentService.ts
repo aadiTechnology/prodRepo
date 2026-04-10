@@ -17,7 +17,27 @@ export interface StudentDetails {
   // Add other fields as needed
 }
 
+
 const studentService = {
+  async list(params?: { page?: number; limit?: number; search?: string; class_id?: number; class?: string; status?: string }) {
+    const { data } = await axiosInstance.get("/students", { params });
+    // Support both { data, pagination } and { items, total }
+    if (Array.isArray(data.data)) {
+      // Map 'class' to 'className' for each student
+      const items = data.data.map((student: any) => ({ ...student, className: student.className || student.class || student.class_name }));
+      return { items, total: data.pagination?.total ?? items.length };
+    }
+    if (Array.isArray(data.items)) {
+      const items = data.items.map((student: any) => ({ ...student, className: student.className || student.class || student.class_name }));
+      return { items, total: typeof data.total === "number" ? data.total : items.length };
+    }
+    return { items: [], total: 0 };
+  },
+
+  async delete(id: string) {
+    await axiosInstance.delete(`/students/${id}`);
+  },
+
   async getStudentsDropdown(): Promise<StudentDropdownItem[]> {
     const { data } = await axiosInstance.get("/students/dropdown");
     return data.data || data;
