@@ -256,6 +256,7 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
       { id: "story-generation", label: "Story Generation", path: "/ai/generate" },
       { id: "sprint-performance", label: "Sprint Performance", path: "/reports/sprint-performance" },
       { id: "sprintwise-performance", label: "Sprintwise Performance", path: "/reports/sprintwise-performance" },
+      { id: "my-tasks-effort", label: "My Tasks — Effort Entry", path: "/my-tasks/effort-entry" },
       { id: "sprints", label: "Sprints", path: "/sprints" }
     ]
   }

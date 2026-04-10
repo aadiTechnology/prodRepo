@@ -84,6 +84,7 @@ def seed_rbac_data():
                     {"name": "General Reports", "path": "/reports/general", "feature": "REPORTS_MGMT"},
                     {"name": "Sprint Performance", "path": "/reports/sprint-performance", "feature": "REPORTS_MGMT"},
                     {"name": "Sprintwise Performance", "path": "/reports/sprintwise-performance", "feature": "REPORTS_MGMT"},
+                    {"name": "My Tasks — Effort Entry", "path": "/my-tasks/effort-entry", "feature": "REPORTS_MGMT"},
                 ]
             },
             {

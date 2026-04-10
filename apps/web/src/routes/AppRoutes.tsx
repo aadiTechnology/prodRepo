@@ -51,6 +51,7 @@ const SprintwisePerformanceReportPage = lazy(() => import("../pages/reports/Spri
 const SprintList = lazy(() => import("../pages/sprints/SprintList"));
 const SprintForm = lazy(() => import("../pages/sprints/SprintForm"));
 const SprintAssignmentsPage = lazy(() => import("../pages/sprints/SprintAssignmentsPage"));
+const MyTasksEffortEntryPage = lazy(() => import("../pages/tasks/MyTasksEffortEntryPage"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -101,6 +102,14 @@ export default function AppRoutes() {
             element={
               <ProtectedRoute>
                 <SprintwisePerformanceReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-tasks/effort-entry"
+            element={
+              <ProtectedRoute>
+                <MyTasksEffortEntryPage />
               </ProtectedRoute>
             }
           />

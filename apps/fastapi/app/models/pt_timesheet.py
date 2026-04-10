@@ -117,6 +117,15 @@ pt_subtasks = Table(
     schema=_SCHEMA,
 )
 
+pt_task_status = Table(
+    "PT_TaskStatus",
+    Base.metadata,
+    Column("StatusId", Integer, primary_key=True),
+    Column("StatusName", String(50), nullable=False),
+    Column("SortOrder", Integer, nullable=False),
+    schema=_SCHEMA,
+)
+
 pt_timesheets = Table(
     "PT_Timesheets",
     Base.metadata,
@@ -128,10 +137,26 @@ pt_timesheets = Table(
     Column("SubtaskId", Integer),
     Column("SprintId", Integer),
     Column("Description", String(500)),
-    Column("Efforts", Numeric(5, 2)),
+    # Cumulative total effort for this task line (incremental entries roll up here).
+    Column("Efforts", Numeric(12, 2)),
     Column("ActivityDate", DateTime),
     Column("CreatedOn", DateTime),
     Column("ProjectId", Integer, ForeignKey("PT_Project.Id")),
+    Column("StatusId", Integer, ForeignKey("PT_TaskStatus.StatusId"), nullable=True),
+    Column("TaskStartDate", Date, nullable=True),
+    Column("TaskEndDate", Date, nullable=True),
+    Column("LastUpdated", DateTime, nullable=True),
+    schema=_SCHEMA,
+)
+
+pt_timesheet_effort_logs = Table(
+    "PT_TimesheetEffortLogs",
+    Base.metadata,
+    Column("LogId", Integer, primary_key=True, autoincrement=True),
+    Column("TimesheetId", Integer, ForeignKey("PT_Timesheets.TimesheetId"), nullable=False),
+    Column("WorkingDate", Date, nullable=False),
+    Column("EffortHours", Numeric(10, 2), nullable=False),
+    Column("CreatedOn", DateTime, nullable=False),
     schema=_SCHEMA,
 )
 
