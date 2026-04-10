@@ -52,6 +52,8 @@ const SprintList = lazy(() => import("../pages/sprints/SprintList"));
 const SprintForm = lazy(() => import("../pages/sprints/SprintForm"));
 const SprintAssignmentsPage = lazy(() => import("../pages/sprints/SprintAssignmentsPage"));
 const MyTasksEffortEntryPage = lazy(() => import("../pages/tasks/MyTasksEffortEntryPage"));
+const LeadManagementPage = lazy(() => import("../pages/Admissions/LeadManagementPage"));
+const AddLeadPage = lazy(() => import("../pages/Admissions/AddLeadPage"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -220,6 +222,11 @@ export default function AppRoutes() {
           <Route path="/academics/classes" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><ClassList /></ProtectedRoute>} />
           <Route path="/academics/classes/new" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:create"><AddClass /></ProtectedRoute>} />
           <Route path="/academics/classes/:id/edit" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><AddClass /></ProtectedRoute>} />
+
+          {/* Admissions – Lead Management */}
+          <Route path="/admissions/leads" element={<ProtectedRoute requiredPermissions="ADMISSIONS_MGMT:view"><LeadManagementPage /></ProtectedRoute>} />
+          <Route path="/admissions/leads/add" element={<ProtectedRoute requiredPermissions="ADMISSIONS_MGMT:create"><AddLeadPage /></ProtectedRoute>} />
+          <Route path="/admissions/leads/:id/edit" element={<ProtectedRoute requiredPermissions="ADMISSIONS_MGMT:edit"><AddLeadPage /></ProtectedRoute>} />
         </Route>
       </Routes>
     </Suspense>
