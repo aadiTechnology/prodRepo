@@ -29,6 +29,10 @@ class AcademicYear(Base):
 
 
 class SchoolClass(Base):
+    @property
+    def division_names(self):
+        """Returns a list of division names for this class."""
+        return [division.division_name for division in self.divisions] if self.divisions else []
     __tablename__ = "classes"
     __table_args__ = {'extend_existing': True}
 

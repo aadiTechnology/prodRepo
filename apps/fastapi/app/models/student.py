@@ -11,16 +11,20 @@ class Student(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
-
     student_name = Column(String(150), nullable=False)
     student_code = Column(String(50), nullable=True)
     class_id = Column(Integer, ForeignKey("classes.id", ondelete="SET NULL"), nullable=True)
     roll_no = Column(String(20), nullable=True)
+    gender = Column(String(10), nullable=True)
+    date_of_birth = Column(String(20), nullable=True)
+    mobile_number = Column(String(20), nullable=True, index=True)
+    email = Column(String(100), nullable=True)
     parent_name = Column(String(150), nullable=True)
-    academic_year = Column(String(20), nullable=True)  # legacy string
     admission_no = Column(String(50), nullable=True)
-    fee_structure_id = Column(Integer, nullable=True)  # Added for unique fee structure per student
+    academic_year_id = Column(Integer, ForeignKey("academic_years.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 
     # Relationships
     class_model = relationship(
