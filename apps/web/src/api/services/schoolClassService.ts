@@ -20,7 +20,8 @@ export interface ClassDivision {
 export interface SchoolClass {
   id: number;
   tenant_id: number;
-  academic_year_id: number;
+  academic_year_id?: number | null;
+  academic_year_name?: string | null;
   name: string;
   code: string;
   description?: string | null;
@@ -37,8 +38,9 @@ export interface SchoolClass {
 }
 
 export interface SchoolClassCreate {
-  academic_year_id: number;
   name: string;
+  academic_year_id: number;
+  section?: string;
   code?: string;
   description?: string;
   capacity?: number;
@@ -53,7 +55,7 @@ const BASE_URL = "/api/classes";
 // School Class Service - CRUD operations
 // ═══════════════════════════════════════════════════════════════════════════
 const schoolClassService = {
-  getAll: async (params?: { search?: string }): Promise<SchoolClass[]> => {
+  getAll: async (params?: { search?: string; academic_year_id?: number }): Promise<SchoolClass[]> => {
     const response = await apiClient.get(BASE_URL, { params });
     return response.data;
   },

@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import schoolClassService from "../../api/services/schoolClassService";
-import academicYearService, { type AcademicYear } from "../../api/services/academicYearService";
+import academicYearService from "../../api/services/academicYearService";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
 import { useFormManager } from "../../hooks/useFormManager";
 import BaseForm from "../../components/reusable/BaseForm";
@@ -16,13 +16,12 @@ export default function AddClass() {
     const [fetchLoading, setFetchLoading] = useState(isEditMode);
     const [error, setError] = useState<string | null>(null);
     const [snackbar, setSnackbar] = useState<string | null>(null);
-    const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
-    const [academicYearLoadFailed, setAcademicYearLoadFailed] = useState(false);
-    const lastAcademicYears = useRef<AcademicYear[]>([]);
-
+    const [academicYearOptions, setAcademicYearOptions] = useState<
+        { id: string; label: string; value: string }[]
+    >([]);
     const initialValues = useMemo<AddClassFormData>(() => ({
-        academic_year_id: "",
         name: "",
+        academic_year_id: "",
         section: "",
         capacity: "",
         is_active: true,
@@ -34,6 +33,7 @@ export default function AddClass() {
             { type: "minLength", value: 1, message: "Min 1 character." },
             { type: "maxLength", value: 100, message: "Max 100 characters." },
         ],
+        academic_year_id: [{ type: "required", message: "Academic year is required." }],
         section: [
             { type: "required", message: "Division is required." },
             { type: "minLength", value: 1, message: "Min 1 character." },
@@ -60,19 +60,26 @@ export default function AddClass() {
     });
 
     const formConfig = useMemo(
-        () => createAddClassFormConfig({ isEditMode }),
-        [isEditMode]
+        () => createAddClassFormConfig({ isEditMode, academicYearOptions }),
+        [isEditMode, academicYearOptions]
     );
 
-    const fetchAcademicYears = useCallback(async () => {
-        try {
-            const years = await academicYearService.getAll();
-            setAcademicYears(years);
-            setAcademicYearLoadFailed(false);
-        } catch (err: any) {
-            setError(err?.message || "Failed to load academic years.");
-            setAcademicYearLoadFailed(true);
-        }
+    useEffect(() => {
+        academicYearService
+            .getAll()
+            .then((data: any) => {
+                const items = data?.data || data || [];
+                setAcademicYearOptions(
+                    items.map((year: any) => ({
+                        id: String(year.id),
+                        label: year.name || year.code || String(year.id),
+                        value: String(year.id),
+                    }))
+                );
+            })
+            .catch(() => {
+                setAcademicYearOptions([]);
+            });
     }, []);
 
     const fetchClass = useCallback(async () => {
@@ -81,8 +88,8 @@ export default function AddClass() {
             setFetchLoading(true);
             const data = await schoolClassService.getById(Number(id));
             setFormData({
-                academic_year_id: data.academic_year_id || "",
                 name: data.name || "",
+                academic_year_id: data.academic_year_id ? String(data.academic_year_id) : "",
                 section: data.divisions?.[0]?.division_name || "",
                 capacity: data.capacity ? String(data.capacity) : "",
                 is_active: data.is_active ?? true,
@@ -95,38 +102,26 @@ export default function AddClass() {
     }, [id, setFormData]);
 
     useEffect(() => {
-        fetchAcademicYears();
-    }, [fetchAcademicYears]);
-
-    useEffect(() => {
         if (isEditMode) {
             fetchClass();
         }
     }, [fetchClass, isEditMode]);
 
-    useEffect(() => {
-        if (isEditMode || formData.academic_year_id || academicYears.length === 0) return;
-        if (JSON.stringify(lastAcademicYears.current) === JSON.stringify(academicYears)) return;
-        const currentYear = academicYears.find((year) => year.is_active) || academicYears[0];
-        setFormData((prev) => ({ ...prev, academic_year_id: currentYear.id }));
-        lastAcademicYears.current = academicYears;
-    }, [academicYears, formData.academic_year_id, isEditMode, setFormData]);
-
     const handleConfirmSubmit = async () => {
-        if (!formData.academic_year_id) {
-            setError("No active academic year found. Please create an academic year first.");
-            return;
-        }
         if (!/^[1-9][0-9]*$/.test(formData.capacity)) {
             setError("Capacity must be a positive number.");
+            return;
+        }
+        if (!/^[1-9][0-9]*$/.test(formData.academic_year_id)) {
+            setError("Academic year is required.");
             return;
         }
         setLoading(true);
         setError(null);
         try {
             const payload = {
-                academic_year_id: Number(formData.academic_year_id),
                 name: formData.name.trim(),
+                academic_year_id: Number(formData.academic_year_id),
                 section: formData.section.trim(), // always present, required
                 capacity: Number(formData.capacity),
                 is_active: formData.is_active,

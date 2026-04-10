@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import schoolClassService, { type SchoolClass } from "../api/services/schoolClassService";
+import academicYearService from "../api/services/academicYearService";
 
 export function useClassListController() {
   const [classes, setClasses] = useState<SchoolClass[]>([]);
@@ -17,23 +18,44 @@ export function useClassListController() {
 
   const [sortBy, setSortBy] = useState<"name" | "createdAt">("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [academicYearFilter, setAcademicYearFilter] = useState("");
+  const [academicYearOptions, setAcademicYearOptions] = useState<{ label: string; value: string }[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const classData = await schoolClassService.getAll();
+      const classData = await schoolClassService.getAll({
+        academic_year_id: academicYearFilter ? Number(academicYearFilter) : undefined,
+      });
       setClasses(classData);
     } catch (err: any) {
       setError(err?.message || "Failed to fetch classes.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [academicYearFilter]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    academicYearService
+      .getAll()
+      .then((data: any) => {
+        const items = data?.data || data || [];
+        setAcademicYearOptions(
+          items.map((year: any) => ({
+            label: year.name || year.code || String(year.id),
+            value: String(year.id),
+          }))
+        );
+      })
+      .catch(() => {
+        setAcademicYearOptions([]);
+      });
+  }, []);
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
@@ -69,7 +91,10 @@ export function useClassListController() {
     return classes.filter(
       (item) =>
         `${item.name || ""}`.toLowerCase().includes(q) ||
-        `${item.section || ""}`.toLowerCase().includes(q)
+        `${item.academic_year_name || ""}`.toLowerCase().includes(q) ||
+        `${item.divisions?.map((division) => division.division_name).join(" ") || ""}`
+          .toLowerCase()
+          .includes(q)
     );
   }, [classes, search]);
 
@@ -109,6 +134,9 @@ export function useClassListController() {
     setSortBy,
     sortOrder,
     setSortOrder,
+    academicYearFilter,
+    setAcademicYearFilter,
+    academicYearOptions,
 
     // Deletion state
     deleteDialogOpen,

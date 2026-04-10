@@ -1,8 +1,8 @@
 import { type FormConfig } from "../../components/reusable/formFramework.types";
 
 export type AddClassFormData = {
-  academic_year_id: number | "";
   name: string;
+  academic_year_id: string;
   section: string;
   capacity: string;
   is_active: boolean;
@@ -10,11 +10,25 @@ export type AddClassFormData = {
 
 export const createAddClassFormConfig = (options: {
   isEditMode: boolean;
+  academicYearOptions: { id: string; label: string; value: string }[];
 }): FormConfig<AddClassFormData> => ({
   fields: {
+    academic_year_id: {
+      name: "academic_year_id",
+      label: "Academic Year",
+      type: "select",
+      required: true,
+      props: {
+        options: [
+          { id: "", label: "Select year", value: "" },
+          ...options.academicYearOptions,
+        ],
+        disableWhenEmpty: false,
+      },
+    },
     name: {
       name: "name",
-      label: "Class Name",
+      label: "Class",
       type: "text",
       placeholder: "e.g. Nursery",
       required: true,
@@ -30,7 +44,7 @@ export const createAddClassFormConfig = (options: {
     },
     capacity: {
       name: "capacity",
-      label: "Max Capacity",
+      label: "Capacity",
       type: "text",
       placeholder: "e.g. 30",
       required: true,
@@ -47,12 +61,12 @@ export const createAddClassFormConfig = (options: {
     {
       kind: "fields",
       grid: { xs: 12, sm: 6 },
-      fieldNames: ["name", "section"],
+      fieldNames: ["academic_year_id", "name"],
     },
     {
       kind: "fields",
       grid: { xs: 12, sm: 6 },
-      fieldNames: ["capacity"],
+      fieldNames: ["section", "capacity"],
     },
     ...(options.isEditMode
       ? [

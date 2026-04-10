@@ -30,6 +30,14 @@ export default function ClassList() {
                             searchValue={controller.search}
                             onSearchChange={controller.setSearch}
                             searchPlaceholder="Search classes..."
+                            filters={[
+                                {
+                                    label: "Academic Year",
+                                    value: controller.academicYearFilter,
+                                    onChange: controller.setAcademicYearFilter,
+                                    options: controller.academicYearOptions,
+                                },
+                            ]}
                             onAddClick={() => navigate("/classes/new")}
                             addLabel="Add Class"
                             addIcon={<AddIcon sx={{ fontSize: 24 }} />}
