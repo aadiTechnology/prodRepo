@@ -17,11 +17,12 @@ class SchoolClassBase(BaseModel):
     code: Optional[str] = Field(None, min_length=1, max_length=50)
     description: Optional[str] = Field(None, max_length=500)
     capacity: Optional[int] = Field(None, ge=1, le=1000)
+    academic_year_id: Optional[int] = Field(None, ge=1)
     is_active: bool = True
 
 
 class SchoolClassCreate(SchoolClassBase):
-    pass
+    academic_year_id: int = Field(ge=1)
 
 
 class SchoolClassUpdate(BaseModel):
@@ -30,6 +31,7 @@ class SchoolClassUpdate(BaseModel):
     code: Optional[str] = Field(None, min_length=1, max_length=50)
     description: Optional[str] = Field(None, max_length=500)
     capacity: Optional[int] = Field(None, ge=1, le=1000)
+    academic_year_id: Optional[int] = Field(None, ge=1)
     is_active: Optional[bool] = None
 
 
@@ -47,6 +49,7 @@ class ClassDivisionResponse(BaseModel):
 class SchoolClassResponse(SchoolClassBase):
     id: int
     tenant_id: int
+    academic_year_name: Optional[str] = None
     divisions: list[ClassDivisionResponse] = []
     created_at: Optional[datetime] = None
     created_by: Optional[int] = None

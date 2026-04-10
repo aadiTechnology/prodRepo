@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/classes", tags=["Classes"])
 @router.get("", response_model=list[SchoolClassResponse])
 def list_classes(
     search: str | None = Query(default=None),
+    academic_year_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_permission("Classes", "view")),
 ):
@@ -29,6 +30,7 @@ def list_classes(
     return school_class_service.get_all_classes(
         db=db,
         tenant_id=current_user.tenant_id,
+        academic_year_id=academic_year_id,
         search=search,
     )
 

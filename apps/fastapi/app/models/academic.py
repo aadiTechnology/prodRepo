@@ -24,8 +24,7 @@ class AcademicYear(Base):
     deleted_at = Column(DateTime, nullable=True)
     deleted_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
-    # Relationships
-    # classes relationship removed — SchoolClass is now a year-independent master
+    classes = relationship("SchoolClass", back_populates="academic_year")
 
 
 class SchoolClass(Base):
@@ -33,11 +32,15 @@ class SchoolClass(Base):
     def division_names(self):
         """Returns a list of division names for this class."""
         return [division.division_name for division in self.divisions] if self.divisions else []
+    @property
+    def academic_year_name(self):
+        return self.academic_year.name if self.academic_year else None
     __tablename__ = "classes"
     __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    academic_year_id = Column(Integer, ForeignKey("academic_years.id", ondelete="SET NULL"), nullable=True)
     name = Column(String(100), nullable=False)
     code = Column(String(50), nullable=False)
     description = Column(String(500), nullable=True)
@@ -54,6 +57,7 @@ class SchoolClass(Base):
     deleted_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Relationships
+    academic_year = relationship("AcademicYear", back_populates="classes")
     divisions = relationship("ClassDivision", back_populates="class_model", cascade="all, delete-orphan")
     fee_structures = relationship("FeeStructure", back_populates="class_model", cascade="all, delete-orphan")
     students = relationship("Student", back_populates="class_model", overlaps="students")
