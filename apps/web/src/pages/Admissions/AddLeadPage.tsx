@@ -15,6 +15,11 @@ import {
 import academicYearService from "../../api/services/academicYearService";
 import schoolClassService from "../../api/services/schoolClassService";
 import userService from "../../api/services/userService";
+import AsyncFreeSoloAutocomplete from "../../components/reusable/AsyncFreeSoloAutocomplete";
+import FormSectionLabel from "../../components/reusable/FormSectionLabel";
+import PersonIcon from "@mui/icons-material/Person";
+import ChildCareIcon from "@mui/icons-material/ChildCare";
+import AssignmentIcon from "@mui/icons-material/Assignment";
 
 const emptyForm = (): AddLeadFormData => ({
   parent_name: "",
@@ -49,6 +54,7 @@ export default function AddLeadPage() {
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [society, setSociety] = useState<string>("");
 
   // Dropdown options
   const [sourceOptions, setSourceOptions] = useState<
@@ -165,6 +171,7 @@ export default function AddLeadPage() {
         remarks: data.remarks || "",
         assigned_to: String(data.assigned_to || ""),
       });
+      setSociety(data.parent?.society ?? "");
     } catch {
       setError("Failed to load lead.");
     } finally {
@@ -205,6 +212,7 @@ export default function AddLeadPage() {
         notes: formData.notes || undefined,
         remarks: formData.remarks || undefined,
         assigned_to: formData.assigned_to ? Number(formData.assigned_to) : undefined,
+        society: society || null,
       };
 
       if (isEditMode && leadId) {
@@ -228,16 +236,64 @@ export default function AddLeadPage() {
   };
 
   const formConfig = useMemo(
-    () =>
-      createAddLeadFormConfig({
+    () => {
+      const config = createAddLeadFormConfig({
         isEditMode,
         sourceOptions,
         statusOptions,
         classOptions,
         academicYearOptions,
         staffOptions,
-      }),
-    [isEditMode, sourceOptions, statusOptions, classOptions, academicYearOptions, staffOptions]
+      });
+      // 1. Parent Section Header
+      config.layoutRows.splice(0, 0, {
+        kind: "custom",
+        grid: { xs: 12 },
+        render: () => <FormSectionLabel title="Parent / Guardian Information" icon={<PersonIcon />} />,
+      });
+
+      // 2. Inject SocietyAutocomplete after the pin_code row
+      const pinCodeRowIndex = config.layoutRows.findIndex(
+        (row) => row.kind === "fields" && row.fieldNames.includes("pin_code")
+      );
+      const societyRow = {
+        kind: "custom" as const,
+        grid: { xs: 12, sm: 3 },
+        render: () => (
+          <AsyncFreeSoloAutocomplete
+            label="Society"
+            value={society}
+            onChange={setSociety}
+            fetchSuggestions={leadService.getSocietySuggestions}
+          />
+        ),
+      };
+      config.layoutRows.splice(pinCodeRowIndex + 1, 0, societyRow);
+
+      // 3. Child Section Header
+      const childNameIndex = config.layoutRows.findIndex(
+        (row) => row.kind === "fields" && row.fieldNames.includes("child_name")
+      );
+      config.layoutRows.splice(childNameIndex, 0, {
+        kind: "custom",
+        grid: { xs: 12 },
+        render: () => <FormSectionLabel title="Child Information" icon={<ChildCareIcon />} sx={{ mt: 2 }} />,
+      });
+
+      // 4. Lead Meta Section Header
+      const leadSourceIndex = config.layoutRows.findIndex(
+        (row) => row.kind === "fields" && row.fieldNames.includes("lead_source_id")
+      );
+      config.layoutRows.splice(leadSourceIndex, 0, {
+        kind: "custom",
+        grid: { xs: 12 },
+        render: () => <FormSectionLabel title="Lead Details" icon={<AssignmentIcon />} sx={{ mt: 2 }} />,
+      });
+
+      return config;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isEditMode, sourceOptions, statusOptions, classOptions, academicYearOptions, staffOptions, society]
   );
 
   return (

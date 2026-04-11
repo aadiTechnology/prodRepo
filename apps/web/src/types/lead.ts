@@ -29,6 +29,7 @@ export interface Parent {
   state?: string | null;
   pin_code?: string | null;
   relationship?: string | null;
+  society?: string | null;
 }
 
 export interface LeadFollowup {
@@ -88,6 +89,7 @@ export interface LeadCreate {
   state?: string;
   pin_code?: string;
   relationship?: string;
+  society?: string | null;
   // Child
   child_name: string;
   child_dob?: string;

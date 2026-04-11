@@ -61,6 +61,12 @@ const leadService = {
     await apiClient.post(`${BASE}/${id}/convert`);
   },
 
+  // ── Autocomplete ───────────────────────────────────────────
+  getSocietySuggestions: async (q: string): Promise<string[]> => {
+    const res = await apiClient.get(`${BASE}/society-suggestions`, { params: { q } });
+    return res.data;
+  },
+
   // ── Follow-ups ─────────────────────────────────────────────
   getFollowups: async (leadId: number): Promise<LeadFollowup[]> => {
     const res = await apiClient.get(`${BASE}/${leadId}/followups`);

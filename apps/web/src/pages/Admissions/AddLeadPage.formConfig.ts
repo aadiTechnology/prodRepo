@@ -249,55 +249,100 @@ export function createAddLeadFormConfig({
       },
     },
     layoutRows: [
-      // Section: Parent Information
+      // Section: Parent Information (Headers injected in TSX)
       {
         kind: "fields",
-        grid: { xs: 12, sm: 6 },
-        fieldNames: ["parent_name", "mobile_number"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, sm: 6 },
-        fieldNames: ["alternate_mobile", "email"],
+        grid: { xs: 12, sm: 8 },
+        fieldNames: ["parent_name"],
       },
       {
         kind: "fields",
         grid: { xs: 12, sm: 4 },
-        fieldNames: ["relationship", "city", "state"],
+        fieldNames: ["relationship"],
       },
       {
         kind: "fields",
-        grid: { xs: 12, sm: 6 },
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["mobile_number"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["alternate_mobile"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["email"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 12 },
         fieldNames: ["address"],
       },
       {
         kind: "fields",
-        grid: { xs: 12, sm: 4 },
+        grid: { xs: 12, sm: 3 },
+        fieldNames: ["city"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 3 },
+        fieldNames: ["state"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 3 },
         fieldNames: ["pin_code"],
       },
 
       // Section: Child Information
       {
         kind: "fields",
-        grid: { xs: 12, sm: 4 },
-        fieldNames: ["child_name", "child_gender", "child_dob"],
+        grid: { xs: 12, sm: 6 },
+        fieldNames: ["child_name"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 3 },
+        fieldNames: ["child_gender"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 3 },
+        fieldNames: ["child_dob"],
       },
 
       // Section: Lead Meta
       {
         kind: "fields",
-        grid: { xs: 12, sm: 6 },
-        fieldNames: ["lead_source_id", "lead_status_id"],
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["lead_source_id"],
       },
       {
         kind: "fields",
-        grid: { xs: 12, sm: 6 },
-        fieldNames: ["preferred_class_id", "preferred_academic_year_id"],
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["lead_status_id"],
       },
       {
         kind: "fields",
-        grid: { xs: 12, sm: 6 },
-        fieldNames: ["expected_admission_date", "assigned_to"],
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["preferred_class_id"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["preferred_academic_year_id"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["expected_admission_date"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["assigned_to"],
       },
       {
         kind: "fields",
