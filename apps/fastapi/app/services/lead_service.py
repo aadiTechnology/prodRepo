@@ -36,6 +36,7 @@ def _get_or_create_parent(db: Session, tenant_id: int, data: LeadCreate, user_id
         parent.state = data.state or parent.state
         parent.pin_code = data.pin_code or parent.pin_code
         parent.relationship = data.relationship or parent.relationship
+        parent.society = data.society
         db.flush()
         return parent
 
@@ -50,6 +51,7 @@ def _get_or_create_parent(db: Session, tenant_id: int, data: LeadCreate, user_id
         state=data.state,
         pin_code=data.pin_code,
         relationship=data.relationship,
+        society=data.society,
         created_by=user_id,
     )
     db.add(parent)
@@ -184,6 +186,8 @@ def update_lead(db: Session, tenant_id: int, lead_id: int, data: LeadUpdate, use
             parent.pin_code = data.pin_code
         if data.relationship is not None:
             parent.relationship = data.relationship
+        if "society" in data.__fields_set__:
+            parent.society = data.society
 
     # Update lead fields
     lead_fields = [
@@ -328,3 +332,26 @@ def get_lead_statuses(db: Session, tenant_id: int):
     return db.query(LeadStatus).filter(
         LeadStatus.is_active == True
     ).order_by(LeadStatus.sequence_order).all()
+
+
+def get_society_suggestions(db: Session, tenant_id: int, q: str) -> list[str]:
+    """
+    Returns up to 20 distinct, non-null society names for the tenant
+    whose value contains `q` (case-insensitive).
+    Returns [] when q is empty or blank.
+    """
+    if not q or not q.strip():
+        return []
+    results = (
+        db.query(Parent.society)
+        .filter(
+            Parent.tenant_id == tenant_id,
+            Parent.society.isnot(None),
+            Parent.society.ilike(f"%{q}%"),
+            Parent.is_deleted == False,
+        )
+        .distinct()
+        .limit(20)
+        .all()
+    )
+    return [row.society for row in results]

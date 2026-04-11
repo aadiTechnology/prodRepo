@@ -44,6 +44,7 @@ class ParentResponse(BaseModel):
     state: Optional[str] = None
     pin_code: Optional[str] = None
     relationship: Optional[str] = None
+    society: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -152,6 +153,7 @@ class LeadCreate(BaseModel):
     notes: Optional[str] = None
     remarks: Optional[str] = None
     assigned_to: Optional[int] = None
+    society: Optional[str] = Field(None, max_length=200)
 
     @validator("parent_name")
     def name_required(cls, v):
@@ -197,6 +199,7 @@ class LeadUpdate(BaseModel):
     notes: Optional[str] = None
     remarks: Optional[str] = None
     assigned_to: Optional[int] = None
+    society: Optional[str] = Field(None, max_length=200)
 
 
 class LeadListItem(BaseModel):

@@ -79,6 +79,15 @@ def list_leads(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/society-suggestions", response_model=list[str])
+def get_society_suggestions(
+    q: str = Query(""),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    return lead_service.get_society_suggestions(db, current_user.tenant_id, q)
+
+
 @router.get("/{lead_id}")
 def get_lead(
     lead_id: int = Path(...),
@@ -195,6 +204,7 @@ def _build_detail(lead) -> dict:
             "state": lead.parent.state,
             "pin_code": lead.parent.pin_code,
             "relationship": lead.parent.relationship,
+            "society": lead.parent.society,
         } if lead.parent else None,
         "child_dob": str(lead.child_dob) if lead.child_dob else None,
         "lead_source_id": lead.lead_source_id,

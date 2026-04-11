@@ -20,6 +20,7 @@ class Parent(Base):
     city = Column(String(100), nullable=True)
     state = Column(String(100), nullable=True)
     pin_code = Column(String(10), nullable=True)
+    society = Column(String(200), nullable=True)
     relationship = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
