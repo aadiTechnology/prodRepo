@@ -6,13 +6,11 @@ from sqlalchemy.orm import Session, joinedload
 from app.models import SchoolClass, ClassDivision, AcademicYear
 from app.schemas.school_class_schema import SchoolClassCreate, SchoolClassUpdate
 
-
 def _normalize_text(value: str | None) -> str | None:
     if value is None:
         return None
     normalized = value.strip()
     return normalized or None
-
 
 def _check_duplicate_code(
     db: Session,
@@ -36,7 +34,6 @@ def _check_duplicate_code(
             detail="Class code must be unique within tenant",
         )
 
-
 def _check_academic_year_exists(db: Session, tenant_id: int, academic_year_id: int) -> None:
     academic_year = db.query(AcademicYear).filter(
         AcademicYear.id == academic_year_id,
@@ -46,7 +43,6 @@ def _check_academic_year_exists(db: Session, tenant_id: int, academic_year_id: i
     ).first()
     if not academic_year:
         raise HTTPException(status_code=400, detail="Invalid academic year for this tenant")
-
 
 def _find_existing_class_for_year(
     db: Session,
@@ -61,21 +57,16 @@ def _find_existing_class_for_year(
         SchoolClass.is_deleted == False,
     ).first()
 
-
 def _division_exists(db_obj: SchoolClass, division_name: str) -> bool:
     return any(
         division.division_name.strip().lower() == division_name.lower()
         for division in db_obj.divisions
     )
 
-
-
 def _generate_default_code(name: str) -> str:
     raw = name.strip().upper()
     normalized = re.sub(r"[^A-Z0-9]+", "-", raw).strip("-")
     return normalized[:40] or "CLASS"
-
-
 
 def get_all_classes(
     db: Session,
@@ -101,7 +92,6 @@ def get_all_classes(
 
     return query.options(joinedload(SchoolClass.divisions), joinedload(SchoolClass.academic_year)).order_by(SchoolClass.name.asc()).distinct().all()
 
-
 def get_class_by_id(db: Session, class_id: int, tenant_id: int):
     db_obj = db.query(SchoolClass).options(joinedload(SchoolClass.divisions), joinedload(SchoolClass.academic_year)).filter(
         SchoolClass.id == class_id,
@@ -111,7 +101,6 @@ def get_class_by_id(db: Session, class_id: int, tenant_id: int):
     if not db_obj:
         raise HTTPException(status_code=404, detail="Class not found")
     return db_obj
-
 
 def create_class(
     db: Session,
@@ -128,6 +117,8 @@ def create_class(
         academic_year_id=data.academic_year_id,
         class_name=normalized_name,
     )
+    
+    # If class already exists, we might just be adding a division
     if existing_class:
         if normalized_section:
             if _division_exists(existing_class, normalized_section):
@@ -140,6 +131,20 @@ def create_class(
                     is_active=data.is_active,
                 )
             )
+        
+        # Handle multiple divisions during creation if provided
+        if data.divisions:
+            for div_name in data.divisions:
+                norm_div_name = _normalize_text(div_name)
+                if norm_div_name and not _division_exists(existing_class, norm_div_name):
+                    db.add(
+                        ClassDivision(
+                            class_id=existing_class.id,
+                            division_name=norm_div_name,
+                            capacity=data.capacity,
+                            is_active=data.is_active,
+                        )
+                    )
         db.commit()
         return get_class_by_id(db, existing_class.id, tenant_id)
 
@@ -170,11 +175,24 @@ def create_class(
             is_active=data.is_active
         )
         db.add(division)
+    
+    # Create extra divisions if provided
+    if data.divisions:
+        for div_name in data.divisions:
+            norm_div_name = _normalize_text(div_name)
+            if norm_div_name and norm_div_name != normalized_section:
+                db.add(
+                    ClassDivision(
+                        class_id=db_obj.id,
+                        division_name=norm_div_name,
+                        capacity=data.capacity,
+                        is_active=data.is_active
+                    )
+                )
 
     db.commit()
     db.refresh(db_obj)
     return db_obj
-
 
 def update_class(
     db: Session,
@@ -212,7 +230,7 @@ def update_class(
     if "description" in update_data:
         update_data["description"] = _normalize_text(update_data["description"])
 
-    # Handle automated division update if section provided
+    # Handle automated division update if section provided (backward compatibility)
     if "section" in update_data:
         normalized_section = _normalize_text(update_data.pop("section"))
         if normalized_section:
@@ -224,6 +242,40 @@ def update_class(
                     is_active=db_obj.is_active
                 )
                 db.add(division)
+    
+    # Handle explicit divisions list (sync logic)
+    if "divisions" in update_data:
+        new_divisions_data = update_data.pop("divisions")
+        if new_divisions_data is not None:
+            existing_divs = {d.id: d for d in db_obj.divisions}
+            incoming_ids = {d.get("id") for d in new_divisions_data if d.get("id")}
+            
+            # 1. Remove divisions not in the new list
+            for div_id, div_ent in existing_divs.items():
+                if div_id not in incoming_ids:
+                    db.delete(div_ent)
+            
+            # 2. Update or Create divisions
+            for d_item in new_divisions_data:
+                d_id = d_item.get("id")
+                d_name = d_item.get("division_name", "").strip()
+                d_cap = d_item.get("capacity")
+                d_act = d_item.get("is_active", True)
+                
+                if d_id and d_id in existing_divs:
+                    div_ent = existing_divs[d_id]
+                    div_ent.division_name = d_name
+                    div_ent.capacity = d_cap
+                    div_ent.is_active = d_act
+                else:
+                    db.add(
+                        ClassDivision(
+                            class_id=db_obj.id,
+                            division_name=d_name,
+                            capacity=d_cap,
+                            is_active=d_act
+                        )
+                    )
 
     for key, value in update_data.items():
         setattr(db_obj, key, value)
@@ -233,7 +285,6 @@ def update_class(
     db.commit()
     db.refresh(db_obj)
     return db_obj
-
 
 def soft_delete_class(db: Session, class_id: int, tenant_id: int, deleted_by: int):
     db_obj = get_class_by_id(db, class_id, tenant_id)

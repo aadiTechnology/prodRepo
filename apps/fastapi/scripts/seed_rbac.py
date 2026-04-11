@@ -3,9 +3,8 @@ import os
 
 # Add apps/fastapi to sys.path to allow importing from 'app'
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
 
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
@@ -27,7 +26,6 @@ def seed_rbac_data():
             {"code": "REPORTS_MGMT", "name": "Reports Management", "category": "Reports"},
             {"code": "SYSTEM_CONFIG", "name": "System Configuration", "category": "System"},
             {"code": "SPRINT_MGMT", "name": "Sprint Management", "category": "System"},
-            {"code": "ADMISSIONS_MGMT", "name": "Admissions & CRM", "category": "Admissions"},
         ]
         
         feature_map = {}
@@ -57,20 +55,15 @@ def seed_rbac_data():
                 ]
             },
             {
-                "name": "Admissions", "level": 1, "icon": "admissionsIcon", "sort_order": 3,
-                "children": [
-                    {"name": "Lead Management", "path": "/admissions/leads", "feature": "ADMISSIONS_MGMT"},
-                ]
-            },
-            {
-                "name": "Academics", "level": 1, "icon": "academicsIcon", "sort_order": 4,
+                "name": "Academics", "level": 1, "icon": "academicsIcon", "sort_order": 3,
                 "children": [
                     {"name": "Attendance", "path": "/academics/attendance", "feature": "ACADEMIC_MGMT"},
                     {"name": "Academic Years", "path": "/academic-years", "feature": "ACADEMIC_MGMT"},
+                    {"name": "Classes", "path": "/classes", "feature": "ACADEMIC_MGMT"},
                 ]
             },
             {
-                "name": "Fees", "level": 1, "icon": "feesIcon", "sort_order": 5,
+                "name": "Fees", "level": 1, "icon": "feesIcon", "sort_order": 4,
                 "children": [
                     {"name": "Fee Collection", "path": "/fees/collection", "feature": "FEE_MGMT"},
                     {"name": "Fee Category", "path": "/fees/categories", "feature": "FEE_MGMT"},
@@ -81,22 +74,21 @@ def seed_rbac_data():
                 ]
             },
             {
-                "name": "Staff", "level": 1, "icon": "staffIcon", "sort_order": 6,
+                "name": "Staff", "level": 1, "icon": "staffIcon", "sort_order": 5,
                 "children": [
                     {"name": "Staff List", "path": "/staff", "feature": "STAFF_MGMT"},
                 ]
             },
             {
-                "name": "Reports", "level": 1, "icon": "reportsIcon", "sort_order": 7,
+                "name": "Reports", "level": 1, "icon": "reportsIcon", "sort_order": 6,
                 "children": [
                     {"name": "General Reports", "path": "/reports/general", "feature": "REPORTS_MGMT"},
                     {"name": "Sprint Performance", "path": "/reports/sprint-performance", "feature": "REPORTS_MGMT"},
                     {"name": "Sprintwise Performance", "path": "/reports/sprintwise-performance", "feature": "REPORTS_MGMT"},
-                    {"name": "My Tasks — Effort Entry", "path": "/my-tasks/effort-entry", "feature": "REPORTS_MGMT"},
                 ]
             },
             {
-                "name": "System Config", "level": 1, "icon": "settingsIcon", "sort_order": 8,
+                "name": "System Config", "level": 1, "icon": "settingsIcon", "sort_order": 7,
                 "children": [
                     {"name": "Theme Studio", "path": "/admin/theme-studio", "feature": "SYSTEM_CONFIG"},
                     {"name": "Permission Mapping", "path": "/roles/permissions", "feature": "SYSTEM_CONFIG"},
