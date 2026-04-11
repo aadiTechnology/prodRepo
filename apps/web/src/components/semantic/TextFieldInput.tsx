@@ -22,7 +22,7 @@ export default function TextFieldInput({
       fullWidth={fullWidth}
       variant="outlined"
       slotProps={{
-        htmlInput: { minLength: 2, ...htmlInput, ...slotProps?.htmlInput },
+        htmlInput: { minLength: 1, ...htmlInput, ...slotProps?.htmlInput },
         ...slotProps,
       }}
       {...props}

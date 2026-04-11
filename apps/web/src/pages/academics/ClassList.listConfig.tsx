@@ -27,16 +27,23 @@ export const createClassListConfig = ({
       id: "division",
       label: "Division",
       align: "center",
-      render: (row: SchoolClass) => 
-        row.divisions && row.divisions.length > 0 
-          ? row.divisions.map(d => d.division_name).join(", ") 
-          : "-",
+      render: (row: SchoolClass) => {
+        const activeDivisions = row.divisions?.filter(d => d.is_active) ?? [];
+        return activeDivisions.length > 0 
+          ? activeDivisions.map(d => d.division_name).join(", ") 
+          : "-";
+      },
     },
     {
       id: "capacity",
       label: "Capacity",
       align: "center",
-      render: (row: SchoolClass) => row.capacity ?? "-",
+      render: (row: SchoolClass) => {
+        const activeDivisions = row.divisions?.filter(d => d.is_active) ?? [];
+        if (activeDivisions.length === 0) return "-";
+        const totalCapacity = activeDivisions.reduce((sum, d) => sum + (Number(d.capacity) || 0), 0);
+        return totalCapacity || "-";
+      },
     },
     {
       id: "status",

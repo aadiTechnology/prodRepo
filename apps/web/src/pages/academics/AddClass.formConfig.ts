@@ -1,11 +1,17 @@
 import { type FormConfig } from "../../components/reusable/formFramework.types";
 
+export type AddClassDivision = {
+  id?: number;
+  division_name: string;
+  capacity: string;
+  is_active: boolean;
+};
+
 export type AddClassFormData = {
   name: string;
   academic_year_id: string;
-  section: string;
-  capacity: string;
   is_active: boolean;
+  divisions: AddClassDivision[];
 };
 
 export const createAddClassFormConfig = (options: {
@@ -28,54 +34,38 @@ export const createAddClassFormConfig = (options: {
     },
     name: {
       name: "name",
-      label: "Class",
+      label: "Class Name",
       type: "text",
       placeholder: "e.g. Nursery",
       required: true,
       props: { htmlInput: { minLength: 1 } },
     },
-    section: {
-      name: "section",
-      label: "Division",
-      type: "text",
-      placeholder: "e.g. A",
-      required: true,
-      props: { htmlInput: { minLength: 1 } },
-    },
-    capacity: {
-      name: "capacity",
-      label: "Capacity",
-      type: "text",
-      placeholder: "e.g. 30",
-      required: true,
-      props: { htmlInput: { minLength: 1 } },
-    },
     is_active: {
       name: "is_active",
-      label: "Status",
+      label: "Class Status",
       type: "switch",
-      helperText: "Control system access for this class",
+      helperText: "Control system access for this entire class",
     },
   },
   layoutRows: [
     {
       kind: "fields",
-      grid: { xs: 12, sm: 6 },
-      fieldNames: ["academic_year_id", "name"],
+      grid: { xs: 6 },
+      fieldNames: ["academic_year_id"],
     },
     {
       kind: "fields",
-      grid: { xs: 12, sm: 6 },
-      fieldNames: ["section", "capacity"],
+      grid: { xs: 6 },
+      fieldNames: ["name"],
     },
     ...(options.isEditMode
       ? [
-          {
-            kind: "fields" as const,
-            grid: { xs: 12 },
-            fieldNames: ["is_active" as keyof AddClassFormData],
-          },
-        ]
+        {
+          kind: "fields" as const,
+          grid: { xs: 12 },
+          fieldNames: ["is_active" as keyof AddClassFormData],
+        },
+      ]
       : []),
   ],
 });

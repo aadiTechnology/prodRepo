@@ -45,9 +45,17 @@ export interface SchoolClassCreate {
   description?: string;
   capacity?: number;
   is_active: boolean;
+  divisions?: string[]; // Nested division names for creation
 }
 
-export interface SchoolClassUpdate extends Partial<SchoolClassCreate> {}
+export interface SchoolClassUpdate extends Partial<Omit<SchoolClassCreate, 'divisions'>> {
+  divisions?: {
+    id?: number;
+    division_name: string;
+    capacity?: number;
+    is_active: boolean;
+  }[];
+}
 
 const BASE_URL = "/api/classes";
 

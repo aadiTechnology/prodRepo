@@ -15,6 +15,9 @@ export type { DeleteButtonProps } from "./DeleteButton";
 export { default as EmailInput } from "./EmailInput";
 export type { EmailInputProps } from "./EmailInput";
 
+export { default as TextFieldInput } from "./TextFieldInput";
+export type { TextFieldInputProps } from "./TextFieldInput";
+
 export { default as PhoneInput } from "./PhoneInput";
 export type { PhoneInputProps } from "./PhoneInput";
 
