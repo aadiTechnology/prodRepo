@@ -50,22 +50,18 @@ export const createAddClassFormConfig = (options: {
   layoutRows: [
     {
       kind: "fields",
-      grid: { xs: 6 },
+      grid: { xs: 12, md: 6 },
       fieldNames: ["academic_year_id"],
     },
     {
       kind: "fields",
-      grid: { xs: 6 },
+      grid: { xs: 12, md: 6 },
       fieldNames: ["name"],
     },
-    ...(options.isEditMode
-      ? [
-        {
-          kind: "fields" as const,
-          grid: { xs: 12 },
-          fieldNames: ["is_active" as keyof AddClassFormData],
-        },
-      ]
-      : []),
+    {
+      kind: "fields",
+      grid: { xs: 12 },
+      fieldNames: ["is_active"],
+    },
   ],
 });

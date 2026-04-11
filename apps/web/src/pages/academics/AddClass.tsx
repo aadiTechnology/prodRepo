@@ -9,9 +9,11 @@ import { useFormManager } from "../../hooks/useFormManager";
 import BaseForm from "../../components/reusable/BaseForm";
 import { createAddClassFormConfig, type AddClassFormData, type AddClassDivision } from "./AddClass.formConfig";
 import { TextFieldInput } from "../../components/semantic";
-import { FormSectionLabel } from "../../components/reusable";
+import { FormSectionLabel, DataTable, type DataTableColumn } from "../../components/reusable";
 import SchoolIcon from "@mui/icons-material/School";
 import LayersIcon from "@mui/icons-material/Layers";
+import { colorTokens } from "../../tokens/colors";
+import { alpha } from "@mui/material/styles";
 
 export default function AddClass() {
     const navigate = useNavigate();
@@ -67,22 +69,105 @@ export default function AddClass() {
             });
 
             // 2. Add custom row for divisions management
+            const tableInputSx = {
+                "& .MuiInputBase-root": {
+                    fontSize: "0.875rem",
+                    fontWeight: 500,
+                    color: "text.primary",
+                    backgroundColor: "transparent",
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                    border: "none",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                    backgroundColor: alpha(colorTokens.primary.main, 0.03),
+                    borderRadius: "6px",
+                },
+                "& .Mui-focused .MuiOutlinedInput-notchedOutline": {
+                    border: `1.5px solid ${colorTokens.primary.main}`,
+                    borderRadius: "6px",
+                    backgroundColor: "transparent",
+                },
+                "& .MuiInputBase-input": {
+                    padding: "8px 12px",
+                }
+            };
+
+            const columns: DataTableColumn<AddClassDivision>[] = [
+                {
+                    id: "division_name",
+                    label: "Division Name",
+                    width: "55%",
+                    render: (row) => {
+                        const index = formData.divisions.indexOf(row);
+                        return (
+                            <TextFieldInput
+                                label=""
+                                placeholder="Enter Division (e.g. A)"
+                                value={row.division_name}
+                                onChange={(e) => handleDivisionChange(index, "division_name", e.target.value)}
+                                sx={tableInputSx}
+                                fullWidth
+                                size="small"
+                                required
+                            />
+                        );
+                    }
+                },
+                {
+                    id: "capacity",
+                    label: "Capacity",
+                    width: "20%",
+                    render: (row) => {
+                        const index = formData.divisions.indexOf(row);
+                        return (
+                            <TextFieldInput
+                                label=""
+                                placeholder="30"
+                                type="number"
+                                value={row.capacity}
+                                onChange={(e) => handleDivisionChange(index, "capacity", e.target.value)}
+                                sx={tableInputSx}
+                                fullWidth
+                                size="small"
+                                required
+                            />
+                        );
+                    }
+                },
+                {
+                    id: "is_active",
+                    label: "Status",
+                    align: "center",
+                    width: "15%",
+                    render: (row) => {
+                        const index = formData.divisions.indexOf(row);
+                        return (
+                            <Switch
+                                checked={row.is_active}
+                                onChange={(e) => handleDivisionChange(index, "is_active", e.target.checked)}
+                                color="primary"
+                                size="small"
+                            />
+                        );
+                    }
+                }
+            ];
+
+            // 2. Add custom row for divisions management
             const divisionsRow = {
                 kind: "custom" as const,
                 grid: { xs: 12 },
                 render: () => (
-                    <Box sx={{ mt: 2 }}>
+                    <Box sx={{ mt: 6 }}>
                         <Box sx={{ 
                             display: "flex", 
                             justifyContent: "space-between", 
                             alignItems: "center", 
-                            mb: 2, 
+                            mb: 2.5, 
                             px: 1,
-                            pb: 0.5,
-                            borderBottom: "1px solid",
-                            borderColor: "divider"
                         }}>
-                            <FormSectionLabel 
+                             <FormSectionLabel 
                                 title="Class Divisions / Sections" 
                                 icon={<LayersIcon fontSize="small" />} 
                                 spacing={0}
@@ -93,96 +178,40 @@ export default function AddClass() {
                                 startIcon={<AddIcon />}
                                 size="small"
                                 onClick={handleAddDivision}
-                                sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 600, mb: 1 }}
+                                sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 700, px: 2 }}
                             >
                                 Add Division
                             </Button>
                         </Box>
 
-                        {/* Table Header */}
-                        <Box sx={{
-                            display: { xs: "none", md: "flex" },
-                            px: 2.5,
-                            py: 1,
-                            bgcolor: "grey.50",
-                            borderRadius: "8px",
-                            mb: 1.5,
-                            gap: 3,
-                            alignItems: "center"
+                        <Box sx={{ 
+                            border: `1px solid ${colorTokens.border.default}`, 
+                            borderRadius: "12px", 
+                            overflow: "hidden",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.03)"
                         }}>
-                            <Typography variant="caption" sx={{ flex: 3, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                Division Name
-                            </Typography>
-                            <Typography variant="caption" sx={{ flex: 1, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                Capacity
-                            </Typography>
-                            <Typography variant="caption" sx={{ width: 80, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", textAlign: "center", letterSpacing: "0.5px" }}>
-                                Status
-                            </Typography>
-                            <Box sx={{ width: 44 }} /> {/* Action spacer */}
-                        </Box>
-
-                        {formData.divisions.map((div, index) => (
-                            <Box key={index} sx={{
-                                display: "flex",
-                                gap: 3,
-                                alignItems: "center",
-                                mb: 1.5,
-                                px: { xs: 1, md: 2.5 },
-                                py: 0.5,
-                                flexWrap: { xs: "wrap", md: "nowrap" },
-                                borderRadius: "12px",
-                                "&:hover": { bgcolor: "action.hover" },
-                                transition: "all 0.2s"
-                            }}>
-                                <Box sx={{ flex: { xs: "1 1 100%", md: 3 } }}>
-                                    <TextFieldInput
-                                        label={index === 0 && window.innerWidth < 900 ? "Division Name" : ""}
-                                        placeholder="e.g. A"
-                                        value={div.division_name}
-                                        onChange={(e) => handleDivisionChange(index, "division_name", e.target.value)}
-                                        required
-                                        fullWidth
-                                        size="small"
-                                    />
-                                </Box>
-                                <Box sx={{ flex: { xs: "1 1 45%", md: 1 } }}>
-                                    <TextFieldInput
-                                        label={index === 0 && window.innerWidth < 900 ? "Capacity" : ""}
-                                        placeholder="30"
-                                        type="number"
-                                        value={div.capacity}
-                                        onChange={(e) => handleDivisionChange(index, "capacity", e.target.value)}
-                                        required
-                                        fullWidth
-                                        size="small"
-                                    />
-                                </Box>
-                                <Box sx={{ width: { xs: "45%", md: 80 }, display: "flex", justifyContent: "center" }}>
-                                    <Switch
-                                        checked={div.is_active}
-                                        onChange={(e) => handleDivisionChange(index, "is_active", e.target.checked)}
-                                        color="primary"
-                                        size="small"
-                                    />
-                                </Box>
-                                <Box sx={{ width: 44, display: "flex", justifyContent: "flex-end" }}>
-                                    {formData.divisions.length > 1 && (
+                            <DataTable<AddClassDivision>
+                                columns={columns}
+                                data={formData.divisions}
+                                renderRowActions={(row) => {
+                                    const index = formData.divisions.indexOf(row);
+                                    return (
                                         <IconButton
                                             color="error"
                                             onClick={() => handleRemoveDivision(index)}
                                             size="small"
+                                            disabled={formData.divisions.length <= 1}
                                             sx={{ 
-                                                bgcolor: "error.lighter",
-                                                "&:hover": { bgcolor: "error.light", color: "white" } 
+                                                bgcolor: alpha(colorTokens.preschool.coral.main, 0.08),
+                                                "&:hover": { bgcolor: colorTokens.preschool.coral.main, color: "white" } 
                                             }}
                                         >
                                             <DeleteIcon fontSize="small" />
                                         </IconButton>
-                                    )}
-                                </Box>
-                            </Box>
-                        ))}
+                                    );
+                                }}
+                            />
+                        </Box>
                     </Box>
                 )
             };
