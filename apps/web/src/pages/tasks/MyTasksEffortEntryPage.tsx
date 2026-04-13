@@ -145,9 +145,15 @@ export default function MyTasksEffortEntryPage() {
                   options={pageOptions}
                   onChangeId={(id) => setPageId(id)}
                   placeholder={
-                    featureId == null ? "Select feature first" : optionsLoading ? "Loading…" : "Select page"
+                    featureId == null
+                      ? "Select feature first"
+                      : optionsLoading
+                        ? "Loading…"
+                        : pageOptions.length === 0
+                          ? "No pages available"
+                          : "Select page"
                   }
-                  disabled={featureId == null || optionsLoading}
+                  disabled={featureId == null || optionsLoading || pageOptions.length === 0}
                 />
               </Box>
 

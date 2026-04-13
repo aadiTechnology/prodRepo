@@ -212,17 +212,14 @@ export function useMyTasksEffortController() {
         if (cancelled) return;
         const resolvedPages = pages.map((p) => ({ id: p.id, label: p.label }));
         setPageOptions(resolvedPages);
-        if (shouldApplyDependentDefaults(projectId)) {
-          const defaultPageId = lastDefaultsRef.current?.pageId ?? null;
-          const hasDefaultPage = defaultPageId != null && resolvedPages.some((p) => p.id === defaultPageId);
-          if (hasDefaultPage) {
-            setPageId(defaultPageId);
-          } else if (lastDefaultsRef.current) {
-            lastDefaultsRef.current = {
-              ...lastDefaultsRef.current,
-              pageId: null,
-            };
-          }
+        if (resolvedPages.length === 1) {
+          setPageId(resolvedPages[0].id);
+        } else if (shouldApplyDependentDefaults(projectId) && lastDefaultsRef.current) {
+          // Multiple/no pages should not auto-select from history; keep page explicitly user-driven.
+          lastDefaultsRef.current = {
+            ...lastDefaultsRef.current,
+            pageId: null,
+          };
         }
       } catch {
         if (!cancelled) setPageOptions([]);
