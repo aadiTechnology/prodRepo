@@ -1,3 +1,4 @@
+    // ...existing code...
 import {
   EmailInput,
   PasswordInput,
@@ -63,6 +64,21 @@ export default function FormFieldRenderer<T extends Record<string, unknown>>({
           required={field.required}
           error={showError}
           helperText={helperText}
+          {...(extra as Record<string, unknown>)}
+        />
+      );
+    case "date":
+      return (
+        <TextFieldInput
+          label={field.label}
+          name={name}
+          type="date"
+          value={formData[name] ?? ""}
+          onChange={handleChange}
+          required={field.required}
+          error={showError}
+          helperText={helperText}
+          InputLabelProps={{ shrink: true }}
           {...(extra as Record<string, unknown>)}
         />
       );

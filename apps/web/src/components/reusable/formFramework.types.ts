@@ -22,7 +22,8 @@ export type FormFieldType =
   | "select"
   | "switch"
   | "phone"
-  | "custom";
+  | "custom"
+  | "date";
 
 export type FormRenderContext<T extends Record<string, unknown>> = {
   formData: T;

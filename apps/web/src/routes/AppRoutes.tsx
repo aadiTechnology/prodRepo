@@ -3,10 +3,9 @@
  * Defines all application routes with lazy loading and code-splitting
  * Integrates protected routes, layouts, and suspense fallbacks
  */
-
-import { Routes, Route, Outlet } from "react-router-dom";
-import { lazy, Suspense } from "react";
+import React, { lazy, Suspense } from "react";
 import { Box, CircularProgress } from "@mui/material";
+import { Routes, Route, Outlet } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import ChangePassword from "../pages/ChangePassword";
@@ -17,6 +16,7 @@ import FeeDiscountsPage from "../pages/Fees/FeeDiscountsPage";
 import AddFeeDiscount from "../pages/AddFeeDiscount";
 import StudentFeeLedger from "../pages/StudentFeeLedger";
 import StudentList from "../pages/students/StudentList";
+const AddStudent = lazy(() => import("../pages/students/AddStudent"));
 // ═══════════════════════════════════════════════════════════════════════════
 // Lazy-loaded Pages - Code splitting for better performance
 // ═══════════════════════════════════════════════════════════════════════════
@@ -69,6 +69,7 @@ const PageLoader = () => (
   </Box>
 );
 
+
 function AIReviewRouteLayout() {
   return (
     <AIReviewProvider>
@@ -76,12 +77,10 @@ function AIReviewRouteLayout() {
     </AIReviewProvider>
   );
 }
-
 export default function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/session-expired" element={<SessionExpired />} />
@@ -90,6 +89,8 @@ export default function AppRoutes() {
         <Route element={<MainLayout />}>
           <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
           <Route path="/students" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:view"><StudentList /></ProtectedRoute>} />
+          <Route path="/students/add" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:create"><AddStudent /></ProtectedRoute>} />
+          <Route path="/students/:id/edit" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:edit"><AddStudent /></ProtectedRoute>} />
           {/* User Management */}
           <Route
             path="/reports/sprint-performance"
