@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import reportProjectService, { type ReportProjectOption } from "../api/services/reportProjectService";
 import sprintService from "../api/services/sprintService";
 import taskEffortService from "../api/services/taskEffortService";
@@ -14,11 +14,19 @@ function todayIsoDate(): string {
   return `${y}-${m}-${day}`;
 }
 
+type LastEffortDefaults = {
+  projectId: number | null;
+  sprintId: number | null;
+  featureId: number | null;
+  pageId: number | null;
+};
+
 export function useMyTasksEffortController() {
   const { projectId, setProjectId } = useReportProjectSelection();
 
   const [projects, setProjects] = useState<ReportProjectOption[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
+  const [lastDefaultsLoading, setLastDefaultsLoading] = useState(true);
 
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [sprintsLoading, setSprintsLoading] = useState(false);
@@ -41,23 +49,72 @@ export function useMyTasksEffortController() {
   const [effortDraft, setEffortDraft] = useState<Record<number, string>>({});
   const [savingId, setSavingId] = useState<number | null>(null);
   const [closingId, setClosingId] = useState<number | null>(null);
+  const userInteractedRef = useRef(false);
+  const lastDefaultsRef = useRef<LastEffortDefaults | null>(null);
+  const initialProjectResolvedRef = useRef(false);
+
+  const shouldApplyDependentDefaults = useCallback(
+    (activeProjectId: number | null): boolean =>
+      !userInteractedRef.current &&
+      activeProjectId != null &&
+      lastDefaultsRef.current?.projectId != null &&
+      lastDefaultsRef.current.projectId === activeProjectId,
+    []
+  );
 
   const fetchProjects = useCallback(async () => {
     try {
       setProjectsLoading(true);
       const items = await reportProjectService.listProjects();
       setProjects(items);
-      if (projectId == null && items.length === 1) setProjectId(items[0].id);
     } catch {
       setProjects([]);
     } finally {
       setProjectsLoading(false);
     }
-  }, [projectId, setProjectId]);
+  }, []);
 
   useEffect(() => {
     void fetchProjects();
   }, [fetchProjects]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLastDefaultsLoading(true);
+        const defaults = await taskEffortService.getLastEntryDefaults();
+        if (cancelled) return;
+        lastDefaultsRef.current = {
+          projectId: defaults.project_id ?? null,
+          sprintId: defaults.sprint_id ?? null,
+          featureId: defaults.feature_id ?? null,
+          pageId: defaults.page_id ?? null,
+        };
+      } catch {
+        if (!cancelled) lastDefaultsRef.current = null;
+      } finally {
+        if (!cancelled) setLastDefaultsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (initialProjectResolvedRef.current || projectsLoading || lastDefaultsLoading) return;
+    initialProjectResolvedRef.current = true;
+
+    const defaultProjectId = lastDefaultsRef.current?.projectId ?? null;
+    const hasDefaultProject = defaultProjectId != null && projects.some((p) => p.id === defaultProjectId);
+    if (hasDefaultProject) {
+      setProjectId(defaultProjectId);
+      return;
+    }
+    if (projectId != null) return;
+    if (projects.length === 1) setProjectId(projects[0].id);
+  }, [lastDefaultsLoading, projectId, projects, projectsLoading, setProjectId]);
 
   useEffect(() => {
     setFeatureId(null);
@@ -80,7 +137,12 @@ export function useMyTasksEffortController() {
         ]);
         if (cancelled) return;
         setSprints(listRes.items);
+        const canApplyDefaults = shouldApplyDependentDefaults(projectId);
+        const defaultSprintId = canApplyDefaults ? lastDefaultsRef.current?.sprintId ?? null : null;
+        const hasDefaultSprint =
+          defaultSprintId != null && listRes.items.some((s) => s.sprint_id === defaultSprintId);
         const preferred =
+          (hasDefaultSprint ? defaultSprintId : null) ??
           activeSid ??
           listRes.items.find((s) => s.is_active)?.sprint_id ??
           listRes.items[0]?.sprint_id ??
@@ -98,7 +160,7 @@ export function useMyTasksEffortController() {
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, shouldApplyDependentDefaults]);
 
   useEffect(() => {
     if (projectId == null) {
@@ -111,7 +173,21 @@ export function useMyTasksEffortController() {
         setOptionsLoading(true);
         const opt = await sprintService.getAssignmentOptions(projectId);
         if (cancelled) return;
-        setFeatureOptions((opt.features ?? []).map((f) => ({ id: f.id, label: f.label })));
+        const features = (opt.features ?? []).map((f) => ({ id: f.id, label: f.label }));
+        setFeatureOptions(features);
+        if (shouldApplyDependentDefaults(projectId)) {
+          const defaultFeatureId = lastDefaultsRef.current?.featureId ?? null;
+          const hasDefaultFeature = defaultFeatureId != null && features.some((f) => f.id === defaultFeatureId);
+          if (hasDefaultFeature) {
+            setFeatureId(defaultFeatureId);
+          } else if (lastDefaultsRef.current) {
+            lastDefaultsRef.current = {
+              ...lastDefaultsRef.current,
+              featureId: null,
+              pageId: null,
+            };
+          }
+        }
       } catch {
         if (!cancelled) setFeatureOptions([]);
       } finally {
@@ -121,7 +197,7 @@ export function useMyTasksEffortController() {
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, shouldApplyDependentDefaults]);
 
   useEffect(() => {
     setPageId(null);
@@ -134,7 +210,20 @@ export function useMyTasksEffortController() {
         setOptionsLoading(true);
         const pages = await sprintService.listFeaturePages(projectId, featureId);
         if (cancelled) return;
-        setPageOptions(pages.map((p) => ({ id: p.id, label: p.label })));
+        const resolvedPages = pages.map((p) => ({ id: p.id, label: p.label }));
+        setPageOptions(resolvedPages);
+        if (shouldApplyDependentDefaults(projectId)) {
+          const defaultPageId = lastDefaultsRef.current?.pageId ?? null;
+          const hasDefaultPage = defaultPageId != null && resolvedPages.some((p) => p.id === defaultPageId);
+          if (hasDefaultPage) {
+            setPageId(defaultPageId);
+          } else if (lastDefaultsRef.current) {
+            lastDefaultsRef.current = {
+              ...lastDefaultsRef.current,
+              pageId: null,
+            };
+          }
+        }
       } catch {
         if (!cancelled) setPageOptions([]);
       } finally {
@@ -144,7 +233,30 @@ export function useMyTasksEffortController() {
     return () => {
       cancelled = true;
     };
-  }, [projectId, featureId]);
+  }, [featureId, projectId, shouldApplyDependentDefaults]);
+
+  const setProjectIdFromUser = useCallback(
+    (id: number | null) => {
+      userInteractedRef.current = true;
+      setProjectId(id);
+    },
+    [setProjectId]
+  );
+
+  const setSelectedSprintIdFromUser = useCallback((id: number | null) => {
+    userInteractedRef.current = true;
+    setSelectedSprintId(id);
+  }, []);
+
+  const setFeatureIdFromUser = useCallback((id: number | null) => {
+    userInteractedRef.current = true;
+    setFeatureId(id);
+  }, []);
+
+  const setPageIdFromUser = useCallback((id: number | null) => {
+    userInteractedRef.current = true;
+    setPageId(id);
+  }, []);
 
   const canLoadTasks = Boolean(
     projectId != null && selectedSprintId != null && featureId != null && pageId != null
@@ -279,19 +391,19 @@ export function useMyTasksEffortController() {
 
   return {
     projectId,
-    setProjectId,
+    setProjectId: setProjectIdFromUser,
     projects,
     projectsLoading,
     sprintOptions,
     selectedSprintId,
-    setSelectedSprintId,
+    setSelectedSprintId: setSelectedSprintIdFromUser,
     sprintsLoading,
     featureOptions,
     featureId,
-    setFeatureId,
+    setFeatureId: setFeatureIdFromUser,
     pageOptions,
     pageId,
-    setPageId,
+    setPageId: setPageIdFromUser,
     optionsLoading,
     workingDate,
     setWorkingDate,

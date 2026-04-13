@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.pt_timesheet import (
     pt_pages,
+    pt_project,
     pt_sprints,
     pt_subtasks,
     pt_task_status,
@@ -41,6 +42,40 @@ def get_active_sprint_id(db: Session, *, project_id: int) -> int | None:
         .order_by(pt_sprints.c.SprintId.desc())
     ).first()
     return int(row[0]) if row else None
+
+
+def fetch_last_effort_defaults(
+    db: Session, *, user_id: int, user_tenant_id: int | None
+) -> dict[str, Any] | None:
+    ts = pt_timesheets
+    logs = pt_timesheet_effort_logs
+    proj = pt_project
+
+    stmt = (
+        select(
+            ts.c.ProjectId,
+            ts.c.SprintId,
+            ts.c.FeatureId,
+            ts.c.PageId,
+            logs.c.CreatedOn,
+        )
+        .select_from(ts.join(logs, logs.c.TimesheetId == ts.c.TimesheetId).join(proj, proj.c.Id == ts.c.ProjectId))
+        .where(ts.c.OwnerId == user_id)
+        .order_by(logs.c.CreatedOn.desc(), logs.c.LogId.desc())
+    )
+    if user_tenant_id is not None:
+        stmt = stmt.where(proj.c.TenantId == user_tenant_id)
+
+    row = db.execute(stmt).first()
+    if not row:
+        return None
+    return {
+        "project_id": int(row[0]) if row[0] is not None else None,
+        "sprint_id": int(row[1]) if row[1] is not None else None,
+        "feature_id": int(row[2]) if row[2] is not None else None,
+        "page_id": int(row[3]) if row[3] is not None else None,
+        "effort_logged_on": row[4],
+    }
 
 
 def resolve_page_feature_id(db: Session, *, project_id: int, page_id: int) -> int | None:

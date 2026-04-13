@@ -8,6 +8,7 @@ from app.schemas.task_effort import (
     ActiveSprintResponse,
     EffortMutationResponse,
     EffortSaveRequest,
+    LastEffortDefaultsResponse,
     TaskCloseRequest,
     TaskEffortListResponse,
     TaskStatusItem,
@@ -36,6 +37,16 @@ def get_active_sprint(
         db, project_id=project_id, user_tenant_id=current_user.tenant_id
     )
     return ActiveSprintResponse(sprint_id=sid)
+
+
+@router.get("/last-entry-defaults", response_model=LastEffortDefaultsResponse)
+def get_last_entry_defaults(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> LastEffortDefaultsResponse:
+    return task_effort_service.get_last_effort_defaults(
+        db, user_id=current_user.id, user_tenant_id=current_user.tenant_id
+    )
 
 
 @router.get("/tasks", response_model=TaskEffortListResponse)

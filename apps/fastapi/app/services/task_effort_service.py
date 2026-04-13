@@ -7,7 +7,13 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ValidationException
 from app.repositories import task_effort_repository as repo
-from app.schemas.task_effort import EffortMutationResponse, TaskEffortListResponse, TaskEffortRow, TaskStatusItem
+from app.schemas.task_effort import (
+    EffortMutationResponse,
+    LastEffortDefaultsResponse,
+    TaskEffortListResponse,
+    TaskEffortRow,
+    TaskStatusItem,
+)
 from app.services.report_project_service import assert_can_access_pt_project
 
 
@@ -19,6 +25,21 @@ def list_statuses(db: Session) -> list[TaskStatusItem]:
 def get_active_sprint_id(db: Session, *, project_id: int, user_tenant_id: int | None) -> int | None:
     assert_can_access_pt_project(db, project_id, user_tenant_id)
     return repo.get_active_sprint_id(db, project_id=project_id)
+
+
+def get_last_effort_defaults(
+    db: Session, *, user_id: int, user_tenant_id: int | None
+) -> LastEffortDefaultsResponse:
+    row = repo.fetch_last_effort_defaults(db, user_id=user_id, user_tenant_id=user_tenant_id)
+    if not row:
+        return LastEffortDefaultsResponse()
+    return LastEffortDefaultsResponse(
+        project_id=row.get("project_id"),
+        sprint_id=row.get("sprint_id"),
+        feature_id=row.get("feature_id"),
+        page_id=row.get("page_id"),
+        effort_logged_on=row.get("effort_logged_on"),
+    )
 
 
 def list_my_tasks(

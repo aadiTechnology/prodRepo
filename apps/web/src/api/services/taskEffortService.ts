@@ -1,5 +1,10 @@
 import { apiClient } from "../client";
-import type { EffortMutationResponse, TaskEffortListResponse, TaskStatusItem } from "../../types/taskEffort";
+import type {
+  EffortMutationResponse,
+  LastEffortDefaultsResponse,
+  TaskEffortListResponse,
+  TaskStatusItem,
+} from "../../types/taskEffort";
 
 export const taskEffortService = {
   listStatuses: async (): Promise<TaskStatusItem[]> => {
@@ -12,6 +17,11 @@ export const taskEffortService = {
       params: { project_id: projectId },
     });
     return res.data.sprint_id ?? null;
+  },
+
+  getLastEntryDefaults: async (): Promise<LastEffortDefaultsResponse> => {
+    const res = await apiClient.get<LastEffortDefaultsResponse>("/task-effort/last-entry-defaults");
+    return res.data;
   },
 
   listTasks: async (params: {

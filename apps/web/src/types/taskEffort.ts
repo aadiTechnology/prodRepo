@@ -21,6 +21,14 @@ export type TaskEffortListResponse = {
   tasks: TaskEffortRow[];
 };
 
+export type LastEffortDefaultsResponse = {
+  project_id: number | null;
+  sprint_id: number | null;
+  feature_id: number | null;
+  page_id: number | null;
+  effort_logged_on: string | null;
+};
+
 export type EffortMutationResponse = {
   ok: boolean;
   task: TaskEffortRow | null;

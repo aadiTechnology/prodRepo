@@ -50,6 +50,14 @@ class ActiveSprintResponse(BaseModel):
     sprint_id: int | None = None
 
 
+class LastEffortDefaultsResponse(BaseModel):
+    project_id: int | None = None
+    sprint_id: int | None = None
+    feature_id: int | None = None
+    page_id: int | None = None
+    effort_logged_on: datetime | None = None
+
+
 class EffortMutationResponse(BaseModel):
     ok: bool = True
     task: TaskEffortRow | None = None
