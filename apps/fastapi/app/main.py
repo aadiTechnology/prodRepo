@@ -104,7 +104,7 @@ app.include_router(class_fee_structure_assignment.router)
 app.include_router(student_fee_ledger.router) 
 app.include_router(student_fee_assignment.router)
 from app.routers import student
-app.include_router(student.router)
+app.include_router(student.router, prefix="/api")
 app.include_router(fee_structure.router)
 app.include_router(installment_tracking.router)
 app.include_router(fee_installment_status.router)

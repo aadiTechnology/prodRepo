@@ -7,7 +7,7 @@ from sqlalchemy.orm import relationship as sa_relationship
 from app.core.database import Base
 
 
-class Parent(Base):
+class LeadParent(Base):
     __tablename__ = "parents"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -31,6 +31,7 @@ class Parent(Base):
     deleted_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     leads = sa_relationship("Lead", back_populates="parent", foreign_keys="Lead.parent_id")
+    students = sa_relationship("Student", back_populates="parent")
 
 
 class LeadSource(Base):
@@ -99,7 +100,7 @@ class Lead(Base):
     deleted_at = Column(DateTime, nullable=True)
     deleted_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
-    parent = sa_relationship("Parent", back_populates="leads", foreign_keys=[parent_id])
+    parent = sa_relationship("LeadParent", back_populates="leads", foreign_keys=[parent_id])
     source = sa_relationship("LeadSource", back_populates="leads", foreign_keys=[lead_source_id])
     status = sa_relationship("LeadStatus", back_populates="leads", foreign_keys=[lead_status_id])
     followups = sa_relationship("LeadFollowup", back_populates="lead", cascade="all, delete-orphan")

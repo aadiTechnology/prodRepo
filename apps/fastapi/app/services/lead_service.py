@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import or_
 from fastapi import HTTPException
 
-from app.models.lead import Lead, LeadFollowup, LeadSource, LeadStatus, Parent
+from app.models.lead import Lead, LeadFollowup, LeadSource, LeadStatus, LeadParent
 from app.schemas.lead import LeadCreate, LeadUpdate, LeadFollowupCreate
 
 
@@ -19,12 +19,12 @@ def _generate_lead_code(db: Session, tenant_id: int) -> str:
     return f"LD-{tenant_id}-{suffix}"
 
 
-def _get_or_create_parent(db: Session, tenant_id: int, data: LeadCreate, user_id: int) -> Parent:
+def _get_or_create_parent(db: Session, tenant_id: int, data: LeadCreate, user_id: int) -> LeadParent:
     # Check if a parent with the same mobile already exists for this tenant
-    parent = db.query(Parent).filter(
-        Parent.tenant_id == tenant_id,
-        Parent.mobile_number == data.mobile_number,
-        Parent.is_deleted == False,
+    parent = db.query(LeadParent).filter(
+        LeadParent.tenant_id == tenant_id,
+        LeadParent.mobile_number == data.mobile_number,
+        LeadParent.is_deleted == False,
     ).first()
     if parent:
         # Update name if changed
@@ -36,11 +36,10 @@ def _get_or_create_parent(db: Session, tenant_id: int, data: LeadCreate, user_id
         parent.state = data.state or parent.state
         parent.pin_code = data.pin_code or parent.pin_code
         parent.relationship = data.relationship or parent.relationship
-        parent.society = data.society
         db.flush()
         return parent
 
-    parent = Parent(
+    parent = LeadParent(
         tenant_id=tenant_id,
         parent_name=data.parent_name,
         mobile_number=data.mobile_number,
@@ -51,7 +50,6 @@ def _get_or_create_parent(db: Session, tenant_id: int, data: LeadCreate, user_id
         state=data.state,
         pin_code=data.pin_code,
         relationship=data.relationship,
-        society=data.society,
         created_by=user_id,
     )
     db.add(parent)
@@ -123,11 +121,11 @@ def get_leads(
     )
 
     if search:
-        query = query.join(Parent, Lead.parent_id == Parent.id, isouter=True).filter(
+        query = query.join(LeadParent, Lead.parent_id == LeadParent.id, isouter=True).filter(
             or_(
                 Lead.child_name.ilike(f"%{search}%"),
-                Parent.parent_name.ilike(f"%{search}%"),
-                Parent.mobile_number.ilike(f"%{search}%"),
+                LeadParent.parent_name.ilike(f"%{search}%"),
+                LeadParent.mobile_number.ilike(f"%{search}%"),
                 Lead.lead_code.ilike(f"%{search}%"),
             )
         )
@@ -186,8 +184,6 @@ def update_lead(db: Session, tenant_id: int, lead_id: int, data: LeadUpdate, use
             parent.pin_code = data.pin_code
         if data.relationship is not None:
             parent.relationship = data.relationship
-        if "society" in data.__fields_set__:
-            parent.society = data.society
 
     # Update lead fields
     lead_fields = [
@@ -334,24 +330,3 @@ def get_lead_statuses(db: Session, tenant_id: int):
     ).order_by(LeadStatus.sequence_order).all()
 
 
-def get_society_suggestions(db: Session, tenant_id: int, q: str) -> list[str]:
-    """
-    Returns up to 20 distinct, non-null society names for the tenant
-    whose value contains `q` (case-insensitive).
-    Returns [] when q is empty or blank.
-    """
-    if not q or not q.strip():
-        return []
-    results = (
-        db.query(Parent.society)
-        .filter(
-            Parent.tenant_id == tenant_id,
-            Parent.society.isnot(None),
-            Parent.society.ilike(f"%{q}%"),
-            Parent.is_deleted == False,
-        )
-        .distinct()
-        .limit(20)
-        .all()
-    )
-    return [row.society for row in results]
