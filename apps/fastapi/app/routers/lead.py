@@ -185,7 +185,7 @@ def _build_list_item(lead) -> dict:
         "next_followup_date": str(lead.next_followup_date) if lead.next_followup_date else None,
         "assigned_to": lead.assigned_to,
         "created_at": str(lead.created_at) if lead.created_at else None,
-        "converted": bool(lead.converted_at),
+        "converted": bool(lead.converted_to_student_id),
     }
 
 

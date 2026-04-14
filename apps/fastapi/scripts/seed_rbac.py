@@ -3,8 +3,9 @@ import os
 
 # Add apps/fastapi to sys.path to allow importing from 'app'
 current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
 
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
@@ -24,6 +25,7 @@ def seed_rbac_data():
             {"code": "FEE_MGMT", "name": "Fee Management", "category": "Finance"},
             {"code": "STAFF_MGMT", "name": "Staff Management", "category": "HR"},
             {"code": "REPORTS_MGMT", "name": "Reports Management", "category": "Reports"},
+            {"code": "ADMISSIONS_MGMT", "name": "Admissions Management", "category": "Admissions"},
             {"code": "SYSTEM_CONFIG", "name": "System Configuration", "category": "System"},
             {"code": "SPRINT_MGMT", "name": "Sprint Management", "category": "System"},
         ]
@@ -55,7 +57,13 @@ def seed_rbac_data():
                 ]
             },
             {
-                "name": "Academics", "level": 1, "icon": "academicsIcon", "sort_order": 3,
+                "name": "Admissions", "level": 1, "icon": "admissionsIcon", "sort_order": 3,
+                "children": [
+                    {"name": "Enrollment", "path": "/admissions/enrollment", "feature": "ADMISSIONS_MGMT"},
+                ]
+            },
+            {
+                "name": "Academics", "level": 1, "icon": "academicsIcon", "sort_order": 4,
                 "children": [
                     {"name": "Attendance", "path": "/academics/attendance", "feature": "ACADEMIC_MGMT"},
                     {"name": "Academic Years", "path": "/academic-years", "feature": "ACADEMIC_MGMT"},
@@ -74,13 +82,13 @@ def seed_rbac_data():
                 ]
             },
             {
-                "name": "Staff", "level": 1, "icon": "staffIcon", "sort_order": 5,
+                "name": "Staff", "level": 1, "icon": "staffIcon", "sort_order": 6,
                 "children": [
                     {"name": "Staff List", "path": "/staff", "feature": "STAFF_MGMT"},
                 ]
             },
             {
-                "name": "Reports", "level": 1, "icon": "reportsIcon", "sort_order": 6,
+                "name": "Reports", "level": 1, "icon": "reportsIcon", "sort_order": 7,
                 "children": [
                     {"name": "General Reports", "path": "/reports/general", "feature": "REPORTS_MGMT"},
                     {"name": "Sprint Performance", "path": "/reports/sprint-performance", "feature": "REPORTS_MGMT"},
@@ -88,10 +96,10 @@ def seed_rbac_data():
                 ]
             },
             {
-                "name": "System Config", "level": 1, "icon": "settingsIcon", "sort_order": 7,
+                "name": "System Config", "level": 1, "icon": "settingsIcon", "sort_order": 8,
                 "children": [
                     {"name": "Theme Studio", "path": "/admin/theme-studio", "feature": "SYSTEM_CONFIG"},
-                    {"name": "Permission Mapping", "path": "/roles/permissions", "feature": "SYSTEM_CONFIG"},
+                    {"name": "Permission Mapping", "path": "/admin/permission-management", "feature": "SYSTEM_CONFIG"},
                     {"name": "Sprints", "path": "/sprints", "feature": "SPRINT_MGMT"},
                 ]
             }

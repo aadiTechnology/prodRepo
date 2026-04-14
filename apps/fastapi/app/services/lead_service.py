@@ -36,6 +36,7 @@ def _get_or_create_parent(db: Session, tenant_id: int, data: LeadCreate, user_id
         parent.state = data.state or parent.state
         parent.pin_code = data.pin_code or parent.pin_code
         parent.relationship = data.relationship or parent.relationship
+        parent.society = data.society or parent.society
         db.flush()
         return parent
 
@@ -49,6 +50,7 @@ def _get_or_create_parent(db: Session, tenant_id: int, data: LeadCreate, user_id
         city=data.city,
         state=data.state,
         pin_code=data.pin_code,
+        society=data.society,
         relationship=data.relationship,
         created_by=user_id,
     )
@@ -184,6 +186,8 @@ def update_lead(db: Session, tenant_id: int, lead_id: int, data: LeadUpdate, use
             parent.pin_code = data.pin_code
         if data.relationship is not None:
             parent.relationship = data.relationship
+        if data.society is not None:
+            parent.society = data.society
 
     # Update lead fields
     lead_fields = [
@@ -328,5 +332,26 @@ def get_lead_statuses(db: Session, tenant_id: int):
     return db.query(LeadStatus).filter(
         LeadStatus.is_active == True
     ).order_by(LeadStatus.sequence_order).all()
+
+
+def get_society_suggestions(db: Session, tenant_id: int, q: str) -> list[str]:
+    if not q:
+        return []
+    
+    # Query distinct society names matching the search term
+    results = (
+        db.query(LeadParent.society)
+        .filter(
+            LeadParent.tenant_id == tenant_id,
+            LeadParent.is_deleted == False,
+            LeadParent.society.ilike(f"%{q}%")
+        )
+        .distinct()
+        .limit(10)
+        .all()
+    )
+    
+    # Return as list of strings, filtering out None/Empty
+    return [r[0] for r in results if r[0] and r[0].strip()]
 
 

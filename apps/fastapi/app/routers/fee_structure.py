@@ -12,7 +12,6 @@ def list_fee_structures(
     tenantId: int = Query(..., alias="tenantId"),
     db: Session = Depends(get_db)
 ):
-    print(f"Incoming academicYear={academicYear}, classId={classId}, tenantId={tenantId}")
     fee_structures = (
         db.query(FeeStructure)
         .filter(
@@ -23,13 +22,13 @@ def list_fee_structures(
         )
         .all()
     )
-    print(f"Total records returned: {len(fee_structures)}")
     result = []
     for f in fee_structures:
         # Always use fee structure name if present, otherwise fallback to 'Fee Structure #{id}'
         display_name = f.name.strip() if f.name and f.name.strip() != "" else f"Fee Structure #{f.id}"
         result.append({
             "id": f.id,
-            "name": display_name
+            "name": display_name,
+            "total_amount": float(f.total_amount or 0),
         })
     return result

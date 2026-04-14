@@ -215,6 +215,7 @@ class LeadListItem(BaseModel):
     next_followup_date: Optional[date] = None
     assigned_to: Optional[int] = None
     created_at: Optional[datetime] = None
+    converted: bool = False
 
     class Config:
         from_attributes = True

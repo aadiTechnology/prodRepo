@@ -46,6 +46,7 @@ from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, 
 from app.routers import fee_discount, fee_category_router
 from app.routers import installment_tracking, fee_installment_status, fee_collection
 from app.routers import lead as lead_router
+from app.routers import enrollment as enrollment_router
 
 # Setup logging first
 setup_logging()
@@ -113,6 +114,7 @@ app.include_router(reports.router)
 app.include_router(sprint.router)
 app.include_router(task_effort.router)
 app.include_router(lead_router.router)
+app.include_router(enrollment_router.router)
 
 
 # Mount static files for profile images
@@ -120,6 +122,8 @@ app.include_router(lead_router.router)
 import os
 os.makedirs("static/profile-images", exist_ok=True)
 app.mount("/profile-images", StaticFiles(directory="static/profile-images"), name="profile-images")
+os.makedirs("static/enrollment-documents", exist_ok=True)
+app.mount("/enrollment-documents", StaticFiles(directory="static/enrollment-documents"), name="enrollment-documents")
 
 @app.on_event("startup")
 async def startup_event():

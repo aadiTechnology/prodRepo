@@ -52,7 +52,7 @@ def get_student_detail(db: Session, student_id: int):
         "tenant_id": class_.tenant_id if class_ else None,
     }
 
-def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate):
+def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto_commit: bool = True):
     # Strict validation
     if not payload.student_id:
         raise AppException("student_id is required", status_code=422)
@@ -84,36 +84,52 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate):
     if not fee_structure:
         raise AppException("Fee structure not found", status_code=400)
 
-    # Fetch fee components
-    fee_components = db.query(FeeCategory).join(FeeStructure, FeeCategory.id == FeeStructure.fee_category_id).filter(FeeStructure.id == payload.fee_structure_id).all()
     # Fetch installments
     installments = db.query(FeeInstallment).filter(FeeInstallment.fee_structure_id == payload.fee_structure_id).all()
 
     # Discount
     discount = None
     if payload.discount_id:
-        discount = db.query(FeeDiscount).filter(FeeDiscount.id == payload.discount_id).first()
+        discount = (
+            db.query(FeeDiscount)
+            .filter(
+                FeeDiscount.id == payload.discount_id,
+                FeeDiscount.is_deleted == False,  # noqa: E712
+                FeeDiscount.status == True,  # noqa: E712
+            )
+            .first()
+        )
 
     # Calculate amounts
-    total_amount = 0
+    total_amount = 0.0
     details = []
-    for comp in fee_components:
-        amount = comp.amount if hasattr(comp, "amount") else 0
-        final_amount = amount
-        discount_applied = 0
-        if discount:
-            if discount.discount_type == "percentage":
-                discount_applied = amount * discount.discount_value / 100
-            else:
-                discount_applied = discount.discount_value
-            final_amount = amount - discount_applied
-        details.append({
-            "category": comp.name if hasattr(comp, "name") else comp.category,
-            "amount": amount,
-            "discount_applied": discount_applied,
-            "final_amount": final_amount,
-        })
-        total_amount += final_amount
+    base_amount = float(sum(float(inst.amount or 0) for inst in installments))
+    if base_amount <= 0:
+        base_amount = float(fee_structure.total_amount or 0)
+
+    discount_applied = 0.0
+    if discount and base_amount > 0:
+        discount_type = str(discount.discount_type or "").strip().lower()
+        discount_value = float(discount.discount_value or 0)
+        if discount_type in {"percentage", "percent"}:
+            discount_applied = (base_amount * discount_value) / 100.0
+        else:
+            discount_applied = discount_value
+        discount_applied = max(0.0, min(discount_applied, base_amount))
+
+    final_amount = max(0.0, base_amount - discount_applied)
+    category_name = (
+        fee_structure.fee_category.name
+        if getattr(fee_structure, "fee_category", None) and getattr(fee_structure.fee_category, "name", None)
+        else "Fee"
+    )
+    details.append({
+        "category": category_name,
+        "amount": base_amount,
+        "discount_applied": discount_applied,
+        "final_amount": final_amount,
+    })
+    total_amount = final_amount
     # additional_fee logic removed
 
     # Save in transaction
@@ -165,7 +181,10 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate):
                 total_balance=total_amount
             )
             db.add(new_ledger)
-        db.commit()
+        if auto_commit:
+            db.commit()
+        else:
+            db.flush()
         # Fetch installments for the assignment
         assignment_installments = db.query(StudentFeeInstallment).filter(StudentFeeInstallment.assignment_id == assignment.id).all()
         installments_response = [

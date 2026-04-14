@@ -1,0 +1,209 @@
+from __future__ import annotations
+
+from datetime import datetime
+import random
+import string
+
+from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from app.models.lead import Lead, LeadStatus, LeadParent
+from app.models.student import Student
+from app.schemas.student_fee_assignment import StudentFeeAssignmentCreate
+from app.services import student_fee_assignment_service
+
+
+class EnrollmentService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_prefill_from_lead(self, tenant_id: int, lead_id: int) -> dict:
+        lead = (
+            self.db.query(Lead)
+            .filter(
+                Lead.id == lead_id,
+                Lead.tenant_id == tenant_id,
+                Lead.is_deleted == False,  # noqa: E712
+            )
+            .first()
+        )
+        if not lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        parent = lead.parent
+        return {
+            "lead_id": lead.id,
+            "student_name": lead.child_name,
+            "date_of_birth": lead.child_dob,
+            "gender": lead.child_gender,
+            "parent_name": parent.parent_name if parent else None,
+            "mobile_number": parent.mobile_number if parent else None,
+            "email": parent.email if parent else None,
+            "academic_year_id": lead.preferred_academic_year_id,
+            "class_id": lead.preferred_class_id,
+            "expected_admission_date": lead.expected_admission_date,
+        }
+
+    def _get_or_create_parent(
+        self,
+        tenant_id: int,
+        parent_name: str,
+        mobile_number: str,
+        email: str | None,
+        user_id: int,
+    ) -> LeadParent:
+        parent = (
+            self.db.query(LeadParent)
+            .filter(
+                LeadParent.tenant_id == tenant_id,
+                LeadParent.mobile_number == mobile_number,
+                LeadParent.is_deleted == False,  # noqa: E712
+            )
+            .first()
+        )
+        if parent:
+            parent.parent_name = parent_name
+            if email is not None:
+                parent.email = email
+            parent.updated_by = user_id
+            parent.updated_at = datetime.utcnow()
+            self.db.flush()
+            return parent
+
+        parent = LeadParent(
+            tenant_id=tenant_id,
+            parent_name=parent_name,
+            mobile_number=mobile_number,
+            email=email,
+            created_by=user_id,
+        )
+        self.db.add(parent)
+        self.db.flush()
+        return parent
+
+    def _generate_admission_no(self, tenant_id: int) -> str:
+        for _ in range(20):
+            suffix = "".join(random.choices(string.digits, k=6))
+            candidate = f"ADM-{tenant_id}-{suffix}"
+            exists = self.db.query(Student.id).filter(Student.admission_no == candidate).first()
+            if not exists:
+                return candidate
+        raise HTTPException(status_code=500, detail="Unable to generate admission number")
+
+    def enroll(self, tenant_id: int, user_id: int, payload) -> dict:
+        try:
+            lead: Lead | None = None
+            if payload.lead_id:
+                lead = (
+                    self.db.query(Lead)
+                    .filter(
+                        Lead.id == payload.lead_id,
+                        Lead.tenant_id == tenant_id,
+                        Lead.is_deleted == False,  # noqa: E712
+                    )
+                    .first()
+                )
+                if not lead:
+                    raise HTTPException(status_code=404, detail="Lead not found")
+                if lead.converted_to_student_id:
+                    raise HTTPException(status_code=400, detail="Lead already converted to student")
+
+            parent = self._get_or_create_parent(
+                tenant_id=tenant_id,
+                parent_name=payload.parent_name,
+                mobile_number=payload.mobile_number,
+                email=payload.email,
+                user_id=user_id,
+            )
+
+            admission_no = (payload.admission_no or "").strip() or self._generate_admission_no(tenant_id)
+
+            student = Student(
+                tenant_id=tenant_id,
+                student_name=payload.student_name,
+                student_code=admission_no,
+                date_of_birth=payload.date_of_birth,
+                gender=payload.gender,
+                admission_no=admission_no,
+                admission_date=payload.admission_date,
+                academic_year_id=payload.academic_year_id,
+                class_id=payload.class_id,
+                class_division_id=payload.class_division_id,
+                parent_id=parent.id,
+                mobile_number=payload.mobile_number,
+                email=payload.email,
+                parent_name=payload.parent_name,
+                address=parent.address,
+                area=parent.society,
+                city=parent.city,
+                state=parent.state,
+                pincode=parent.pin_code,
+                birth_certificate_url=payload.birth_certificate_url,
+                photo_url=payload.photo_url,
+                is_active=True,
+            )
+            self.db.add(student)
+            self.db.flush()
+
+            fee_payload = StudentFeeAssignmentCreate(
+                student_id=student.id,
+                academic_year_id=payload.academic_year_id,
+                fee_structure_id=payload.fee_structure_id,
+                discount_id=payload.discount_id,
+                additional_fee=payload.additional_fee,
+            )
+            fee_result = student_fee_assignment_service.assign_fee_to_student(
+                self.db,
+                fee_payload,
+                auto_commit=False,
+            )
+
+            if lead:
+                lead.converted_to_student_id = student.id
+                lead.converted_at = datetime.utcnow()
+                lead.converted_by = user_id
+
+                converted_status = (
+                    self.db.query(LeadStatus)
+                    .filter(
+                        (LeadStatus.code.ilike("converted")) | (LeadStatus.name.ilike("converted")),
+                        LeadStatus.is_active == True,  # noqa: E712
+                    )
+                    .order_by(LeadStatus.id.desc())
+                    .first()
+                )
+                if converted_status:
+                    lead.lead_status_id = converted_status.id
+
+            self.db.commit()
+            self.db.refresh(student)
+
+            printable = {
+                "student": {
+                    "id": student.id,
+                    "name": student.student_name,
+                    "admission_no": student.admission_no,
+                    "admission_date": str(student.admission_date) if student.admission_date else None,
+                },
+                "parent": {
+                    "name": parent.parent_name,
+                    "mobile_number": parent.mobile_number,
+                },
+                "fee": fee_result,
+                "generated_at": datetime.utcnow().isoformat(),
+            }
+
+            return {
+                "message": "Enrollment completed successfully",
+                "student_id": student.id,
+                "admission_no": student.admission_no,
+                "fee_assignment": fee_result,
+                "printable": printable,
+            }
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise HTTPException(status_code=500, detail="Enrollment failed. Please try again")

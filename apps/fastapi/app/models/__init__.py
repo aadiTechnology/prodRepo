@@ -70,5 +70,5 @@ __all__ = [
     "LeadSource",
     "LeadStatus",
     "LeadFollowup",
-    "Parent",
+    "LeadParent",
 ]
