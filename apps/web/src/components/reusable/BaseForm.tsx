@@ -45,6 +45,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
   submitLabelCreate = "Save",
   submitLabelEdit = "Save",
   formTopSlot,
+  canSubmit = true,
 }: BaseFormProps<T>) {
   const formId = useId();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -116,6 +117,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
                     variant="save"
                     onClick={(e) => runSubmit(e, handleSubmit, onValid)}
                     loading={loading}
+                    disabled={!canSubmit}
                     tooltipTitle={saveTooltip}
                   />
                 </Box>
@@ -174,7 +176,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
               mt: 4,
             }}
           >
-            <SaveButton type="submit" disabled={false} loading={loading}>
+            <SaveButton type="submit" disabled={!canSubmit} loading={loading}>
               {isEditMode ? submitLabelEdit : submitLabelCreate}
             </SaveButton>
             <CancelButton onClick={onCancelNavigate} disabled={loading}>

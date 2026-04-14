@@ -143,7 +143,7 @@ export default function EnrollmentPage() {
         const items = data?.data || data || [];
         setAcademicYears(items.map((y: any) => ({ id: Number(y.id), name: y.name || String(y.id) })));
       })
-      .catch(() => {});
+      .catch(() => { });
 
     leadService
       .list({ page: 1, page_size: 100 })
@@ -151,7 +151,7 @@ export default function EnrollmentPage() {
         const items = res?.data || [];
         setLeadOptions(items.map((l: any) => ({ id: l.id, label: `${l.child_name} (${l.lead_code})` })));
       })
-      .catch(() => {});
+      .catch(() => { });
 
     feeDiscountService
       .list({ page: 1, page_size: 100 })
@@ -202,7 +202,7 @@ export default function EnrollmentPage() {
           admission_date: prefill.expected_admission_date ?? prev.admission_date,
         }));
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setFetchLoading(false));
   }, [leadId, setFormData]);
 
@@ -480,7 +480,7 @@ export default function EnrollmentPage() {
           onChange={(_, value) => {
             setSelectedLead(value);
             if (!value) return;
-            void prefillFromLead(value).catch(() => {});
+            void prefillFromLead(value).catch(() => { });
           }}
           renderInput={(params) => (
             <TextField {...params} label="Select Lead" placeholder="Search lead..." />
