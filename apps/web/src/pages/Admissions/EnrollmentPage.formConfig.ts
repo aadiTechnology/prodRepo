@@ -152,6 +152,18 @@ export function createEnrollmentFormConfig({
           disableWhenEmpty: false,
         },
       },
+      birth_certificate_url: {
+        name: "birth_certificate_url",
+        label: "Birth Certificate",
+        type: "custom",
+        required: false,
+      },
+      photo_url: {
+        name: "photo_url",
+        label: "Photo",
+        type: "custom",
+        required: false,
+      },
     },
     layoutRows: [
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["student_name"] },
@@ -171,6 +183,9 @@ export function createEnrollmentFormConfig({
 
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["fee_structure_id"] },
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["discount_id"] },
+
+      { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["birth_certificate_url"] },
+      { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["photo_url"] },
     ],
   };
 }

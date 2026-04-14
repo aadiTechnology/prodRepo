@@ -11,6 +11,8 @@ import PaymentsIcon from "@mui/icons-material/Payments";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import PersonIcon from "@mui/icons-material/Person";
+import ClearIcon from "@mui/icons-material/Clear";
+import { IconButton } from "@mui/material";
 
 import BaseForm from "../../components/reusable/BaseForm";
 import FormSectionLabel from "../../components/reusable/FormSectionLabel";
@@ -466,14 +468,14 @@ export default function EnrollmentPage() {
     config.layoutRows.splice(0, 0, {
       kind: "custom" as const,
       grid: { xs: 12 },
-      render: () => <FormSectionLabel title="Convert from Lead (Optional)" icon={<PersonSearchIcon />} />,
+      render: (ctx) => <FormSectionLabel title="Convert from Lead (Optional)" icon={<PersonSearchIcon />} />,
     });
 
     // 2. Lead Selection Autocomplete
     config.layoutRows.splice(1, 0, {
       kind: "custom" as const,
       grid: { xs: 12 },
-      render: () => (
+      render: (ctx) => (
         <Autocomplete
           options={leadOptions}
           value={selectedLead}
@@ -497,7 +499,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(studentNameIdx, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: () => <FormSectionLabel title="Student Information" icon={<ChildCareIcon />} sx={{ mt: 2 }} />,
+        render: (ctx) => <FormSectionLabel title="Student Information" icon={<ChildCareIcon />} sx={{ mt: 2 }} />,
       });
     }
 
@@ -509,7 +511,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(admissionNoIdx, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: () => <FormSectionLabel title="Admission Details" icon={<AssignmentIcon />} sx={{ mt: 2 }} />,
+        render: (ctx) => <FormSectionLabel title="Admission Details" icon={<AssignmentIcon />} sx={{ mt: 2 }} />,
       });
     }
 
@@ -521,7 +523,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(classIdIdx, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: () => <FormSectionLabel title="Class Allocation" icon={<ClassIcon />} sx={{ mt: 2 }} />,
+        render: (ctx) => <FormSectionLabel title="Class Allocation" icon={<ClassIcon />} sx={{ mt: 2 }} />,
       });
     }
 
@@ -533,7 +535,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(parentNameIdx, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: () => <FormSectionLabel title="Parent Details" icon={<Groups2Icon />} sx={{ mt: 2 }} />,
+        render: (ctx) => <FormSectionLabel title="Parent Details" icon={<Groups2Icon />} sx={{ mt: 2 }} />,
       });
     }
 
@@ -545,7 +547,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(feeStructureIdx, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: () => <FormSectionLabel title="Fee Details" icon={<PaymentsIcon />} sx={{ mt: 2 }} />,
+        render: (ctx) => <FormSectionLabel title="Fee Details" icon={<PaymentsIcon />} sx={{ mt: 2 }} />,
       });
     }
 
@@ -557,19 +559,19 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(discountIdx + 1, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: () => (
+        render: (ctx) => (
           <Box sx={{ bgcolor: "grey.50", border: "1px dashed", borderColor: "grey.300", borderRadius: 2, p: 2 }}>
             <Typography variant="body2" color="text.secondary">
               Discount: <strong>{selectedDiscountLabel}</strong>
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Total: ${feePreview.total.toFixed(2)}
+              Total: Rs. {feePreview.total.toFixed(2)}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Discount: ${feePreview.discountAmount.toFixed(2)}
+              Discount: Rs. {feePreview.discountAmount.toFixed(2)}
             </Typography>
             <Typography variant="body2" color="success.main" sx={{ fontWeight: 600 }}>
-              Final: ${feePreview.finalAmount.toFixed(2)}
+              Final: Rs. {feePreview.finalAmount.toFixed(2)}
             </Typography>
           </Box>
         ),
@@ -584,7 +586,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(birthCertIdx, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: () => <FormSectionLabel title="Documents Upload" icon={<UploadFileIcon />} sx={{ mt: 2 }} />,
+        render: (ctx) => <FormSectionLabel title="Documents Upload" icon={<UploadFileIcon />} sx={{ mt: 2 }} />,
       });
     }
 
@@ -596,7 +598,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(photoIdx + 1, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: () => (
+        render: (ctx) => (
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6 }}>
               <Button
@@ -604,12 +606,31 @@ export default function EnrollmentPage() {
                 fullWidth
                 onClick={() => birthCertInputRef.current?.click()}
                 disabled={uploadingBirthCert}
+                startIcon={birthCertName ? <ClearIcon onClick={(e) => {
+                  e.stopPropagation();
+                  setBirthCertName("");
+                  setFormData(prev => ({ ...prev, birth_certificate_url: "" }));
+                }} /> : undefined}
               >
                 {uploadingBirthCert ? "Uploading..." : "Upload Birth Cert"}
               </Button>
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-                {birthCertName || "PDF, JPG, PNG, WEBP"}
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, gap: 1 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                  {birthCertName || "PDF, JPG, PNG, WEBP"}
+                </Typography>
+                {birthCertName && (
+                  <IconButton 
+                    size="small" 
+                    color="error" 
+                    onClick={() => {
+                      setBirthCertName("");
+                      setFormData(prev => ({ ...prev, birth_certificate_url: "" }));
+                    }}
+                  >
+                    <ClearIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                )}
+              </Box>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <Button
@@ -620,9 +641,23 @@ export default function EnrollmentPage() {
               >
                 {uploadingPhoto ? "Uploading..." : "Upload Photo"}
               </Button>
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-                {photoName || "JPG, PNG, WEBP"}
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, gap: 1 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                  {photoName || "JPG, PNG, WEBP"}
+                </Typography>
+                {photoName && (
+                  <IconButton 
+                    size="small" 
+                    color="error" 
+                    onClick={() => {
+                      setPhotoName("");
+                      setFormData(prev => ({ ...prev, photo_url: "" }));
+                    }}
+                  >
+                    <ClearIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                )}
+              </Box>
             </Grid>
           </Grid>
         ),
@@ -636,9 +671,7 @@ export default function EnrollmentPage() {
     classOptions,
     discountOptions,
     feePlanOptions,
-    feePreview.discountAmount,
-    feePreview.finalAmount,
-    feePreview.total,
+    feePreview,
     leadOptions,
     photoName,
     selectedDiscountLabel,
@@ -646,6 +679,8 @@ export default function EnrollmentPage() {
     divisionOptions,
     uploadingBirthCert,
     uploadingPhoto,
+    prefillFromLead,
+    discountById,
   ]);
 
   return (
