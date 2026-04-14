@@ -62,6 +62,7 @@ export const createAddClassFormConfig = (options: {
       kind: "fields",
       grid: { xs: 12 },
       fieldNames: ["is_active"],
+      show: (ctx) => ctx.isEditMode,
     },
   ],
 });

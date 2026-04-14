@@ -97,7 +97,7 @@ export default function AddClass() {
                 {
                     id: "division_name",
                     label: "Division Name",
-                    width: "55%",
+                    width: isEditMode ? "55%" : "70%",
                     render: (row) => {
                         const index = formData.divisions.indexOf(row);
                         return (
@@ -117,7 +117,7 @@ export default function AddClass() {
                 {
                     id: "capacity",
                     label: "Capacity",
-                    width: "20%",
+                    width: isEditMode ? "20%" : "25%",
                     render: (row) => {
                         const index = formData.divisions.indexOf(row);
                         return (
@@ -135,12 +135,12 @@ export default function AddClass() {
                         );
                     }
                 },
-                {
-                    id: "is_active",
+                ...(isEditMode ? [{
+                    id: "is_active" as const,
                     label: "Status",
-                    align: "center",
+                    align: "center" as const,
                     width: "15%",
-                    render: (row) => {
+                    render: (row: AddClassDivision) => {
                         const index = formData.divisions.indexOf(row);
                         return (
                             <Switch
@@ -151,7 +151,7 @@ export default function AddClass() {
                             />
                         );
                     }
-                }
+                }] : [])
             ];
 
             // 2. Add custom row for divisions management
