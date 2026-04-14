@@ -16,6 +16,8 @@ import permissionService, {
   Role,
   RoleMenuPermission,
 } from "../../api/services/permissionService";
+import tenantService from "../../api/services/tenantService";
+import { Tenant } from "../../types/tenant";
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout, EntityTableSection, ListPageToolbar } from "../../components/reusable";
 import { useAuth } from "../../context/AuthContext";
@@ -45,6 +47,10 @@ const PermissionManagementPage = () => {
 
   // ── Core State ────────────────────────────────────────────────────────────
   const [roles, setRoles] = useState<Role[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState<number | null>(
+    user?.tenant_id || null
+  );
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [menuTree, setMenuTree] = useState<MenuTreeNode[]>([]);
   const [permissions, setPermissions] = useState<Map<number, RoleMenuPermission>>(new Map());
@@ -58,24 +64,31 @@ const PermissionManagementPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // ── Fetch Roles ─────────────────────────────────────────────────────────
-  const fetchRoles = useCallback(async () => {
+  // ── Fetch Tenants & Roles ─────────────────────────────────────────────
+  const fetchData = useCallback(async () => {
     try {
       setLoadingRoles(true);
       setError(null);
-      const data = await permissionService.getRolesForUser();
-      setRoles(data || []);
+      
+      // Fetch tenants if Super Admin or System Admin
+      if (isSuperAdmin || isSystemAdmin) {
+        const tenantData = await tenantService.list();
+        setTenants(tenantData.items || []);
+      }
+
+      // Fetch roles
+      const rolesData = await permissionService.getRolesForUser();
+      setRoles(rolesData || []);
     } catch (err: any) {
-      setError(err?.message || "Failed to fetch roles.");
-      setRoles([]);
+      setError(err?.message || "Failed to fetch necessary data.");
     } finally {
       setLoadingRoles(false);
     }
-  }, []);
+  }, [isSuperAdmin, isSystemAdmin]);
 
   useEffect(() => {
-    fetchRoles();
-  }, [fetchRoles]);
+    fetchData();
+  }, [fetchData]);
 
   // ── Expanded Modules State ──────────────────────────────────────────────
   const [expandedModuleIds, setExpandedModuleIds] = useState<Set<number>>(
@@ -98,7 +111,12 @@ const PermissionManagementPage = () => {
   const handleRoleChange = useCallback(
     async (roleId: number) => {
       const role = roles.find((r) => r.id === roleId);
-      if (!role) return;
+      if (!role) {
+        setSelectedRole(null);
+        setMenuTree([]);
+        setPermissions(new Map());
+        return;
+      }
       setSelectedRole(role);
       setError(null);
       setLoadingMenus(true);
@@ -117,11 +135,21 @@ const PermissionManagementPage = () => {
       } catch (err: any) {
         setError(err?.message || "Failed to fetch permissions.");
       } finally {
+        setLoadingMenus(true); // Keep loading state updated
         setLoadingMenus(false);
       }
     },
     [roles]
   );
+
+  // ── Handle Tenant Change ───────────────────────────────────────────────
+  const handleTenantChange = useCallback((tenantId: number | null) => {
+    setSelectedTenantId(tenantId);
+    setSelectedRole(null);
+    setMenuTree([]);
+    setPermissions(new Map());
+    setOriginalPermissions(new Map());
+  }, []);
 
   // ── Transform Tree Into Flat Rows ────────────────────────────────────────
   const allRows: PermissionTableRow[] = useMemo(() => {
@@ -349,10 +377,14 @@ const PermissionManagementPage = () => {
   }, [originalPermissions]);
 
   // ── Filtered Roles ────────────────────────────────────────────────────
-  const filteredRoles = useMemo(
-    () => (isSystemAdmin ? roles : roles.filter((r) => r.tenant_id === user?.tenant_id)),
-    [roles, isSystemAdmin, user?.tenant_id]
-  );
+  const filteredRoles = useMemo(() => {
+    if (!selectedTenantId) {
+      // If no tenant selected, only show roles with no tenant (system roles) 
+      // or all roles if super admin wants to see all (but let's stick to filtering)
+      return roles.filter((r) => !r.tenant_id);
+    }
+    return roles.filter((r) => r.tenant_id === selectedTenantId);
+  }, [roles, selectedTenantId]);
 
   // ── Table Configuration ──────────────────────────────────────────────────
   const columnConfig = useMemo(
@@ -398,6 +430,20 @@ const PermissionManagementPage = () => {
                 searchPlaceholder="Search modules..."
                 actionsAfterSearch
                 filters={[
+                  ...(isSuperAdmin || isSystemAdmin
+                    ? [
+                        {
+                          label: "Tenant",
+                          value: selectedTenantId?.toString() || "",
+                          onChange: (val: string) =>
+                            handleTenantChange(val ? parseInt(val) : null),
+                          options: tenants.map((t) => ({
+                            label: t.name,
+                            value: t.id.toString(),
+                          })),
+                        },
+                      ]
+                    : []),
                   {
                     label: "Role",
                     value: selectedRole?.id?.toString() || "",
