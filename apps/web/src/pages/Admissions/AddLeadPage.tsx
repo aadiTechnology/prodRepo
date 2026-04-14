@@ -73,6 +73,20 @@ export default function AddLeadPage() {
     { id: string; label: string; value: string }[]
   >([]);
 
+  const toUniqueClassOptions = (items: any[]) => {
+    const byName = new Map<string, { id: string; label: string; value: string }>();
+    items.forEach((c: any) => {
+      const id = String(c.id);
+      const name = String(c.name || "").trim();
+      if (!name) return;
+      const key = name.toLowerCase();
+      if (!byName.has(key)) {
+        byName.set(key, { id, label: name, value: id });
+      }
+    });
+    return Array.from(byName.values());
+  };
+
   // Load dropdown data
   useEffect(() => {
     leadService.getSources().then((data) =>
@@ -84,12 +98,6 @@ export default function AddLeadPage() {
     leadService.getStatuses().then((data) =>
       setStatusOptions(
         data.map((s) => ({ id: String(s.id), label: s.name, value: String(s.id) }))
-      )
-    ).catch(() => {});
-
-    schoolClassService.getAll().then((data: any[]) =>
-      setClassOptions(
-        data.map((c: any) => ({ id: String(c.id), label: c.name, value: String(c.id) }))
       )
     ).catch(() => {});
 
@@ -142,6 +150,19 @@ export default function AddLeadPage() {
     validationConfig,
     onClearError: () => setError(null),
   });
+
+  useEffect(() => {
+    const selectedAcademicYearId = formData.preferred_academic_year_id
+      ? Number(formData.preferred_academic_year_id)
+      : undefined;
+
+    schoolClassService
+      .getAll(selectedAcademicYearId ? { academic_year_id: selectedAcademicYearId } : undefined)
+      .then((data: any[]) => {
+        setClassOptions(toUniqueClassOptions(data || []));
+      })
+      .catch(() => setClassOptions([]));
+  }, [formData.preferred_academic_year_id]);
 
   // Fetch lead data for edit mode
   const fetchLead = useCallback(async () => {

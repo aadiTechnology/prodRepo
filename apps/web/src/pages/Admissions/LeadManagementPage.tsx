@@ -226,7 +226,10 @@ const LeadManagementPage = () => {
               <Tooltip title="Convert to Student">
                 <IconButton
                   size="small"
-                  onClick={() => navigate(`/admissions/students/add?lead_id=${row.id}`)}
+                  onClick={() => {
+                    if (!row.id) return;
+                    navigate(`/admissions/enrollment/from-lead/${row.id}`);
+                  }}
                   sx={{
                     color: "success.main",
                     ml: 0.5,
