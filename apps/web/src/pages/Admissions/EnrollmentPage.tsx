@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Alert, Autocomplete, Box, Button, TextField, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
@@ -10,10 +10,9 @@ import Groups2Icon from "@mui/icons-material/Groups2";
 import PaymentsIcon from "@mui/icons-material/Payments";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
+import PersonIcon from "@mui/icons-material/Person";
 
-import { PageHeader } from "../../components/layout";
-import ListPageLayout from "../../components/reusable/ListPageLayout";
-import FormFieldRenderer from "../../components/reusable/FormFieldRenderer";
+import BaseForm from "../../components/reusable/BaseForm";
 import FormSectionLabel from "../../components/reusable/FormSectionLabel";
 import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
@@ -24,18 +23,26 @@ import academicYearService from "../../api/services/academicYearService";
 import schoolClassService, { type SchoolClass, type ClassDivision } from "../../api/services/schoolClassService";
 import feeDiscountService from "../../api/services/feeDiscountService";
 import apiClient from "../../api/client";
-import type { FormRenderContext } from "../../components/reusable/formFramework.types";
 import { createEnrollmentFormConfig, type EnrollmentFormData } from "./EnrollmentPage.formConfig";
 
-type LeadOption = { id: number; label: string };
-type FeePlanOption = { id: number; name: string; total_amount?: number };
-type DiscountOption = {
+interface LeadOption {
+  id: number;
+  label: string;
+}
+
+interface FeePlanOption {
+  id: number;
+  name: string;
+  total_amount?: number;
+}
+
+interface DiscountOption {
   id: number;
   discount_name: string;
   discount_type: string;
   discount_value: number;
   applicable_class?: string | null;
-};
+}
 
 const emptyForm = (): EnrollmentFormData => ({
   student_name: "",
@@ -65,24 +72,30 @@ export default function EnrollmentPage() {
 
   const tenantId = (user as any)?.tenant?.id ?? (user as any)?.tenant_id ?? null;
 
+  // Core form state
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [fetchLoading, setFetchLoading] = useState(Boolean(leadId));
+  const [snackbar, setSnackbar] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Lead selection state
+  const [leadOptions, setLeadOptions] = useState<LeadOption[]>([]);
+  const [selectedLead, setSelectedLead] = useState<LeadOption | null>(null);
+
+  // Dropdown options
+  const [academicYears, setAcademicYears] = useState<{ id: number; name: string }[]>([]);
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [divisions, setDivisions] = useState<ClassDivision[]>([]);
+  const [feePlans, setFeePlans] = useState<FeePlanOption[]>([]);
+  const [discounts, setDiscounts] = useState<DiscountOption[]>([]);
+
+  // Document upload state
   const [uploadingBirthCert, setUploadingBirthCert] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [birthCertName, setBirthCertName] = useState<string>("");
   const [photoName, setPhotoName] = useState<string>("");
   const birthCertInputRef = useRef<HTMLInputElement | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
-
-  const [leadOptions, setLeadOptions] = useState<LeadOption[]>([]);
-  const [selectedLead, setSelectedLead] = useState<LeadOption | null>(null);
-
-  const [academicYears, setAcademicYears] = useState<{ id: number; name: string }[]>([]);
-  const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const [divisions, setDivisions] = useState<ClassDivision[]>([]);
-  const [feePlans, setFeePlans] = useState<FeePlanOption[]>([]);
-  const [discounts, setDiscounts] = useState<DiscountOption[]>([]);
 
   const initialValues = useMemo(() => emptyForm(), []);
   const validationConfig = useMemo(
@@ -101,12 +114,20 @@ export default function EnrollmentPage() {
     }),
     []
   );
-  const { formData, setFormData, fieldErrors, handleChange, handleFieldValueChange, handleSubmit } =
-    useFormManager<EnrollmentFormData>({
-      initialValues,
-      validationConfig,
-      onClearError: () => setError(null),
-    });
+
+  const {
+    formData,
+    setFormData,
+    fieldErrors,
+    setFieldErrors,
+    handleChange,
+    handleFieldValueChange,
+    handleSubmit,
+  } = useFormManager<EnrollmentFormData>({
+    initialValues,
+    validationConfig,
+    onClearError: () => setError(null),
+  });
 
   const discountById = useMemo(() => {
     const map = new Map<number, DiscountOption>();
@@ -114,6 +135,7 @@ export default function EnrollmentPage() {
     return map;
   }, [discounts]);
 
+  // Load initial dropdown data
   useEffect(() => {
     academicYearService
       .getAll()
@@ -139,24 +161,30 @@ export default function EnrollmentPage() {
           items
             .filter((d: any) => d?.status === true || d?.status === 1)
             .map((d: any) => ({
-            id: Number(d.id),
-            discount_name: d.discount_name,
-            discount_type: d.discount_type,
-            discount_value: Number(d.discount_value),
-            applicable_class: d.applicable_class ?? null,
+              id: Number(d.id),
+              discount_name: d.discount_name,
+              discount_type: d.discount_type,
+              discount_value: Number(d.discount_value),
+              applicable_class: d.applicable_class ?? null,
             }))
         );
       })
-      .catch((err: any) => {
-        console.error("Unable to load discounts for enrollment:", err);
+      .catch(() => {
         setDiscounts([]);
       });
   }, []);
 
+  // Prefill from lead if leadId param exists
   useEffect(() => {
-    if (!leadId) return;
+    if (!leadId) {
+      setFetchLoading(false);
+      return;
+    }
     const idNum = Number(leadId);
-    if (!Number.isFinite(idNum)) return;
+    if (!Number.isFinite(idNum)) {
+      setFetchLoading(false);
+      return;
+    }
     enrollmentService
       .prefillFromLead(idNum)
       .then((prefill) => {
@@ -174,9 +202,11 @@ export default function EnrollmentPage() {
           admission_date: prefill.expected_admission_date ?? prev.admission_date,
         }));
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setFetchLoading(false));
   }, [leadId, setFormData]);
 
+  // Load classes when academic year changes
   useEffect(() => {
     if (!formData.academic_year_id) {
       setClasses([]);
@@ -188,6 +218,7 @@ export default function EnrollmentPage() {
       .catch(() => setClasses([]));
   }, [formData.academic_year_id]);
 
+  // Load divisions when class changes
   useEffect(() => {
     const selectedClass = classes.find((x) => x.id === Number(formData.class_id));
     const nextDivisions = selectedClass?.divisions || [];
@@ -197,6 +228,7 @@ export default function EnrollmentPage() {
     }
   }, [formData.class_id, classes, formData.class_division_id, setFormData]);
 
+  // Load fee plans when academic year or class changes
   useEffect(() => {
     if (!formData.academic_year_id || !formData.class_id || !tenantId) {
       setFeePlans([]);
@@ -223,45 +255,7 @@ export default function EnrollmentPage() {
       .catch(() => setFeePlans([]));
   }, [formData.academic_year_id, formData.class_id, tenantId]);
 
-  const buildPayload = (): EnrollmentCreatePayload => ({
-    lead_id: selectedLead?.id ?? null,
-    student_name: formData.student_name.trim(),
-    date_of_birth: formData.date_of_birth,
-    gender: formData.gender || null,
-    admission_no: formData.admission_no.trim() || null,
-    admission_date: formData.admission_date,
-    academic_year_id: Number(formData.academic_year_id),
-    class_id: Number(formData.class_id),
-    class_division_id: formData.class_division_id ? Number(formData.class_division_id) : null,
-    parent_name: formData.parent_name.trim(),
-    mobile_number: formData.mobile_number.trim(),
-    email: formData.email.trim() || null,
-    fee_structure_id: Number(formData.fee_structure_id),
-    discount_id: formData.discount_id ? Number(formData.discount_id) : null,
-    additional_fee: null,
-    birth_certificate_url: formData.birth_certificate_url.trim() || null,
-    photo_url: formData.photo_url.trim() || null,
-  });
-
-  const submit = async (mode: "enroll" | "print") => {
-    setError(null);
-    setSuccess(null);
-    setLoading(true);
-    try {
-      const res = await enrollmentService.enroll(buildPayload());
-      setSuccess(res.message || "Enrollment completed successfully");
-      if (mode === "print") {
-        navigate("/admissions/enrollment/print", { state: res.printable });
-      } else {
-        setTimeout(() => navigate("/students"), 700);
-      }
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || "Enrollment failed. Please try again");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Document upload handler
   const uploadDocument = async (
     file: File,
     documentType: "birth_certificate" | "photo"
@@ -316,13 +310,65 @@ export default function EnrollmentPage() {
     if (photoInputRef.current) photoInputRef.current.value = "";
   };
 
-  const selectedDiscountLabel = useMemo(() => {
-    if (!formData.discount_id) return "None";
-    const discount = discountById.get(Number(formData.discount_id));
-    if (!discount) return "None";
-    return `${discount.discount_name} (${discount.discount_type} ${discount.discount_value})`;
-  }, [discountById, formData.discount_id]);
+  // Build submission payload
+  const buildPayload = (): EnrollmentCreatePayload => ({
+    lead_id: selectedLead?.id ?? null,
+    student_name: formData.student_name.trim(),
+    date_of_birth: formData.date_of_birth,
+    gender: formData.gender || null,
+    admission_no: formData.admission_no.trim() || null,
+    admission_date: formData.admission_date,
+    academic_year_id: Number(formData.academic_year_id),
+    class_id: Number(formData.class_id),
+    class_division_id: formData.class_division_id ? Number(formData.class_division_id) : null,
+    parent_name: formData.parent_name.trim(),
+    mobile_number: formData.mobile_number.trim(),
+    email: formData.email.trim() || null,
+    fee_structure_id: Number(formData.fee_structure_id),
+    discount_id: formData.discount_id ? Number(formData.discount_id) : null,
+    additional_fee: null,
+    birth_certificate_url: formData.birth_certificate_url.trim() || null,
+    photo_url: formData.photo_url.trim() || null,
+  });
 
+  // Submit handler
+  const handleConfirmSubmit = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await enrollmentService.enroll(buildPayload());
+      setSnackbar(res.message || "Enrollment completed successfully");
+      setTimeout(() => navigate("/students"), 1000);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || "Enrollment failed. Please try again");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const academicYearOptions = useMemo(
+    () => academicYears.map((year) => ({ id: String(year.id), label: year.name, value: String(year.id) })),
+    [academicYears]
+  );
+  const classOptions = useMemo(
+    () => classes.map((item) => ({ id: String(item.id), label: item.name, value: String(item.id) })),
+    [classes]
+  );
+  const divisionOptions = useMemo(
+    () =>
+      divisions.map((division) => ({
+        id: String(division.id),
+        label: division.division_name,
+        value: String(division.id),
+      })),
+    [divisions]
+  );
+  const feePlanOptions = useMemo(
+    () => feePlans.map((plan) => ({ id: String(plan.id), label: plan.name, value: String(plan.id) })),
+    [feePlans]
+  );
+
+  // Filter discounts by class BEFORE using in discountOptions
   const filteredDiscounts = useMemo(() => {
     const selectedClass = classes.find((item) => item.id === Number(formData.class_id));
     const className = (selectedClass?.name || "").trim().toLowerCase();
@@ -333,21 +379,22 @@ export default function EnrollmentPage() {
     });
   }, [classes, discounts, formData.class_id]);
 
-  useEffect(() => {
-    if (!formData.discount_id) return;
-    const stillValid = filteredDiscounts.some((discount) => discount.id === Number(formData.discount_id));
-    if (!stillValid) {
-      setFormData((prev) => ({ ...prev, discount_id: "" }));
-    }
-  }, [filteredDiscounts, formData.discount_id, setFormData]);
+  const discountOptions = useMemo(
+    () =>
+      filteredDiscounts.map((discount) => ({
+        id: String(discount.id),
+        label: discount.discount_name,
+        value: String(discount.id),
+      })),
+    [filteredDiscounts]
+  );
 
-  useEffect(() => {
-    if (!formData.fee_structure_id) return;
-    const stillValid = feePlans.some((plan) => plan.id === Number(formData.fee_structure_id));
-    if (!stillValid) {
-      setFormData((prev) => ({ ...prev, fee_structure_id: "" }));
-    }
-  }, [feePlans, formData.fee_structure_id, setFormData]);
+  const selectedDiscountLabel = useMemo(() => {
+    if (!formData.discount_id) return "None";
+    const discount = discountById.get(Number(formData.discount_id));
+    if (!discount) return "None";
+    return `${discount.discount_name} (${discount.discount_type} ${discount.discount_value})`;
+  }, [discountById, formData.discount_id]);
 
   const feePreview = useMemo(() => {
     const feePlan = feePlans.find((item) => item.id === Number(formData.fee_structure_id));
@@ -372,36 +419,23 @@ export default function EnrollmentPage() {
     };
   }, [discountById, feePlans, formData.fee_structure_id, formData.discount_id]);
 
-  const academicYearOptions = useMemo(
-    () => academicYears.map((year) => ({ id: String(year.id), label: year.name, value: String(year.id) })),
-    [academicYears]
-  );
-  const classOptions = useMemo(
-    () => classes.map((item) => ({ id: String(item.id), label: item.name, value: String(item.id) })),
-    [classes]
-  );
-  const divisionOptions = useMemo(
-    () =>
-      divisions.map((division) => ({
-        id: String(division.id),
-        label: division.division_name,
-        value: String(division.id),
-      })),
-    [divisions]
-  );
-  const feePlanOptions = useMemo(
-    () => feePlans.map((plan) => ({ id: String(plan.id), label: plan.name, value: String(plan.id) })),
-    [feePlans]
-  );
-  const discountOptions = useMemo(
-    () =>
-      filteredDiscounts.map((discount) => ({
-        id: String(discount.id),
-        label: discount.discount_name,
-        value: String(discount.id),
-      })),
-    [filteredDiscounts]
-  );
+  // Sync discount validity when filtered options change
+  useEffect(() => {
+    if (!formData.discount_id) return;
+    const stillValid = filteredDiscounts.some((discount) => discount.id === Number(formData.discount_id));
+    if (!stillValid) {
+      setFormData((prev) => ({ ...prev, discount_id: "" }));
+    }
+  }, [filteredDiscounts, formData.discount_id, setFormData]);
+
+  // Sync fee plan validity when options change
+  useEffect(() => {
+    if (!formData.fee_structure_id) return;
+    const stillValid = feePlans.some((plan) => plan.id === Number(formData.fee_structure_id));
+    if (!stillValid) {
+      setFormData((prev) => ({ ...prev, fee_structure_id: "" }));
+    }
+  }, [feePlans, formData.fee_structure_id, setFormData]);
 
   const prefillFromLead = async (selected: LeadOption) => {
     const prefill = await enrollmentService.prefillFromLead(selected.id);
@@ -428,26 +462,16 @@ export default function EnrollmentPage() {
       discountOptions,
     });
 
-    const insertSectionBefore = (fieldName: keyof EnrollmentFormData, title: string, icon: ReactNode) => {
-      const idx = config.layoutRows.findIndex(
-        (row) => row.kind === "fields" && row.fieldNames.includes(fieldName)
-      );
-      if (idx >= 0) {
-        config.layoutRows.splice(idx, 0, {
-          kind: "custom",
-          grid: { xs: 12 },
-          render: () => <FormSectionLabel title={title} icon={icon} sx={{ mt: 1 }} />,
-        });
-      }
-    };
-
+    // 1. Lead Selection Header
     config.layoutRows.splice(0, 0, {
-      kind: "custom",
+      kind: "custom" as const,
       grid: { xs: 12 },
       render: () => <FormSectionLabel title="Convert from Lead (Optional)" icon={<PersonSearchIcon />} />,
     });
+
+    // 2. Lead Selection Autocomplete
     config.layoutRows.splice(1, 0, {
-      kind: "custom",
+      kind: "custom" as const,
       grid: { xs: 12 },
       render: () => (
         <Autocomplete
@@ -458,48 +482,119 @@ export default function EnrollmentPage() {
             if (!value) return;
             void prefillFromLead(value).catch(() => {});
           }}
-          renderInput={(params) => <TextField {...params} label="Select Lead" placeholder="Search lead..." sx={{ mt: 0.5 }} />}
+          renderInput={(params) => (
+            <TextField {...params} label="Select Lead" placeholder="Search lead..." />
+          )}
         />
       ),
     });
 
-    insertSectionBefore("student_name", "Student Information", <ChildCareIcon />);
-    insertSectionBefore("admission_no", "Admission Details", <AssignmentIcon />);
-    insertSectionBefore("class_id", "Class Allocation", <ClassIcon />);
-    insertSectionBefore("parent_name", "Parent Details", <Groups2Icon />);
-    insertSectionBefore("fee_structure_id", "Fee Details", <PaymentsIcon />);
+    // 3. Student Section Header
+    const studentNameIdx = config.layoutRows.findIndex(
+      (row) => row.kind === "fields" && row.fieldNames.includes("student_name")
+    );
+    if (studentNameIdx >= 0) {
+      config.layoutRows.splice(studentNameIdx, 0, {
+        kind: "custom" as const,
+        grid: { xs: 12 },
+        render: () => <FormSectionLabel title="Student Information" icon={<ChildCareIcon />} sx={{ mt: 2 }} />,
+      });
+    }
 
-    const discountRowIndex = config.layoutRows.findIndex(
+    // 4. Admission Section Header
+    const admissionNoIdx = config.layoutRows.findIndex(
+      (row) => row.kind === "fields" && row.fieldNames.includes("admission_no")
+    );
+    if (admissionNoIdx >= 0) {
+      config.layoutRows.splice(admissionNoIdx, 0, {
+        kind: "custom" as const,
+        grid: { xs: 12 },
+        render: () => <FormSectionLabel title="Admission Details" icon={<AssignmentIcon />} sx={{ mt: 2 }} />,
+      });
+    }
+
+    // 5. Class Section Header
+    const classIdIdx = config.layoutRows.findIndex(
+      (row) => row.kind === "fields" && row.fieldNames.includes("class_id")
+    );
+    if (classIdIdx >= 0) {
+      config.layoutRows.splice(classIdIdx, 0, {
+        kind: "custom" as const,
+        grid: { xs: 12 },
+        render: () => <FormSectionLabel title="Class Allocation" icon={<ClassIcon />} sx={{ mt: 2 }} />,
+      });
+    }
+
+    // 6. Parent Section Header
+    const parentNameIdx = config.layoutRows.findIndex(
+      (row) => row.kind === "fields" && row.fieldNames.includes("parent_name")
+    );
+    if (parentNameIdx >= 0) {
+      config.layoutRows.splice(parentNameIdx, 0, {
+        kind: "custom" as const,
+        grid: { xs: 12 },
+        render: () => <FormSectionLabel title="Parent Details" icon={<Groups2Icon />} sx={{ mt: 2 }} />,
+      });
+    }
+
+    // 7. Fee Section Header and Preview
+    const feeStructureIdx = config.layoutRows.findIndex(
+      (row) => row.kind === "fields" && row.fieldNames.includes("fee_structure_id")
+    );
+    if (feeStructureIdx >= 0) {
+      config.layoutRows.splice(feeStructureIdx, 0, {
+        kind: "custom" as const,
+        grid: { xs: 12 },
+        render: () => <FormSectionLabel title="Fee Details" icon={<PaymentsIcon />} sx={{ mt: 2 }} />,
+      });
+    }
+
+    // 8. Discount Preview Box
+    const discountIdx = config.layoutRows.findIndex(
       (row) => row.kind === "fields" && row.fieldNames.includes("discount_id")
     );
-    if (discountRowIndex >= 0) {
-      config.layoutRows.splice(discountRowIndex + 1, 0, {
-        kind: "custom",
+    if (discountIdx >= 0) {
+      config.layoutRows.splice(discountIdx + 1, 0, {
+        kind: "custom" as const,
         grid: { xs: 12 },
         render: () => (
           <Box sx={{ bgcolor: "grey.50", border: "1px dashed", borderColor: "grey.300", borderRadius: 2, p: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              Discount Preview: <strong>{selectedDiscountLabel}</strong>
+              Discount: <strong>{selectedDiscountLabel}</strong>
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Total Fee: <strong>{feePreview.total.toFixed(2)}</strong>
+              Total: ${feePreview.total.toFixed(2)}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Discount Amount: <strong>{feePreview.discountAmount.toFixed(2)}</strong>
+              Discount: ${feePreview.discountAmount.toFixed(2)}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Final Payable: <strong>{feePreview.finalAmount.toFixed(2)}</strong>
+            <Typography variant="body2" color="success.main" sx={{ fontWeight: 600 }}>
+              Final: ${feePreview.finalAmount.toFixed(2)}
             </Typography>
           </Box>
         ),
       });
-      config.layoutRows.splice(discountRowIndex + 2, 0, {
-        kind: "custom",
+    }
+
+    // 9. Documents Section Header
+    const birthCertIdx = config.layoutRows.findIndex(
+      (row) => row.kind === "fields" && row.fieldNames.includes("birth_certificate_url")
+    );
+    if (birthCertIdx >= 0) {
+      config.layoutRows.splice(birthCertIdx, 0, {
+        kind: "custom" as const,
         grid: { xs: 12 },
-        render: () => <FormSectionLabel title="Documents Upload" icon={<UploadFileIcon />} sx={{ mt: 1.5 }} />,
+        render: () => <FormSectionLabel title="Documents Upload" icon={<UploadFileIcon />} sx={{ mt: 2 }} />,
       });
-      config.layoutRows.splice(discountRowIndex + 3, 0, {
-        kind: "custom",
+    }
+
+    // 10. Document Upload Buttons
+    const photoIdx = config.layoutRows.findIndex(
+      (row) => row.kind === "fields" && row.fieldNames.includes("photo_url")
+    );
+    if (photoIdx >= 0) {
+      config.layoutRows.splice(photoIdx + 1, 0, {
+        kind: "custom" as const,
         grid: { xs: 12 },
         render: () => (
           <Grid container spacing={2}>
@@ -510,10 +605,10 @@ export default function EnrollmentPage() {
                 onClick={() => birthCertInputRef.current?.click()}
                 disabled={uploadingBirthCert}
               >
-                {uploadingBirthCert ? "Uploading Birth Cert..." : "Upload Birth Cert"}
+                {uploadingBirthCert ? "Uploading..." : "Upload Birth Cert"}
               </Button>
-              <Typography variant="caption" color="text.secondary">
-                {birthCertName || "No birth certificate selected"}
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                {birthCertName || "PDF, JPG, PNG, WEBP"}
               </Typography>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
@@ -523,10 +618,10 @@ export default function EnrollmentPage() {
                 onClick={() => photoInputRef.current?.click()}
                 disabled={uploadingPhoto}
               >
-                {uploadingPhoto ? "Uploading Photo..." : "Upload Photo"}
+                {uploadingPhoto ? "Uploading..." : "Upload Photo"}
               </Button>
-              <Typography variant="caption" color="text.secondary">
-                {photoName || "No photo selected"}
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                {photoName || "JPG, PNG, WEBP"}
               </Typography>
             </Grid>
           </Grid>
@@ -553,104 +648,52 @@ export default function EnrollmentPage() {
     uploadingPhoto,
   ]);
 
-  const renderCtx: FormRenderContext<EnrollmentFormData> = {
-    formData,
-    fieldErrors,
-    isEditMode: false,
-    handleChange,
-    handleFieldValueChange,
-    setFormData,
-    setError,
-  };
-
-  const runSubmit = (e: FormEvent | MouseEvent, mode: "enroll" | "print") => {
-    e.preventDefault();
-    handleSubmit(e as FormEvent, () => {
-      void submit(mode);
-    });
-  };
-
   return (
-    <ListPageLayout
-      pageBackground
-      scrollableFormContent
-      header={
-        <Box sx={{ mb: 2 }}>
-          <PageHeader
-            links={[{ title: "Admissions", path: "/admissions/leads" }, { title: "Enrollment", path: "#" }]}
-            homePath="/"
-            actions={
-              <Button variant="outlined" onClick={() => navigate(-1)} disabled={loading}>
-                Cancel
-              </Button>
-            }
-          />
-          {error ? (
-            <Alert severity="error" variant="filled" sx={{ mt: 2, borderRadius: 2 }} onClose={() => setError(null)}>
-              {error}
-            </Alert>
-          ) : null}
-          {success ? (
-            <Alert severity="success" variant="filled" sx={{ mt: 2, borderRadius: 2 }} onClose={() => setSuccess(null)}>
-              {success}
-            </Alert>
-          ) : null}
-        </Box>
-      }
-    >
-      <Box sx={{ px: { xs: 0, sm: 1 }, pb: 3 }}>
-        <form onSubmit={(e) => runSubmit(e, "enroll")} autoComplete="off">
-          <Grid container spacing={2.5}>
-            {formConfig.layoutRows.map((row, idx) => {
-              if (row.kind === "custom") {
-                return (
-                  <Grid key={`custom-${idx}`} size={row.grid}>
-                    {row.render(renderCtx)}
-                  </Grid>
-                );
-              }
-              return (
-                <Grid key={`fields-${idx}`} size={row.grid}>
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 2.25 }}>
-                    {row.fieldNames.map((fieldName) => {
-                      const field = formConfig.fields[fieldName];
-                      if (!field) return null;
-                      return <FormFieldRenderer<EnrollmentFormData> key={fieldName} field={field} ctx={renderCtx} />;
-                    })}
-                  </Box>
-                </Grid>
-              );
-            })}
-          </Grid>
-
-          <input
-            ref={birthCertInputRef}
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.webp"
-            style={{ display: "none" }}
-            onChange={(e) => void onBirthCertSelected(e)}
-          />
-          <input
-            ref={photoInputRef}
-            type="file"
-            accept=".jpg,.jpeg,.png,.webp"
-            style={{ display: "none" }}
-            onChange={(e) => void onPhotoSelected(e)}
-          />
-
-          <Box sx={{ display: "flex", gap: 2, justifyContent: "center", mt: 4, flexWrap: "wrap" }}>
-            <Button type="submit" variant="contained" disabled={loading || !canEnroll}>
-              Enroll
-            </Button>
-            <Button variant="outlined" onClick={(e) => runSubmit(e, "print")} disabled={loading || !canEnroll}>
-              Save & Print
-            </Button>
-            <Button variant="text" onClick={() => navigate(-1)} disabled={loading}>
-              Cancel
-            </Button>
-          </Box>
-        </form>
-      </Box>
-    </ListPageLayout>
+    <>
+      <input
+        ref={birthCertInputRef}
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png,.webp"
+        style={{ display: "none" }}
+        onChange={(e) => void onBirthCertSelected(e)}
+      />
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp"
+        style={{ display: "none" }}
+        onChange={(e) => void onPhotoSelected(e)}
+      />
+      <BaseForm<EnrollmentFormData>
+        formConfig={formConfig}
+        formData={formData}
+        setFormData={setFormData}
+        fieldErrors={fieldErrors}
+        handleChange={handleChange}
+        handleFieldValueChange={handleFieldValueChange}
+        handleSubmit={handleSubmit}
+        setFormError={setError}
+        onConfirmSubmit={handleConfirmSubmit}
+        isEditMode={false}
+        loading={loading}
+        fetchLoading={fetchLoading}
+        error={error}
+        onErrorDismiss={() => setError(null)}
+        snackbar={snackbar}
+        onSnackbarClose={() => setSnackbar(null)}
+        headerConfig={{
+          links: [
+            { title: "Admissions", path: "/admissions/leads" },
+            { title: "Enrollment", path: "#" },
+          ],
+          homePath: "/",
+          cancelTooltip: "Cancel",
+          saveTooltipCreate: "Enroll Student",
+        }}
+        onCancelNavigate={() => navigate(-1)}
+        confirmMessage={() => "Are you sure you want to enroll this student?"}
+        canSubmit={canEnroll}
+      />
+    </>
   );
 }
