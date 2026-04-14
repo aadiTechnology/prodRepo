@@ -101,7 +101,7 @@ const FeeStructureSetup = () => {
                     </MenuItem>
                     {controller.academicYears.map((ay) => (
                       <MenuItem key={ay.id} value={ay.id.toString()}>
-                        {ay.name} ({ay.code})
+                        {ay.name}
                       </MenuItem>
                     ))}
                   </Select>
