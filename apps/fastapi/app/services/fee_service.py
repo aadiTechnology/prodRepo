@@ -192,6 +192,10 @@ def create_fee_structure(db: Session, obj_in: FeeStructureCreate, tenant_id: int
     if existing:
         raise ConflictException("Fee structure already exists for this class, category, and year.")
 
+    # Fetch category to get the name for the structure's name field
+    category = db.query(FeeCategory).filter(FeeCategory.id == obj_in.fee_category_id).first()
+    category_name = category.name if category else ""
+
     db_obj = FeeStructure(
         tenant_id=tenant_id,
         class_id=obj_in.class_id,
@@ -201,7 +205,7 @@ def create_fee_structure(db: Session, obj_in: FeeStructureCreate, tenant_id: int
         installment_type=obj_in.installment_type,
         num_installments=obj_in.num_installments,
         description=obj_in.description,
-        name="",
+        name=obj_in.name if obj_in.name else category_name,
         is_active=obj_in.is_active,
         created_by=user_id
     )

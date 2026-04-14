@@ -15,6 +15,11 @@ export function createFeeStructureListConfig({
   return {
     columns: [
       {
+        id: "name",
+        label: "Structure Name",
+        render: (s: FeeStructure) => s.name || "N/A",
+      },
+      {
         id: "class",
         label: "Class",
         render: (s: FeeStructure) => s.class_name || "N/A",

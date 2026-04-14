@@ -49,6 +49,7 @@ export interface FeeInstallment {
 
 export interface FeeStructure {
   id: number;
+  name?: string;
   class_id: number;
   class_name?: string;
   academic_year_id: number;
@@ -64,6 +65,7 @@ export interface FeeStructure {
 }
 
 export interface FeeStructureCreate {
+  name?: string;
   class_id: number;
   academic_year_id: number;
   fee_category_id: string;

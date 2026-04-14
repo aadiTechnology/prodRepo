@@ -64,6 +64,7 @@ class FeeStructureBase(BaseModel):
     installment_type: Optional[str] = None
     num_installments: int
     description: Optional[str] = None
+    name: Optional[str] = None
     is_active: bool = True
 
 class FeeStructureCreate(FeeStructureBase):
@@ -74,6 +75,7 @@ class FeeStructureUpdate(BaseModel):
     installment_type: Optional[str] = None
     num_installments: Optional[int] = None
     description: Optional[str] = None
+    name: Optional[str] = None
     is_active: Optional[bool] = None
     installments: Optional[List[FeeInstallmentCreate]] = None
 
