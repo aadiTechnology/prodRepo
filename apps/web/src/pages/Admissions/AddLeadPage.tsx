@@ -133,6 +133,7 @@ export default function AddLeadPage() {
       child_name: [{ type: "required" as const, message: "Child name is required." }],
       lead_source_id: [{ type: "required" as const, message: "Lead source is required." }],
       lead_status_id: [{ type: "required" as const, message: "Lead status is required." }],
+      preferred_academic_year_id: [{ type: "required" as const, message: "Academic year is required." }],
     }),
     []
   );
@@ -265,6 +266,7 @@ export default function AddLeadPage() {
         classOptions,
         academicYearOptions,
         staffOptions,
+        academicYearSelected: Boolean(formData.preferred_academic_year_id),
       });
       // 1. Parent Section Header
       config.layoutRows.splice(0, 0, {
@@ -314,7 +316,7 @@ export default function AddLeadPage() {
       return config;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isEditMode, sourceOptions, statusOptions, classOptions, academicYearOptions, staffOptions, society]
+    [isEditMode, sourceOptions, statusOptions, classOptions, academicYearOptions, staffOptions, society, formData.preferred_academic_year_id]
   );
 
   return (

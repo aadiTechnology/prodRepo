@@ -35,6 +35,7 @@ type AddLeadFormConfigArgs = {
   classOptions: { id: string; label: string; value: string }[];
   academicYearOptions: { id: string; label: string; value: string }[];
   staffOptions: { id: string; label: string; value: string }[];
+  academicYearSelected: boolean;
 };
 
 export function createAddLeadFormConfig({
@@ -44,6 +45,7 @@ export function createAddLeadFormConfig({
   classOptions,
   academicYearOptions,
   staffOptions,
+  academicYearSelected,
 }: AddLeadFormConfigArgs): FormConfig<AddLeadFormData> {
   return {
     fields: {
@@ -195,13 +197,14 @@ export function createAddLeadFormConfig({
             ...classOptions,
           ],
           disableWhenEmpty: false,
+          disabled: !academicYearSelected,
         },
       },
       preferred_academic_year_id: {
         name: "preferred_academic_year_id",
         label: "Academic Year",
         type: "select",
-        required: false,
+        required: true,
         props: {
           options: [
             { id: "", label: "Select year", value: "" },
@@ -327,12 +330,12 @@ export function createAddLeadFormConfig({
       {
         kind: "fields",
         grid: { xs: 12, sm: 4 },
-        fieldNames: ["preferred_class_id"],
+        fieldNames: ["preferred_academic_year_id"],
       },
       {
         kind: "fields",
         grid: { xs: 12, sm: 4 },
-        fieldNames: ["preferred_academic_year_id"],
+        fieldNames: ["preferred_class_id"],
       },
       {
         kind: "fields",
