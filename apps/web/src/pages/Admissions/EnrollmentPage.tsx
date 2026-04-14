@@ -606,19 +606,14 @@ export default function EnrollmentPage() {
                 fullWidth
                 onClick={() => birthCertInputRef.current?.click()}
                 disabled={uploadingBirthCert}
-                startIcon={birthCertName ? <ClearIcon onClick={(e) => {
-                  e.stopPropagation();
-                  setBirthCertName("");
-                  setFormData(prev => ({ ...prev, birth_certificate_url: "" }));
-                }} /> : undefined}
               >
                 {uploadingBirthCert ? "Uploading..." : "Upload Birth Cert"}
               </Button>
-              <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, gap: 1 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
-                  {birthCertName || "PDF, JPG, PNG, WEBP"}
-                </Typography>
-                {birthCertName && (
+              {birthCertName && (
+                <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, px: 1 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {birthCertName}
+                  </Typography>
                   <IconButton 
                     size="small" 
                     color="error" 
@@ -626,11 +621,12 @@ export default function EnrollmentPage() {
                       setBirthCertName("");
                       setFormData(prev => ({ ...prev, birth_certificate_url: "" }));
                     }}
+                    sx={{ p: 0.5 }}
                   >
                     <ClearIcon sx={{ fontSize: 16 }} />
                   </IconButton>
-                )}
-              </Box>
+                </Box>
+              )}
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <Button
@@ -641,11 +637,11 @@ export default function EnrollmentPage() {
               >
                 {uploadingPhoto ? "Uploading..." : "Upload Photo"}
               </Button>
-              <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, gap: 1 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
-                  {photoName || "JPG, PNG, WEBP"}
-                </Typography>
-                {photoName && (
+              {photoName && (
+                <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, px: 1 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {photoName}
+                  </Typography>
                   <IconButton 
                     size="small" 
                     color="error" 
@@ -653,11 +649,12 @@ export default function EnrollmentPage() {
                       setPhotoName("");
                       setFormData(prev => ({ ...prev, photo_url: "" }));
                     }}
+                    sx={{ p: 0.5 }}
                   >
                     <ClearIcon sx={{ fontSize: 16 }} />
                   </IconButton>
-                )}
-              </Box>
+                </Box>
+              )}
             </Grid>
           </Grid>
         ),
