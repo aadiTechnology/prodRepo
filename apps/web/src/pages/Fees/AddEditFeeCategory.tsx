@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { mapApiErrorsToFields } from "../../utils/formValidation";
 import { useNavigate, useParams } from "react-router-dom";
-import { Alert, Snackbar, Box } from "@mui/material";
 import {
   createFeeCategory,
   updateFeeCategory,
   getFeeCategory,
+  getAcademicYears,
 } from "../../api/services/feeService";
 import BaseForm from "../../components/reusable/BaseForm";
 import { useFormManager } from "../../hooks/useFormManager";
@@ -23,18 +23,36 @@ const AddEditFeeCategory = () => {
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [academicYears, setAcademicYears] = useState<{ id: number; name: string }[]>([]);
+
+  // Fetch academic years for the dropdown
+  useEffect(() => {
+    const loadYears = async () => {
+      try {
+        const years = await getAcademicYears();
+        setAcademicYears(
+          (years || []).map((y: any) => ({ id: y.id, name: y.name }))
+        );
+      } catch {
+        // Non-critical: dropdown will be empty
+      }
+    };
+    loadYears();
+  }, []);
 
   const initialValues = useMemo<FeeCategoryFormData>(
     () => ({
       name: "",
+      academic_year_id: "",
+      amount: "",
       status: true,
     }),
     []
   );
 
   const formConfig = useMemo(
-    () => createFeeCategoryFormConfig({ isEditMode }),
-    [isEditMode]
+    () => createFeeCategoryFormConfig({ isEditMode, academicYears }),
+    [isEditMode, academicYears]
   );
 
   const validationConfig: import("../../utils/formValidation").FormValidationConfig<FeeCategoryFormData> = useMemo(() => ({
@@ -42,6 +60,12 @@ const AddEditFeeCategory = () => {
       { type: "required", message: "Category Name is required." },
       { type: "minLength", value: 2, message: "Min 2 characters." },
       { type: "maxLength", value: 100, message: "Max 100 characters." },
+    ],
+    academic_year_id: [
+      { type: "required", message: "Academic Year is required." },
+    ],
+    amount: [
+      { type: "required", message: "Amount is required." },
     ],
   }), []);
 
@@ -60,6 +84,8 @@ const AddEditFeeCategory = () => {
       const data = await getFeeCategory(id);
       setFormData({
         name: data.name,
+        academic_year_id: data.academic_year_id ?? "",
+        amount: data.amount ?? "",
         status: !!data.status,
       });
     } catch (err: any) {
@@ -86,14 +112,19 @@ const AddEditFeeCategory = () => {
     setError(null);
     setFieldErrors({});
     try {
+      const payload = {
+        name: formData.name,
+        academic_year_id: formData.academic_year_id !== "" ? Number(formData.academic_year_id) : undefined,
+        amount: formData.amount !== "" ? Number(formData.amount) : undefined,
+        status: formData.status,
+      };
       if (isEditMode && id) {
-        await updateFeeCategory(id, formData);
+        await updateFeeCategory(id, payload);
         setSnackbar("Category updated successfully!");
       } else {
-        await createFeeCategory(formData);
+        await createFeeCategory(payload);
         setSnackbar("Category created successfully!");
       }
-      // Wait for snackbar to show before navigating
       setTimeout(() => {
         setSnackbar(null);
         navigate("/fees/categories");

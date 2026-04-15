@@ -11,12 +11,27 @@ logger = get_logger(__name__)
 
 
 def get_fee_categories(db: Session, tenant_id: int) -> list[FeeCategory]:
-    """Return all non-deleted fee categories for a tenant."""
-    return (
+    """Return all non-deleted fee categories for a tenant with academic year names."""
+    categories = (
         db.query(FeeCategory)
         .filter(FeeCategory.tenant_id == tenant_id, FeeCategory.status == True)
         .all()
     )
+    
+    # Populate academic year names
+    if categories:
+        year_ids = list({cat.academic_year_id for cat in categories if cat.academic_year_id})
+        year_map = {}
+        if year_ids:
+            years = db.query(AcademicYear.id, AcademicYear.name).filter(
+                AcademicYear.id.in_(year_ids), AcademicYear.tenant_id == tenant_id
+            ).all()
+            year_map = {y.id: y.name for y in years}
+            
+        for cat in categories:
+            cat.academic_year_name = year_map.get(cat.academic_year_id)
+            
+    return categories
 
 
 def get_fee_category(db: Session, tenant_id: int, category_id: str) -> FeeCategory:
@@ -33,13 +48,53 @@ def get_fee_category(db: Session, tenant_id: int, category_id: str) -> FeeCatego
     )
     if not obj:
         raise NotFoundException("FeeCategory", category_id)
+        
+    # Populate academic year name
+    if obj.academic_year_id:
+        obj.academic_year_name = db.query(AcademicYear.name).filter(
+            AcademicYear.id == obj.academic_year_id, AcademicYear.tenant_id == tenant_id
+        ).scalar()
+        
     return obj
 
 
 def create_fee_category(db: Session, obj_in: FeeCategoryCreate, tenant_id: int, user_id: int | None) -> FeeCategory:
-    """Create a new fee category. Code is optional and auto-derived from name when omitted."""
+    """Create a new fee category. Code is auto-derived from name + academic year for uniqueness."""
     name = obj_in.name.strip()
-    code = (obj_in.code or name[:4]).upper()
+    base_code = name[:4].upper().replace(" ", "")
+
+    # Fetch academic year code to make the auto-code unique across years
+    ay_code = ""
+    if obj_in.academic_year_id:
+        ay = db.query(AcademicYear).filter(
+            AcademicYear.id == obj_in.academic_year_id,
+            AcademicYear.tenant_id == tenant_id,
+        ).first()
+        if ay:
+            ay_code = ay.code
+
+    # Build initial code candidate
+    code_candidate = obj_in.code if obj_in.code else (f"{base_code}_{ay_code}" if ay_code else base_code)
+
+    # Check for existing category with same name + academic year for this tenant
+    existing = db.query(FeeCategory).filter(
+        FeeCategory.tenant_id == tenant_id,
+        FeeCategory.name == name,
+        FeeCategory.academic_year_id == obj_in.academic_year_id,
+        FeeCategory.status == True,
+    ).first()
+    if existing:
+        raise ConflictException("A fee category with this name already exists for the selected academic year.")
+
+    # Ensure code is unique within tenant — append numeric suffix if needed
+    suffix = 1
+    code = code_candidate
+    while db.query(FeeCategory).filter(
+        FeeCategory.tenant_id == tenant_id,
+        FeeCategory.code == code,
+    ).first():
+        code = f"{code_candidate}{suffix}"
+        suffix += 1
 
     db_obj = FeeCategory(
         id=str(uuid4()),
@@ -48,6 +103,8 @@ def create_fee_category(db: Session, obj_in: FeeCategoryCreate, tenant_id: int, 
         code=code,
         description=obj_in.description,
         status=obj_in.status if obj_in.status is not None else True,
+        academic_year_id=obj_in.academic_year_id,
+        amount=obj_in.amount,
         created_by=user_id,
     )
     db.add(db_obj)

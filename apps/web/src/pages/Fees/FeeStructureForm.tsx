@@ -51,9 +51,10 @@ const FeeStructureForm = () => {
 
   const initialValues = useMemo<FeeStructureFormData>(
     () => ({
+      name: "",
       academic_year_id: "",
       class_id: "",
-      fee_category_id: "",
+      fee_category_ids: [],
       total_amount: "",
       installment_type: "QUARTERLY",
       num_installments: 4,
@@ -65,9 +66,18 @@ const FeeStructureForm = () => {
 
   // Field-level validation config
   const validationConfig: FormValidationConfig<FeeStructureFormData> = {
+    name: [ { type: "required", message: "Fee structure name is required." } ],
     academic_year_id: [ { type: "required", message: "Academic year is required." } ],
     class_id: [ { type: "required", message: "Class is required." } ],
-    fee_category_id: [ { type: "required", message: "Fee category is required." } ],
+    fee_category_ids: [
+      {
+        type: "custom",
+        validate: (data) => {
+          const ids = data.fee_category_ids as string[];
+          return !ids || ids.length === 0 ? "At least one fee category is required." : "";
+        },
+      },
+    ],
     total_amount: [
       { type: "required", message: "Total amount is required." },
       { type: "pattern", regex: /^\d+(\.\d{1,2})?$/, message: "Enter a valid amount." },
@@ -118,6 +128,27 @@ const FeeStructureForm = () => {
     });
   }, [formData.academic_year_id, handleFieldValueChange]);
 
+  // Auto-sum selected category amounts → total_amount (read-only when categories selected)
+  useEffect(() => {
+    const ids = formData.fee_category_ids as string[];
+    if (!ids || ids.length === 0) return;
+    const sum = ids.reduce((acc, id) => {
+      const cat = categories.find((c) => String(c.id) === String(id));
+      return acc + (cat?.amount ? Number(cat.amount) : 0);
+    }, 0);
+    handleFieldValueChange("total_amount", sum > 0 ? sum : "");
+
+    // Auto-populate name if empty
+    if (!formData.name && categories.length > 0) {
+      const selectedNames = ids
+        .map((id) => categories.find((c) => String(c.id) === String(id))?.name)
+        .filter(Boolean);
+      if (selectedNames.length > 0) {
+        handleFieldValueChange("name", selectedNames.join(" + "));
+      }
+    }
+  }, [formData.fee_category_ids, categories, handleFieldValueChange, formData.name]);
+
   // Fetch existing data
   const fetchStructure = useCallback(async () => {
     if (!id) return;
@@ -126,9 +157,13 @@ const FeeStructureForm = () => {
       const found = await feeService.getFeeStructure(Number(id));
       if (found) {
         setFormData({
+          name: found.name || "",
           academic_year_id: found.academic_year_id,
           class_id: found.class_id,
-          fee_category_id: found.fee_category_id,
+          // Support both legacy single id and new array
+          fee_category_ids: found.fee_category_id
+            ? [String(found.fee_category_id)]
+            : [],
           total_amount: found.total_amount,
           installment_type: found.installment_type as any,
           num_installments: found.num_installments,
@@ -176,21 +211,28 @@ const FeeStructureForm = () => {
     }
   }, [formData.num_installments, formData.total_amount, formData.installment_type, formData.academic_year_id, academicYears]);
 
+  const selectedCategoryIds = formData.fee_category_ids as string[];
+  const hasSelectedCategories = selectedCategoryIds && selectedCategoryIds.length > 0;
+
   const formConfig = useMemo(() => {
     const cfg = createFeeStructureFormConfig({
       isEditMode,
       academicYears,
       classes,
       installments,
+      categories,
     });
-    // Inject dynamic options for fee category
-    if (cfg.fields.fee_category_id) {
-      cfg.fields.fee_category_id.props = {
-        options: categories.map((cat) => ({ value: cat.id, label: cat.name })),
+    // Make total_amount read-only when categories drive the value
+    if (cfg.fields.total_amount && hasSelectedCategories) {
+      cfg.fields.total_amount.props = {
+        ...cfg.fields.total_amount.props,
+        type: "number",
+        disabled: true,
+        helperText: "Auto-calculated from selected categories",
       };
     }
     return cfg;
-  }, [isEditMode, academicYears, classes, installments, categories]);
+  }, [isEditMode, academicYears, classes, installments, categories, hasSelectedCategories]);
 
   const onConfirmSubmit = async () => {
     setLoading(true);
@@ -201,16 +243,21 @@ const FeeStructureForm = () => {
       const class_id = Number(formData.class_id);
       const total_amount = Number(formData.total_amount);
       const num_installments = Number(formData.num_installments);
+      const fee_category_ids = formData.fee_category_ids as string[];
+      // For backward-compat, send primary category id as fee_category_id
+      const fee_category_id = fee_category_ids[0] ?? "";
       const payload = {
         ...formData,
         academic_year_id,
         class_id,
+        fee_category_id,
+        fee_category_ids,
         total_amount,
         num_installments,
         installments: installments.map((inst) => ({
           ...inst,
-          late_fee_applicable: true, // TODO: make configurable if needed
-          late_fee_amount: 100, // TODO: make configurable if needed
+          late_fee_applicable: true,
+          late_fee_amount: 100,
         })),
       };
 

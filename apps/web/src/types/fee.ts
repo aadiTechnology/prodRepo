@@ -4,6 +4,9 @@ export interface FeeCategory {
   code?: string;
   description?: string;
   status: boolean;
+  academic_year_id?: number;
+  academic_year_name?: string;
+  amount?: number;
 }
 
 export type FeeCategoryResponse = FeeCategory;
@@ -13,6 +16,8 @@ export interface FeeCategoryCreate {
   code?: string;
   description?: string;
   status?: boolean;
+  academic_year_id?: number;
+  amount?: number;
 }
 
 export interface FeeCategoryUpdate {
@@ -20,6 +25,8 @@ export interface FeeCategoryUpdate {
   code?: string;
   description?: string;
   status?: boolean;
+  academic_year_id?: number;
+  amount?: number;
 }
 
 

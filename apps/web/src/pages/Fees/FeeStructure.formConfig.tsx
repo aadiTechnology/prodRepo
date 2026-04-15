@@ -1,13 +1,24 @@
 import React from "react";
 import { type FormConfig, type FormRenderContext } from "../../components/reusable/formFramework.types";
 import { DataTable } from "../../components/reusable";
-import { Box, Typography } from "@mui/material";
-import { type ClassEntity } from "../../types/fee";
+import {
+  Box,
+  Typography,
+  Select,
+  MenuItem,
+  Chip,
+  OutlinedInput,
+  FormControl,
+  InputLabel,
+  FormHelperText,
+} from "@mui/material";
+import { type ClassEntity, type FeeCategory } from "../../types/fee";
 
 export interface FeeStructureFormData extends Record<string, unknown> {
+  name: string;
   academic_year_id: number | "";
   class_id: number | "";
-  fee_category_id: string;
+  fee_category_ids: string[];   // multi-select: array of category ids
   total_amount: number | "";
   installment_type: "MONTHLY" | "QUARTERLY" | "YEARLY";
   num_installments: number;
@@ -26,14 +37,23 @@ export function createFeeStructureFormConfig({
   academicYears,
   classes,
   installments,
+  categories,
 }: {
   isEditMode: boolean;
   academicYears: { id: number; name: string }[];
   classes: ClassEntity[];
   installments: FeeInstallmentPreview[];
+  categories: FeeCategory[];
 }): FormConfig<FeeStructureFormData> {
   return {
     fields: {
+      name: {
+        name: "name",
+        label: "Fee Structure Name",
+        type: "text",
+        required: true,
+        placeholder: "e.g. Annual Tuition Fee, Quarter 1 Fees",
+      },
       academic_year_id: {
         name: "academic_year_id",
         label: "Academic Year",
@@ -56,12 +76,82 @@ export function createFeeStructureFormConfig({
           disabled: classes.length === 0,
         },
       },
-      fee_category_id: {
-        name: "fee_category_id",
+      fee_category_ids: {
+        name: "fee_category_ids",
         label: "Fee Category",
-        type: "select",
+        type: "custom",
         required: true,
-        // Options will be populated in the component
+        render: (ctx: FormRenderContext<FeeStructureFormData>) => {
+          const selected = (ctx.formData.fee_category_ids as string[]) ?? [];
+          const error = ctx.fieldErrors["fee_category_ids"];
+          return (
+            <FormControl fullWidth error={Boolean(error)} required>
+              <InputLabel
+                shrink={selected.length > 0}
+                sx={{
+                  fontSize: "0.85rem",
+                  color: error ? "error.main" : "primary.main",
+                }}
+              >
+                Fee Category
+              </InputLabel>
+              <Select
+                multiple
+                value={selected}
+                onChange={(e) => {
+                  const val = e.target.value as string[];
+                  ctx.handleFieldValueChange("fee_category_ids", val);
+                }}
+                input={
+                  <OutlinedInput
+                    notched={selected.length > 0}
+                    label="Fee Category"
+                  />
+                }
+                renderValue={(chosen) => (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                    {(chosen as string[]).map((id) => {
+                      const cat = categories.find((c) => String(c.id) === String(id));
+                      return (
+                        <Chip
+                          key={id}
+                          label={cat ? cat.name : id}
+                          size="small"
+                          sx={{ borderRadius: 1, fontWeight: 600, fontSize: "0.75rem" }}
+                        />
+                      );
+                    })}
+                  </Box>
+                )}
+                MenuProps={{ PaperProps: { sx: { maxHeight: 260 } } }}
+                sx={{
+                  "& .MuiOutlinedInput-notchedOutline legend": {
+                    fontSize: "0.75rem",
+                  },
+                }}
+              >
+                {categories.map((cat) => (
+                  <MenuItem key={cat.id} value={String(cat.id)}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                      <Typography variant="body2">{cat.name}</Typography>
+                      {cat.amount !== undefined && (
+                        <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                          ₹{Number(cat.amount).toLocaleString()}
+                        </Typography>
+                      )}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+              {error && <FormHelperText>{error}</FormHelperText>}
+              {selected.length > 0 && (
+                <FormHelperText sx={{ color: "text.secondary" }}>
+                  {selected.length} categor{selected.length === 1 ? "y" : "ies"} selected
+                </FormHelperText>
+              )}
+            </FormControl>
+          );
+        },
       },
       total_amount: {
         name: "total_amount",
@@ -106,9 +196,10 @@ export function createFeeStructureFormConfig({
         kind: "fields",
         grid: { xs: 12, md: 6 },
         fieldNames: [
+          "name",
           "academic_year_id",
           "class_id",
-          "fee_category_id",
+          "fee_category_ids",
           ...(isEditMode ? ["is_active"] : []),
           "description",
         ],

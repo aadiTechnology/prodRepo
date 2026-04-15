@@ -15,10 +15,23 @@ export function createFeeCategoryListConfig({
   return {
     columns: [
       {
+        id: "academic_year_name",
+        label: "Academic Year",
+        render: (cat: FeeCategoryResponse) => cat.academic_year_name ?? "—",
+        align: "left" as const,
+      },
+      {
         id: "name",
-        label: "Name",
+        label: "Category Name",
         field: "name",
         align: "left" as const,
+      },
+      {
+        id: "amount",
+        label: "Amount (₹)",
+        render: (cat: FeeCategoryResponse) =>
+          cat.amount != null ? `₹${Number(cat.amount).toLocaleString()}` : "—",
+        align: "right" as const,
       },
       {
         id: "status",

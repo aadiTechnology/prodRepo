@@ -10,6 +10,8 @@ class FeeCategoryBase(BaseModel):
     code: Optional[str] = None
     description: Optional[str] = None
     status: bool = True
+    academic_year_id: Optional[int] = None
+    amount: Optional[float] = None
 
 
 class FeeCategoryCreate(FeeCategoryBase):
@@ -23,6 +25,8 @@ class FeeCategoryUpdate(BaseModel):
     code: Optional[str] = None
     description: Optional[str] = None
     status: Optional[bool] = None
+    academic_year_id: Optional[int] = None
+    amount: Optional[float] = None
 
 
 class FeeCategoryResponse(FeeCategoryBase):
@@ -31,6 +35,7 @@ class FeeCategoryResponse(FeeCategoryBase):
     id: str
     tenant_id: int
     created_at: datetime
+    academic_year_name: Optional[str] = None
 
     class Config:
         from_attributes = True
