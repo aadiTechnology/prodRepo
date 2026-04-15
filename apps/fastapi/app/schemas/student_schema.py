@@ -9,6 +9,7 @@ class StudentDetailResponse(BaseModel):
     gender: str
     date_of_birth: str
     mobile: str
+    roll_no: Optional[str] = None
     email: Optional[EmailStr] = None
     address: Optional[str] = None
     area: Optional[str] = None
@@ -40,6 +41,7 @@ class StudentUpdateRequest(BaseModel):
     gender: Optional[str] = None
     date_of_birth: Optional[str] = None
     mobile_number: Optional[str] = None
+    roll_no: Optional[str] = None
     email: Optional[EmailStr] = None
     address: Optional[str] = None
     area: Optional[str] = None
@@ -56,6 +58,7 @@ class StudentListItem(BaseModel):
     name: str
     gender: Optional[str]
     mobile: Optional[str]
+    roll_no: Optional[str] = None
     class_: Optional[str] = Field(None, alias="class")
 
     model_config = {
@@ -81,6 +84,7 @@ class StudentCreateRequest(BaseModel):
     gender: str
     date_of_birth: str
     mobile_number: str
+    roll_no: Optional[str] = None
     email: Optional[EmailStr] = None
     address: Optional[str] = None
     area: Optional[str] = None

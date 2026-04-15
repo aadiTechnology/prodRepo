@@ -22,9 +22,10 @@ export function createStudentListConfig({
   return {
     columns: [
       {
-        id: "id",
-        label: "ID",
-        field: "id",
+        id: "roll_no",
+        label: "Roll Number",
+        field: "roll_no",
+        render: (row) => (row as Student)?.roll_no ?? "-",
       },
       {
         id: "name",

@@ -25,10 +25,10 @@ import studentService from "../../api/services/studentService";
 import type { Student } from "../../types/student";
 
 const StudentList = () => {
-    // Mock values for summary cards (replace with real API calls as needed)
-    const averageAttendance = 94.8; // %
-    const graduationRate = 92; // %
-    const pendingEnrollment = 12; // count
+  // Mock values for summary cards (replace with real API calls as needed)
+  const averageAttendance = 94.8; // %
+  const graduationRate = 92; // %
+  const pendingEnrollment = 12; // count
   const navigate = useNavigate();
   // Fetch all class options from backend (schoolClassService)
   const [classOptions, setClassOptions] = useState([{ value: '', label: 'All' }]);
@@ -85,6 +85,13 @@ const StudentList = () => {
     classFilter: selectedClass,
     statusFilter: selectedStatus,
   });
+
+  // Debug: log student data to verify roll_no is present
+  useEffect(() => {
+    if (sortedStudents && sortedStudents.length > 0) {
+      console.log('Student List Data:', sortedStudents);
+    }
+  }, [sortedStudents]);
 
   const listConfig = useMemo(
     () =>

@@ -1,6 +1,7 @@
 export interface Student {
   id: string;
   name: string;
+  roll_no?: string;
   gender?: string;
   mobile?: string;
   class?: string;

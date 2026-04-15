@@ -11,6 +11,7 @@ import { mapApiErrorsToFields } from "../../utils/formValidation";
 // --- Form Data Type ---
 
 export type AddStudentFormData = {
+  roll_no: string;
   student_name: string;
   gender: string;
   date_of_birth: string;
@@ -30,6 +31,7 @@ export type AddStudentFormData = {
 };
 
 const emptyForm = (): AddStudentFormData => ({
+  roll_no: "",
   student_name: "",
   gender: "",
   date_of_birth: "",
@@ -72,6 +74,7 @@ export default function AddStudent() {
 
   const validationConfig = useMemo<FormValidationConfig<AddStudentFormData>>(
     () => ({
+      roll_no: [{ type: "required", message: "Required." }],
       student_name: [{ type: "required", message: "Required." }],
       gender: [{ type: "required", message: "Required." }],
       date_of_birth: [{ type: "required", message: "Required." }],
@@ -162,6 +165,12 @@ export default function AddStudent() {
         student_name: {
           name: "student_name" as const,
           label: "Student Name",
+          type: "text" as const,
+          required: true,
+        },
+        roll_no: {
+          name: "roll_no" as const,
+          label: "Roll Number",
           type: "text" as const,
           required: true,
         },
@@ -268,6 +277,7 @@ export default function AddStudent() {
           title: "Student Information",
           fields: [
             "student_name",
+            "roll_no",
             "gender",
             "date_of_birth",
             "mobile_number",
@@ -297,12 +307,13 @@ export default function AddStudent() {
           grid: { xs: 12 },
           render: () => <SectionHeader title="Student Information" />,
         },
-        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["student_name", "gender"] },
-        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["date_of_birth", "mobile_number"] },
-        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["email", "address"] },
-        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["area", "city"] },
-        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["state", "pincode"] },
-        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["class_id", "class_division_id"] },
+        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["student_name", "roll_no"] },
+        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["gender", "date_of_birth"] },
+        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["mobile_number", "email"] },
+        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["address", "area"] },
+        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["city", "state"] },
+        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["pincode", "class_id"] },
+        { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["class_division_id"] },
         {
           kind: "custom",
           grid: { xs: 12 },
@@ -351,6 +362,7 @@ export default function AddStudent() {
         return;
       }
       const payload = {
+        roll_no: formData.roll_no,
         student_name: formData.student_name,
         gender: formData.gender,
         date_of_birth: formData.date_of_birth,
