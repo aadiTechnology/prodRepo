@@ -18,6 +18,7 @@ export interface FeeStructureFormData extends Record<string, unknown> {
   name: string;
   academic_year_id: number | "";
   class_id: number | "";
+  class_division_id: number | "";
   fee_category_ids: string[];   // multi-select: array of category ids
   total_amount: number | "";
   installment_type: "MONTHLY" | "QUARTERLY" | "YEARLY";
@@ -38,12 +39,14 @@ export function createFeeStructureFormConfig({
   classes,
   installments,
   categories,
+  divisions,
 }: {
   isEditMode: boolean;
   academicYears: { id: number; name: string }[];
   classes: ClassEntity[];
   installments: FeeInstallmentPreview[];
   categories: FeeCategory[];
+  divisions: { id: number; division_name: string }[];
 }): FormConfig<FeeStructureFormData> {
   return {
     fields: {
@@ -69,11 +72,19 @@ export function createFeeStructureFormConfig({
         type: "select",
         required: true,
         props: {
-          // Deduplicate by name — each class shown once regardless of how many sections exist
           options: classes
             .filter((c, idx, arr) => arr.findIndex((x) => x.name.toLowerCase() === c.name.toLowerCase()) === idx)
             .map((c) => ({ value: c.id, label: c.name })),
           disabled: classes.length === 0,
+        },
+      },
+      class_division_id: {
+        name: "class_division_id",
+        label: "Division (Optional)",
+        type: "select",
+        props: {
+          options: [{ value: "", label: "All Divisions" }, ...divisions.map((d) => ({ value: d.id, label: d.division_name }))],
+          disabled: divisions.length === 0,
         },
       },
       fee_category_ids: {
@@ -199,6 +210,7 @@ export function createFeeStructureFormConfig({
           "name",
           "academic_year_id",
           "class_id",
+          "class_division_id",
           "fee_category_ids",
           ...(isEditMode ? ["is_active"] : []),
           "description",

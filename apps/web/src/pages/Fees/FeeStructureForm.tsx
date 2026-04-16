@@ -54,6 +54,7 @@ const FeeStructureForm = () => {
       name: "",
       academic_year_id: "",
       class_id: "",
+      class_division_id: "",
       fee_category_ids: [],
       total_amount: "",
       installment_type: "QUARTERLY",
@@ -117,6 +118,7 @@ const FeeStructureForm = () => {
     if (!formData.academic_year_id) {
       setClasses([]);
       handleFieldValueChange("class_id", "");
+      handleFieldValueChange("fee_category_ids", []);
       return;
     }
     feeService.getClasses(Number(formData.academic_year_id)).then((res) => {
@@ -124,9 +126,38 @@ const FeeStructureForm = () => {
       // Validate current class_id
       if (formData.class_id && !res.find((c) => c.id === Number(formData.class_id))) {
         handleFieldValueChange("class_id", "");
+        handleFieldValueChange("class_division_id", "");
+        handleFieldValueChange("fee_category_ids", []);
       }
     });
   }, [formData.academic_year_id, handleFieldValueChange]);
+
+  // Reset category selection if selected categories belong to a different class
+  useEffect(() => {
+    const ids = formData.fee_category_ids as string[];
+    if (ids && ids.length > 0 && formData.class_id) {
+      const allMatch = ids.every(id => {
+        const cat = categories.find(c => String(c.id) === String(id));
+        return cat && cat.class_id === Number(formData.class_id);
+      });
+      if (!allMatch) {
+        handleFieldValueChange("fee_category_ids", []);
+      }
+    } else if (ids && ids.length > 0 && !formData.class_id) {
+      // If class is cleared, clear categories
+      handleFieldValueChange("fee_category_ids", []);
+    }
+
+    // Reset division if class changes
+    const selectedClass = classes.find(c => c.id === Number(formData.class_id));
+    if (formData.class_division_id) {
+      const isValidDiv = selectedClass?.divisions?.find(d => d.id === Number(formData.class_division_id));
+      if (!isValidDiv) {
+        handleFieldValueChange("class_division_id", "");
+      }
+    }
+
+  }, [formData.class_id, classes, formData.class_division_id, categories, handleFieldValueChange]);
 
   // Auto-sum selected category amounts → total_amount (read-only when categories selected)
   useEffect(() => {
@@ -160,6 +191,7 @@ const FeeStructureForm = () => {
           name: found.name || "",
           academic_year_id: found.academic_year_id,
           class_id: found.class_id,
+          class_division_id: found.class_division_id || "",
           // Support both legacy single id and new array
           fee_category_ids: found.fee_category_id
             ? [String(found.fee_category_id)]
@@ -215,12 +247,20 @@ const FeeStructureForm = () => {
   const hasSelectedCategories = selectedCategoryIds && selectedCategoryIds.length > 0;
 
   const formConfig = useMemo(() => {
+    const filteredCategories = formData.class_id
+      ? categories.filter(c => c.class_id === Number(formData.class_id))
+      : [];
+      
+    const selectedClass = classes.find(c => c.id === Number(formData.class_id));
+    const divisions = selectedClass?.divisions || [];
+
     const cfg = createFeeStructureFormConfig({
       isEditMode,
       academicYears,
       classes,
       installments,
-      categories,
+      categories: filteredCategories,
+      divisions,
     });
     // Make total_amount read-only when categories drive the value
     if (cfg.fields.total_amount && hasSelectedCategories) {
@@ -241,6 +281,7 @@ const FeeStructureForm = () => {
       // Ensure all required fields are numbers for API
       const academic_year_id = Number(formData.academic_year_id);
       const class_id = Number(formData.class_id);
+      const class_division_id = formData.class_division_id ? Number(formData.class_division_id) : null;
       const total_amount = Number(formData.total_amount);
       const num_installments = Number(formData.num_installments);
       const fee_category_ids = formData.fee_category_ids as string[];
@@ -250,6 +291,7 @@ const FeeStructureForm = () => {
         ...formData,
         academic_year_id,
         class_id,
+        class_division_id,
         fee_category_id,
         fee_category_ids,
         total_amount,

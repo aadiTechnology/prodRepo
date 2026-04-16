@@ -39,6 +39,7 @@ class FeeStructure(Base):
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     class_id = Column(Integer, ForeignKey("classes.id", ondelete="CASCADE"), nullable=False)
+    class_division_id = Column(Integer, ForeignKey("class_divisions.id", ondelete="CASCADE"), nullable=True)
     fee_category_id = Column(String(36), ForeignKey("fee_categories.id", ondelete="CASCADE"), nullable=False)
     academic_year_id = Column(Integer, ForeignKey("academic_years.id", ondelete="CASCADE"), nullable=False)
     

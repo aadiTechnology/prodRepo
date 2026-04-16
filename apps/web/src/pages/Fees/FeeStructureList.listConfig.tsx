@@ -21,8 +21,8 @@ export function createFeeStructureListConfig({
       },
       {
         id: "class",
-        label: "Class",
-        render: (s: FeeStructure) => s.class_name || "N/A",
+        label: "Class / Division",
+        render: (s: FeeStructure) => s.class_division_name ? `${s.class_name || "N/A"} - ${s.class_division_name}` : (s.class_name || "N/A"),
       },
       {
         id: "category",

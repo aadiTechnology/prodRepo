@@ -165,6 +165,7 @@ def delete_fee_category(db: Session, category_id: str, tenant_id: int, user_id: 
     db.commit()
 
 def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academic_year_id: int = None, class_name: str = None) -> list[FeeStructure]:
+    from app.models.academic import ClassDivision
     query = db.query(FeeStructure).filter(
         FeeStructure.tenant_id == tenant_id,
         FeeStructure.is_deleted == False
@@ -183,6 +184,7 @@ def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academ
 
     # Fetch lookup dictionaries to avoid N+1 queries
     class_ids = list({s.class_id for s in structures if s.class_id})
+    div_ids = list({s.class_division_id for s in structures if s.class_division_id})
     category_ids = list({str(s.fee_category_id) for s in structures if s.fee_category_id})
     year_ids = list({s.academic_year_id for s in structures if s.academic_year_id})
 
@@ -192,6 +194,14 @@ def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academ
             SchoolClass.id.in_(class_ids), SchoolClass.tenant_id == tenant_id
         ).all()
         class_map = {c.id: c.name for c in classes}
+
+    div_map = {}
+    if div_ids:
+        divs = db.query(ClassDivision.id, ClassDivision.division_name).filter(
+            ClassDivision.id.in_(div_ids)
+        ).all()
+        div_map = {d.id: d.division_name for d in divs}
+
 
     category_map = {}
     if category_ids:
@@ -210,16 +220,16 @@ def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academ
     # Enrich with names
     for s in structures:
         s.class_name = class_map.get(s.class_id)
+        s.class_division_name = div_map.get(s.class_division_id)
         s.fee_category_name = category_map.get(str(s.fee_category_id))
         s.academic_year_name = year_map.get(s.academic_year_id)
         
-    # Deduplicate by (class_name, academic_year_id, fee_category_id)
+    # Deduplicate by unique DB id (since we don't want to over-filter distinct setups)
     unique_structures = []
     seen = set()
     for s in structures:
-        key = (s.class_name, s.academic_year_id, str(s.fee_category_id))
-        if key not in seen:
-            seen.add(key)
+        if s.id not in seen:
+            seen.add(s.id)
             unique_structures.append(s)
 
     return unique_structures
@@ -237,6 +247,15 @@ def get_fee_structure(db: Session, structure_id: int, tenant_id: int) -> FeeStru
     obj.class_name = db.query(SchoolClass.name).filter(
         SchoolClass.id == obj.class_id, SchoolClass.tenant_id == tenant_id
     ).scalar()
+
+    from app.models.academic import ClassDivision
+    if obj.class_division_id:
+        obj.class_division_name = db.query(ClassDivision.division_name).filter(
+            ClassDivision.id == obj.class_division_id
+        ).scalar()
+    else:
+        obj.class_division_name = None
+
     obj.fee_category_name = db.query(FeeCategory.name).filter(
         FeeCategory.id == str(obj.fee_category_id), FeeCategory.tenant_id == tenant_id
     ).scalar()
@@ -257,17 +276,8 @@ def create_fee_structure(db: Session, obj_in: FeeStructureCreate, tenant_id: int
     if not target_class:
         raise NotFoundException("SchoolClass", obj_in.class_id)
 
-    # Check if a fee structure already exists for this class + category + year
-    existing = db.query(FeeStructure).filter(
-        FeeStructure.tenant_id == tenant_id,
-        FeeStructure.class_id == obj_in.class_id,
-        FeeStructure.fee_category_id == obj_in.fee_category_id,
-        FeeStructure.academic_year_id == obj_in.academic_year_id,
-        FeeStructure.is_deleted == False
-    ).first()
-
-    if existing:
-        raise ConflictException("Fee structure already exists for this class, category, and year.")
+    # User explicitly wants multiple fee structures for same class + category + year 
+    # so we no longer do the ConflictException check here.
 
     # Fetch category to get the name for the structure's name field
     category = db.query(FeeCategory).filter(FeeCategory.id == obj_in.fee_category_id).first()
@@ -276,6 +286,7 @@ def create_fee_structure(db: Session, obj_in: FeeStructureCreate, tenant_id: int
     db_obj = FeeStructure(
         tenant_id=tenant_id,
         class_id=obj_in.class_id,
+        class_division_id=obj_in.class_division_id,
         fee_category_id=obj_in.fee_category_id,
         academic_year_id=obj_in.academic_year_id,
         total_amount=obj_in.total_amount,

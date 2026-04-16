@@ -66,6 +66,7 @@ class FeeInstallmentResponse(FeeInstallmentBase):
 
 class FeeStructureBase(BaseModel):
     class_id: int
+    class_division_id: Optional[int] = None
     fee_category_id: str
     academic_year_id: int
     total_amount: Optional[float] = None
@@ -79,12 +80,16 @@ class FeeStructureCreate(FeeStructureBase):
     installments: List[FeeInstallmentCreate]
 
 class FeeStructureUpdate(BaseModel):
+    class_id: Optional[int] = None
+    fee_category_id: Optional[str] = None
+    academic_year_id: Optional[int] = None
     total_amount: Optional[float] = None
     installment_type: Optional[str] = None
     num_installments: Optional[int] = None
     description: Optional[str] = None
     name: Optional[str] = None
     is_active: Optional[bool] = None
+    class_division_id: Optional[int] = None
     installments: Optional[List[FeeInstallmentCreate]] = None
 
 class FeeStructureResponse(FeeStructureBase):
@@ -93,6 +98,7 @@ class FeeStructureResponse(FeeStructureBase):
     created_at: datetime
     installments: List[FeeInstallmentResponse]
     class_name: Optional[str] = None
+    class_division_name: Optional[str] = None
     fee_category_name: Optional[str] = None
     academic_year_name: Optional[str] = None
 

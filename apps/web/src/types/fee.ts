@@ -45,7 +45,7 @@ export interface ClassEntity {
   id: number;
   name: string;
   code: string;
-  divisions?: any[];
+  divisions?: { id: number; division_name: string }[];
   section?: string;
 }
 
@@ -63,6 +63,8 @@ export interface FeeStructure {
   name?: string;
   class_id: number;
   class_name?: string;
+  class_division_id?: number;
+  class_division_name?: string;
   academic_year_id: number;
   academic_year_name?: string;
   fee_category_id: string;
@@ -78,6 +80,7 @@ export interface FeeStructure {
 export interface FeeStructureCreate {
   name?: string;
   class_id: number;
+  class_division_id?: number | null;
   academic_year_id: number;
   fee_category_id: string;
   total_amount: number;
