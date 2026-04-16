@@ -352,8 +352,11 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
         ).delete()
 
         new_perms = []
+        granted_menu_ids: list[int] = []
         for p in data.permissions:
-            if p.can_view:
+            has_any_access = p.can_view or p.can_create or p.can_edit or p.can_delete
+            if has_any_access:
+                granted_menu_ids.append(p.menu_id)
                 new_perms.append(RoleMenuPermission(
                     role_id=role.id,
                     tenant_id=role.tenant_id,
@@ -367,9 +370,20 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
 
         if new_perms:
             db.add_all(new_perms)
+        
+        # Keep legacy role_menus association in sync with matrix grants.
+        db.execute(role_menus.delete().where(role_menus.c.role_id == role.id))
+        if granted_menu_ids:
+            db.execute(
+                role_menus.insert(),
+                [{"role_id": role.id, "menu_id": menu_id} for menu_id in granted_menu_ids],
+            )
 
         db.commit()
-        logger.info(f"[RBAC] Updated {len(new_perms)} granular permissions for role {role.code} (id={role.id})")
+        logger.info(
+            f"[RBAC] Updated {len(new_perms)} granular permissions and "
+            f"{len(granted_menu_ids)} role_menus rows for role {role.code} (id={role.id})"
+        )
     except (IntegrityError, DataError) as e:
         db.rollback()
         logger.error(f"[RBAC] Failed to update permissions for role {role.code} (id={role.id}): {str(e)}")
