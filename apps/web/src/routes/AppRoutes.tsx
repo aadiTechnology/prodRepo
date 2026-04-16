@@ -160,10 +160,12 @@ export default function AppRoutes() {
           <Route path="/tenants" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><TenantList /></ProtectedRoute>} />
           <Route path="/tenants/add" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><AddTenant /></ProtectedRoute>} />
           <Route path="/tenants/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><AddTenant /></ProtectedRoute>} />
-          <Route path="/sprints" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><SprintList /></ProtectedRoute>} />
-          <Route path="/sprints/add" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><SprintForm /></ProtectedRoute>} />
-          <Route path="/sprints/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><SprintForm /></ProtectedRoute>} />
-          <Route path="/sprints/assignments" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><SprintAssignmentsPage /></ProtectedRoute>} />
+          
+          {/* Sprint Management (RBAC) */}
+          <Route path="/sprints" element={<ProtectedRoute requiredPermissions="SPRINT_MGMT:view"><SprintList /></ProtectedRoute>} />
+          <Route path="/sprints/add" element={<ProtectedRoute requiredPermissions="SPRINT_MGMT:create"><SprintForm /></ProtectedRoute>} />
+          <Route path="/sprints/:id/edit" element={<ProtectedRoute requiredPermissions="SPRINT_MGMT:edit"><SprintForm /></ProtectedRoute>} />
+          <Route path="/sprints/assignments" element={<ProtectedRoute requiredPermissions="SPRINT_MGMT:view"><SprintAssignmentsPage /></ProtectedRoute>} />
           
           {/* Fee Management */}
           <Route path="/fees/setup" element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeStructureSetup /></ProtectedRoute>} />
