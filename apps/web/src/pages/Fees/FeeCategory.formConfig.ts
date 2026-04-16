@@ -3,6 +3,7 @@ import { type FormConfig } from "../../components/reusable/formFramework.types";
 export interface FeeCategoryFormData extends Record<string, unknown> {
   name: string;
   academic_year_id: number | "";
+  class_id: number | "";
   amount: number | "";
   status: boolean;
 }
@@ -10,9 +11,11 @@ export interface FeeCategoryFormData extends Record<string, unknown> {
 export function createFeeCategoryFormConfig({
   isEditMode,
   academicYears,
+  classes,
 }: {
   isEditMode: boolean;
   academicYears: { id: number; name: string }[];
+  classes: { id: number; name: string }[];
 }): FormConfig<FeeCategoryFormData> {
   return {
     fields: {
@@ -30,6 +33,16 @@ export function createFeeCategoryFormConfig({
         required: true,
         props: {
           options: academicYears.map((ay) => ({ value: ay.id, label: ay.name })),
+        },
+      },
+      class_id: {
+        name: "class_id",
+        label: "Class",
+        type: "select",
+        required: true,
+        props: {
+          options: classes.map((c) => ({ value: c.id, label: c.name })),
+          disabled: classes.length === 0,
         },
       },
       amount: {
@@ -51,12 +64,12 @@ export function createFeeCategoryFormConfig({
       {
         kind: "fields",
         grid: { xs: 12, md: 6 },
-        fieldNames: ["name", "academic_year_id"],
+        fieldNames: ["academic_year_id", "class_id"],
       },
       {
         kind: "fields",
         grid: { xs: 12, md: 6 },
-        fieldNames: ["amount"],
+        fieldNames: ["name", "amount"],
       },
       ...(isEditMode
         ? [

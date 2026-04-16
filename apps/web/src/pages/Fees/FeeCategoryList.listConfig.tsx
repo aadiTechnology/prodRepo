@@ -21,6 +21,12 @@ export function createFeeCategoryListConfig({
         align: "left" as const,
       },
       {
+        id: "class",
+        label: "Class",
+        render: (cat: FeeCategoryResponse) => cat.class_name ?? "—",
+        align: "left" as const,
+      },
+      {
         id: "name",
         label: "Category Name",
         field: "name",

@@ -6,6 +6,8 @@ export interface FeeCategory {
   status: boolean;
   academic_year_id?: number;
   academic_year_name?: string;
+  class_id?: number;
+  class_name?: string;
   amount?: number;
 }
 
@@ -17,6 +19,7 @@ export interface FeeCategoryCreate {
   description?: string;
   status?: boolean;
   academic_year_id?: number;
+  class_id?: number;
   amount?: number;
 }
 
@@ -26,6 +29,7 @@ export interface FeeCategoryUpdate {
   description?: string;
   status?: boolean;
   academic_year_id?: number;
+  class_id?: number;
   amount?: number;
 }
 

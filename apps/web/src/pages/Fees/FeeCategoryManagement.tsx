@@ -1,5 +1,5 @@
 import React from "react";
-import { Alert, Snackbar } from "@mui/material";
+import { Alert, Snackbar, Select, MenuItem, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { PageHeader } from "../../components/layout";
@@ -43,6 +43,64 @@ const FeeCategoryManagement = () => {
               <ListPageToolbar
                 searchValue={controller.listState.search}
                 onSearchChange={controller.listState.setSearch}
+                renderActions={
+                  <>
+                    <Select
+                      value={controller.listState.filters.className}
+                      onChange={(e) =>
+                        controller.listState.setFilter("className", e.target.value as string)
+                      }
+                      displayEmpty
+                      size="small"
+                      sx={{
+                        minWidth: { xs: "100%", sm: 180 },
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: "15px",
+                          fontSize: "0.85rem",
+                          fontWeight: 600,
+                        },
+                      }}
+                    >
+                      <MenuItem value="">
+                        <Typography variant="body2" color="text.secondary">
+                          Class
+                        </Typography>
+                      </MenuItem>
+                      {controller.uniqueClasses.map((cls) => (
+                        <MenuItem key={cls.id} value={cls.name}>
+                          {cls.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Select
+                      value={controller.listState.filters.academicYearId}
+                      onChange={(e) =>
+                        controller.listState.setFilter("academicYearId", e.target.value as string)
+                      }
+                      displayEmpty
+                      size="small"
+                      sx={{
+                        minWidth: { xs: "100%", sm: 180 },
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: "15px",
+                          fontSize: "0.85rem",
+                          fontWeight: 600,
+                        },
+                      }}
+                    >
+                      <MenuItem value="">
+                        <Typography variant="body2" color="text.secondary">
+                          Academic Year
+                        </Typography>
+                      </MenuItem>
+                      {controller.academicYears.map((ay) => (
+                        <MenuItem key={ay.id} value={ay.id.toString()}>
+                          {ay.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </>
+                }
                 searchPlaceholder="Search Category"
                 onAddClick={() => navigate("/fees/categories/add")}
                 addLabel="Add Category"

@@ -10,17 +10,22 @@ from app.core.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def get_fee_categories(db: Session, tenant_id: int) -> list[FeeCategory]:
-    """Return all non-deleted fee categories for a tenant with academic year names."""
-    categories = (
-        db.query(FeeCategory)
-        .filter(FeeCategory.tenant_id == tenant_id, FeeCategory.status == True)
-        .all()
-    )
+def get_fee_categories(db: Session, tenant_id: int, class_id: int = None, academic_year_id: int = None, class_name: str = None) -> list[FeeCategory]:
+    """Return all non-deleted fee categories for a tenant with academic year and class names."""
+    query = db.query(FeeCategory).filter(FeeCategory.tenant_id == tenant_id, FeeCategory.status == True)
+    if class_id:
+        query = query.filter(FeeCategory.class_id == class_id)
+    if academic_year_id:
+        query = query.filter(FeeCategory.academic_year_id == academic_year_id)
+    if class_name:
+        query = query.join(FeeCategory.class_model).filter(SchoolClass.name == class_name)
     
-    # Populate academic year names
+    categories = query.all()
+    
     if categories:
         year_ids = list({cat.academic_year_id for cat in categories if cat.academic_year_id})
+        class_ids = list({cat.class_id for cat in categories if cat.class_id})
+        
         year_map = {}
         if year_ids:
             years = db.query(AcademicYear.id, AcademicYear.name).filter(
@@ -28,8 +33,16 @@ def get_fee_categories(db: Session, tenant_id: int) -> list[FeeCategory]:
             ).all()
             year_map = {y.id: y.name for y in years}
             
+        class_map = {}
+        if class_ids:
+            classes = db.query(SchoolClass.id, SchoolClass.name).filter(
+                SchoolClass.id.in_(class_ids), SchoolClass.tenant_id == tenant_id
+            ).all()
+            class_map = {c.id: c.name for c in classes}
+            
         for cat in categories:
             cat.academic_year_name = year_map.get(cat.academic_year_id)
+            cat.class_name = class_map.get(cat.class_id)
             
     return categories
 
@@ -49,10 +62,15 @@ def get_fee_category(db: Session, tenant_id: int, category_id: str) -> FeeCatego
     if not obj:
         raise NotFoundException("FeeCategory", category_id)
         
-    # Populate academic year name
+    # Populate names
     if obj.academic_year_id:
         obj.academic_year_name = db.query(AcademicYear.name).filter(
             AcademicYear.id == obj.academic_year_id, AcademicYear.tenant_id == tenant_id
+        ).scalar()
+        
+    if obj.class_id:
+        obj.class_name = db.query(SchoolClass.name).filter(
+            SchoolClass.id == obj.class_id, SchoolClass.tenant_id == tenant_id
         ).scalar()
         
     return obj
@@ -76,15 +94,16 @@ def create_fee_category(db: Session, obj_in: FeeCategoryCreate, tenant_id: int, 
     # Build initial code candidate
     code_candidate = obj_in.code if obj_in.code else (f"{base_code}_{ay_code}" if ay_code else base_code)
 
-    # Check for existing category with same name + academic year for this tenant
+    # Check for existing category with same name + academic year + class for this tenant
     existing = db.query(FeeCategory).filter(
         FeeCategory.tenant_id == tenant_id,
         FeeCategory.name == name,
         FeeCategory.academic_year_id == obj_in.academic_year_id,
+        FeeCategory.class_id == obj_in.class_id,
         FeeCategory.status == True,
     ).first()
     if existing:
-        raise ConflictException("A fee category with this name already exists for the selected academic year.")
+        raise ConflictException("A fee category with this name already exists for the selected academic year and class.")
 
     # Ensure code is unique within tenant — append numeric suffix if needed
     suffix = 1
@@ -104,6 +123,7 @@ def create_fee_category(db: Session, obj_in: FeeCategoryCreate, tenant_id: int, 
         description=obj_in.description,
         status=obj_in.status if obj_in.status is not None else True,
         academic_year_id=obj_in.academic_year_id,
+        class_id=obj_in.class_id,
         amount=obj_in.amount,
         created_by=user_id,
     )

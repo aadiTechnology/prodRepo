@@ -16,6 +16,7 @@ class FeeCategory(Base):
 
     # Scope fields
     academic_year_id = Column(Integer, ForeignKey("academic_years.id", ondelete="CASCADE"), nullable=True)
+    class_id = Column(Integer, ForeignKey("classes.id", ondelete="CASCADE"), nullable=True)
     amount = Column(Numeric(10, 2), nullable=True)
 
     # Audit fields
@@ -29,6 +30,7 @@ class FeeCategory(Base):
     # Relationships
     fee_structures = relationship("FeeStructure", back_populates="fee_category")
     academic_year = relationship("AcademicYear")
+    class_model = relationship("SchoolClass")
 
 
 class FeeStructure(Base):

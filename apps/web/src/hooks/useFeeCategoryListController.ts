@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { getFeeCategories, deleteFeeCategory } from "../api/services/feeService";
+import { getFeeCategories, deleteFeeCategory, getAcademicYears } from "../api/services/feeService";
+import schoolClassService from "../api/services/schoolClassService";
 import type { FeeCategoryResponse } from "../types/fee";
 import { useListManager } from "./useListManager";
 
@@ -12,8 +13,11 @@ export function useFeeCategoryListController() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<string | null>(null);
 
-  const listState = useListManager<Record<string, never>, "name">({
-    initialFilters: {},
+  const [academicYears, setAcademicYears] = useState<{ id: number; name: string }[]>([]);
+  const [uniqueClasses, setUniqueClasses] = useState<{ id: number; name: string }[]>([]);
+
+  const listState = useListManager<{ className: string; academicYearId: string }, "name">({
+    initialFilters: { className: "", academicYearId: "" },
     initialSortBy: "name",
     initialSortOrder: "asc",
     initialRowsPerPage: 10,
@@ -25,8 +29,14 @@ export function useFeeCategoryListController() {
     try {
       setLoading(true);
       setError(null);
-      const data = await getFeeCategories();
+      const [data, years, cls] = await Promise.all([
+        getFeeCategories(),
+        getAcademicYears(),
+        schoolClassService.getAll()
+      ]);
       setCategories(data || []);
+      setAcademicYears((years || []).map((y: any) => ({ id: y.id, name: y.name })));
+      setUniqueClasses((cls || []).map((c: any) => ({ id: c.id, name: c.name })));
     } catch (err: any) {
       setError(err?.message || err?.detail || "Failed to fetch categories.");
     } finally {
@@ -60,12 +70,22 @@ export function useFeeCategoryListController() {
   };
 
   const filteredCategories = useMemo(() => {
-    return categories.filter(
-      (cat) =>
+    return categories.filter((cat) => {
+      const matchesSearch =
+        listState.search === "" ||
         cat.name.toLowerCase().includes(listState.search.toLowerCase()) ||
-        String(cat.id).includes(listState.search)
-    );
-  }, [categories, listState.search]);
+        String(cat.id).includes(listState.search);
+
+      const matchesClass =
+        listState.filters.className === "" || cat.class_name === listState.filters.className;
+
+      const matchesYear =
+        listState.filters.academicYearId === "" ||
+        String(cat.academic_year_id) === listState.filters.academicYearId;
+
+      return matchesSearch && matchesClass && matchesYear;
+    });
+  }, [categories, listState.search, listState.filters]);
 
   const sortedCategories = useMemo(() => {
     return [...filteredCategories].sort((a, b) => {
@@ -89,6 +109,8 @@ export function useFeeCategoryListController() {
     categories,
     filteredCategories,
     paginatedCategories,
+    academicYears,
+    uniqueClasses,
     loading,
     error,
     setError,

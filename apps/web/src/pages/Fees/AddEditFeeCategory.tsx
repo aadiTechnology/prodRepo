@@ -7,6 +7,7 @@ import {
   getFeeCategory,
   getAcademicYears,
 } from "../../api/services/feeService";
+import schoolClassService from "../../api/services/schoolClassService";
 import BaseForm from "../../components/reusable/BaseForm";
 import { useFormManager } from "../../hooks/useFormManager";
 import {
@@ -24,26 +25,30 @@ const AddEditFeeCategory = () => {
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [academicYears, setAcademicYears] = useState<{ id: number; name: string }[]>([]);
+  const [classes, setClasses] = useState<{ id: number; name: string }[]>([]);
 
-  // Fetch academic years for the dropdown
+  // Fetch academic years and classes for dropdowns
   useEffect(() => {
-    const loadYears = async () => {
+    const loadLookups = async () => {
       try {
-        const years = await getAcademicYears();
-        setAcademicYears(
-          (years || []).map((y: any) => ({ id: y.id, name: y.name }))
-        );
+        const [years, cls] = await Promise.all([
+          getAcademicYears(),
+          schoolClassService.getAll()
+        ]);
+        setAcademicYears((years || []).map((y: any) => ({ id: y.id, name: y.name })));
+        setClasses((cls || []).map((c: any) => ({ id: c.id, name: c.name })));
       } catch {
         // Non-critical: dropdown will be empty
       }
     };
-    loadYears();
+    loadLookups();
   }, []);
 
   const initialValues = useMemo<FeeCategoryFormData>(
     () => ({
       name: "",
       academic_year_id: "",
+      class_id: "",
       amount: "",
       status: true,
     }),
@@ -51,8 +56,8 @@ const AddEditFeeCategory = () => {
   );
 
   const formConfig = useMemo(
-    () => createFeeCategoryFormConfig({ isEditMode, academicYears }),
-    [isEditMode, academicYears]
+    () => createFeeCategoryFormConfig({ isEditMode, academicYears, classes }),
+    [isEditMode, academicYears, classes]
   );
 
   const validationConfig: import("../../utils/formValidation").FormValidationConfig<FeeCategoryFormData> = useMemo(() => ({
@@ -63,6 +68,9 @@ const AddEditFeeCategory = () => {
     ],
     academic_year_id: [
       { type: "required", message: "Academic Year is required." },
+    ],
+    class_id: [
+      { type: "required", message: "Class is required." },
     ],
     amount: [
       { type: "required", message: "Amount is required." },
@@ -85,6 +93,7 @@ const AddEditFeeCategory = () => {
       setFormData({
         name: data.name,
         academic_year_id: data.academic_year_id ?? "",
+        class_id: data.class_id ?? "",
         amount: data.amount ?? "",
         status: !!data.status,
       });
@@ -115,6 +124,7 @@ const AddEditFeeCategory = () => {
       const payload = {
         name: formData.name,
         academic_year_id: formData.academic_year_id !== "" ? Number(formData.academic_year_id) : undefined,
+        class_id: formData.class_id !== "" ? Number(formData.class_id) : undefined,
         amount: formData.amount !== "" ? Number(formData.amount) : undefined,
         status: formData.status,
       };
