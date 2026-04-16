@@ -68,6 +68,7 @@ export interface FeeStructure {
   academic_year_id: number;
   academic_year_name?: string;
   fee_category_id: string;
+  fee_category_ids?: string[];
   fee_category_name?: string;
   total_amount: number;
   installment_type: 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
@@ -83,6 +84,7 @@ export interface FeeStructureCreate {
   class_division_id?: number | null;
   academic_year_id: number;
   fee_category_id: string;
+  fee_category_ids?: string[];
   total_amount: number;
   installment_type: string;
   num_installments: number;

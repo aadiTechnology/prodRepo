@@ -41,6 +41,7 @@ class FeeStructure(Base):
     class_id = Column(Integer, ForeignKey("classes.id", ondelete="CASCADE"), nullable=False)
     class_division_id = Column(Integer, ForeignKey("class_divisions.id", ondelete="CASCADE"), nullable=True)
     fee_category_id = Column(String(36), ForeignKey("fee_categories.id", ondelete="CASCADE"), nullable=False)
+    multi_category_ids = Column(String(2000), nullable=True)
     academic_year_id = Column(Integer, ForeignKey("academic_years.id", ondelete="CASCADE"), nullable=False)
     
     total_amount = Column(Numeric(10, 2), nullable=False)

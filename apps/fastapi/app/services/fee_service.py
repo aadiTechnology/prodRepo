@@ -221,7 +221,17 @@ def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academ
     for s in structures:
         s.class_name = class_map.get(s.class_id)
         s.class_division_name = div_map.get(s.class_division_id)
-        s.fee_category_name = category_map.get(str(s.fee_category_id))
+        
+        # Load multi-category array and compute joined name
+        if s.multi_category_ids:
+            # e.g., "id1,id2"
+            s.fee_category_ids = [cid.strip() for cid in s.multi_category_ids.split(",") if cid.strip()]
+            resolved_names = [category_map.get(cid) for cid in s.fee_category_ids if category_map.get(cid)]
+            s.fee_category_name = " + ".join(resolved_names) if resolved_names else category_map.get(str(s.fee_category_id))
+        else:
+            s.fee_category_ids = []
+            s.fee_category_name = category_map.get(str(s.fee_category_id))
+            
         s.academic_year_name = year_map.get(s.academic_year_id)
         
     # Deduplicate by unique DB id (since we don't want to over-filter distinct setups)
@@ -256,9 +266,23 @@ def get_fee_structure(db: Session, structure_id: int, tenant_id: int) -> FeeStru
     else:
         obj.class_division_name = None
 
-    obj.fee_category_name = db.query(FeeCategory.name).filter(
-        FeeCategory.id == str(obj.fee_category_id), FeeCategory.tenant_id == tenant_id
-    ).scalar()
+    # Load multi-category array and compute joined name
+    if obj.multi_category_ids:
+        obj.fee_category_ids = [cid.strip() for cid in obj.multi_category_ids.split(",") if cid.strip()]
+        resolved_names = []
+        for cid in obj.fee_category_ids:
+            cat_name = db.query(FeeCategory.name).filter(
+                FeeCategory.id == cid, FeeCategory.tenant_id == tenant_id
+            ).scalar()
+            if cat_name:
+                resolved_names.append(cat_name)
+        obj.fee_category_name = " + ".join(resolved_names) if resolved_names else None
+    else:
+        obj.fee_category_ids = []
+        obj.fee_category_name = db.query(FeeCategory.name).filter(
+            FeeCategory.id == str(obj.fee_category_id), FeeCategory.tenant_id == tenant_id
+        ).scalar()
+
     obj.academic_year_name = db.query(AcademicYear.name).filter(
         AcademicYear.id == obj.academic_year_id, AcademicYear.tenant_id == tenant_id
     ).scalar()
@@ -295,6 +319,7 @@ def create_fee_structure(db: Session, obj_in: FeeStructureCreate, tenant_id: int
         description=obj_in.description,
         name=obj_in.name if obj_in.name else category_name,
         is_active=obj_in.is_active,
+        multi_category_ids=",".join(obj_in.fee_category_ids) if obj_in.fee_category_ids else None,
         created_by=user_id
     )
     db.add(db_obj)
@@ -319,8 +344,14 @@ def update_fee_structure(db: Session, structure_id: int, obj_in: FeeStructureUpd
     db_obj = get_fee_structure(db, structure_id, tenant_id)
 
     update_data = obj_in.model_dump(exclude={"installments"}, exclude_unset=True)
+    
+    fee_category_ids = update_data.pop("fee_category_ids", None)
+    if fee_category_ids is not None:
+        db_obj.multi_category_ids = ",".join(fee_category_ids)
+
     for field, value in update_data.items():
-        setattr(db_obj, field, value)
+        if hasattr(db_obj, field):
+            setattr(db_obj, field, value)
 
     db_obj.updated_at = datetime.utcnow()
     db_obj.updated_by = user_id

@@ -68,6 +68,7 @@ class FeeStructureBase(BaseModel):
     class_id: int
     class_division_id: Optional[int] = None
     fee_category_id: str
+    fee_category_ids: Optional[List[str]] = None
     academic_year_id: int
     total_amount: Optional[float] = None
     installment_type: Optional[str] = None
@@ -82,6 +83,7 @@ class FeeStructureCreate(FeeStructureBase):
 class FeeStructureUpdate(BaseModel):
     class_id: Optional[int] = None
     fee_category_id: Optional[str] = None
+    fee_category_ids: Optional[List[str]] = None
     academic_year_id: Optional[int] = None
     total_amount: Optional[float] = None
     installment_type: Optional[str] = None

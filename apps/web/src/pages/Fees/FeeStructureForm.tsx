@@ -193,7 +193,9 @@ const FeeStructureForm = () => {
           class_id: found.class_id,
           class_division_id: found.class_division_id || "",
           // Support both legacy single id and new array
-          fee_category_ids: found.fee_category_id
+          fee_category_ids: found.fee_category_ids && found.fee_category_ids.length > 0
+            ? found.fee_category_ids
+            : found.fee_category_id
             ? [String(found.fee_category_id)]
             : [],
           total_amount: found.total_amount,
