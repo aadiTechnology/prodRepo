@@ -30,6 +30,8 @@ from app.models.student_fee_assignment import (
 from app.models.student_fee_ledger import FeeLedger
 from app.models.permission import Permission, role_permissions
 from app.models.lead import Lead, LeadSource, LeadStatus, LeadFollowup, LeadParent
+from app.models.student_attendance import StudentAttendance
+
 # Export all models for convenience
 __all__ = [
     "Tenant",
@@ -71,4 +73,6 @@ __all__ = [
     "LeadStatus",
     "LeadFollowup",
     "LeadParent",
+    "StudentAttendance",
 ]
+

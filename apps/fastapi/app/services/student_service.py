@@ -9,7 +9,7 @@ class StudentService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_students(self, page=1, limit=10, search=None, class_id=None, class_=None, status=None):
+    def get_students(self, page=1, limit=10, search=None, class_id=None, class_=None, status=None, tenant_id=None):
         from app.schemas.student_schema import StudentListItem, Pagination, StudentListResponse
         query = (
             self.db.query(Student, SchoolClass, ClassDivision)
@@ -18,6 +18,8 @@ class StudentService:
         )
         # Build dynamic filters (from stashed changes)
         filters = []
+        if tenant_id:
+            filters.append(Student.tenant_id == tenant_id)
         if search is not None and isinstance(search, str) and search.strip() != "":
             like = f"%{search.strip()}%"
             filters.append(or_(Student.student_name.ilike(like), Student.student_code.ilike(like), Student.mobile_number.ilike(like)))
@@ -61,8 +63,11 @@ class StudentService:
     class AccessDenied(Exception):
         pass
 
-    def get_student_by_id(self, student_id: str) -> Optional[StudentDetailResponse]:
+    def get_student_by_id(self, student_id: str, tenant_id: int = None) -> Optional[StudentDetailResponse]:
         query = self.db.query(Student)
+        if tenant_id:
+            query = query.filter(Student.tenant_id == tenant_id)
+        
         if str(student_id).isdigit():
             student = query.filter(Student.id == int(student_id)).first()
         else:
@@ -164,8 +169,11 @@ class StudentService:
             self.db.rollback()
             raise e
 
-    def update_student(self, student_id: str, req: StudentUpdateRequest):
+    def update_student(self, student_id: str, req: StudentUpdateRequest, tenant_id: int = None):
         query = self.db.query(Student)
+        if tenant_id:
+            query = query.filter(Student.tenant_id == tenant_id)
+            
         if str(student_id).isdigit():
             student = query.filter(Student.id == int(student_id)).first()
         else:
@@ -180,8 +188,11 @@ class StudentService:
         self.db.refresh(student)
         return {"success": True}
 
-    def soft_delete_student(self, student_id: str):
+    def soft_delete_student(self, student_id: str, tenant_id: int = None):
         query = self.db.query(Student)
+        if tenant_id:
+            query = query.filter(Student.tenant_id == tenant_id)
+            
         if str(student_id).isdigit():
             student = query.filter(Student.id == int(student_id)).first()
         else:

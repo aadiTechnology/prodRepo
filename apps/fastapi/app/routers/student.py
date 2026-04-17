@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.student_service import StudentService
 from app.schemas.student_schema import StudentListResponse, StudentUpdateRequest, StudentCreateRequest, StudentCreateResponse
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, CurrentUser
 from typing import Optional
 
 router = APIRouter(prefix="/students", tags=["Students"])
@@ -35,9 +35,10 @@ def get_students(
     class_: Optional[str] = Query(None, alias="class"),
     status: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user)
 ):
     try:
-        result = StudentService(db).get_students(page, limit, search, class_id, class_, status)
+        result = StudentService(db).get_students(page, limit, search, class_id, class_, status, tenant_id=current_user.tenant_id)
         return result.dict(by_alias=True)
     except Exception as e:
         print("Error in get_students:", e)
@@ -45,16 +46,25 @@ def get_students(
         raise HTTPException(status_code=500, detail="Unable to load students")
 
 @router.get("/{student_id}")
-def get_student_by_id(student_id: str, db: Session = Depends(get_db)):
-    student = StudentService(db).get_student_by_id(student_id)
+def get_student_by_id(
+    student_id: str, 
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    student = StudentService(db).get_student_by_id(student_id, tenant_id=current_user.tenant_id)
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
     return student
 
 @router.put("/{student_id}")
-def update_student(student_id: str, req: StudentUpdateRequest, db: Session = Depends(get_db)):
+def update_student(
+    student_id: str, 
+    req: StudentUpdateRequest, 
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     try:
-        return StudentService(db).update_student(student_id, req)
+        return StudentService(db).update_student(student_id, req, tenant_id=current_user.tenant_id)
     except StudentService.NotFound:
         raise HTTPException(status_code=404, detail="Student not found")
     except StudentService.AccessDenied:
@@ -65,9 +75,13 @@ def update_student(student_id: str, req: StudentUpdateRequest, db: Session = Dep
         raise HTTPException(status_code=500, detail="Unable to update student")
 
 @router.delete("/{student_id}")
-def delete_student(student_id: str, db: Session = Depends(get_db)):
+def delete_student(
+    student_id: str, 
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     try:
-        return StudentService(db).soft_delete_student(student_id)
+        return StudentService(db).soft_delete_student(student_id, tenant_id=current_user.tenant_id)
     except StudentService.NotFound:
         raise HTTPException(status_code=404, detail="Student not found")
     except StudentService.AccessDenied:

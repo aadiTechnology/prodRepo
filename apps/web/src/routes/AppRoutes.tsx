@@ -23,6 +23,8 @@ const AddStudent = lazy(() => import("../pages/students/AddStudent"));
 // Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
 const Users = lazy(() => import("../pages/Users"));
+const MarkAttendance = lazy(() => import("../pages/Attendance/MarkAttendance"));
+
 const Login = lazy(() => import("../pages/Login"));
 const Register = lazy(() => import("../pages/Register"));
 const Profile = lazy(() => import("../pages/ProfilePage"));
@@ -227,6 +229,10 @@ export default function AppRoutes() {
           <Route path="/academics/classes" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><ClassList /></ProtectedRoute>} />
           <Route path="/academics/classes/new" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:create"><AddClass /></ProtectedRoute>} />
           <Route path="/academics/classes/:id/edit" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><AddClass /></ProtectedRoute>} />
+
+          {/* Attendance Management */}
+          <Route path="/attendance/mark" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:view"><MarkAttendance /></ProtectedRoute>} />
+
 
           {/* Admissions – Lead Management */}
           <Route path="/admissions/leads" element={<ProtectedRoute requiredPermissions="ADMISSIONS_MGMT:view"><LeadManagementPage /></ProtectedRoute>} />

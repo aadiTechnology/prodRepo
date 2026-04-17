@@ -199,9 +199,11 @@ const ICON_MAP: Record<string, string> = {
   "settings": assetsIcon,
   "tenants": schoolIcon,
   "users": userIcon,
+  "attendance": schoolIcon,
   "config": assetsIcon,
   "default": workingIcon
 };
+
 
 const COLOR_MAP: Record<string, string> = {
   "dashboard": colorTokens.menuColors.dashboard,
@@ -214,8 +216,10 @@ const COLOR_MAP: Record<string, string> = {
   "settings": colorTokens.menuColors.settings,
   "tenants": colorTokens.menuColors.students,
   "users": colorTokens.menuColors.academics,
+  "attendance": colorTokens.menuColors.academics,
   "config": colorTokens.menuColors.settings,
 };
+
 
 const SYSTEM_ADMIN_MENU: MenuItemData[] = [
   {
@@ -235,7 +239,17 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
     ]
   },
   {
+    id: "attendance",
+    label: "Attendance",
+    icon: schoolIcon,
+    color: colorTokens.menuColors.academics,
+    children: [
+      { id: "mark-attendance", label: "Mark Attendance", path: "/attendance/mark" }
+    ]
+  },
+  {
     id: "users",
+
     label: "Users",
     icon: userIcon,
     color: colorTokens.menuColors.academics,
