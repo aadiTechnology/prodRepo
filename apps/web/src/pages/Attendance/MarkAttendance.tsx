@@ -75,6 +75,8 @@ const MarkAttendance = () => {
     severity: 'success'
   });
 
+  const today = new Date().toISOString().split('T')[0];
+
   // Load initial data
   useEffect(() => {
     const loadInitialData = async () => {
@@ -129,11 +131,21 @@ const MarkAttendance = () => {
       if (filters.attendance_date < selectedYear.start_date || filters.attendance_date > selectedYear.end_date) {
         setSnackbar({ 
           open: true, 
-          message: "Outside academic year you are not able to mark attendance", 
+          message: "Selected date is outside the academic year", 
           severity: 'error' 
         });
         return;
       }
+    }
+
+    // Future date validation
+    if (filters.attendance_date > today) {
+      setSnackbar({ 
+        open: true, 
+        message: "You cannot mark attendance for future dates", 
+        severity: 'error' 
+      });
+      return;
     }
     
     setLoading(true);
@@ -173,11 +185,21 @@ const MarkAttendance = () => {
       if (filters.attendance_date < selectedYear.start_date || filters.attendance_date > selectedYear.end_date) {
         setSnackbar({ 
           open: true, 
-          message: "Outside academic year you are not able to mark attendance", 
+          message: "Selected date is outside the academic year", 
           severity: 'error' 
         });
         return;
       }
+    }
+
+    // Future date validation
+    if (filters.attendance_date > today) {
+      setSnackbar({ 
+        open: true, 
+        message: "You cannot mark attendance for future dates", 
+        severity: 'error' 
+      });
+      return;
     }
     
     setSaving(true);
@@ -274,7 +296,10 @@ const MarkAttendance = () => {
                 InputLabelProps={{ shrink: true }}
                 inputProps={{
                   min: academicYears.find(y => y.id === filters.academic_year_id)?.start_date,
-                  max: academicYears.find(y => y.id === filters.academic_year_id)?.end_date
+                  max: [
+                    academicYears.find(y => y.id === filters.academic_year_id)?.end_date,
+                    today
+                  ].filter(Boolean).sort()[0]
                 }}
                 value={filters.attendance_date}
                 onChange={(e) => setFilters(prev => ({ ...prev, attendance_date: e.target.value }))}

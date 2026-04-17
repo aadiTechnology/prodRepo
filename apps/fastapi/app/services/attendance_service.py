@@ -12,6 +12,9 @@ class AttendanceService:
         self.db = db
 
     def get_attendance_grid(self, attendance_date: date, class_id: int, division_id: int, tenant_id: int) -> AttendanceListResponse:
+        if attendance_date > date.today():
+            raise HTTPException(status_code=400, detail="Cannot fetch attendance for future dates")
+
         # 1. Fetch all active students for this class/division
         students = (
             self.db.query(Student)
@@ -69,7 +72,10 @@ class AttendanceService:
                 raise HTTPException(status_code=404, detail="Academic year not found")
                 
             if not (academic_year.start_date <= req.attendance_date <= academic_year.end_date):
-                raise HTTPException(status_code=400, detail="Outside academic year you are not able to mark attendance")
+                raise HTTPException(status_code=400, detail="Selected date is outside the academic year")
+                
+            if req.attendance_date > date.today():
+                raise HTTPException(status_code=400, detail="You cannot mark attendance for future dates")
 
             # 2. Process each record
             for record in req.records:
