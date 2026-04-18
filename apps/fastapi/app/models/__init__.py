@@ -22,6 +22,7 @@ from app.models.fee_discount import FeeDiscount
 from app.models.fee_payment import FeePayment, FeePaymentAllocation
 from app.models.role_menu_permission import RoleMenuPermission
 from app.models.student import Student
+from app.models.teacher import Teacher
 from app.models.student_fee_assignment import (
     StudentFeeAssignment,
     StudentFeeDetail,
@@ -63,6 +64,7 @@ __all__ = [
     "FeeDiscount",
     "FeeLedger",
     "Student",
+    "Teacher",
     "StudentFeeAssignment",
     "StudentFeeDetail",
     "StudentFeeInstallment",

@@ -20,9 +20,10 @@ const AddStudent = lazy(() => import("../pages/students/AddStudent"));
 // ═══════════════════════════════════════════════════════════════════════════
 // Lazy-loaded Pages - Code splitting for better performance
 // ═══════════════════════════════════════════════════════════════════════════
-// Lazy load pages for code splitting and better performance
 const Home = lazy(() => import("../pages/Home"));
 const Users = lazy(() => import("../pages/Users"));
+const TeacherList = lazy(() => import("../pages/teachers/TeacherList"));
+const AddTeacher = lazy(() => import("../pages/teachers/AddTeacher"));
 const MarkAttendance = lazy(() => import("../pages/Attendance/MarkAttendance"));
 
 const Login = lazy(() => import("../pages/Login"));
@@ -136,6 +137,11 @@ export default function AppRoutes() {
           <Route path="/roles/:id/edit" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:edit"><AddRole /></ProtectedRoute>} />
           <Route path="/roles/edit/:id" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:edit"><AddRole /></ProtectedRoute>} />
           <Route path="/roles/permissions" element={<ProtectedRoute requiredPermissions={["ADMIN_MGMT:view", "SYSTEM_CONFIG:view"]}><PermissionManagementPage /></ProtectedRoute>} />
+
+          {/* Teacher Management */}
+          <Route path="/teachers" element={<ProtectedRoute requiredPermissions="TEACHER_MGMT:view"><TeacherList /></ProtectedRoute>} />
+          <Route path="/teachers/add" element={<ProtectedRoute requiredPermissions="TEACHER_MGMT:create"><AddTeacher /></ProtectedRoute>} />
+          <Route path="/teachers/:id/edit" element={<ProtectedRoute requiredPermissions="TEACHER_MGMT:edit"><AddTeacher /></ProtectedRoute>} />
 
           {/* AI Features */}
           <Route

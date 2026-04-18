@@ -28,6 +28,7 @@ def seed_rbac_data():
             {"code": "ADMISSIONS_MGMT", "name": "Admissions Management", "category": "Admissions"},
             {"code": "SYSTEM_CONFIG", "name": "System Configuration", "category": "System"},
             {"code": "SPRINT_MGMT", "name": "Sprint Management", "category": "System"},
+            {"code": "TEACHER_MGMT", "name": "Teacher Management", "category": "HR"},
         ]
         
         feature_map = {}
@@ -85,6 +86,7 @@ def seed_rbac_data():
                 "name": "Staff", "level": 1, "icon": "staffIcon", "sort_order": 6,
                 "children": [
                     {"name": "Staff List", "path": "/staff", "feature": "STAFF_MGMT"},
+                    {"name": "Teachers", "path": "/teachers", "feature": "TEACHER_MGMT"},
                 ]
             },
             {

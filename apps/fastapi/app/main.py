@@ -39,7 +39,7 @@ from app.models.pt_timesheet import (  # noqa: F401
     pt_timesheets,
 )
 
-from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, academic_year, class_fee_structure_assignment, class_router,student_fee_assignment, fee_structure, reports, sprint, task_effort
+from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, academic_year, class_fee_structure_assignment, class_router,student_fee_assignment, fee_structure, reports, sprint, task_effort, teacher_router
 
 
 
@@ -109,6 +109,7 @@ app.include_router(student_fee_ledger.router)
 app.include_router(student_fee_assignment.router)
 from app.routers import student
 app.include_router(student.router, prefix="/api")
+app.include_router(teacher_router.router, prefix="/api")
 app.include_router(fee_structure.router)
 app.include_router(installment_tracking.router)
 app.include_router(fee_installment_status.router)
