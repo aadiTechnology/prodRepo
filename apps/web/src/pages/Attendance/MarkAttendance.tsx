@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -41,7 +41,9 @@ import { PageHeader } from "../../components/layout";
 import schoolClassService, { SchoolClass, ClassDivision } from "../../api/services/schoolClassService";
 import academicYearService, { AcademicYear } from "../../api/services/academicYearService";
 import attendanceService, { AttendanceResponse } from "../../api/services/attendanceService";
+import teacherService, { TeacherResponse } from "../../api/services/teacherService";
 import { useAuth } from "../../context/AuthContext";
+import { useRBAC } from "../../context/RBACContext";
 
 const ATTENDANCE_STATUSES = [
   { id: 'Present', label: 'Present', color: 'success' },
@@ -53,14 +55,17 @@ const ATTENDANCE_STATUSES = [
 const MarkAttendance = () => {
   const theme = useTheme();
   const { user } = useAuth();
+  const { hasRole } = useRBAC();
   
   // State
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  const [teachers, setTeachers] = useState<TeacherResponse[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [divisions, setDivisions] = useState<ClassDivision[]>([]);
   
   const [filters, setFilters] = useState({
     academic_year_id: 0,
+    teacher_id: 0,
     class_id: 0,
     division_id: 0,
     attendance_date: new Date().toISOString().split('T')[0]
@@ -81,12 +86,14 @@ const MarkAttendance = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const [years, classList] = await Promise.all([
+        const [years, teacherList, classList] = await Promise.all([
           academicYearService.getAll(),
+          teacherService.list({ limit: 1000 }),
           schoolClassService.getAll()
         ]);
         
         setAcademicYears(years);
+        setTeachers(teacherList.items);
         setClasses(classList);
         
         // Find active year
@@ -94,30 +101,88 @@ const MarkAttendance = () => {
         if (activeYear) {
           setFilters(prev => ({ ...prev, academic_year_id: activeYear.id }));
         }
+
+        // Logic for Teacher role
+        if (hasRole('TEACHER') && user?.email) {
+          const myAssignments = teacherList.items.filter(t => t.email?.toLowerCase() === user.email?.toLowerCase());
+          if (myAssignments.length > 0) {
+            // Auto-select the first assignment
+            const first = myAssignments[0];
+            setFilters(prev => ({ 
+              ...prev, 
+              teacher_id: first.id,
+              class_id: first.class_id || prev.class_id
+            }));
+          }
+        }
       } catch (err) {
         console.error("Failed to load initial data", err);
       }
     };
     loadInitialData();
-  }, []);
+  }, [hasRole, user?.email]);
 
-  // Update divisions when class changes
+  // Update filtered classes based on selected teacher
+  const filteredClasses = useMemo(() => {
+    if (!filters.teacher_id) return classes;
+    
+    // Get all classes assigned to this teacher
+    const selectedTeacherAssignments = teachers.filter(t => t.id === filters.teacher_id);
+    const assignedClassIds = selectedTeacherAssignments.map(t => t.class_id).filter(Boolean);
+    
+    if (assignedClassIds.length === 0) return [];
+    
+    return classes.filter(c => assignedClassIds.includes(c.id));
+  }, [classes, teachers, filters.teacher_id]);
+
+  // Update filtered divisions based on selected teacher and class
+  const filteredDivisions = useMemo(() => {
+    if (!filters.class_id) return [];
+    
+    const selectedClass = classes.find(c => c.id === filters.class_id);
+    if (!selectedClass) return [];
+    
+    const allDivisions = selectedClass.divisions || [];
+    
+    if (!filters.teacher_id) return allDivisions;
+    
+    // Filter divisions assigned to this teacher for this class
+    const selectedTeacherAssignments = teachers.filter(t => 
+      t.id === filters.teacher_id && t.class_id === filters.class_id
+    );
+    const assignedDivisionIds = selectedTeacherAssignments.map(t => t.class_division_id).filter(Boolean);
+    
+    if (assignedDivisionIds.length === 0) return allDivisions; // Fallback to all if no specific division info (though schema has it)
+    
+    return allDivisions.filter(d => assignedDivisionIds.includes(d.id));
+  }, [classes, teachers, filters.teacher_id, filters.class_id]);
+
+  // Update divisions state for the dropdown
   useEffect(() => {
-    if (filters.class_id) {
-      const selectedClass = classes.find(c => c.id === filters.class_id);
-      if (selectedClass) {
-        setDivisions(selectedClass.divisions || []);
-        if (selectedClass.divisions?.length) {
-          setFilters(prev => ({ ...prev, division_id: selectedClass.divisions[0].id }));
-        } else {
-          setFilters(prev => ({ ...prev, division_id: 0 }));
-        }
+    setDivisions(filteredDivisions);
+    
+    // Auto-select if changed
+    if (filteredDivisions.length > 0) {
+      const isCurrentDivInFiltered = filteredDivisions.some(d => d.id === filters.division_id);
+      if (!isCurrentDivInFiltered) {
+        setFilters(prev => ({ ...prev, division_id: filteredDivisions[0].id }));
       }
     } else {
-      setDivisions([]);
       setFilters(prev => ({ ...prev, division_id: 0 }));
     }
-  }, [filters.class_id, classes]);
+  }, [filteredDivisions, filters.division_id]);
+
+  // Reset class if it's no longer in filtered classes
+  useEffect(() => {
+    if (filters.class_id && filteredClasses.length > 0) {
+      const isCurrentClassInFiltered = filteredClasses.some(c => c.id === filters.class_id);
+      if (!isCurrentClassInFiltered) {
+        setFilters(prev => ({ ...prev, class_id: filteredClasses[0].id }));
+      }
+    } else if (filteredClasses.length === 0 && filters.class_id !== 0) {
+      setFilters(prev => ({ ...prev, class_id: 0 }));
+    }
+  }, [filteredClasses, filters.class_id]);
 
   const fetchAttendance = useCallback(async () => {
     if (!filters.class_id || !filters.division_id || !filters.attendance_date) {
@@ -244,87 +309,121 @@ const MarkAttendance = () => {
       }}>
         <CardContent sx={{ p: 3 }}>
           <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Academic Year</InputLabel>
-                <Select
-                  value={filters.academic_year_id}
-                  label="Academic Year"
-                  onChange={(e) => setFilters(prev => ({ ...prev, academic_year_id: Number(e.target.value) }))}
+            <Grid item xs={12} md={2.4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Academic Year</InputLabel>
+                  <Select
+                    value={filters.academic_year_id}
+                    label="Academic Year"
+                    onChange={(e) => setFilters(prev => ({ ...prev, academic_year_id: Number(e.target.value) }))}
+                  >
+                    {academicYears.map(year => (
+                      <MenuItem key={year.id} value={year.id}>{year.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={12} md={2.4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Teacher</InputLabel>
+                  <Select
+                    value={filters.teacher_id}
+                    label="Teacher"
+                    onChange={(e) => setFilters(prev => ({ 
+                      ...prev, 
+                      teacher_id: Number(e.target.value),
+                      class_id: 0,
+                      division_id: 0
+                    }))}
+                    disabled={hasRole('TEACHER')}
+                  >
+                    {!hasRole('TEACHER') && <MenuItem value={0}>All Teachers</MenuItem>}
+                    {teachers.map(teacher => (
+                      <MenuItem key={teacher.id} value={teacher.id}>{teacher.full_name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={12} md={2.4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Class</InputLabel>
+                  <Select
+                    value={filters.class_id}
+                    label="Class"
+                    onChange={(e) => setFilters(prev => ({ ...prev, class_id: Number(e.target.value) }))}
+                  >
+                    <MenuItem value={0}>Select Class</MenuItem>
+                    {filteredClasses.map(cls => (
+                      <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={12} md={2.4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Division</InputLabel>
+                  <Select
+                    value={filters.division_id}
+                    label="Division"
+                    onChange={(e) => setFilters(prev => ({ ...prev, division_id: Number(e.target.value) }))}
+                    disabled={!divisions.length}
+                  >
+                    <MenuItem value={0}>Select Division</MenuItem>
+                    {divisions.map(div => (
+                      <MenuItem key={div.id} value={div.id}>{div.division_name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={12} md={2.4}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="date"
+                  label="Attendance Date"
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{
+                    min: academicYears.find(y => y.id === filters.academic_year_id)?.start_date,
+                    max: [
+                      academicYears.find(y => y.id === filters.academic_year_id)?.end_date,
+                      today
+                    ].filter(Boolean).sort()[0]
+                  }}
+                  value={filters.attendance_date}
+                  onChange={(e) => setFilters(prev => ({ ...prev, attendance_date: e.target.value }))}
+                />
+              </Grid>
+
+              <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 1 }}>
+                <Button 
+                  variant="outlined" 
+                  startIcon={<RefreshIcon />}
+                  onClick={() => {
+                    setStudents([]);
+                    if (!hasRole('TEACHER')) {
+                      setFilters(prev => ({ ...prev, teacher_id: 0, class_id: 0, division_id: 0 }));
+                    } else {
+                      setFilters(prev => ({ ...prev, class_id: 0, division_id: 0 }));
+                    }
+                  }}
+                  sx={{ borderRadius: 2, textTransform: 'none' }}
                 >
-                  {academicYears.map(y => (
-                    <MenuItem key={y.id} value={y.id}>{y.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Class</InputLabel>
-                <Select
-                  value={filters.class_id}
-                  label="Class"
-                  onChange={(e) => setFilters(prev => ({ ...prev, class_id: Number(e.target.value) }))}
+                  Reset
+                </Button>
+                <Button 
+                  variant="contained" 
+                  startIcon={<SearchIcon />} 
+                  onClick={fetchAttendance}
+                  disabled={loading}
+                  sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, px: 4 }}
                 >
-                  {classes.map(c => (
-                    <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Division</InputLabel>
-                <Select
-                  value={filters.division_id}
-                  label="Division"
-                  onChange={(e) => setFilters(prev => ({ ...prev, division_id: Number(e.target.value) }))}
-                  disabled={!divisions.length}
-                >
-                  {divisions.map(d => (
-                    <MenuItem key={d.id} value={d.id}>{d.division_name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <TextField
-                fullWidth
-                size="small"
-                type="date"
-                label="Attendance Date"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{
-                  min: academicYears.find(y => y.id === filters.academic_year_id)?.start_date,
-                  max: [
-                    academicYears.find(y => y.id === filters.academic_year_id)?.end_date,
-                    today
-                  ].filter(Boolean).sort()[0]
-                }}
-                value={filters.attendance_date}
-                onChange={(e) => setFilters(prev => ({ ...prev, attendance_date: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={3} sx={{ display: 'flex', gap: 1 }}>
-              <Button 
-                variant="contained" 
-                startIcon={<SearchIcon />} 
-                fullWidth
-                onClick={fetchAttendance}
-                disabled={loading}
-                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
-              >
-                Search
-              </Button>
-              <Button 
-                variant="outlined" 
-                startIcon={<RefreshIcon />}
-                onClick={() => setStudents([])}
-                sx={{ borderRadius: 2, textTransform: 'none' }}
-              >
-                Reset
-              </Button>
-            </Grid>
+                  Search Students
+                </Button>
+              </Grid>
           </Grid>
         </CardContent>
       </Card>
