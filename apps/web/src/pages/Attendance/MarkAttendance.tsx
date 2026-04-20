@@ -296,8 +296,22 @@ const MarkAttendance = () => {
 
       {/* Date — hidden native input triggered by 3D calendar icon only */}
       <Tooltip title={filters.attendance_date || "Select Date"} arrow>
-        <Box sx={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-          {/* Invisible native date input sits on top */}
+        <Box
+          sx={{
+            position: "relative",
+            display: "inline-flex",
+            alignItems: "center",
+            cursor: "pointer",
+          }}
+          onClick={() => {
+            try {
+              dateInputRef.current?.showPicker();
+            } catch (err) {
+              dateInputRef.current?.click();
+            }
+          }}
+        >
+          {/* Invisible native date input sits behind, triggered via ref */}
           <input
             ref={dateInputRef}
             type="date"
@@ -308,28 +322,32 @@ const MarkAttendance = () => {
             style={{
               position: "absolute",
               opacity: 0,
-              width: "100%",
-              height: "100%",
-              top: 0,
-              left: 0,
-              cursor: "pointer",
-              zIndex: 1,
+              width: 0,
+              height: 0,
+              top: "50%",
+              left: "50%",
+              zIndex: -1,
+              pointerEvents: "none",
             }}
           />
-          {/* Visible: just the 3D calendar image icon */}
+          {/* Visible: 3D calendar image icon with responsive transitions */}
           <Box
             component="img"
             src="/icons/3d-calendar.png"
             alt="Pick attendance date"
             sx={{
-              width: 36,
-              height: 36,
+              width: 38,
+              height: 38,
               objectFit: "contain",
-              cursor: "pointer",
-              transition: "transform 0.2s, filter 0.2s",
+              transition: "all 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
+              filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))",
               "&:hover": {
-                transform: "scale(1.15)",
-                filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.18))",
+                transform: "scale(1.1) translateY(-1px)",
+                filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.22))",
+              },
+              "&:active": {
+                transform: "scale(0.92)",
+                filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.1))",
               },
             }}
           />
