@@ -2,6 +2,8 @@ from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from app.models.teacher import Teacher
 from app.schemas.teacher_schema import TeacherCreate, TeacherUpdate
+from app.schemas.user import UserCreate, UserUpdate
+from app.services import user_service
 from app.core.exceptions import ConflictException, NotFoundException
 from fastapi import HTTPException, status
 
@@ -101,11 +103,43 @@ def create_teacher(db: Session, payload: TeacherCreate, created_by: int, tenant_
     
     teacher_code = generate_teacher_code(db, tenant_id)
     
+    # Create or link user account
+    user_id = None
+    if payload.email:
+        # Check if user already exists
+        existing_user = user_service.get_user_by_email(db, payload.email)
+        if existing_user:
+            # If user exists, check if they already have a teacher profile
+            existing_teacher = db.query(Teacher).filter(Teacher.user_id == existing_user.id, Teacher.is_deleted == False).first()
+            if existing_teacher:
+                raise ConflictException(f"A teacher profile already exists for user: {payload.email}")
+            user_id = existing_user.id
+        else:
+            # Create new user for teacher
+            user_data = UserCreate(
+                email=payload.email,
+                full_name=payload.full_name,
+                password="Teacher@123",
+                role="TEACHER",
+                tenant_id=tenant_id
+            )
+            try:
+                 new_user = user_service.create_user(db, user_data, created_by=created_by, tenant_id=tenant_id)
+                 user_id = new_user.id
+            except Exception as e:
+                # Log but possibly continue or handle specific conflicts
+                from app.core.logging_config import get_logger
+                logger = get_logger(__name__)
+                logger.error(f"Failed to create user for teacher: {str(e)}")
+                # For consistency, we might want to fail teacher creation if user creation fails
+                raise e
+
     db_teacher = Teacher(
         **payload.model_dump(),
         tenant_id=tenant_id,
         teacher_code=teacher_code,
-        created_by=created_by
+        created_by=created_by,
+        user_id=user_id
     )
     
     db.add(db_teacher)
@@ -132,6 +166,21 @@ def update_teacher(db: Session, teacher_id: int, payload: TeacherUpdate, updated
         setattr(db_teacher, key, value)
         
     db_teacher.updated_by = updated_by
+    
+    # Sync with User account if linked
+    if db_teacher.user_id:
+        user_update_data = {}
+        if payload.full_name:
+            user_update_data['full_name'] = payload.full_name
+        if payload.mobile_number:
+            user_update_data['phone_number'] = payload.mobile_number
+        if payload.is_active is not None:
+            user_update_data['is_active'] = payload.is_active
+            
+        if user_update_data:
+            from app.schemas.user import UserUpdate
+            user_service.update_user(db, db_teacher.user_id, UserUpdate(**user_update_data), updated_by=updated_by)
+
     db.commit()
     db.refresh(db_teacher)
     return db_teacher
@@ -150,4 +199,14 @@ def soft_delete_teacher(db: Session, teacher_id: int, deleted_by: int, tenant_id
     db_teacher.is_deleted = True
     db_teacher.deleted_at = datetime.utcnow()
     db_teacher.deleted_by = deleted_by
+    
+    # Sync with User account if linked - deactivate user
+    if db_teacher.user_id:
+        user_service.update_user(
+            db, 
+            db_teacher.user_id, 
+            UserUpdate(is_active=False), 
+            updated_by=deleted_by
+        )
+        
     db.commit()

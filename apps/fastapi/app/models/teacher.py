@@ -28,6 +28,8 @@ class Teacher(Base):
     class_id = Column(Integer, ForeignKey("classes.id", ondelete="SET NULL"), nullable=True)
     class_division_id = Column(Integer, ForeignKey("class_divisions.id", ondelete="SET NULL"), nullable=True)
     
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
     is_active = Column(Boolean, default=True, nullable=False)
     
     # Audit fields
@@ -42,6 +44,7 @@ class Teacher(Base):
 
     # Relationships
     tenant = relationship("Tenant")
+    user = relationship("User")
     class_model = relationship(
         "SchoolClass",
         foreign_keys=[class_id],
