@@ -344,10 +344,22 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   }, [menus, user]);
 
   const toggleSection = (id: string) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
+    setExpandedSections((prev) => {
+      const isCurrentlyExpanded = prev[id];
+      const newState: Record<string, boolean> = {};
+      
+      // Close all sections first
+      Object.keys(prev).forEach(key => {
+        newState[key] = false;
+      });
+      
+      // If the clicked section wasn't expanded, expand only this one
+      if (!isCurrentlyExpanded) {
+        newState[id] = true;
+      }
+      
+      return newState;
+    });
   };
 
   const handleMenuNavigate = (path: string) => {
