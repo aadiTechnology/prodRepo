@@ -13,10 +13,13 @@ import {
   Alert,
   Stack,
   alpha,
+  IconButton,
 } from "@mui/material";
 import {
-  Save as SaveIcon,
-  CheckBox as CheckBoxIcon,
+  SaveOutlined as SaveIcon,
+  DoneAllOutlined as CheckAllIcon,
+  CalendarMonthOutlined as CalendarIcon,
+  FilterAltOffOutlined as ResetIcon,
   CheckBoxOutlined,
   CheckBoxOutlineBlank,
 } from "@mui/icons-material";
@@ -40,6 +43,43 @@ const filterSelectSx = {
     "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
   },
 };
+
+// ── Action Button Component ───────────────────────────────────────────────────
+const ActionButton = ({ 
+  icon, 
+  onClick, 
+  colorMain, 
+  disabled = false 
+}: { 
+  icon: React.ReactNode; 
+  onClick: () => void; 
+  colorMain: string; 
+  disabled?: boolean;
+}) => (
+  <IconButton
+    onClick={onClick}
+    disabled={disabled}
+    sx={{
+      width: 42,
+      height: 42,
+      bgcolor: alpha(colorMain, 0.08),
+      color: colorMain,
+      borderRadius: "12px",
+      border: `1.5px solid ${alpha(colorMain, 0.2)}`,
+      transition: "all 0.2s ease",
+      "&:hover": {
+        bgcolor: alpha(colorMain, 0.15),
+        transform: "translateY(-2px)",
+        boxShadow: `0 4px 12px ${alpha(colorMain, 0.2)}`,
+      },
+      "&.Mui-disabled": {
+        opacity: 0.6,
+      }
+    }}
+  >
+    {icon}
+  </IconButton>
+);
 
 // ── Legend Item ───────────────────────────────────────────────────────────────
 const LegendItem = ({
@@ -300,21 +340,7 @@ const MarkAttendance = () => {
 
       {/* Date Picker */}
       <Tooltip title={filters.attendance_date || "Select Date"} arrow>
-        <Box
-          sx={{
-            position: "relative",
-            display: "inline-flex",
-            alignItems: "center",
-            cursor: "pointer",
-          }}
-          onClick={() => {
-            try {
-              dateInputRef.current?.showPicker();
-            } catch (err) {
-              dateInputRef.current?.click();
-            }
-          }}
-        >
+        <Box sx={{ position: "relative" }}>
           <input
             ref={dateInputRef}
             type="date"
@@ -333,62 +359,56 @@ const MarkAttendance = () => {
               pointerEvents: "none",
             }}
           />
-          <Box
-            component="img"
-            src="/icons/3d-calendar.png"
-            alt="Pick attendance date"
-            sx={{
-              width: 38,
-              height: 38,
-              objectFit: "contain",
-              transition: "all 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
-              filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))",
-              "&:hover": {
-                transform: "scale(1.1) translateY(-1px)",
-                filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.22))",
-              },
-              "&:active": {
-                transform: "scale(0.92)",
-                filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.1))",
-              },
+          <ActionButton
+            icon={<CalendarIcon sx={{ fontSize: 22 }} />}
+            onClick={() => {
+              try {
+                dateInputRef.current?.showPicker();
+              } catch (err) {
+                dateInputRef.current?.click();
+              }
             }}
+            colorMain={colorTokens.preschool.turquoise.main}
           />
         </Box>
       </Tooltip>
 
       {/* Reset Button */}
       <Tooltip title="Reset filters" arrow>
-        <Box
-          onClick={resetFilters}
-          sx={{
-            position: "relative",
-            display: "inline-flex",
-            alignItems: "center",
-            cursor: "pointer",
-          }}
-        >
-          <Box
-            component="img"
-            src="/icons/reset.png"
-            alt="Reset filters"
-            sx={{
-              width: 38,
-              height: 38,
-              objectFit: "contain",
-              transition: "all 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
-              filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))",
-              "&:hover": {
-                transform: "scale(1.1) translateY(-1px)",
-                filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.22))",
-              },
-              "&:active": {
-                transform: "scale(0.92)",
-                filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.1))",
-              },
-            }}
+        <Box>
+          <ActionButton
+            icon={<ResetIcon sx={{ fontSize: 22 }} />}
+            onClick={resetFilters}
+            colorMain={colorTokens.preschool.coral.main}
           />
         </Box>
       </Tooltip>
+
+      {/* Action Buttons (Mark All & Save) */}
+      {students.length > 0 && (
+        <>
+          <Box sx={{ width: '1px', height: 32, bgcolor: colorTokens.border.default, mx: 0.5, borderRadius: 1, display: { xs: 'none', sm: 'block' } }} />
+          <Tooltip title="Mark All Present" arrow>
+            <Box>
+              <ActionButton
+                icon={<CheckAllIcon sx={{ fontSize: 22 }} />}
+                onClick={markAllPresent}
+                colorMain={colorTokens.success.main}
+              />
+            </Box>
+          </Tooltip>
+          <Tooltip title="Save Attendance" arrow>
+            <Box>
+              <ActionButton
+                icon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon sx={{ fontSize: 22 }} />}
+                onClick={saveAttendance}
+                disabled={saving}
+                colorMain={colorTokens.primary.main}
+              />
+            </Box>
+          </Tooltip>
+        </>
+      )}
     </Stack>
   );
 
@@ -530,65 +550,7 @@ const MarkAttendance = () => {
         </Box>
       )}
 
-      {/* ── Action Buttons (Mark All Present & Save) ──────────────────────– */}
-      {students.length > 0 && (
-        <Box
-          sx={{
-            display: "flex",
-            gap: 1,
-            px: { xs: 2, sm: 2.5 },
-            py: 2,
-            flexWrap: "wrap",
-            justifyContent: "flex-end",
-          }}
-        >
-          <Button
-            variant="outlined"
-            startIcon={<CheckBoxIcon />}
-            onClick={markAllPresent}
-            size="small"
-            sx={{
-              borderRadius: "10px",
-              textTransform: "none",
-              fontWeight: 600,
-              fontSize: "0.8rem",
-              borderColor: colorTokens.success.main,
-              color: colorTokens.success.main,
-              "&:hover": {
-                bgcolor: alpha(colorTokens.success.main, 0.06),
-                borderColor: colorTokens.success.dark,
-              },
-            }}
-          >
-            Mark All Present
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={
-              saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />
-            }
-            onClick={saveAttendance}
-            disabled={saving}
-            size="small"
-            sx={{
-              borderRadius: "10px",
-              textTransform: "none",
-              fontWeight: 700,
-              fontSize: "0.8rem",
-              px: 2.5,
-              background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
-              boxShadow: `0 4px 10px ${alpha(colorTokens.preschool.turquoise.main, 0.3)}`,
-              "&:hover": {
-                boxShadow: `0 6px 14px ${alpha(colorTokens.preschool.turquoise.main, 0.4)}`,
-                transform: "translateY(-1px)",
-              },
-              transition: "all 0.2s ease",
-            }}
-          >
-            {saving ? "Saving..." : "Save Attendance"}
-          </Button>
-        </Box>
-      )}
+
 
       {/* ── Snackbar ─────────────────────────────────────────────────────– */}
       <Snackbar
