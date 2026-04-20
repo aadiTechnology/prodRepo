@@ -223,7 +223,16 @@ const StudentList = () => {
         renderRowActions={(row) =>
           renderStudentRowActions({
             row,
-            onEdit: () => navigate(`/admissions/enrollment?studentId=${row.id}&mode=edit`),
+            onView: () => {
+              const studentId = String((row as any).id ?? (row as any).student_id ?? "");
+              if (!studentId) return;
+              navigate(`/students/${studentId}/view?mode=view`);
+            },
+            onEdit: () => {
+              const studentId = String((row as any).id ?? (row as any).student_id ?? "");
+              if (!studentId) return;
+              navigate(`/admissions/enrollment?studentId=${studentId}&mode=edit`);
+            },
             onDelete: () => openDeleteConfirm(row),
           })
         }

@@ -106,4 +106,6 @@ export type BaseFormProps<T extends Record<string, unknown>> = {
   formTopSlot?: ReactNode;
   /** Custom flag to disable the save/submit actions (e.g. permission check). Defaults to true. */
   canSubmit?: boolean;
+  /** Hide bottom Save/Cancel bar (useful for read-only detail pages). */
+  hideFooterActions?: boolean;
 };

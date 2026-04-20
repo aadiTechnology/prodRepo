@@ -119,6 +119,14 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/students/:studentId/view"
+            element={
+              <ProtectedRoute requiredPermissions="ADMIN_MGMT:view">
+                <EnrollmentPage />
+              </ProtectedRoute>
+            }
+          />
           {/* User Management */}
           <Route
             path="/reports/sprint-performance"

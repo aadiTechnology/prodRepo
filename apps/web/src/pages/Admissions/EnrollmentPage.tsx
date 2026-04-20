@@ -10,7 +10,6 @@ import Groups2Icon from "@mui/icons-material/Groups2";
 import PaymentsIcon from "@mui/icons-material/Payments";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
-import PersonIcon from "@mui/icons-material/Person";
 import ClearIcon from "@mui/icons-material/Clear";
 import { IconButton } from "@mui/material";
 
@@ -47,6 +46,35 @@ interface DiscountOption {
   applicable_class?: string | null;
 }
 
+type StudentViewMeta = {
+  academic_year_name?: string;
+  class_name?: string;
+  class_division_name?: string;
+  fee_structure_name?: string;
+  discount_name?: string;
+};
+
+const VIEW_FALLBACK_VALUES = {
+  academicYear: "__view_academic_year__",
+  classDivision: "__view_class_division__",
+  feePlan: "__view_fee_plan__",
+  discount: "__view_discount__",
+} as const;
+
+const viewModeFieldSx = {
+  "& .MuiInputBase-input.Mui-disabled": {
+    color: "text.primary",
+    WebkitTextFillColor: "rgba(0, 0, 0, 0.87)",
+  },
+  "& .MuiSelect-select.Mui-disabled": {
+    color: "text.primary",
+    WebkitTextFillColor: "rgba(0, 0, 0, 0.87)",
+  },
+  "& .MuiSvgIcon-root": {
+    color: "text.secondary",
+  },
+} as const;
+
 const emptyForm = (): EnrollmentFormData => ({
   student_name: "",
   date_of_birth: "",
@@ -65,14 +93,35 @@ const emptyForm = (): EnrollmentFormData => ({
   photo_url: "",
 });
 
+const toDateInputValue = (value?: string | null): string => {
+  if (!value) return "";
+  const v = String(value).trim();
+  if (!v) return "";
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  const ddmmyyyy = /^(\d{2})[-/](\d{2})[-/](\d{4})$/.exec(v);
+  if (ddmmyyyy) return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
+  const parsed = dayjs(v);
+  return parsed.isValid() ? parsed.format("YYYY-MM-DD") : "";
+};
+
+const normalizeGender = (value?: string | null): string => {
+  const v = String(value || "").trim().toLowerCase();
+  if (v === "male") return "Male";
+  if (v === "female") return "Female";
+  if (v === "other") return "Other";
+  return "";
+};
+
 export default function EnrollmentPage() {
   const navigate = useNavigate();
-  const { leadId } = useParams<{ leadId?: string }>();
+  const { leadId, studentId: routeStudentId } = useParams<{ leadId?: string; studentId?: string }>();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { hasPermission } = useRBAC();
   const isEditMode = searchParams.get("mode") === "edit";
-  const editStudentId = searchParams.get("studentId");
+  const isViewMode = searchParams.get("mode") === "view";
+  const editStudentId = searchParams.get("studentId") || routeStudentId;
 
   const canEnroll = hasPermission("ADMISSIONS_MGMT:create") || hasPermission("ADMISSIONS_MGMT:edit") || user?.role === "SUPER_ADMIN";
 
@@ -80,7 +129,7 @@ export default function EnrollmentPage() {
 
   // Core form state
   const [error, setError] = useState<string | null>(null);
-  const [fetchLoading, setFetchLoading] = useState(Boolean(leadId) || Boolean(isEditMode && editStudentId));
+  const [fetchLoading, setFetchLoading] = useState(Boolean(leadId) || Boolean((isEditMode || isViewMode) && editStudentId));
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -94,6 +143,7 @@ export default function EnrollmentPage() {
   const [divisions, setDivisions] = useState<ClassDivision[]>([]);
   const [feePlans, setFeePlans] = useState<FeePlanOption[]>([]);
   const [discounts, setDiscounts] = useState<DiscountOption[]>([]);
+  const [studentViewMeta, setStudentViewMeta] = useState<StudentViewMeta>({});
 
   // Document upload state
   const [uploadingBirthCert, setUploadingBirthCert] = useState(false);
@@ -182,7 +232,7 @@ export default function EnrollmentPage() {
 
   // Prefill from lead if leadId param exists
   useEffect(() => {
-    if (isEditMode) {
+    if (isEditMode || isViewMode) {
       setFetchLoading(false);
       return;
     }
@@ -214,11 +264,11 @@ export default function EnrollmentPage() {
       })
       .catch(() => { })
       .finally(() => setFetchLoading(false));
-  }, [leadId, isEditMode, setFormData]);
+  }, [leadId, isEditMode, isViewMode, setFormData]);
 
   // Prefill from student if enrollment is used in edit mode
   useEffect(() => {
-    if (!isEditMode) return;
+    if (!isEditMode && !isViewMode) return;
     if (!editStudentId) {
       setError("Student ID is required for edit mode.");
       setFetchLoading(false);
@@ -229,19 +279,43 @@ export default function EnrollmentPage() {
     studentService
       .getStudentById(editStudentId)
       .then((student) => {
+        setStudentViewMeta({
+          academic_year_name: student.academic_year_name,
+          class_name: student.class_name || student.className,
+          class_division_name: student.class_division_name,
+          fee_structure_name: student.fee_structure_name,
+          discount_name: student.discount_name,
+        });
         setFormData((prev) => ({
           ...prev,
           student_name: student.name ?? prev.student_name,
-          date_of_birth: student.date_of_birth ?? prev.date_of_birth,
-          gender: student.gender ?? prev.gender,
+          date_of_birth: toDateInputValue(student.date_of_birth) || prev.date_of_birth,
+          gender: normalizeGender(student.gender) || prev.gender,
           admission_no: student.admission_no ?? prev.admission_no,
           admission_date: student.created_at
             ? dayjs(student.created_at).format("YYYY-MM-DD")
             : prev.admission_date,
+          academic_year_id: student.academic_year_id
+            ? String(student.academic_year_id)
+            : student.academic_year_name
+              ? VIEW_FALLBACK_VALUES.academicYear
+              : prev.academic_year_id,
           class_id: student.class_id ? String(student.class_id) : prev.class_id,
           class_division_id: student.class_division_id
             ? String(student.class_division_id)
+            : student.class_division_name
+              ? VIEW_FALLBACK_VALUES.classDivision
             : prev.class_division_id,
+          fee_structure_id: student.fee_structure_id
+            ? String(student.fee_structure_id)
+            : student.fee_structure_name
+              ? VIEW_FALLBACK_VALUES.feePlan
+              : prev.fee_structure_id,
+          discount_id: student.discount_id
+            ? String(student.discount_id)
+            : student.discount_name
+              ? VIEW_FALLBACK_VALUES.discount
+              : prev.discount_id,
           parent_name: student.parent_name ?? prev.parent_name,
           mobile_number: student.mobile ?? prev.mobile_number,
           email: student.email ?? prev.email,
@@ -251,7 +325,7 @@ export default function EnrollmentPage() {
       })
       .catch(() => setError("Failed to load student details."))
       .finally(() => setFetchLoading(false));
-  }, [editStudentId, isEditMode, setFormData]);
+  }, [editStudentId, isEditMode, isViewMode, setFormData]);
 
   // Load classes when academic year changes
   useEffect(() => {
@@ -422,25 +496,97 @@ export default function EnrollmentPage() {
   };
 
   const academicYearOptions = useMemo(
-    () => academicYears.map((year) => ({ id: String(year.id), label: year.name, value: String(year.id) })),
-    [academicYears]
+    () => {
+      const base = academicYears.map((year) => ({ id: String(year.id), label: year.name, value: String(year.id) }));
+      if (
+        formData.academic_year_id === VIEW_FALLBACK_VALUES.academicYear &&
+        studentViewMeta.academic_year_name
+      ) {
+        base.push({
+          id: VIEW_FALLBACK_VALUES.academicYear,
+          value: VIEW_FALLBACK_VALUES.academicYear,
+          label: studentViewMeta.academic_year_name,
+        });
+      }
+      if (
+        formData.academic_year_id &&
+        !base.some((opt) => opt.value === formData.academic_year_id)
+      ) {
+        base.push({
+          id: formData.academic_year_id,
+          value: formData.academic_year_id,
+          label: studentViewMeta.academic_year_name || `Academic Year #${formData.academic_year_id}`,
+        });
+      }
+      return base;
+    },
+    [academicYears, formData.academic_year_id, studentViewMeta.academic_year_name]
   );
   const classOptions = useMemo(
-    () => classes.map((item) => ({ id: String(item.id), label: item.name, value: String(item.id) })),
-    [classes]
+    () => {
+      const base = classes.map((item) => ({ id: String(item.id), label: item.name, value: String(item.id) }));
+      if (formData.class_id && !base.some((opt) => opt.value === formData.class_id)) {
+        base.push({
+          id: formData.class_id,
+          value: formData.class_id,
+          label: studentViewMeta.class_name || `Class #${formData.class_id}`,
+        });
+      }
+      return base;
+    },
+    [classes, formData.class_id, studentViewMeta.class_name]
   );
   const divisionOptions = useMemo(
-    () =>
-      divisions.map((division) => ({
+    () => {
+      const base = divisions.map((division) => ({
         id: String(division.id),
         label: division.division_name,
         value: String(division.id),
-      })),
-    [divisions]
+      }));
+      if (
+        formData.class_division_id === VIEW_FALLBACK_VALUES.classDivision &&
+        studentViewMeta.class_division_name
+      ) {
+        base.push({
+          id: VIEW_FALLBACK_VALUES.classDivision,
+          value: VIEW_FALLBACK_VALUES.classDivision,
+          label: studentViewMeta.class_division_name,
+        });
+      }
+      if (formData.class_division_id && !base.some((opt) => opt.value === formData.class_division_id)) {
+        base.push({
+          id: formData.class_division_id,
+          value: formData.class_division_id,
+          label: studentViewMeta.class_division_name || `Division #${formData.class_division_id}`,
+        });
+      }
+      return base;
+    },
+    [divisions, formData.class_division_id, studentViewMeta.class_division_name]
   );
   const feePlanOptions = useMemo(
-    () => feePlans.map((plan) => ({ id: String(plan.id), label: plan.name, value: String(plan.id) })),
-    [feePlans]
+    () => {
+      const base = feePlans.map((plan) => ({ id: String(plan.id), label: plan.name, value: String(plan.id) }));
+      if (
+        formData.fee_structure_id === VIEW_FALLBACK_VALUES.feePlan &&
+        studentViewMeta.fee_structure_name
+      ) {
+        base.push({
+          id: VIEW_FALLBACK_VALUES.feePlan,
+          value: VIEW_FALLBACK_VALUES.feePlan,
+          label: studentViewMeta.fee_structure_name,
+        });
+      }
+      if (formData.fee_structure_id && !base.some((opt) => opt.value === formData.fee_structure_id)) {
+        base.push({
+          id: formData.fee_structure_id,
+          value: formData.fee_structure_id,
+          label: studentViewMeta.fee_structure_name || `Fee Plan #${formData.fee_structure_id}`,
+        });
+      }
+      return base;
+    },
+    [feePlans, formData.fee_structure_id, studentViewMeta.fee_structure_name]
   );
 
   // Filter discounts by class BEFORE using in discountOptions
@@ -455,13 +601,32 @@ export default function EnrollmentPage() {
   }, [classes, discounts, formData.class_id]);
 
   const discountOptions = useMemo(
-    () =>
-      filteredDiscounts.map((discount) => ({
+    () => {
+      const base = filteredDiscounts.map((discount) => ({
         id: String(discount.id),
         label: discount.discount_name,
         value: String(discount.id),
-      })),
-    [filteredDiscounts]
+      }));
+      if (
+        formData.discount_id === VIEW_FALLBACK_VALUES.discount &&
+        studentViewMeta.discount_name
+      ) {
+        base.push({
+          id: VIEW_FALLBACK_VALUES.discount,
+          value: VIEW_FALLBACK_VALUES.discount,
+          label: studentViewMeta.discount_name,
+        });
+      }
+      if (formData.discount_id && !base.some((opt) => opt.value === formData.discount_id)) {
+        base.push({
+          id: formData.discount_id,
+          value: formData.discount_id,
+          label: studentViewMeta.discount_name || `Discount #${formData.discount_id}`,
+        });
+      }
+      return base;
+    },
+    [filteredDiscounts, formData.discount_id, studentViewMeta.discount_name]
   );
 
   const selectedDiscountLabel = useMemo(() => {
@@ -496,21 +661,23 @@ export default function EnrollmentPage() {
 
   // Sync discount validity when filtered options change
   useEffect(() => {
+    if (isViewMode) return;
     if (!formData.discount_id) return;
     const stillValid = filteredDiscounts.some((discount) => discount.id === Number(formData.discount_id));
     if (!stillValid) {
       setFormData((prev) => ({ ...prev, discount_id: "" }));
     }
-  }, [filteredDiscounts, formData.discount_id, setFormData]);
+  }, [filteredDiscounts, formData.discount_id, setFormData, isViewMode]);
 
   // Sync fee plan validity when options change
   useEffect(() => {
+    if (isViewMode) return;
     if (!formData.fee_structure_id) return;
     const stillValid = feePlans.some((plan) => plan.id === Number(formData.fee_structure_id));
     if (!stillValid) {
       setFormData((prev) => ({ ...prev, fee_structure_id: "" }));
     }
-  }, [feePlans, formData.fee_structure_id, setFormData]);
+  }, [feePlans, formData.fee_structure_id, setFormData, isViewMode]);
 
   const prefillFromLead = async (selected: LeadOption) => {
     const prefill = await enrollmentService.prefillFromLead(selected.id);
@@ -537,32 +704,52 @@ export default function EnrollmentPage() {
       discountOptions,
     });
 
-    // 1. Lead Selection Header
-    config.layoutRows.splice(0, 0, {
-      kind: "custom" as const,
-      grid: { xs: 12 },
-      render: (ctx) => <FormSectionLabel title="Convert from Lead (Optional)" icon={<PersonSearchIcon />} />,
-    });
+    if (isViewMode) {
+      Object.values(config.fields).forEach((field) => {
+        if (field.type !== "custom") {
+          const props = field.props || {};
+          const currentSx = (props as any).sx;
+          field.props = {
+            ...props,
+            disabled: true,
+            sx: Array.isArray(currentSx)
+              ? [...currentSx, viewModeFieldSx]
+              : currentSx
+                ? [currentSx, viewModeFieldSx]
+                : [viewModeFieldSx],
+          };
+        }
+      });
+    }
 
-    // 2. Lead Selection Autocomplete
-    config.layoutRows.splice(1, 0, {
-      kind: "custom" as const,
-      grid: { xs: 12 },
-      render: (ctx) => (
-        <Autocomplete
-          options={leadOptions}
-          value={selectedLead}
-          onChange={(_, value) => {
-            setSelectedLead(value);
-            if (!value) return;
-            void prefillFromLead(value).catch(() => { });
-          }}
-          renderInput={(params) => (
-            <TextField {...params} label="Select Lead" placeholder="Search lead..." />
-          )}
-        />
-      ),
-    });
+    if (!isViewMode) {
+      // 1. Lead Selection Header
+      config.layoutRows.splice(0, 0, {
+        kind: "custom" as const,
+        grid: { xs: 12 },
+        render: (ctx) => <FormSectionLabel title="Convert from Lead (Optional)" icon={<PersonSearchIcon />} />,
+      });
+
+      // 2. Lead Selection Autocomplete
+      config.layoutRows.splice(1, 0, {
+        kind: "custom" as const,
+        grid: { xs: 12 },
+        render: (ctx) => (
+          <Autocomplete
+            options={leadOptions}
+            value={selectedLead}
+            onChange={(_, value) => {
+              setSelectedLead(value);
+              if (!value) return;
+              void prefillFromLead(value).catch(() => { });
+            }}
+            renderInput={(params) => (
+              <TextField {...params} label="Select Lead" placeholder="Search lead..." />
+            )}
+          />
+        ),
+      });
+    }
 
     // 3. Student Section Header
     const studentNameIdx = config.layoutRows.findIndex(
@@ -667,7 +854,7 @@ export default function EnrollmentPage() {
     const photoIdx = config.layoutRows.findIndex(
       (row) => row.kind === "fields" && row.fieldNames.includes("photo_url")
     );
-    if (photoIdx >= 0) {
+    if (photoIdx >= 0 && !isViewMode) {
       config.layoutRows.splice(photoIdx + 1, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
@@ -751,6 +938,7 @@ export default function EnrollmentPage() {
     uploadingPhoto,
     prefillFromLead,
     discountById,
+    isViewMode,
   ]);
 
   return (
@@ -779,7 +967,7 @@ export default function EnrollmentPage() {
         handleSubmit={handleSubmit}
         setFormError={setError}
         onConfirmSubmit={handleConfirmSubmit}
-        isEditMode={isEditMode}
+        isEditMode={isEditMode || isViewMode}
         loading={loading}
         fetchLoading={fetchLoading}
         error={error}
@@ -788,21 +976,24 @@ export default function EnrollmentPage() {
         onSnackbarClose={() => setSnackbar(null)}
         headerConfig={{
           links: [
-            { title: "Admissions", path: "/admissions/leads" },
-            { title: isEditMode ? "Edit Student Enrollment" : "Enrollment", path: "#" },
+            { title: "Students", path: "/students" },
+            { title: isViewMode ? "Student Details" : isEditMode ? "Edit" : "Add", path: "#" },
           ],
           homePath: "/",
-          cancelTooltip: "Cancel",
+          cancelTooltip: isViewMode ? "Back" : "Cancel",
           saveTooltipCreate: isEditMode ? "Save Student" : "Enroll Student",
           saveTooltipEdit: "Save Student",
         }}
         onCancelNavigate={() => navigate(-1)}
         confirmMessage={() =>
-          isEditMode
+          isViewMode
+            ? "This page is in view-only mode."
+            : isEditMode
             ? "Are you sure you want to update this student?"
             : "Are you sure you want to enroll this student?"
         }
-        canSubmit={canEnroll}
+        canSubmit={isViewMode ? false : canEnroll}
+        hideFooterActions={isViewMode}
       />
     </>
   );

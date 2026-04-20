@@ -18,6 +18,14 @@ class StudentDetailResponse(BaseModel):
     pincode: Optional[str] = None
     class_id: Optional[int] = None
     class_division_id: Optional[int] = None
+    class_name: Optional[str] = None
+    class_division_name: Optional[str] = None
+    academic_year_id: Optional[int] = None
+    academic_year_name: Optional[str] = None
+    fee_structure_id: Optional[int] = None
+    fee_structure_name: Optional[str] = None
+    discount_id: Optional[int] = None
+    discount_name: Optional[str] = None
     is_active: Optional[bool] = None
     parent_id: Optional[int] = None
     parent_name: Optional[str] = None

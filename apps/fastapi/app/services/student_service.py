@@ -1,4 +1,8 @@
 from app.models.student import Student
+from app.models.student_fee_assignment import StudentFeeAssignment
+from app.models.academic import AcademicYear, SchoolClass, ClassDivision
+from app.models.fee import FeeStructure
+from app.models.fee_discount import FeeDiscount
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from app.models.academic import SchoolClass, ClassDivision
@@ -74,6 +78,39 @@ class StudentService:
             student = query.filter(Student.student_code == student_id).first()
         if not student:
             return None
+        latest_assignment = (
+            self.db.query(StudentFeeAssignment)
+            .filter(StudentFeeAssignment.student_id == student.id)
+            .order_by(StudentFeeAssignment.id.desc())
+            .first()
+        )
+        effective_academic_year_id = student.academic_year_id or (latest_assignment.academic_year_id if latest_assignment else None)
+        effective_fee_structure_id = student.fee_structure_id or (latest_assignment.fee_structure_id if latest_assignment else None)
+        effective_discount_id = latest_assignment.discount_id if latest_assignment else None
+
+        academic_year_name = None
+        class_name = None
+        division_name = None
+        fee_structure_name = None
+        discount_name = None
+
+        if effective_academic_year_id:
+            ay = self.db.query(AcademicYear).filter(AcademicYear.id == effective_academic_year_id).first()
+            academic_year_name = ay.name if ay else None
+        if student.class_id:
+            cls = self.db.query(SchoolClass).filter(SchoolClass.id == student.class_id).first()
+            class_name = cls.name if cls else None
+            if not effective_academic_year_id and cls and cls.academic_year_id:
+                effective_academic_year_id = cls.academic_year_id
+        if student.class_division_id:
+            div = self.db.query(ClassDivision).filter(ClassDivision.id == student.class_division_id).first()
+            division_name = div.division_name if div else None
+        if effective_fee_structure_id:
+            fs = self.db.query(FeeStructure).filter(FeeStructure.id == effective_fee_structure_id).first()
+            fee_structure_name = fs.name if fs and fs.name else (f"Fee Structure #{effective_fee_structure_id}" if fs else None)
+        if effective_discount_id:
+            disc = self.db.query(FeeDiscount).filter(FeeDiscount.id == effective_discount_id).first()
+            discount_name = disc.discount_name if disc else None
         dob = student.date_of_birth
         if dob is not None and not isinstance(dob, str):
             dob = dob.isoformat()
@@ -100,6 +137,14 @@ class StudentService:
             pincode=student.pincode,
             class_id=student.class_id,
             class_division_id=student.class_division_id,
+            class_name=class_name,
+            class_division_name=division_name,
+            academic_year_id=effective_academic_year_id,
+            academic_year_name=academic_year_name,
+            fee_structure_id=effective_fee_structure_id,
+            fee_structure_name=fee_structure_name,
+            discount_id=effective_discount_id,
+            discount_name=discount_name,
             is_active=student.is_active,
             parent_id=student.parent_id,
             parent_name=parent_name,

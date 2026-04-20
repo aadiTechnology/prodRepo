@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import StatusChip from "../../components/roles/StatusChip";
 import type { Student } from "../../types/student";
 import type { ListConfig } from "../../components/reusable";
@@ -85,22 +86,50 @@ export function createStudentListConfig({
 
 export function renderStudentRowActions({
   row,
+  onView,
   onEdit,
   onDelete,
 }: {
   row: Student;
+  onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   return (
     <Box sx={{ display: "flex", gap: 1 }}>
+      <Tooltip title="View">
+        <IconButton
+          size="small"
+          onClick={(event) => {
+            event.stopPropagation();
+            onView();
+          }}
+          color="info"
+        >
+          <VisibilityIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
       <Tooltip title="Edit">
-        <IconButton size="small" onClick={onEdit} color="primary">
+        <IconButton
+          size="small"
+          onClick={(event) => {
+            event.stopPropagation();
+            onEdit();
+          }}
+          color="primary"
+        >
           <EditIcon fontSize="small" />
         </IconButton>
       </Tooltip>
       <Tooltip title="Delete">
-        <IconButton size="small" onClick={onDelete} color="error">
+        <IconButton
+          size="small"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete();
+          }}
+          color="error"
+        >
           <DeleteIcon fontSize="small" />
         </IconButton>
       </Tooltip>

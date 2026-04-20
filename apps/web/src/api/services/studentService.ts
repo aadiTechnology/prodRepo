@@ -22,6 +22,14 @@ export interface StudentDetails {
   pincode?: string;
   class_id?: number;
   class_division_id?: number;
+  class_name?: string;
+  class_division_name?: string;
+  academic_year_id?: number;
+  academic_year_name?: string;
+  fee_structure_id?: number;
+  fee_structure_name?: string;
+  discount_id?: number;
+  discount_name?: string;
   is_active?: boolean;
   parent_name?: string;
   parent_mobile?: string;
@@ -87,6 +95,14 @@ const studentService = {
       pincode: d.pincode,
       class_id: d.class_id,
       class_division_id: d.class_division_id,
+      class_name: d.class_name,
+      class_division_name: d.class_division_name,
+      academic_year_id: d.academic_year_id,
+      academic_year_name: d.academic_year_name,
+      fee_structure_id: d.fee_structure_id,
+      fee_structure_name: d.fee_structure_name,
+      discount_id: d.discount_id,
+      discount_name: d.discount_name,
       is_active: d.is_active,
       parent_name: d.parent_name,
       parent_mobile: d.parent_mobile,

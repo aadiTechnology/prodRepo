@@ -46,6 +46,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
   submitLabelEdit = "Save",
   formTopSlot,
   canSubmit = true,
+  hideFooterActions = false,
 }: BaseFormProps<T>) {
   const formId = useId();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -167,22 +168,24 @@ export default function BaseForm<T extends Record<string, unknown>>({
             })}
           </Grid>
 
-          <Box
-            sx={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 2,
-              justifyContent: "center",
-              mt: 4,
-            }}
-          >
-            <SaveButton type="submit" disabled={!canSubmit} loading={loading}>
-              {isEditMode ? submitLabelEdit : submitLabelCreate}
-            </SaveButton>
-            <CancelButton onClick={onCancelNavigate} disabled={loading}>
-              Cancel
-            </CancelButton>
-          </Box>
+          {!hideFooterActions && (
+            <Box
+              sx={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 2,
+                justifyContent: "center",
+                mt: 4,
+              }}
+            >
+              <SaveButton type="submit" disabled={!canSubmit} loading={loading}>
+                {isEditMode ? submitLabelEdit : submitLabelCreate}
+              </SaveButton>
+              <CancelButton onClick={onCancelNavigate} disabled={loading}>
+                Cancel
+              </CancelButton>
+            </Box>
+          )}
         </form>
       </ListPageLayout>
 
