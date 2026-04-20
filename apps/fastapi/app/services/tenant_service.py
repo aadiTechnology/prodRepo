@@ -144,6 +144,20 @@ def provision_tenant(db: Session, data: TenantProvision, created_by: int | None 
             {"user_id": admin_user.id, "role_id": admin_role.id}
         )
 
+        # 5. Provision TEACHER role
+        teacher_role = Role(
+            tenant_id=new_tenant.id,
+            code="TEACHER",
+            name="Teacher",
+            scope_type="Tenant",
+            is_system=False,
+            is_active=True,
+            created_by=created_by,
+        )
+        db.add(teacher_role)
+        db.flush()
+        logger.info(f"Tenant {code}: Provisioned default TEACHER role")
+
         db.commit()
         logger.info(f"Tenant {code} provisioned successfully with ADMIN {data.email}")
 

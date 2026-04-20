@@ -61,7 +61,7 @@ class Role(Base):
     __tablename__ = "roles"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    code = Column(String(50), unique=True, nullable=False)
+    code = Column(String(50), nullable=False)
     name = Column(String(100), nullable=False)
     scope_type = Column(String(20), nullable=False, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)

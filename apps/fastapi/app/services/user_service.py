@@ -26,9 +26,30 @@ def create_user(
             logger.warning(f"Attempt to create user with existing email: {user.email}")
             raise ConflictException(f"User with email {user.email} already exists")
 
-        role_obj = db.query(Role).filter(Role.code == user.role).first()
+        # Tenant-aware role lookup
+        role_obj = db.query(Role).filter(
+            Role.code == user.role,
+            Role.tenant_id == tenant_id
+        ).first()
+
         if not role_obj:
-            raise ConflictException("Role does not exist.")
+            # Auto-healing: Create the role if it's a critical role (TEACHER/ADMIN) and missing for this tenant
+            if user.role.upper() in ["TEACHER", "ADMIN"]:
+                role_obj = Role(
+                    code=user.role.upper(),
+                    name=user.role.title(),
+                    scope_type="Tenant",
+                    tenant_id=tenant_id,
+                    is_system=False,
+                    is_active=True,
+                    created_by=created_by
+                )
+                db.add(role_obj)
+                db.flush()
+                logger.info(f"Auto-created {user.role.upper()} role for tenant {tenant_id}")
+            else:
+                logger.warning(f"Role not found: {user.role} for tenant {tenant_id}")
+                raise ConflictException(f"Role '{user.role}' does not exist.")
 
         db_user = User(
             email=user.email,
