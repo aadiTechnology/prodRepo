@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from "react";
+import React, { useMemo } from "react";
 import {
   Box,
   Typography,
@@ -6,20 +6,16 @@ import {
   MenuItem,
   Button,
   TextField,
-  Chip,
   Tooltip,
   CircularProgress,
   Snackbar,
   Alert,
   Stack,
   alpha,
-  IconButton,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import {
-  SaveOutlined as SaveIcon,
-  DoneAllOutlined as CheckAllIcon,
-  CalendarMonthOutlined as CalendarIcon,
-  FilterAltOffOutlined as ResetIcon,
   CheckBoxOutlined,
   CheckBoxOutlineBlank,
 } from "@mui/icons-material";
@@ -44,43 +40,6 @@ const filterSelectSx = {
   },
 };
 
-// ── Action Button Component ───────────────────────────────────────────────────
-const ActionButton = ({ 
-  icon, 
-  onClick, 
-  colorMain, 
-  disabled = false 
-}: { 
-  icon: React.ReactNode; 
-  onClick: () => void; 
-  colorMain: string; 
-  disabled?: boolean;
-}) => (
-  <IconButton
-    onClick={onClick}
-    disabled={disabled}
-    sx={{
-      width: 42,
-      height: 42,
-      bgcolor: alpha(colorMain, 0.08),
-      color: colorMain,
-      borderRadius: "12px",
-      border: `1.5px solid ${alpha(colorMain, 0.2)}`,
-      transition: "all 0.2s ease",
-      "&:hover": {
-        bgcolor: alpha(colorMain, 0.15),
-        transform: "translateY(-2px)",
-        boxShadow: `0 4px 12px ${alpha(colorMain, 0.2)}`,
-      },
-      "&.Mui-disabled": {
-        opacity: 0.6,
-      }
-    }}
-  >
-    {icon}
-  </IconButton>
-);
-
 // ── Legend Item ───────────────────────────────────────────────────────────────
 const LegendItem = ({
   icon,
@@ -101,7 +60,6 @@ const LegendItem = ({
 
 // ── Main Component ────────────────────────────────────────────────────────────
 const MarkAttendance = () => {
-  const dateInputRef = useRef<HTMLInputElement>(null);
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(10);
 
@@ -126,6 +84,8 @@ const MarkAttendance = () => {
     filteredDivisions,
     isTeacher,
   } = controller;
+
+  const allRowsPresent = students.length > 0 && students.every((s) => s.status === "Present");
 
   // Paginate students
   const paginatedStudents = students.slice(
@@ -155,38 +115,28 @@ const MarkAttendance = () => {
         return {
           ...col,
           render: (row: any) => (
-            <Box sx={{ display: "flex", justifyContent: "center", gap: 0.75 }}>
-              {ATTENDANCE_STATUSES.map((status) => {
-                const isSelected = row.status === status.id;
-                return (
-                  <Tooltip key={status.id} title={status.label} arrow>
-                    <Button
-                      variant={isSelected ? "contained" : "outlined"}
-                      color={status.color as any}
-                      size="small"
-                      onClick={() => updateStudentStatus(row.student_id, status.id)}
-                      sx={{
-                        minWidth: 38,
-                        height: 32,
-                        borderRadius: "10px",
-                        textTransform: "none",
-                        fontWeight: 700,
-                        fontSize: "0.75rem",
-                        opacity: row.status && !isSelected ? 0.45 : 1,
-                        transition: "all 0.2s ease-in-out",
-                        boxShadow: isSelected ? `0 4px 10px rgba(0,0,0,0.15)` : "none",
-                        "&:hover": {
-                          transform: "translateY(-2px)",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      {status.short}
-                    </Button>
-                  </Tooltip>
-                );
-              })}
+            <Box sx={{ display: "flex", justifyContent: "center" }}>
+              <Stack direction="row" spacing={0.75}>
+                {ATTENDANCE_STATUSES.map((status) => (
+                  <FormControlLabel
+                    key={status.id}
+                    sx={{ mr: 0 }}
+                    control={
+                      <Checkbox
+                        checked={row.status === status.id}
+                        onChange={() => updateStudentStatus(row.student_id, status.id)}
+                        size="small"
+                      />
+                    }
+                    label={
+                      <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                        {status.short}
+                      </Typography>
+                    }
+                    labelPlacement="end"
+                  />
+                ))}
+              </Stack>
             </Box>
           ),
         };
@@ -196,22 +146,11 @@ const MarkAttendance = () => {
           ...col,
           render: (row: any) => (
             <TextField
-              fullWidth
               size="small"
-              placeholder="Add note..."
+              fullWidth
+              placeholder="Remarks (optional)"
               value={row.remarks || ""}
-              onChange={(e) => updateStudentRemarks(row.student_id, e.target.value)}
-              variant="outlined"
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: "10px",
-                  fontSize: "0.8rem",
-                  bgcolor: colorTokens.background.subtle,
-                  "& fieldset": { borderColor: "transparent" },
-                  "&:hover fieldset": { borderColor: colorTokens.border.default },
-                  "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
-                },
-              }}
+              onChange={(event) => updateStudentRemarks(row.student_id, event.target.value)}
             />
           ),
         };
@@ -229,6 +168,31 @@ const MarkAttendance = () => {
       flexWrap="wrap"
       sx={{ width: "100%" }}
     >
+      {/* Date Picker */}
+      <TextField
+        label="Date"
+        type="date"
+        size="small"
+        value={filters.attendance_date}
+        onChange={(e) =>
+          setFilters((prev) => ({ ...prev, attendance_date: e.target.value }))
+        }
+        InputLabelProps={{ shrink: true }}
+        inputProps={{
+          max: new Date().toISOString().split("T")[0],
+          min: isTeacher ? new Date().toISOString().split("T")[0] : undefined,
+        }}
+        sx={{
+          minWidth: { xs: "100%", sm: 180 },
+          "& .MuiOutlinedInput-root": {
+            borderRadius: "15px",
+            fontSize: "0.85rem",
+            fontWeight: 600,
+            bgcolor: "#ffffff",
+          },
+        }}
+      />
+
       {/* Academic Year */}
       <Select
         value={filters.academic_year_id || ""}
@@ -294,6 +258,7 @@ const MarkAttendance = () => {
         value={filters.class_id || ""}
         displayEmpty
         size="small"
+        disabled={isTeacher}
         onChange={(e) =>
           setFilters((prev) => ({
             ...prev,
@@ -320,7 +285,7 @@ const MarkAttendance = () => {
         value={filters.division_id || ""}
         displayEmpty
         size="small"
-        disabled={!filteredDivisions.length}
+        disabled={!filteredDivisions.length || isTeacher}
         onChange={(e) =>
           setFilters((prev) => ({ ...prev, division_id: Number(e.target.value) }))
         }
@@ -338,75 +303,38 @@ const MarkAttendance = () => {
         ))}
       </Select>
 
-      {/* Date Picker */}
-      <Tooltip title={filters.attendance_date || "Select Date"} arrow>
-        <Box sx={{ position: "relative" }}>
-          <input
-            ref={dateInputRef}
-            type="date"
-            value={filters.attendance_date}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, attendance_date: e.target.value }))
-            }
-            style={{
-              position: "absolute",
-              opacity: 0,
-              width: 0,
-              height: 0,
-              top: "50%",
-              left: "50%",
-              zIndex: -1,
-              pointerEvents: "none",
-            }}
-          />
-          <ActionButton
-            icon={<CalendarIcon sx={{ fontSize: 22 }} />}
-            onClick={() => {
-              try {
-                dateInputRef.current?.showPicker();
-              } catch (err) {
-                dateInputRef.current?.click();
-              }
-            }}
-            colorMain={colorTokens.preschool.turquoise.main}
-          />
-        </Box>
-      </Tooltip>
-
-      {/* Reset Button */}
-      <Tooltip title="Reset filters" arrow>
-        <Box>
-          <ActionButton
-            icon={<ResetIcon sx={{ fontSize: 22 }} />}
-            onClick={resetFilters}
-            colorMain={colorTokens.preschool.coral.main}
-          />
-        </Box>
-      </Tooltip>
-
-      {/* Action Buttons (Mark All & Save) */}
+      {/* Action Buttons */}
       {students.length > 0 && (
         <>
-          <Box sx={{ width: '1px', height: 32, bgcolor: colorTokens.border.default, mx: 0.5, borderRadius: 1, display: { xs: 'none', sm: 'block' } }} />
-          <Tooltip title="Mark All Present" arrow>
-            <Box>
-              <ActionButton
-                icon={<CheckAllIcon sx={{ fontSize: 22 }} />}
-                onClick={markAllPresent}
-                colorMain={colorTokens.success.main}
+          <FormControlLabel
+            sx={{ ml: { xs: 0, sm: 1 } }}
+            control={
+              <Checkbox
+                checked={allRowsPresent}
+                onChange={markAllPresent}
               />
-            </Box>
-          </Tooltip>
-          <Tooltip title="Save Attendance" arrow>
-            <Box>
-              <ActionButton
-                icon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon sx={{ fontSize: 22 }} />}
-                onClick={saveAttendance}
-                disabled={saving}
-                colorMain={colorTokens.primary.main}
-              />
-            </Box>
-          </Tooltip>
+            }
+            label={
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Select All (Mark All Present)
+              </Typography>
+            }
+          />
+          <Button
+            variant="outlined"
+            onClick={resetFilters}
+            sx={{ borderRadius: "12px", textTransform: "none" }}
+          >
+            Reset
+          </Button>
+          <Button
+            variant="contained"
+            onClick={saveAttendance}
+            disabled={saving}
+            sx={{ borderRadius: "12px", textTransform: "none", px: 2.5 }}
+          >
+            {saving ? <CircularProgress size={20} color="inherit" /> : "Save"}
+          </Button>
         </>
       )}
     </Stack>
@@ -525,7 +453,7 @@ const MarkAttendance = () => {
             Select filters to load students
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Choose academic year, teacher, class & division — students will load automatically.
+            Choose date, class and division to load students.
           </Typography>
         </Box>
       )}

@@ -68,6 +68,23 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     severity: 'success'
   });
 
+  const showError = (message: string) => {
+    setSnackbar({ open: true, message, severity: "error" });
+  };
+
+  const isTeacherDateRestricted = (attendanceDate: string) =>
+    isTeacher && attendanceDate !== today;
+
+  const isFutureDate = (attendanceDate: string) => attendanceDate > today;
+
+  const resolveNetworkErrorMessage = (fallback: string, err: unknown) => {
+    const errorLike = err as { response?: unknown };
+    if (!errorLike?.response) {
+      return "Check your internet connection";
+    }
+    return fallback;
+  };
+
   // Load initial metadata
   useEffect(() => {
     const loadInitialData = async () => {
@@ -189,22 +206,33 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
   }, [filters.class_id, filters.division_id, filters.attendance_date]);
 
   const fetchStudents = useCallback(async () => {
-    if (!filters.class_id || !filters.division_id || !filters.attendance_date) {
-      setSnackbar({ open: true, message: "Please select Class and Division", severity: 'error' });
+    if (!filters.class_id) {
+      showError("Please select Class");
+      return;
+    }
+    if (!filters.division_id) {
+      showError("Please select Division");
+      return;
+    }
+    if (!filters.attendance_date) {
+      showError("Please select Date");
+      return;
+    }
+    if (isTeacherDateRestricted(filters.attendance_date)) {
+      showError("You cannot edit past attendance");
+      return;
+    }
+    if (isFutureDate(filters.attendance_date)) {
+      showError("You cannot mark attendance for future dates");
       return;
     }
 
     const selectedYear = academicYears.find(y => y.id === filters.academic_year_id);
     if (selectedYear) {
       if (filters.attendance_date < selectedYear.start_date || filters.attendance_date > selectedYear.end_date) {
-        setSnackbar({ open: true, message: "Selected date is outside the academic year", severity: 'error' });
+        showError("Selected date is outside the academic year");
         return;
       }
-    }
-
-    if (filters.attendance_date > today) {
-      setSnackbar({ open: true, message: "You cannot mark attendance for future dates", severity: 'error' });
-      return;
     }
 
     setLoading(true);
@@ -217,11 +245,11 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
       setStudents(data.attendance);
     } catch (err) {
       console.error("Failed to fetch students", err);
-      setSnackbar({ open: true, message: "Failed to load students", severity: 'error' });
+      showError(resolveNetworkErrorMessage("Unable to load student list", err));
     } finally {
       setLoading(false);
     }
-  }, [filters, academicYears, today]);
+  }, [filters, academicYears, isTeacher, today]);
 
   const updateStudentStatus = (studentId: number, status: string) => {
     setStudents(prev => prev.map(s => s.student_id === studentId ? { ...s, status } : s));
@@ -232,23 +260,38 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
   };
 
   const markAllPresent = () => {
-    setStudents(prev => prev.map(s => ({ ...s, status: s.status || 'Present' })));
+    setStudents(prev => prev.map(s => ({ ...s, status: "Present" })));
   };
 
   const saveAttendance = async () => {
     if (!students.length) return;
+    if (!filters.class_id) {
+      showError("Please select Class");
+      return;
+    }
+    if (!filters.division_id) {
+      showError("Please select Division");
+      return;
+    }
+    if (isTeacherDateRestricted(filters.attendance_date)) {
+      showError("You cannot edit past attendance");
+      return;
+    }
+    if (isFutureDate(filters.attendance_date)) {
+      showError("You cannot mark attendance for future dates");
+      return;
+    }
+    if (students.some((student) => !student.status)) {
+      showError("Please mark attendance for all students");
+      return;
+    }
 
     const selectedYear = academicYears.find(y => y.id === filters.academic_year_id);
     if (selectedYear) {
       if (filters.attendance_date < selectedYear.start_date || filters.attendance_date > selectedYear.end_date) {
-        setSnackbar({ open: true, message: "Selected date is outside the academic year", severity: 'error' });
+        showError("Selected date is outside the academic year");
         return;
       }
-    }
-
-    if (filters.attendance_date > today) {
-      setSnackbar({ open: true, message: "You cannot mark attendance for future dates", severity: 'error' });
-      return;
     }
 
     setSaving(true);
@@ -267,10 +310,10 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
       };
 
       await attendanceService.markAttendance(payload);
-      setSnackbar({ open: true, message: "Attendance saved successfully!", severity: 'success' });
+      setSnackbar({ open: true, message: "Attendance saved successfully", severity: 'success' });
     } catch (err) {
       console.error("Failed to save attendance", err);
-      setSnackbar({ open: true, message: "Failed to save attendance", severity: 'error' });
+      showError(resolveNetworkErrorMessage("Failed to save attendance", err));
     } finally {
       setSaving(false);
     }

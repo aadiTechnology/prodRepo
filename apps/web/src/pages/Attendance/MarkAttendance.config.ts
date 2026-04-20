@@ -18,26 +18,26 @@ export const createMarkAttendanceColumns = (
 ): DataTableProps<AttendanceResponse>["columns"] => [
   {
     id: "roll_no",
-    label: "Roll #",
+    label: "Roll",
     width: "80px",
     render: (row) => row.roll_no || "-",
   },
   {
     id: "student_name",
-    label: "Student Name",
+    label: "Name",
     render: (row) => row.student_name,
   },
   {
     id: "status",
-    label: "Attendance Status",
+    label: "Status (P/A/HD/L)",
     align: "center",
-    width: "250px",
+    width: "320px",
     // Rendering logic will be handled inside the component or a dedicated cell component
     // but we define the column here for structure.
   },
   {
     id: "remarks",
-    label: "Remarks",
-    width: "300px",
+    label: "Remarks (Optional)",
+    width: "260px",
   }
 ];
