@@ -41,7 +41,9 @@ class TeacherResponse(TeacherBase):
     teacher_code: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
-    
+    # Linked user account id — used by frontend to match teacher to logged-in user
+    user_id: Optional[int] = None
+
     # Extended properties
     class_name: Optional[str] = None
     division_name: Optional[str] = None

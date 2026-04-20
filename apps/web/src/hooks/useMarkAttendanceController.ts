@@ -84,18 +84,22 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         // Find active year
         const activeYear = years.find(y => y.is_active);
 
-        if (isTeacher && user?.email) {
-          // For TEACHER role: only expose their own record in the dropdown
-          const myTeacher = teacherList.items.find(
-            t => t.email?.toLowerCase() === user.email?.toLowerCase()
-          );
+        if (isTeacher && user?.id) {
+          // Primary match: teacher.user_id === logged-in user.id (most reliable)
+          // Fallback : match by email for legacy records where user_id may be null
+          let myTeacher = teacherList.items.find(t => t.user_id === user.id);
+          if (!myTeacher && user?.email) {
+            myTeacher = teacherList.items.find(
+              t => t.email?.toLowerCase() === user.email?.toLowerCase()
+            );
+          }
           if (myTeacher) {
             setTeachers([myTeacher]); // only their own name
             setFilters(prev => ({
               ...prev,
               academic_year_id: activeYear?.id ?? prev.academic_year_id,
-              teacher_id: myTeacher.id,
-              class_id: myTeacher.class_id || prev.class_id,
+              teacher_id: myTeacher!.id,
+              class_id: myTeacher!.class_id || prev.class_id,
             }));
           } else {
             setTeachers([]);

@@ -30,6 +30,8 @@ export interface TeacherResponse extends TeacherBase {
   teacher_code?: string;
   created_at: string;
   updated_at?: string | null;
+  /** Linked user account id — used to resolve the logged-in teacher's record */
+  user_id?: number | null;
   class_name?: string | null;
   division_name?: string | null;
 }
