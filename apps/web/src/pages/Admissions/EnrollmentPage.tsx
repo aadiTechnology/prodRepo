@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Alert, Autocomplete, Box, Button, TextField, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import dayjs from "dayjs";
@@ -21,6 +21,7 @@ import { useRBAC } from "../../context/RBACContext";
 import { useFormManager } from "../../hooks/useFormManager";
 import leadService from "../../api/services/leadService";
 import enrollmentService, { type EnrollmentCreatePayload } from "../../api/services/enrollmentService";
+import studentService from "../../api/services/studentService";
 import academicYearService from "../../api/services/academicYearService";
 import schoolClassService, { type SchoolClass, type ClassDivision } from "../../api/services/schoolClassService";
 import feeDiscountService from "../../api/services/feeDiscountService";
@@ -67,8 +68,11 @@ const emptyForm = (): EnrollmentFormData => ({
 export default function EnrollmentPage() {
   const navigate = useNavigate();
   const { leadId } = useParams<{ leadId?: string }>();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { hasPermission } = useRBAC();
+  const isEditMode = searchParams.get("mode") === "edit";
+  const editStudentId = searchParams.get("studentId");
 
   const canEnroll = hasPermission("ADMISSIONS_MGMT:create") || hasPermission("ADMISSIONS_MGMT:edit") || user?.role === "SUPER_ADMIN";
 
@@ -76,7 +80,7 @@ export default function EnrollmentPage() {
 
   // Core form state
   const [error, setError] = useState<string | null>(null);
-  const [fetchLoading, setFetchLoading] = useState(Boolean(leadId));
+  const [fetchLoading, setFetchLoading] = useState(Boolean(leadId) || Boolean(isEditMode && editStudentId));
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -178,6 +182,10 @@ export default function EnrollmentPage() {
 
   // Prefill from lead if leadId param exists
   useEffect(() => {
+    if (isEditMode) {
+      setFetchLoading(false);
+      return;
+    }
     if (!leadId) {
       setFetchLoading(false);
       return;
@@ -206,7 +214,44 @@ export default function EnrollmentPage() {
       })
       .catch(() => { })
       .finally(() => setFetchLoading(false));
-  }, [leadId, setFormData]);
+  }, [leadId, isEditMode, setFormData]);
+
+  // Prefill from student if enrollment is used in edit mode
+  useEffect(() => {
+    if (!isEditMode) return;
+    if (!editStudentId) {
+      setError("Student ID is required for edit mode.");
+      setFetchLoading(false);
+      return;
+    }
+
+    setFetchLoading(true);
+    studentService
+      .getStudentById(editStudentId)
+      .then((student) => {
+        setFormData((prev) => ({
+          ...prev,
+          student_name: student.name ?? prev.student_name,
+          date_of_birth: student.date_of_birth ?? prev.date_of_birth,
+          gender: student.gender ?? prev.gender,
+          admission_no: student.admission_no ?? prev.admission_no,
+          admission_date: student.created_at
+            ? dayjs(student.created_at).format("YYYY-MM-DD")
+            : prev.admission_date,
+          class_id: student.class_id ? String(student.class_id) : prev.class_id,
+          class_division_id: student.class_division_id
+            ? String(student.class_division_id)
+            : prev.class_division_id,
+          parent_name: student.parent_name ?? prev.parent_name,
+          mobile_number: student.mobile ?? prev.mobile_number,
+          email: student.email ?? prev.email,
+          photo_url: student.photo_url ?? prev.photo_url,
+          birth_certificate_url: student.birth_certificate_url ?? prev.birth_certificate_url,
+        }));
+      })
+      .catch(() => setError("Failed to load student details."))
+      .finally(() => setFetchLoading(false));
+  }, [editStudentId, isEditMode, setFormData]);
 
   // Load classes when academic year changes
   useEffect(() => {
@@ -338,11 +383,39 @@ export default function EnrollmentPage() {
     setError(null);
     setLoading(true);
     try {
-      const res = await enrollmentService.enroll(buildPayload());
-      setSnackbar(res.message || "Enrollment completed successfully");
+      if (isEditMode) {
+        if (!editStudentId) {
+          setError("Student ID is required for edit mode.");
+          return;
+        }
+        const res = await studentService.update(editStudentId, {
+          student_name: formData.student_name.trim(),
+          gender: formData.gender || null,
+          date_of_birth: formData.date_of_birth,
+          mobile_number: formData.mobile_number.trim(),
+          email: formData.email.trim() || null,
+          class_id: Number(formData.class_id),
+          class_division_id: formData.class_division_id ? Number(formData.class_division_id) : null,
+          parent: {
+            parent_name: formData.parent_name.trim(),
+            mobile_number: formData.mobile_number.trim(),
+            email: formData.email.trim() || null,
+          },
+          admission_no: formData.admission_no.trim() || null,
+          birth_certificate_url: formData.birth_certificate_url.trim() || null,
+          photo_url: formData.photo_url.trim() || null,
+        });
+        setSnackbar(res?.message || "Student updated successfully");
+      } else {
+        const res = await enrollmentService.enroll(buildPayload());
+        setSnackbar(res.message || "Enrollment completed successfully");
+      }
       setTimeout(() => navigate("/students"), 1000);
     } catch (e: any) {
-      setError(e?.response?.data?.detail || "Enrollment failed. Please try again");
+      setError(
+        e?.response?.data?.detail ||
+          (isEditMode ? "Student update failed. Please try again" : "Enrollment failed. Please try again")
+      );
     } finally {
       setLoading(false);
     }
@@ -706,7 +779,7 @@ export default function EnrollmentPage() {
         handleSubmit={handleSubmit}
         setFormError={setError}
         onConfirmSubmit={handleConfirmSubmit}
-        isEditMode={false}
+        isEditMode={isEditMode}
         loading={loading}
         fetchLoading={fetchLoading}
         error={error}
@@ -716,14 +789,19 @@ export default function EnrollmentPage() {
         headerConfig={{
           links: [
             { title: "Admissions", path: "/admissions/leads" },
-            { title: "Enrollment", path: "#" },
+            { title: isEditMode ? "Edit Student Enrollment" : "Enrollment", path: "#" },
           ],
           homePath: "/",
           cancelTooltip: "Cancel",
-          saveTooltipCreate: "Enroll Student",
+          saveTooltipCreate: isEditMode ? "Save Student" : "Enroll Student",
+          saveTooltipEdit: "Save Student",
         }}
         onCancelNavigate={() => navigate(-1)}
-        confirmMessage={() => "Are you sure you want to enroll this student?"}
+        confirmMessage={() =>
+          isEditMode
+            ? "Are you sure you want to update this student?"
+            : "Are you sure you want to enroll this student?"
+        }
         canSubmit={canEnroll}
       />
     </>

@@ -5,7 +5,7 @@
  */
 import React, { lazy, Suspense } from "react";
 import { Box, CircularProgress } from "@mui/material";
-import { Routes, Route, Outlet } from "react-router-dom";
+import { Routes, Route, Outlet, Navigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import ChangePassword from "../pages/ChangePassword";
@@ -16,7 +16,6 @@ import FeeDiscountsPage from "../pages/Fees/FeeDiscountsPage";
 import AddFeeDiscount from "../pages/AddFeeDiscount";
 import StudentFeeLedger from "../pages/StudentFeeLedger";
 import StudentList from "../pages/students/StudentList";
-const AddStudent = lazy(() => import("../pages/students/AddStudent"));
 // ═══════════════════════════════════════════════════════════════════════════
 // Lazy-loaded Pages - Code splitting for better performance
 // ═══════════════════════════════════════════════════════════════════════════
@@ -83,6 +82,15 @@ function AIReviewRouteLayout() {
     </AIReviewProvider>
   );
 }
+
+function LegacyStudentEditRedirect() {
+  const { id } = useParams<{ id?: string }>();
+  const target = id
+    ? `/admissions/enrollment?studentId=${encodeURIComponent(id)}&mode=edit`
+    : "/admissions/enrollment?mode=edit";
+  return <Navigate to={target} replace />;
+}
+
 export default function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -95,8 +103,22 @@ export default function AppRoutes() {
         <Route element={<MainLayout />}>
           <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
           <Route path="/students" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:view"><StudentList /></ProtectedRoute>} />
-          <Route path="/students/add" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:create"><AddStudent /></ProtectedRoute>} />
-          <Route path="/students/:id/edit" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:edit"><AddStudent /></ProtectedRoute>} />
+          <Route
+            path="/students/add"
+            element={
+              <ProtectedRoute requiredPermissions="ADMIN_MGMT:create">
+                <Navigate to="/admissions/enrollment" replace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/students/:id/edit"
+            element={
+              <ProtectedRoute requiredPermissions="ADMIN_MGMT:edit">
+                <LegacyStudentEditRedirect />
+              </ProtectedRoute>
+            }
+          />
           {/* User Management */}
           <Route
             path="/reports/sprint-performance"

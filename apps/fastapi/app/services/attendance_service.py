@@ -1,3 +1,5 @@
+
+from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from datetime import date, datetime

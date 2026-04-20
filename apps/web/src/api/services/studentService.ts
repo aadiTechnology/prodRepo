@@ -33,6 +33,8 @@ export interface StudentDetails {
   classId?: number;
   tenantId?: number;
   feeStructureId?: number;
+  birth_certificate_url?: string;
+  photo_url?: string;
 }
 
 

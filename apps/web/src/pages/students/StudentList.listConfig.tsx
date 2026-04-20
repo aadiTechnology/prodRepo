@@ -76,7 +76,7 @@ export function createStudentListConfig({
     ],
     actions: {
       rowActions: (row) => ({
-        onEdit: () => navigate(`/students/${row.id}/edit`),
+        onEdit: () => navigate(`/admissions/enrollment?studentId=${row.id}&mode=edit`),
         onDelete: () => onDeleteClick(row),
       }),
     },

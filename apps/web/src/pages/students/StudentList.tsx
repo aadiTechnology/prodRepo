@@ -142,7 +142,7 @@ const StudentList = () => {
                   searchValue={search}
                   onSearchChange={onSearchChange}
                   searchPlaceholder="Search students..."
-                  onAddClick={() => navigate("/students/add")}
+                  onAddClick={() => navigate("/admissions/enrollment")}
                   addLabel="Add Student"
                   filters={[]}
                 />
@@ -223,7 +223,7 @@ const StudentList = () => {
         renderRowActions={(row) =>
           renderStudentRowActions({
             row,
-            onEdit: () => navigate(`/students/${row.id}/edit`),
+            onEdit: () => navigate(`/admissions/enrollment?studentId=${row.id}&mode=edit`),
             onDelete: () => openDeleteConfirm(row),
           })
         }

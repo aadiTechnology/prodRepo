@@ -276,6 +276,7 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
   }
 ];
 
+
 export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggleCollapse }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -288,6 +289,21 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Initialize expandedSections based on current path and menuItems
+  useEffect(() => {
+    const initialExpanded: Record<string, boolean> = {};
+    menuItems.forEach(item => {
+      if (
+        location.pathname === item.path ||
+        (item.children?.some(child => location.pathname === child.path) ?? false)
+      ) {
+        initialExpanded[item.id] = true;
+      }
+    });
+    setExpandedSections(initialExpanded);
+    // Only run when menuItems or location.pathname changes
+  }, [menus, user, location.pathname]);
 
   const menuItems: MenuItemData[] = useMemo(() => {
     if (rbacRoles.includes("super_admin")) {
@@ -327,10 +343,10 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
     });
   }, [menus, user]);
 
-  const toggleSection = (id: string, isActive: boolean) => {
+  const toggleSection = (id: string) => {
     setExpandedSections((prev) => ({
       ...prev,
-      [id]: prev[id] !== undefined ? !prev[id] : !isActive,
+      [id]: !prev[id],
     }));
   };
 
@@ -411,7 +427,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         <List sx={{ pt: 1 }}>
           {filteredItems.map((item) => {
             const isActive = location.pathname === item.path || (item.children?.some(child => location.pathname === child.path) ?? false);
-            const isSectionExpanded = expandedSections[item.id] !== undefined ? expandedSections[item.id] : isActive;
+            const isSectionExpanded = !!expandedSections[item.id];
 
             return (
               <Box key={item.id} sx={{ mb: 0.5 }}>
@@ -421,7 +437,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                     onClick={() => {
                       if (item.children) {
                         if (collapsed) onToggleCollapse();
-                        toggleSection(item.id, isActive);
+                        toggleSection(item.id);
                       } else if (item.path) {
                         handleMenuNavigate(item.path);
                       }
