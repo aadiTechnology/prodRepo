@@ -65,6 +65,8 @@ export default function MediaUploadField({
     e.target.value = "";
   };
 
+  const tooltipTitle = tooltip || (items.length === 0 ? tooltipChoose : tooltipAdd);
+
   return (
     <Box>
       {size !== "small" && (
@@ -72,126 +74,145 @@ export default function MediaUploadField({
           {label}
         </Typography>
       )}
+      
+      <input
+        ref={fileInputRef}
+        accept={accept}
+        type="file"
+        hidden
+        multiple={inputMultiple}
+        onChange={handleFileChange}
+      />
+
       <Box 
+        onClick={openFilePicker}
         sx={{ 
           p: size === "small" ? 1 : 2.5, 
           border: '1px dashed', 
           borderColor: 'divider', 
           borderRadius: size === "small" ? 2 : 3,
           bgcolor: 'background.paper',
+          cursor: canOpenPicker ? 'pointer' : 'default',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          boxSizing: 'border-box',
           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          '&:hover': {
+          '&:hover': canOpenPicker ? {
             borderColor: 'primary.main',
             bgcolor: 'action.hover',
             transform: 'translateY(-2px)',
             boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
-          }
+          } : {}
         }}
       >
-        <input
-          ref={fileInputRef}
-          accept={accept}
-          type="file"
-          hidden
-          multiple={inputMultiple}
-          onChange={handleFileChange}
-        />
-        
-        {items.length > 0 ? (
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2.5, justifyContent: "center", mb: canOpenPicker ? 2.5 : 0 }}>
-            {items.map((item) => (
+        <Tooltip title={canOpenPicker ? tooltipTitle : ""} arrow placement="bottom">
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center',
+              width: 'fit-content' 
+            }}
+          >
+            {items.length > 0 ? (
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2.5, justifyContent: "center", mb: canOpenPicker ? 1 : 0 }}>
+                {items.map((item) => (
+                  <Box 
+                    key={item.id} 
+                    sx={{ 
+                      position: "relative", 
+                      width: containerSize, 
+                      height: containerSize,
+                      boxShadow: 3,
+                      borderRadius: 3,
+                      border: '2px solid',
+                      borderColor: 'background.paper',
+                      overflow: 'visible'
+                    }}
+                  >
+                    <Box
+                      component="img"
+                      src={item.previewUrl}
+                      alt="Preview"
+                      sx={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        borderRadius: 2.5,
+                        display: 'block'
+                      }}
+                    />
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveItem(item.id);
+                      }}
+                      sx={{ 
+                        position: "absolute", 
+                        top: -10, 
+                        right: -10,
+                        bgcolor: 'error.main',
+                        color: 'white',
+                        boxShadow: 2,
+                        zIndex: 1,
+                        '&:hover': { 
+                          bgcolor: 'error.dark',
+                          transform: 'scale(1.1)'
+                        }
+                      }}
+                      aria-label="Remove"
+                    >
+                      <DeleteIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Box>
+            ) : null}
+
+            {canOpenPicker ? (
               <Box 
-                key={item.id} 
                 sx={{ 
-                  position: "relative", 
-                  width: containerSize, 
-                  height: containerSize,
-                  boxShadow: 3,
-                  borderRadius: 3,
-                  border: '2px solid',
-                  borderColor: 'background.paper',
-                  overflow: 'visible'
+                  display: "flex", 
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  py: items.length > 0 ? 0 : 4,
+                  '& .upload-icon': {
+                    transition: 'transform 0.2s',
+                  },
+                  '&:hover .upload-icon': {
+                    transform: 'scale(1.1)',
+                    opacity: 1
+                  }
                 }}
               >
-                <Box
-                  component="img"
-                  src={item.previewUrl}
-                  alt="Preview"
-                  sx={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    borderRadius: 2.5,
-                    display: 'block'
-                  }}
-                />
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveItem(item.id);
-                  }}
+                <CloudUploadIcon 
+                  className="upload-icon"
                   sx={{ 
-                    position: "absolute", 
-                    top: -10, 
-                    right: -10,
-                    bgcolor: 'error.main',
-                    color: 'white',
-                    boxShadow: 2,
-                    zIndex: 1,
-                    '&:hover': { 
-                      bgcolor: 'error.dark',
-                      transform: 'scale(1.1)'
-                    }
-                  }}
-                  aria-label="Remove"
-                >
-                  <DeleteIcon sx={{ fontSize: 16 }} />
-                </IconButton>
+                    fontSize: iconSize, 
+                    color: 'primary.main', 
+                    opacity: 0.6,
+                    transition: 'all 0.3s ease'
+                  }} 
+                />
+                {size !== "small" && (
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                      {items.length === 0 ? tooltipChoose : tooltipAdd}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      SVG, PNG, JPG or GIF (max. 800x800px)
+                    </Typography>
+                  </Box>
+                )}
               </Box>
-            ))}
+            ) : null}
           </Box>
-        ) : null}
-
-        {canOpenPicker ? (
-          <Tooltip title={tooltip || (items.length === 0 ? tooltipChoose : tooltipAdd)} arrow placement="top">
-            <Box 
-              onClick={openFilePicker}
-              sx={{ 
-                cursor: 'pointer',
-                display: "flex", 
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 1.5,
-                py: items.length > 0 ? 1 : 4,
-                '&:hover .upload-icon': {
-                  transform: 'scale(1.1)',
-                  opacity: 1
-                }
-              }}
-            >
-              <CloudUploadIcon 
-                className="upload-icon"
-                sx={{ 
-                  fontSize: iconSize, 
-                  color: 'primary.main', 
-                  opacity: 0.6,
-                  transition: 'all 0.3s ease'
-                }} 
-              />
-              {size !== "small" && (
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                    {items.length === 0 ? tooltipChoose : tooltipAdd}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    SVG, PNG, JPG or GIF (max. 800x800px)
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </Tooltip>
-        ) : null}
+        </Tooltip>
       </Box>
     </Box>
   );
