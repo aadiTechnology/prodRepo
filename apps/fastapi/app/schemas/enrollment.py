@@ -30,6 +30,7 @@ class EnrollmentCreateRequest(BaseModel):
 
     class_id: int
     class_division_id: Optional[int] = None
+    roll_no: Optional[str] = None
 
     parent_name: str
     mobile_number: str

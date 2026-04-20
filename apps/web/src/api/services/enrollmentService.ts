@@ -23,6 +23,7 @@ export interface EnrollmentCreatePayload {
   academic_year_id: number;
   class_id: number;
   class_division_id?: number | null;
+  roll_no?: string | null;
   parent_name: string;
   mobile_number: string;
   email?: string | null;

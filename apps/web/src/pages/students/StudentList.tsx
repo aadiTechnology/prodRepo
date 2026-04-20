@@ -142,7 +142,7 @@ const StudentList = () => {
                   searchValue={search}
                   onSearchChange={onSearchChange}
                   searchPlaceholder="Search students..."
-                  onAddClick={() => navigate("/admissions/enrollment")}
+                  onAddClick={() => navigate("/students/add")}
                   addLabel="Add Student"
                   filters={[]}
                 />
@@ -226,12 +226,12 @@ const StudentList = () => {
             onView: () => {
               const studentId = String((row as any).id ?? (row as any).student_id ?? "");
               if (!studentId) return;
-              navigate(`/students/${studentId}/view?mode=view`);
+              navigate(`/students/${studentId}/view?mode=view&source=students`);
             },
             onEdit: () => {
               const studentId = String((row as any).id ?? (row as any).student_id ?? "");
               if (!studentId) return;
-              navigate(`/admissions/enrollment?studentId=${studentId}&mode=edit`);
+              navigate(`/admissions/enrollment?studentId=${studentId}&mode=edit&source=students`);
             },
             onDelete: () => openDeleteConfirm(row),
           })

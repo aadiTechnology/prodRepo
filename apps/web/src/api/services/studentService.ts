@@ -11,6 +11,7 @@ export interface StudentDropdownItem {
 export interface StudentDetails {
   id: string;
   name: string;
+  roll_no?: string;
   gender?: string;
   date_of_birth?: string;
   mobile?: string;
@@ -84,6 +85,7 @@ const studentService = {
     const d = data.data || data;
     return {
       ...d,
+      roll_no: d.roll_no,
       gender: d.gender,
       date_of_birth: d.date_of_birth,
       mobile: d.mobile,

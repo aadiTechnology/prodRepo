@@ -130,6 +130,7 @@ class EnrollmentService:
                 academic_year_id=payload.academic_year_id,
                 class_id=payload.class_id,
                 class_division_id=payload.class_division_id,
+                roll_no=payload.roll_no,
                 parent_id=parent.id,
                 mobile_number=payload.mobile_number,
                 email=payload.email,

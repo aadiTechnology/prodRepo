@@ -80,6 +80,7 @@ const emptyForm = (): EnrollmentFormData => ({
   date_of_birth: "",
   gender: "",
   admission_no: "",
+  roll_no: "",
   admission_date: dayjs().format("YYYY-MM-DD"),
   academic_year_id: "",
   class_id: "",
@@ -121,6 +122,8 @@ export default function EnrollmentPage() {
   const { hasPermission } = useRBAC();
   const isEditMode = searchParams.get("mode") === "edit";
   const isViewMode = searchParams.get("mode") === "view";
+  const isStudentAddMode = searchParams.get("source") === "students" && !isEditMode && !isViewMode;
+  const isStudentFlow = isStudentAddMode || isEditMode || isViewMode;
   const editStudentId = searchParams.get("studentId") || routeStudentId;
 
   const canEnroll = hasPermission("ADMISSIONS_MGMT:create") || hasPermission("ADMISSIONS_MGMT:edit") || user?.role === "SUPER_ADMIN";
@@ -292,6 +295,7 @@ export default function EnrollmentPage() {
           date_of_birth: toDateInputValue(student.date_of_birth) || prev.date_of_birth,
           gender: normalizeGender(student.gender) || prev.gender,
           admission_no: student.admission_no ?? prev.admission_no,
+          roll_no: (student as any).roll_no ?? prev.roll_no,
           admission_date: student.created_at
             ? dayjs(student.created_at).format("YYYY-MM-DD")
             : prev.admission_date,
@@ -442,6 +446,7 @@ export default function EnrollmentPage() {
     academic_year_id: Number(formData.academic_year_id),
     class_id: Number(formData.class_id),
     class_division_id: formData.class_division_id ? Number(formData.class_division_id) : null,
+    roll_no: formData.roll_no.trim() || null,
     parent_name: formData.parent_name.trim(),
     mobile_number: formData.mobile_number.trim(),
     email: formData.email.trim() || null,
@@ -470,6 +475,7 @@ export default function EnrollmentPage() {
           email: formData.email.trim() || null,
           class_id: Number(formData.class_id),
           class_division_id: formData.class_division_id ? Number(formData.class_division_id) : null,
+          roll_no: formData.roll_no.trim() || null,
           parent: {
             parent_name: formData.parent_name.trim(),
             mobile_number: formData.mobile_number.trim(),
@@ -704,6 +710,34 @@ export default function EnrollmentPage() {
       discountOptions,
     });
 
+    if (!isStudentFlow) {
+      config.layoutRows = config.layoutRows.filter(
+        (row) => !(row.kind === "fields" && row.fieldNames.includes("roll_no"))
+      );
+    }
+
+    // Adjust Class Allocation field widths by flow:
+    // - Student flows (add/edit/view): class + division + roll_no => 3 equal columns
+    // - Admissions enrollment flow: class + division => 2 equal columns
+    const classRow = config.layoutRows.find(
+      (row) => row.kind === "fields" && row.fieldNames.includes("class_id")
+    );
+    const divisionRow = config.layoutRows.find(
+      (row) => row.kind === "fields" && row.fieldNames.includes("class_division_id")
+    );
+    const rollRow = config.layoutRows.find(
+      (row) => row.kind === "fields" && row.fieldNames.includes("roll_no")
+    );
+    if (classRow) {
+      classRow.grid = { xs: 12, sm: isStudentFlow ? 4 : 6 };
+    }
+    if (divisionRow) {
+      divisionRow.grid = { xs: 12, sm: isStudentFlow ? 4 : 6 };
+    }
+    if (rollRow) {
+      rollRow.grid = { xs: 12, sm: 4 };
+    }
+
     if (isViewMode) {
       Object.values(config.fields).forEach((field) => {
         if (field.type !== "custom") {
@@ -722,7 +756,7 @@ export default function EnrollmentPage() {
       });
     }
 
-    if (!isViewMode) {
+    if (!isViewMode && !isEditMode) {
       // 1. Lead Selection Header
       config.layoutRows.splice(0, 0, {
         kind: "custom" as const,
@@ -939,6 +973,8 @@ export default function EnrollmentPage() {
     prefillFromLead,
     discountById,
     isViewMode,
+    isEditMode,
+    isStudentFlow,
   ]);
 
   return (
@@ -976,8 +1012,14 @@ export default function EnrollmentPage() {
         onSnackbarClose={() => setSnackbar(null)}
         headerConfig={{
           links: [
-            { title: "Students", path: "/students" },
-            { title: isViewMode ? "Student Details" : isEditMode ? "Edit" : "Add", path: "#" },
+            {
+              title: isStudentFlow ? "Students" : "Admissions",
+              path: isStudentFlow ? "/students" : "/admissions/leads",
+            },
+            {
+              title: isViewMode ? "Student Details" : isEditMode ? "Edit" : isStudentAddMode ? "Add" : "Enrollment",
+              path: "#",
+            },
           ],
           homePath: "/",
           cancelTooltip: isViewMode ? "Back" : "Cancel",

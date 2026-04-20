@@ -86,7 +86,7 @@ function AIReviewRouteLayout() {
 function LegacyStudentEditRedirect() {
   const { id } = useParams<{ id?: string }>();
   const target = id
-    ? `/admissions/enrollment?studentId=${encodeURIComponent(id)}&mode=edit`
+    ? `/admissions/enrollment?studentId=${encodeURIComponent(id)}&mode=edit&source=students`
     : "/admissions/enrollment?mode=edit";
   return <Navigate to={target} replace />;
 }
@@ -107,7 +107,7 @@ export default function AppRoutes() {
             path="/students/add"
             element={
               <ProtectedRoute requiredPermissions="ADMIN_MGMT:create">
-                <Navigate to="/admissions/enrollment" replace />
+                <Navigate to="/admissions/enrollment?source=students" replace />
               </ProtectedRoute>
             }
           />

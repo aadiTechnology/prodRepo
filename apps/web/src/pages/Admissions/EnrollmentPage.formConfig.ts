@@ -5,6 +5,7 @@ export type EnrollmentFormData = {
   date_of_birth: string;
   gender: string;
   admission_no: string;
+  roll_no: string;
   admission_date: string;
   academic_year_id: string;
   class_id: string;
@@ -71,6 +72,13 @@ export function createEnrollmentFormConfig({
         label: "Admission No",
         type: "text",
         placeholder: "AUTO",
+        required: false,
+      },
+      roll_no: {
+        name: "roll_no",
+        label: "Roll Number",
+        type: "text",
+        placeholder: "Enter roll number",
         required: false,
       },
       admission_date: {
@@ -174,8 +182,9 @@ export function createEnrollmentFormConfig({
       { kind: "fields", grid: { xs: 12, sm: 4 }, fieldNames: ["admission_date"] },
       { kind: "fields", grid: { xs: 12, sm: 4 }, fieldNames: ["academic_year_id"] },
 
-      { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["class_id"] },
-      { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["class_division_id"] },
+      { kind: "fields", grid: { xs: 12, sm: 4 }, fieldNames: ["class_id"] },
+      { kind: "fields", grid: { xs: 12, sm: 4 }, fieldNames: ["class_division_id"] },
+      { kind: "fields", grid: { xs: 12, sm: 4 }, fieldNames: ["roll_no"] },
 
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["parent_name"] },
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["mobile_number"] },
