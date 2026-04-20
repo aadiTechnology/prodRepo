@@ -191,6 +191,7 @@ export function addTeacherFormConfig({
             size="small"
             tooltipChoose="Upload"
             tooltipAdd="Change"
+            tooltip="Upload Teacher Photo"
           />
         ),
       },

@@ -23,8 +23,8 @@ export interface MediaUploadFieldProps {
   maxFiles?: number;
   size?: "small" | "medium" | "large";
   tooltipChoose?: string;
-
   tooltipAdd?: string;
+  tooltip?: string;
 }
 
 /**
@@ -40,8 +40,8 @@ export default function MediaUploadField({
   maxFiles,
   size = "large",
   tooltipChoose = "Choose files",
-
   tooltipAdd = "Add more files",
+  tooltip,
 }: MediaUploadFieldProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const atCapacity = maxFiles !== undefined && items.length >= maxFiles;
@@ -51,8 +51,6 @@ export default function MediaUploadField({
 
   const containerSize = size === "small" ? 64 : size === "medium" ? 110 : 130;
   const iconSize = size === "small" ? 28 : size === "medium" ? 44 : 56;
-
-
 
   const openFilePicker = () => {
     if (!canOpenPicker) return;
@@ -81,7 +79,6 @@ export default function MediaUploadField({
           borderColor: 'divider', 
           borderRadius: size === "small" ? 2 : 3,
           bgcolor: 'background.paper',
-
           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           '&:hover': {
             borderColor: 'primary.main',
@@ -111,7 +108,6 @@ export default function MediaUploadField({
                   height: containerSize,
                   boxShadow: 3,
                   borderRadius: 3,
-
                   border: '2px solid',
                   borderColor: 'background.paper',
                   overflow: 'visible'
@@ -158,42 +154,43 @@ export default function MediaUploadField({
         ) : null}
 
         {canOpenPicker ? (
-          <Box 
-            onClick={openFilePicker}
-            sx={{ 
-              cursor: 'pointer',
-              display: "flex", 
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 1.5,
-              py: items.length > 0 ? 1 : 4,
-              '&:hover .upload-icon': {
-                transform: 'scale(1.1)',
-                opacity: 1
-              }
-            }}
-          >
-            <CloudUploadIcon 
-              className="upload-icon"
+          <Tooltip title={tooltip || (items.length === 0 ? tooltipChoose : tooltipAdd)} arrow placement="top">
+            <Box 
+              onClick={openFilePicker}
               sx={{ 
-                fontSize: iconSize, 
-                color: 'primary.main', 
-                opacity: 0.6,
-                transition: 'all 0.3s ease'
-              }} 
-            />
-            {size !== "small" && (
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                  {items.length === 0 ? tooltipChoose : tooltipAdd}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  SVG, PNG, JPG or GIF (max. 800x800px)
-                </Typography>
-              </Box>
-            )}
-
-          </Box>
+                cursor: 'pointer',
+                display: "flex", 
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 1.5,
+                py: items.length > 0 ? 1 : 4,
+                '&:hover .upload-icon': {
+                  transform: 'scale(1.1)',
+                  opacity: 1
+                }
+              }}
+            >
+              <CloudUploadIcon 
+                className="upload-icon"
+                sx={{ 
+                  fontSize: iconSize, 
+                  color: 'primary.main', 
+                  opacity: 0.6,
+                  transition: 'all 0.3s ease'
+                }} 
+              />
+              {size !== "small" && (
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                    {items.length === 0 ? tooltipChoose : tooltipAdd}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    SVG, PNG, JPG or GIF (max. 800x800px)
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </Tooltip>
         ) : null}
       </Box>
     </Box>
