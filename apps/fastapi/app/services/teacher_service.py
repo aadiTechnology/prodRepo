@@ -13,6 +13,7 @@ def get_all_teachers(
     search: Optional[str] = None, 
     status: Optional[str] = None,
     class_id: Optional[int] = None,
+    class_division_id: Optional[int] = None,
     skip: int = 0, 
     limit: int = 100
 ) -> Tuple[List[Teacher], int]:
@@ -37,6 +38,9 @@ def get_all_teachers(
             
     if class_id is not None:
         query = query.filter(Teacher.class_id == class_id)
+
+    if class_division_id is not None:
+        query = query.filter(Teacher.class_division_id == class_division_id)
             
     total = query.count()
     teachers = query.order_by(Teacher.full_name.asc()).offset(skip).limit(limit).all()

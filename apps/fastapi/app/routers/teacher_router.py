@@ -41,6 +41,7 @@ async def list_teachers(
     search: Optional[str] = None,
     status: Optional[str] = None,
     class_id: Optional[int] = None,
+    class_division_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ):
@@ -52,6 +53,7 @@ async def list_teachers(
         search=search,
         status=status,
         class_id=class_id,
+        class_division_id=class_division_id,
         skip=skip,
         limit=limit
     )

@@ -133,27 +133,58 @@ export function addTeacherFormConfig({
     layoutRows: [
       {
         kind: "fields",
-        grid: { xs: 12, md: 4 },
-        fieldNames: ["full_name", "date_of_birth", "gender"],
+        grid: { xs: 12, md: 6 },
+        fieldNames: ["full_name"],
       },
       {
         kind: "fields",
         grid: { xs: 12, md: 6 },
-        fieldNames: ["mobile_number", "email"],
+        fieldNames: ["mobile_number"],
       },
       {
         kind: "fields",
         grid: { xs: 12, md: 6 },
-        fieldNames: ["qualification", "experience_years"],
+        fieldNames: ["date_of_birth"],
       },
       {
         kind: "fields",
         grid: { xs: 12, md: 6 },
-        fieldNames: ["class_id", "class_division_id"],
+        fieldNames: ["email"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, md: 6 },
+        fieldNames: ["gender"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, md: 6 },
+        fieldNames: ["qualification"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, md: 6 },
+        fieldNames: ["experience_years"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, md: 6 },
+        fieldNames: ["class_id"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, md: 6 },
+        fieldNames: ["class_division_id"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, md: 6 },
+        fieldNames: ["is_active"],
+        show: (c: FormLayoutContext) => c.isEditMode,
       },
       {
         kind: "custom",
-        grid: { xs: 12, md: 6 },
+        grid: { xs: 12 },
         show: () => true,
         render: (ctx) => (
           <MediaUploadUrlField
@@ -176,12 +207,6 @@ export function addTeacherFormConfig({
             tooltipAdd="Replace photo"
           />
         ),
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, sm: 6 },
-        fieldNames: ["is_active"],
-        show: (c: FormLayoutContext) => c.isEditMode,
       },
     ],
   };

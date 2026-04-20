@@ -50,7 +50,7 @@ const teacherService = {
     return response.data;
   },
 
-  list: async (params?: { skip?: number; limit?: number; search?: string; class_id?: number; status?: string }): Promise<TeacherListResponse> => {
+  list: async (params?: { skip?: number; limit?: number; search?: string; class_id?: number; class_division_id?: number; status?: string }): Promise<TeacherListResponse> => {
     const response = await axiosInstance.get("/api/teachers/", { params });
     return response.data;
   },

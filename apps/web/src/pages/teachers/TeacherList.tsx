@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Select, MenuItem } from "@mui/material";
 import {
   ListPageLayout,
   ListPageToolbar,
@@ -10,7 +11,7 @@ import { Box, Typography } from "../../components/primitives";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import teacherService, { type TeacherResponse } from "../../api/services/teacherService";
 import { createTeacherListConfig, renderTeacherRowActions } from "./TeacherList.listConfig";
-// import schoolClassService from "../../../api/services/schoolClassService"; // For class filter if needed in future
+import schoolClassService, { type SchoolClass } from "../../api/services/schoolClassService";
 
 export default function TeacherList() {
   const navigate = useNavigate();
@@ -25,12 +26,33 @@ export default function TeacherList() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [classFilter, setClassFilter] = useState("");
+  const [divisionFilter, setDivisionFilter] = useState("");
   
+  // Data for filters
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [filtersLoading, setFiltersLoading] = useState(false);
+
   // Actions state
   const [toggleLoadingId, setToggleLoadingId] = useState<number | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<TeacherResponse | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchClasses = async () => {
+      setFiltersLoading(true);
+      try {
+        const data = await schoolClassService.getAll();
+        setClasses(data);
+      } catch (err: unknown) {
+        console.error("Failed to fetch classes:", err);
+      } finally {
+        setFiltersLoading(false);
+      }
+    };
+    fetchClasses();
+  }, []);
 
   const fetchTeachers = useCallback(async () => {
     setLoading(true);
@@ -40,6 +62,8 @@ export default function TeacherList() {
         skip: page * rowsPerPage,
         limit: rowsPerPage,
         search: search || undefined,
+        class_id: classFilter ? Number(classFilter) : undefined,
+        class_division_id: divisionFilter ? Number(divisionFilter) : undefined,
       });
       setTeachers(response.items);
       setTotal(response.total);
@@ -49,7 +73,7 @@ export default function TeacherList() {
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, search]);
+  }, [page, rowsPerPage, search, classFilter, divisionFilter]);
 
   useEffect(() => {
     fetchTeachers();
@@ -59,6 +83,28 @@ export default function TeacherList() {
     setSearch(val);
     setPage(0);
   };
+
+  const handleClassChange = (val: string) => {
+    setClassFilter(val);
+    setDivisionFilter(""); // Reset division when class changes
+    setPage(0);
+  };
+
+  const handleDivisionChange = (val: string) => {
+    setDivisionFilter(val);
+    setPage(0);
+  };
+
+  const classOptions = useMemo(() => {
+    return classes.map(c => ({ label: c.name, value: String(c.id) }));
+  }, [classes]);
+
+  const divisionOptions = useMemo(() => {
+    if (!classFilter) return [];
+    const selectedClass = classes.find(c => String(c.id) === classFilter);
+    if (!selectedClass || !selectedClass.divisions) return [];
+    return selectedClass.divisions.map(d => ({ label: d.division_name, value: String(d.id) }));
+  }, [classes, classFilter]);
 
   const handleToggleStatus = async (teacher: TeacherResponse) => {
     setToggleLoadingId(teacher.id);
@@ -121,6 +167,61 @@ export default function TeacherList() {
               searchPlaceholder="Search by name, ID or mobile"
               onAddClick={() => navigate("/teachers/add")}
               addLabel="Add Teacher"
+              renderActions={
+                <>
+                  <Select
+                    value={classFilter}
+                    onChange={(e) => handleClassChange(e.target.value as string)}
+                    displayEmpty
+                    size="small"
+                    sx={{
+                      minWidth: { xs: "100%", sm: 180 },
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: "15px",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                      },
+                    }}
+                  >
+                    <MenuItem value="">
+                      <Typography variant="body2" color="text.secondary">
+                        All Classes
+                      </Typography>
+                    </MenuItem>
+                    {classes.map((cls) => (
+                      <MenuItem key={cls.id} value={String(cls.id)}>
+                        {cls.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <Select
+                    value={divisionFilter}
+                    onChange={(e) => handleDivisionChange(e.target.value as string)}
+                    displayEmpty
+                    size="small"
+                    disabled={!classFilter}
+                    sx={{
+                      minWidth: { xs: "100%", sm: 180 },
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: "15px",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                      },
+                    }}
+                  >
+                    <MenuItem value="">
+                      <Typography variant="body2" color="text.secondary">
+                        All Divisions
+                      </Typography>
+                    </MenuItem>
+                    {divisionOptions.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </>
+              }
             />
           }
         />
