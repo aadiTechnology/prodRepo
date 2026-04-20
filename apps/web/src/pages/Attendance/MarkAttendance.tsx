@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   Box,
   Typography,
@@ -11,28 +11,28 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
-  Divider,
   Stack,
   alpha,
+  IconButton,
 } from "@mui/material";
 import {
   Save as SaveIcon,
-  Refresh as RefreshIcon,
-  Search as SearchIcon,
   CheckBox as CheckBoxIcon,
-  CalendarMonth as CalendarIcon,
   Groups as GroupsIcon,
+  RefreshOutlined as ResetIcon,
+  CheckBoxOutlined,
+  CheckBoxOutlineBlank,
 } from "@mui/icons-material";
 
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout, EntityTableSection } from "../../components/reusable";
 import { useMarkAttendanceController } from "../../hooks/useMarkAttendanceController";
-import { useRBAC } from "../../context/RBACContext";
 import { ATTENDANCE_STATUSES, createMarkAttendanceColumns } from "./MarkAttendance.config";
 import { colorTokens } from "../../tokens/colors";
 
+// ── Shared select style ───────────────────────────────────────────────────────
 const filterSelectSx = {
-  minWidth: { xs: "100%", sm: 150 },
+  minWidth: { xs: "100%", sm: 148 },
   "& .MuiOutlinedInput-root": {
     borderRadius: "15px",
     fontSize: "0.85rem",
@@ -44,21 +44,28 @@ const filterSelectSx = {
   },
 };
 
-const filterDateSx = {
-  minWidth: { xs: "100%", sm: 160 },
-  "& .MuiOutlinedInput-root": {
-    borderRadius: "15px",
-    fontSize: "0.85rem",
-    fontWeight: 600,
-    bgcolor: "#ffffff",
-    "& fieldset": { borderColor: colorTokens.border.subtle },
-    "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
-    "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
-  },
-};
+// ── Legend pill ───────────────────────────────────────────────────────────────
+const LegendPill = ({
+  icon,
+  label,
+  color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  color: string;
+}) => (
+  <Stack direction="row" alignItems="center" gap={0.6}>
+    <Box sx={{ color, fontSize: 16, lineHeight: 1, display: "flex" }}>{icon}</Box>
+    <Typography variant="caption" sx={{ fontWeight: 700, color, lineHeight: 1 }}>
+      {label}
+    </Typography>
+  </Stack>
+);
 
+// ── Main Component ────────────────────────────────────────────────────────────
 const MarkAttendance = () => {
-  const { hasRole } = useRBAC();
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
   const controller = useMarkAttendanceController();
 
   const {
@@ -71,7 +78,6 @@ const MarkAttendance = () => {
     snackbar,
     setFilters,
     setSnackbar,
-    fetchStudents,
     updateStudentStatus,
     updateStudentRemarks,
     markAllPresent,
@@ -79,8 +85,10 @@ const MarkAttendance = () => {
     resetFilters,
     filteredClasses,
     filteredDivisions,
+    isTeacher,
   } = controller;
 
+  // ── Column definitions ────────────────────────────────────────────────────
   const columns = React.useMemo(() => {
     const baseColumns = createMarkAttendanceColumns({
       onStatusChange: updateStudentStatus,
@@ -167,6 +175,7 @@ const MarkAttendance = () => {
     });
   }, [updateStudentStatus, updateStudentRemarks]);
 
+  // ── Filter toolbar (placed in PageHeader actions) ─────────────────────────
   const filterToolbar = (
     <Stack
       direction={{ xs: "column", sm: "row" }}
@@ -180,23 +189,29 @@ const MarkAttendance = () => {
         value={filters.academic_year_id || ""}
         displayEmpty
         size="small"
-        onChange={(e) => setFilters((prev) => ({ ...prev, academic_year_id: Number(e.target.value) }))}
+        onChange={(e) =>
+          setFilters((prev) => ({ ...prev, academic_year_id: Number(e.target.value) }))
+        }
         sx={filterSelectSx}
       >
         <MenuItem value="">
-          <Typography variant="body2" color="text.secondary">Academic Year</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Academic Year
+          </Typography>
         </MenuItem>
         {academicYears.map((year) => (
-          <MenuItem key={year.id} value={year.id}>{year.name}</MenuItem>
+          <MenuItem key={year.id} value={year.id}>
+            {year.name}
+          </MenuItem>
         ))}
       </Select>
 
-      {/* Teacher */}
+      {/* Teacher — locked for TEACHER role, full list for Admin */}
       <Select
         value={filters.teacher_id || ""}
         displayEmpty
         size="small"
-        disabled={hasRole("TEACHER")}
+        disabled={isTeacher}
         onChange={(e) =>
           setFilters((prev) => ({
             ...prev,
@@ -205,15 +220,28 @@ const MarkAttendance = () => {
             division_id: 0,
           }))
         }
-        sx={filterSelectSx}
+        sx={{
+          ...filterSelectSx,
+          ...(isTeacher && {
+            "& .MuiOutlinedInput-root": {
+              ...filterSelectSx["& .MuiOutlinedInput-root"],
+              bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.07),
+            },
+          }),
+        }}
       >
-        {!hasRole("TEACHER") && (
+        {/* Admin only: "All Teachers" option */}
+        {!isTeacher && (
           <MenuItem value="">
-            <Typography variant="body2" color="text.secondary">All Teachers</Typography>
+            <Typography variant="body2" color="text.secondary">
+              All Teachers
+            </Typography>
           </MenuItem>
         )}
         {teachers.map((teacher) => (
-          <MenuItem key={teacher.id} value={teacher.id}>{teacher.full_name}</MenuItem>
+          <MenuItem key={teacher.id} value={teacher.id}>
+            {teacher.full_name}
+          </MenuItem>
         ))}
       </Select>
 
@@ -222,14 +250,24 @@ const MarkAttendance = () => {
         value={filters.class_id || ""}
         displayEmpty
         size="small"
-        onChange={(e) => setFilters((prev) => ({ ...prev, class_id: Number(e.target.value), division_id: 0 }))}
+        onChange={(e) =>
+          setFilters((prev) => ({
+            ...prev,
+            class_id: Number(e.target.value),
+            division_id: 0,
+          }))
+        }
         sx={filterSelectSx}
       >
         <MenuItem value="">
-          <Typography variant="body2" color="text.secondary">Select Class</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Select Class
+          </Typography>
         </MenuItem>
         {filteredClasses.map((cls) => (
-          <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
+          <MenuItem key={cls.id} value={cls.id}>
+            {cls.name}
+          </MenuItem>
         ))}
       </Select>
 
@@ -239,74 +277,91 @@ const MarkAttendance = () => {
         displayEmpty
         size="small"
         disabled={!filteredDivisions.length}
-        onChange={(e) => setFilters((prev) => ({ ...prev, division_id: Number(e.target.value) }))}
+        onChange={(e) =>
+          setFilters((prev) => ({ ...prev, division_id: Number(e.target.value) }))
+        }
         sx={filterSelectSx}
       >
         <MenuItem value="">
-          <Typography variant="body2" color="text.secondary">Select Division</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Select Division
+          </Typography>
         </MenuItem>
         {filteredDivisions.map((div) => (
-          <MenuItem key={div.id} value={div.id}>{div.division_name}</MenuItem>
+          <MenuItem key={div.id} value={div.id}>
+            {div.division_name}
+          </MenuItem>
         ))}
       </Select>
 
-      {/* Date */}
-      <TextField
-        size="small"
-        type="date"
-        label="Date"
-        InputLabelProps={{ shrink: true }}
-        value={filters.attendance_date}
-        onChange={(e) => setFilters((prev) => ({ ...prev, attendance_date: e.target.value }))}
-        sx={filterDateSx}
-      />
+      {/* Date — hidden native input triggered by 3D calendar icon only */}
+      <Tooltip title={filters.attendance_date || "Select Date"} arrow>
+        <Box sx={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+          {/* Invisible native date input sits on top */}
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={filters.attendance_date}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, attendance_date: e.target.value }))
+            }
+            style={{
+              position: "absolute",
+              opacity: 0,
+              width: "100%",
+              height: "100%",
+              top: 0,
+              left: 0,
+              cursor: "pointer",
+              zIndex: 1,
+            }}
+          />
+          {/* Visible: just the 3D calendar image icon */}
+          <Box
+            component="img"
+            src="/icons/3d-calendar.png"
+            alt="Pick attendance date"
+            sx={{
+              width: 36,
+              height: 36,
+              objectFit: "contain",
+              cursor: "pointer",
+              transition: "transform 0.2s, filter 0.2s",
+              "&:hover": {
+                transform: "scale(1.15)",
+                filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.18))",
+              },
+            }}
+          />
+        </Box>
+      </Tooltip>
 
-      {/* Reset */}
-      <Button
-        variant="outlined"
-        startIcon={<RefreshIcon />}
-        onClick={resetFilters}
-        sx={{
-          borderRadius: "15px",
-          textTransform: "none",
-          fontWeight: 600,
-          fontSize: "0.85rem",
-          borderColor: colorTokens.border.default,
-          color: colorTokens.text.secondary,
-          "&:hover": { borderColor: colorTokens.preschool.turquoise.main, color: colorTokens.preschool.turquoise.main },
-          whiteSpace: "nowrap",
-        }}
-      >
-        Reset
-      </Button>
-
-      {/* Search */}
-      <Button
-        variant="contained"
-        startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
-        onClick={fetchStudents}
-        disabled={loading}
-        sx={{
-          borderRadius: "15px",
-          textTransform: "none",
-          fontWeight: 700,
-          fontSize: "0.85rem",
-          px: 3,
-          background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
-          boxShadow: `0 4px 12px ${alpha(colorTokens.preschool.turquoise.main, 0.3)}`,
-          "&:hover": {
-            boxShadow: `0 6px 16px ${alpha(colorTokens.preschool.turquoise.main, 0.4)}`,
-            transform: "translateY(-1px)",
-          },
-          transition: "all 0.2s ease",
-          whiteSpace: "nowrap",
-        }}
-      >
-        Search Students
-      </Button>
+      {/* Reset icon button */}
+      <Tooltip title="Reset filters" arrow>
+        <IconButton
+          onClick={resetFilters}
+          size="small"
+          sx={{
+            border: `1.5px solid ${colorTokens.border.default}`,
+            borderRadius: "12px",
+            p: 0.9,
+            bgcolor: "#ffffff",
+            color: colorTokens.text.secondary,
+            "&:hover": {
+              borderColor: colorTokens.preschool.turquoise.main,
+              color: colorTokens.preschool.turquoise.main,
+              bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.06),
+            },
+            transition: "all 0.2s",
+          }}
+        >
+          <ResetIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
     </Stack>
   );
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <ListPageLayout
       header={
@@ -320,10 +375,59 @@ const MarkAttendance = () => {
         />
       }
     >
-      {/* Student Table Section */}
+      {/* ── Legend bar ──────────────────────────────────────────────────── */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 2.5,
+          px: 2.5,
+          py: 1.2,
+          borderBottom: `1px solid ${colorTokens.border.subtle}`,
+          bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.04),
+          flexWrap: "wrap",
+        }}
+      >
+        <Typography
+          variant="caption"
+          sx={{ fontWeight: 800, color: colorTokens.text.secondary, textTransform: "uppercase", letterSpacing: 0.8 }}
+        >
+          Legend:
+        </Typography>
+        <LegendPill
+          icon={<CheckBoxOutlined sx={{ fontSize: 16 }} />}
+          label="Present"
+          color="#2e7d32"
+        />
+        <LegendPill
+          icon={<CheckBoxOutlineBlank sx={{ fontSize: 16 }} />}
+          label="Absent"
+          color="#c62828"
+        />
+        <LegendPill
+          icon={
+            <Typography component="span" sx={{ fontWeight: 800, fontSize: "0.72rem", color: "#e65100", lineHeight: 1 }}>
+              HD
+            </Typography>
+          }
+          label="Half Day"
+          color="#e65100"
+        />
+        <LegendPill
+          icon={
+            <Typography component="span" sx={{ fontWeight: 800, fontSize: "0.72rem", color: "#0277bd", lineHeight: 1 }}>
+              L
+            </Typography>
+          }
+          label="Leave"
+          color="#0277bd"
+        />
+      </Box>
+
+      {/* ── Student List section ─────────────────────────────────────────── */}
       {students.length > 0 && (
         <>
-          {/* Student list sub-header */}
+          {/* Sub-header: title + actions */}
           <Box
             sx={{
               display: "flex",
@@ -378,7 +482,9 @@ const MarkAttendance = () => {
               </Button>
               <Button
                 variant="contained"
-                startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                startIcon={
+                  saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />
+                }
                 onClick={saveAttendance}
                 disabled={saving}
                 size="small"
@@ -419,7 +525,27 @@ const MarkAttendance = () => {
         </>
       )}
 
-      {/* Empty state */}
+      {/* ── Loading state ────────────────────────────────────────────────── */}
+      {loading && (
+        <Box
+          sx={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            py: 10,
+            gap: 2,
+          }}
+        >
+          <CircularProgress size={44} sx={{ color: colorTokens.preschool.turquoise.main }} />
+          <Typography variant="body2" color="text.secondary">
+            Loading student list...
+          </Typography>
+        </Box>
+      )}
+
+      {/* ── Empty state ──────────────────────────────────────────────────── */}
       {!students.length && !loading && (
         <Box
           sx={{
@@ -434,40 +560,22 @@ const MarkAttendance = () => {
             opacity: 0.55,
           }}
         >
-          <CalendarIcon sx={{ fontSize: 64, color: colorTokens.preschool.turquoise.main }} />
-          <Typography variant="h6" fontWeight={600} color={colorTokens.text.primary}>
-            Select filters and search to load students
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Choose an academic year, class, and division, then click Search Students.
-          </Typography>
-        </Box>
-      )}
-
-      {/* Loading state */}
-      {loading && (
-        <Box
-          sx={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            py: 10,
-            gap: 2,
-          }}
-        >
-          <CircularProgress
-            size={44}
-            sx={{ color: colorTokens.preschool.turquoise.main }}
+          <Box
+            component="img"
+            src="/icons/3d-calendar.png"
+            alt="calendar"
+            sx={{ width: 72, height: 72, objectFit: "contain" }}
           />
+          <Typography variant="h6" fontWeight={600} color={colorTokens.text.primary}>
+            Select filters to load students
+          </Typography>
           <Typography variant="body2" color="text.secondary">
-            Loading student list...
+            Choose class &amp; division — students will load automatically.
           </Typography>
         </Box>
       )}
 
-      {/* Snackbar */}
+      {/* ── Snackbar ─────────────────────────────────────────────────────── */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}

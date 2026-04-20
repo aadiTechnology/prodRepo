@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import schoolClassService, { SchoolClass, ClassDivision } from "../api/services/schoolClassService";
 import academicYearService, { AcademicYear } from "../api/services/academicYearService";
 import attendanceService, { AttendanceResponse } from "../api/services/attendanceService";
@@ -34,12 +34,15 @@ export interface UseMarkAttendanceControllerResult {
   resetFilters: () => void;
   filteredClasses: SchoolClass[];
   filteredDivisions: ClassDivision[];
+  /** true when the current user is a teacher (lock teacher dropdown) */
+  isTeacher: boolean;
 }
 
 export function useMarkAttendanceController(): UseMarkAttendanceControllerResult {
   const { user } = useAuth();
   const { hasRole } = useRBAC();
   const today = new Date().toISOString().split('T')[0];
+  const isTeacher = hasRole('TEACHER');
 
   // Lists Data
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
@@ -74,35 +77,42 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
           teacherService.list({ limit: 1000 }),
           schoolClassService.getAll()
         ]);
-        
+
         setAcademicYears(years);
-        setTeachers(teacherList.items);
         setClasses(classList);
-        
+
         // Find active year
         const activeYear = years.find(y => y.is_active);
-        if (activeYear) {
-          setFilters(prev => ({ ...prev, academic_year_id: activeYear.id }));
-        }
 
-        // Auto-assign for TEACHER role
-        if (hasRole('TEACHER') && user?.email) {
-          const myAssignments = teacherList.items.filter(t => t.email?.toLowerCase() === user.email?.toLowerCase());
-          if (myAssignments.length > 0) {
-            const first = myAssignments[0];
-            setFilters(prev => ({ 
-              ...prev, 
-              teacher_id: first.id,
-              class_id: first.class_id || prev.class_id
+        if (isTeacher && user?.email) {
+          // For TEACHER role: only expose their own record in the dropdown
+          const myTeacher = teacherList.items.find(
+            t => t.email?.toLowerCase() === user.email?.toLowerCase()
+          );
+          if (myTeacher) {
+            setTeachers([myTeacher]); // only their own name
+            setFilters(prev => ({
+              ...prev,
+              academic_year_id: activeYear?.id ?? prev.academic_year_id,
+              teacher_id: myTeacher.id,
+              class_id: myTeacher.class_id || prev.class_id,
             }));
+          } else {
+            setTeachers([]);
+            if (activeYear) setFilters(prev => ({ ...prev, academic_year_id: activeYear.id }));
           }
+        } else {
+          // Admin / Tenant-Admin: show all teachers
+          setTeachers(teacherList.items);
+          if (activeYear) setFilters(prev => ({ ...prev, academic_year_id: activeYear.id }));
         }
       } catch (err) {
         console.error("Failed to load metadata", err);
       }
     };
     loadInitialData();
-  }, [hasRole, user?.email]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTeacher, user?.email]);
 
   // Derived filtered classes
   const filteredClasses = useMemo(() => {
@@ -121,7 +131,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     const allDivisions = selectedClass.divisions || [];
     if (!filters.teacher_id) return allDivisions;
 
-    const selectedTeacherAssignments = teachers.filter(t => 
+    const selectedTeacherAssignments = teachers.filter(t =>
       t.id === filters.teacher_id && t.class_id === filters.class_id
     );
     const assignedDivisionIds = selectedTeacherAssignments.map(t => t.class_division_id).filter(Boolean);
@@ -140,7 +150,8 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     } else {
       setFilters(prev => ({ ...prev, division_id: 0 }));
     }
-  }, [filteredDivisions, filters.division_id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredDivisions]);
 
   // Sync class dropdown
   useEffect(() => {
@@ -152,7 +163,26 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     } else if (filteredClasses.length === 0 && filters.class_id !== 0) {
       setFilters(prev => ({ ...prev, class_id: 0 }));
     }
-  }, [filteredClasses, filters.class_id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredClasses]);
+
+  // ── Auto-fetch: trigger when class + division + date are all set ──────────
+  const prevAutoFetchKey = useRef<string>("");
+  useEffect(() => {
+    const key = `${filters.class_id}_${filters.division_id}_${filters.attendance_date}`;
+    if (
+      filters.class_id &&
+      filters.division_id &&
+      filters.attendance_date &&
+      key !== prevAutoFetchKey.current
+    ) {
+      prevAutoFetchKey.current = key;
+      // Skip fetch for future dates silently
+      if (filters.attendance_date > today) return;
+      void fetchStudents();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.class_id, filters.division_id, filters.attendance_date]);
 
   const fetchStudents = useCallback(async () => {
     if (!filters.class_id || !filters.division_id || !filters.attendance_date) {
@@ -172,7 +202,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
       setSnackbar({ open: true, message: "You cannot mark attendance for future dates", severity: 'error' });
       return;
     }
-    
+
     setLoading(true);
     try {
       const data = await attendanceService.getAttendance({
@@ -216,7 +246,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
       setSnackbar({ open: true, message: "You cannot mark attendance for future dates", severity: 'error' });
       return;
     }
-    
+
     setSaving(true);
     try {
       const payload = {
@@ -231,7 +261,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
           remarks: s.remarks || ""
         }))
       };
-      
+
       await attendanceService.markAttendance(payload);
       setSnackbar({ open: true, message: "Attendance saved successfully!", severity: 'success' });
     } catch (err) {
@@ -244,10 +274,11 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
 
   const resetFilters = () => {
     setStudents([]);
-    if (!hasRole('TEACHER')) {
-      setFilters(prev => ({ ...prev, teacher_id: 0, class_id: 0, division_id: 0 }));
+    prevAutoFetchKey.current = "";
+    if (!isTeacher) {
+      setFilters(prev => ({ ...prev, teacher_id: 0, class_id: 0, division_id: 0, attendance_date: today }));
     } else {
-      setFilters(prev => ({ ...prev, class_id: 0, division_id: 0 }));
+      setFilters(prev => ({ ...prev, class_id: 0, division_id: 0, attendance_date: today }));
     }
   };
 
@@ -270,6 +301,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     saveAttendance,
     resetFilters,
     filteredClasses,
-    filteredDivisions
+    filteredDivisions,
+    isTeacher,
   };
 }
