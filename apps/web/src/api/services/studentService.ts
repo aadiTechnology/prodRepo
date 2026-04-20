@@ -37,10 +37,10 @@ export interface StudentDetails {
 
 
 const studentService = {
-    async update(id: string, payload: any) {
-      const { data } = await axiosInstance.put(`/api/students/${id}`, payload);
-      return data;
-    },
+  async update(id: string, payload: any) {
+    const { data } = await axiosInstance.put(`/api/students/${id}`, payload);
+    return data;
+  },
   async create(payload: any) {
     const { data } = await axiosInstance.post("/api/students", payload);
     return data;

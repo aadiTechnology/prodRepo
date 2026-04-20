@@ -66,7 +66,8 @@ def seed_rbac_data():
             {
                 "name": "Academics", "level": 1, "icon": "academicsIcon", "sort_order": 4,
                 "children": [
-                    {"name": "Attendance", "path": "/academics/attendance", "feature": "ACADEMIC_MGMT"},
+                    {"name": "Mark Attendance", "path": "/attendance/mark", "feature": "ACADEMIC_MGMT"},
+                    {"name": "Attendance Report", "path": "/attendance/report", "feature": "ACADEMIC_MGMT"},
                     {"name": "Academic Years", "path": "/academic-years", "feature": "ACADEMIC_MGMT"},
                     {"name": "Classes", "path": "/classes", "feature": "ACADEMIC_MGMT"},
                 ]

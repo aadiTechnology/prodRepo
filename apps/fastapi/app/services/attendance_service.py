@@ -113,3 +113,78 @@ class AttendanceService:
         except Exception as e:
             self.db.rollback()
             raise e
+
+    def get_attendance_report(
+        self, 
+        tenant_id: int,
+        from_date: date,
+        to_date: date,
+        class_id: Optional[int] = None,
+        division_id: Optional[int] = None,
+        student_id: Optional[int] = None,
+        limit: int = 100,
+        offset: int = 0
+    ):
+        from app.schemas.attendance_schema import AttendanceReportResponse, AttendanceReportItem, AttendanceReportSummary
+        
+        # Base query
+        query = self.db.query(StudentAttendance).join(
+            Student, 
+            and_(
+                StudentAttendance.student_id == Student.id,
+                Student.is_active == True
+            )
+        ).filter(
+            StudentAttendance.tenant_id == tenant_id,
+            StudentAttendance.attendance_date >= from_date,
+            StudentAttendance.attendance_date <= to_date,
+            StudentAttendance.is_deleted == False
+        )
+
+        # Apply filters
+        if class_id:
+            query = query.filter(StudentAttendance.class_id == class_id)
+        if division_id:
+            query = query.filter(StudentAttendance.class_division_id == division_id)
+        if student_id:
+            query = query.filter(StudentAttendance.student_id == student_id)
+
+        # Count totals for summary
+        summary_query = query.with_entities(StudentAttendance.status)
+        statuses = [s[0] for s in summary_query.all()]
+        
+        summary = AttendanceReportSummary(
+            total_present=statuses.count('Present'),
+            total_absent=statuses.count('Absent'),
+            total_half_day=statuses.count('Half Day'),
+            total_leave=statuses.count('Leave')
+        )
+
+        # Fetch records with pagination
+        records_query = query.order_by(StudentAttendance.attendance_date.desc(), Student.student_name.asc())
+        total_count = records_query.count()
+        records_results = records_query.offset(offset).limit(limit).all()
+
+        records = []
+        for r in records_results:
+            # Map status to type code
+            type_code = None
+            if r.status == "Half Day":
+                type_code = "HD"
+            elif r.status == "Leave":
+                type_code = "L"
+            
+            records.append(AttendanceReportItem(
+                date=r.attendance_date,
+                roll_no=r.student.roll_no,
+                student_name=r.student.student_name,
+                status=r.status,
+                type=type_code,
+                remarks=r.remarks
+            ))
+
+        return AttendanceReportResponse(
+            records=records,
+            summary=summary,
+            total_count=total_count
+        )

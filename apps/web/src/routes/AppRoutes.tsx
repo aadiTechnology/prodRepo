@@ -25,6 +25,7 @@ const Users = lazy(() => import("../pages/Users"));
 const TeacherList = lazy(() => import("../pages/teachers/TeacherList"));
 const AddTeacher = lazy(() => import("../pages/teachers/AddTeacher"));
 const MarkAttendance = lazy(() => import("../pages/Attendance/MarkAttendance"));
+const AttendanceReport = lazy(() => import("../pages/Attendance/AttendanceReport"));
 
 const Login = lazy(() => import("../pages/Login"));
 const Register = lazy(() => import("../pages/Register"));
@@ -237,7 +238,9 @@ export default function AppRoutes() {
           <Route path="/academics/classes/:id/edit" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><AddClass /></ProtectedRoute>} />
 
           {/* Attendance Management */}
-          <Route path="/attendance/mark" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:view"><MarkAttendance /></ProtectedRoute>} />
+          {/* Attendance Management */}
+          <Route path="/attendance/mark" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><MarkAttendance /></ProtectedRoute>} />
+          <Route path="/attendance/report" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><AttendanceReport /></ProtectedRoute>} />
 
 
           {/* Admissions – Lead Management */}

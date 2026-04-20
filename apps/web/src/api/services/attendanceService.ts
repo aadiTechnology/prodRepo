@@ -30,6 +30,28 @@ export interface AttendanceListResponse {
   attendance: AttendanceResponse[];
 }
 
+export interface AttendanceReportItem {
+  date: string;
+  roll_no: string | null;
+  student_name: string;
+  status: string;
+  type: string | null; // HD, L
+  remarks: string | null;
+}
+
+export interface AttendanceReportSummary {
+  total_present: number;
+  total_absent: number;
+  total_half_day: number;
+  total_leave: number;
+}
+
+export interface AttendanceReportResponse {
+  records: AttendanceReportItem[];
+  summary: AttendanceReportSummary;
+  total_count: number;
+}
+
 const attendanceService = {
   async getAttendance(params: { attendance_date: string; class_id: number; division_id: number }) {
     const { data } = await axiosInstance.get<AttendanceListResponse>("/attendance", { params });
@@ -38,6 +60,19 @@ const attendanceService = {
 
   async markAttendance(payload: MarkAttendanceRequest) {
     const { data } = await axiosInstance.post("/attendance/mark", payload);
+    return data;
+  },
+
+  async getReport(params: {
+    from_date: string;
+    to_date: string;
+    class_id?: number;
+    division_id?: number;
+    student_id?: number;
+    limit?: number;
+    offset?: number;
+  }) {
+    const { data } = await axiosInstance.get<AttendanceReportResponse>("/attendance/report", { params });
     return data;
   },
 };
