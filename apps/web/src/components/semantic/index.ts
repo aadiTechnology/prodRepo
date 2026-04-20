@@ -70,4 +70,8 @@ export { default as LabeledSwitch } from "./LabeledSwitch";
 export type { LabeledSwitchProps } from "./LabeledSwitch";
 
 export { default as MediaUploadUrlField } from "./MediaUploadUrlField";
-export type { MediaUploadSlotItem, MediaUploadUrlFieldProps } from "./MediaUploadUrlField";
+export type { MediaUploadUrlFieldProps } from "./MediaUploadUrlField";
+
+export { default as MediaUploadField } from "./MediaUploadField";
+export type { MediaUploadSlotItem, MediaUploadFieldProps } from "./MediaUploadField";
+

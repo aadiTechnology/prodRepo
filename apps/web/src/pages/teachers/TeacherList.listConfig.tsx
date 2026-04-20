@@ -62,6 +62,7 @@ export function createTeacherListConfig({
     },
     actions: {
       rowActions: (tableTeacher: TeacherResponse) => ({
+        onView: () => navigate(`/teachers/${tableTeacher.id}`),
         onEdit: () => navigate(`/teachers/${tableTeacher.id}/edit`),
         onDelete: () => onDeleteClick(tableTeacher),
         disabled: toggleLoadingId === tableTeacher.id,
@@ -75,13 +76,14 @@ export function renderTeacherRowActions(args: {
   toggleLoadingId: number | null;
   onEdit: () => void;
   onDelete: () => void;
+  onView: () => void;
   onToggleStatus: () => void;
 }) {
-  const { row, toggleLoadingId, onEdit, onDelete, onToggleStatus } = args;
+  const { row, toggleLoadingId, onEdit, onDelete, onView, onToggleStatus } = args;
 
   return (
     <Box sx={{ display: "flex", alignItems: "center" }}>
-      <TableRowActions onEdit={onEdit} onDelete={onDelete} />
+      <TableRowActions onView={onView} onEdit={onEdit} onDelete={onDelete} />
       {/* We could add an explicit toggle button here, but typically it is fine in TableRowActions or StatusChip. Since TableRowActions doesn't have onToggle by default in this repo's standard components, we might wait. Actually table actions are standardized, let's keep it simple. */}
     </Box>
   );

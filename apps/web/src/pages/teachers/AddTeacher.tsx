@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import PersonIcon from "@mui/icons-material/Person";
+import ContactPhoneIcon from "@mui/icons-material/ContactPhone";
+import SchoolIcon from "@mui/icons-material/School";
+import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
+import HomeIcon from "@mui/icons-material/Home";
+
 import teacherService, { type TeacherCreate, type TeacherUpdate } from "../../api/services/teacherService";
 import schoolClassService, { type SchoolClass } from "../../api/services/schoolClassService";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
@@ -20,6 +26,10 @@ const emptyForm = (): AddTeacherFormData => ({
   class_division_id: null,
   photo_url: "",
   is_active: true,
+  address: null,
+  city: null,
+  state: null,
+  pincode: null,
 });
 
 export default function AddTeacher() {
@@ -37,8 +47,8 @@ export default function AddTeacher() {
   const [classesLoading, setClassesLoading] = useState(false);
   
   // Media states
-  const [mediaTab, setMediaTab] = useState(0);
   const [uploadItems, setUploadItems] = useState<MediaUploadSlotItem[]>([]);
+
   
   // Setup validation
   const validationConfig = useMemo<FormValidationConfig<AddTeacherFormData>>(() => ({
@@ -102,11 +112,15 @@ export default function AddTeacher() {
         class_division_id: teacher.class_division_id ? String(teacher.class_division_id) : null,
         photo_url: teacher.photo_url || "",
         is_active: teacher.is_active,
+        address: teacher.address || null,
+        city: teacher.city || null,
+        state: teacher.state || null,
+        pincode: teacher.pincode || null,
       });
       if (teacher.photo_url) {
         setUploadItems([{ id: "existing", previewUrl: teacher.photo_url }]);
-        if (teacher.photo_url.startsWith("http")) setMediaTab(1);
       }
+
     } catch (err) {
       console.error(err);
       setError("Failed to load teacher data");
@@ -180,14 +194,21 @@ export default function AddTeacher() {
         divisionOptions,
         classesLoading,
         divisionsLoading: false, // Divs load with classes
-        mediaTab,
-        setMediaTab,
         uploadItems,
         handleAddMediaFiles,
         handleRemoveMediaItem,
+        icons: {
+          personal: <PersonIcon fontSize="small" />,
+          contact: <ContactPhoneIcon fontSize="small" />,
+          academic: <SchoolIcon fontSize="small" />,
+          assignment: <AssignmentIndIcon fontSize="small" />,
+          address: <HomeIcon fontSize="small" />,
+        },
       }),
-    [isEditMode, classOptions, divisionOptions, classesLoading, mediaTab, uploadItems, handleAddMediaFiles, handleRemoveMediaItem]
+    [isEditMode, classOptions, divisionOptions, classesLoading, uploadItems, handleAddMediaFiles, handleRemoveMediaItem]
   );
+
+
 
   const handleConfirmSubmit = async (values: AddTeacherFormData, actionType: 'SAVE' | 'SAVE_AND_ADD') => {
     setLoading(true);
@@ -205,6 +226,10 @@ export default function AddTeacher() {
         class_division_id: values.class_division_id ? Number(values.class_division_id) : null,
         photo_url: values.photo_url || null,
         is_active: values.is_active,
+        address: values.address,
+        city: values.city,
+        state: values.state,
+        pincode: values.pincode,
       };
 
       if (isEditMode && id) {

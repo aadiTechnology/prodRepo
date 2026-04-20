@@ -248,6 +248,7 @@ export default function TeacherList() {
           renderTeacherRowActions({
             row,
             toggleLoadingId,
+            onView: () => listConfig.actions!.rowActions!(row)?.onView?.(),
             onEdit: () => listConfig.actions!.rowActions!(row)?.onEdit?.(),
             onDelete: () => listConfig.actions!.rowActions!(row)?.onDelete?.(),
             onToggleStatus: () => handleToggleStatus(row),

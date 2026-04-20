@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { FormConfig, FormLayoutContext } from "../../components/reusable/formFramework.types";
-import { MediaUploadUrlField, type MediaUploadSlotItem, type SelectItemOption } from "../../components/semantic";
+import { MediaUploadField, type MediaUploadSlotItem, type SelectItemOption } from "../../components/semantic";
 
 export type AddTeacherFormData = {
   full_name: string;
@@ -14,6 +14,10 @@ export type AddTeacherFormData = {
   class_division_id: string | null;
   photo_url: string;
   is_active: boolean;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
 };
 
 type AddTeacherFormConfigFactoryArgs = {
@@ -22,12 +26,19 @@ type AddTeacherFormConfigFactoryArgs = {
   divisionOptions: SelectItemOption[];
   classesLoading: boolean;
   divisionsLoading: boolean;
-  mediaTab: number;
-  setMediaTab: (value: number) => void;
   uploadItems: MediaUploadSlotItem[];
   handleAddMediaFiles: (files: FileList | File[]) => Promise<void>;
   handleRemoveMediaItem: (itemId: string) => void;
+  icons?: {
+    personal?: ReactNode;
+    contact?: ReactNode;
+    academic?: ReactNode;
+    assignment?: ReactNode;
+    address?: ReactNode;
+  };
 };
+
+
 
 export function addTeacherFormConfig({
   isEditMode,
@@ -35,12 +46,13 @@ export function addTeacherFormConfig({
   divisionOptions,
   classesLoading,
   divisionsLoading,
-  mediaTab,
-  setMediaTab,
   uploadItems,
   handleAddMediaFiles,
   handleRemoveMediaItem,
+  icons,
 }: AddTeacherFormConfigFactoryArgs): FormConfig<AddTeacherFormData> {
+
+
   return {
     fields: {
       // Personal Details
@@ -129,85 +141,147 @@ export function addTeacherFormConfig({
         type: "switch",
         conditionalRender: () => isEditMode,
       },
+
+      // Address Details
+      address: {
+        name: "address",
+        label: "Full Address",
+        type: "text",
+        placeholder: "Enter full address",
+        props: { multiline: true, rows: 2 }
+      },
+      city: {
+        name: "city",
+        label: "City",
+        type: "text",
+        placeholder: "City",
+      },
+      state: {
+        name: "state",
+        label: "State",
+        type: "text",
+        placeholder: "State",
+      },
+      pincode: {
+        name: "pincode",
+        label: "Pincode",
+        type: "text",
+        placeholder: "6-digit pincode",
+      },
     },
     layoutRows: [
       {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["full_name"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["mobile_number"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["date_of_birth"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["email"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["gender"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["qualification"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["experience_years"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["class_id"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["class_division_id"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["is_active"],
-        show: (c: FormLayoutContext) => c.isEditMode,
+        kind: "section",
+        title: "Information",
+        icon: icons?.personal,
       },
       {
         kind: "custom",
-        grid: { xs: 12 },
+        grid: { xs: 12, sm: 2 },
         show: () => true,
         render: (ctx) => (
-          <MediaUploadUrlField
-            label="Profile Photo"
-            tabIndex={mediaTab}
-            onTabChange={setMediaTab}
-            urlValue={ctx.formData.photo_url.startsWith("data:") ? "" : ctx.formData.photo_url}
-            urlFieldName="photo_url"
-            onUrlChange={ctx.handleChange}
-            urlError={ctx.fieldErrors.photo_url}
-            urlInputLabel="Image URL"
-            urlPlaceholder="https://example.com/photo.png"
+          <MediaUploadField
+            label="Profile Image"
             items={uploadItems}
             onAddFiles={handleAddMediaFiles}
             onRemoveItem={handleRemoveMediaItem}
             accept="image/*"
             multiple={false}
             maxFiles={1}
-            tooltipChoose="Choose photo"
-            tooltipAdd="Replace photo"
+            size="small"
+            tooltipChoose="Upload"
+            tooltipAdd="Change"
           />
         ),
       },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 7 },
+        fieldNames: ["full_name"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 3 },
+        fieldNames: ["gender"],
+      },
+
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 6 },
+        fieldNames: ["mobile_number"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 6 },
+        fieldNames: ["email"],
+      },
+
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 5 },
+        fieldNames: ["qualification"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["date_of_birth"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 3 },
+        fieldNames: ["experience_years"],
+      },
+
+      {
+        kind: "section",
+        title: "Assignment & Status",
+        icon: icons?.assignment,
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["class_id"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["class_division_id"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["is_active"],
+        show: (c: FormLayoutContext) => c.isEditMode,
+      },
+
+      {
+        kind: "section",
+        title: "Location",
+        icon: icons?.address,
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12 },
+        fieldNames: ["address"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["city"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["state"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 4 },
+        fieldNames: ["pincode"],
+      },
     ],
+
+
+
   };
 }

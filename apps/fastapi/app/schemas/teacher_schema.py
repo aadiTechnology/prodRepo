@@ -15,6 +15,12 @@ class TeacherBase(BaseModel):
     class_id: Optional[int] = None
     class_division_id: Optional[int] = None
     is_active: bool = True
+    
+    # Address Details
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pincode: Optional[str] = None
 
 # Properties to receive on creation
 class TeacherCreate(TeacherBase):
@@ -33,6 +39,12 @@ class TeacherUpdate(BaseModel):
     class_id: Optional[int] = None
     class_division_id: Optional[int] = None
     is_active: Optional[bool] = None
+    
+    # Address Details
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pincode: Optional[str] = None
 
 # Properties to return to client
 class TeacherResponse(TeacherBase):

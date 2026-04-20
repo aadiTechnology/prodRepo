@@ -18,6 +18,10 @@ export interface TeacherBase {
   class_id?: number | null;
   class_division_id?: number | null;
   is_active: boolean;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
 }
 
 export interface TeacherCreate extends TeacherBase {}

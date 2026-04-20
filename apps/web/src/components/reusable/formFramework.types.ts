@@ -59,7 +59,15 @@ export type FormLayoutRow<T extends Record<string, unknown>> =
       show?: (ctx: FormLayoutContext) => boolean;
     }
   | {
+      kind: "section";
+      title: string;
+      icon?: ReactNode;
+      grid?: FormGridSize;
+      show?: (ctx: FormLayoutContext) => boolean;
+    }
+  | {
       kind: "custom";
+
       grid: FormGridSize;
       render: (ctx: FormRenderContext<T>) => ReactNode;
       show?: (ctx: FormLayoutContext) => boolean;

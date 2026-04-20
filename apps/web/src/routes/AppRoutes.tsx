@@ -23,6 +23,7 @@ const Home = lazy(() => import("../pages/Home"));
 const Users = lazy(() => import("../pages/Users"));
 const TeacherList = lazy(() => import("../pages/teachers/TeacherList"));
 const AddTeacher = lazy(() => import("../pages/teachers/AddTeacher"));
+const TeacherDetails = lazy(() => import("../pages/teachers/TeacherDetails"));
 const MarkAttendance = lazy(() => import("../pages/Attendance/MarkAttendance"));
 const AttendanceReport = lazy(() => import("../pages/Attendance/AttendanceReport"));
 
@@ -172,6 +173,7 @@ export default function AppRoutes() {
           {/* Teacher Management */}
           <Route path="/teachers" element={<ProtectedRoute requiredPermissions="TEACHER_MGMT:view"><TeacherList /></ProtectedRoute>} />
           <Route path="/teachers/add" element={<ProtectedRoute requiredPermissions="TEACHER_MGMT:create"><AddTeacher /></ProtectedRoute>} />
+          <Route path="/teachers/:id" element={<ProtectedRoute requiredPermissions="TEACHER_MGMT:view"><TeacherDetails /></ProtectedRoute>} />
           <Route path="/teachers/:id/edit" element={<ProtectedRoute requiredPermissions="TEACHER_MGMT:edit"><AddTeacher /></ProtectedRoute>} />
 
           {/* AI Features */}
