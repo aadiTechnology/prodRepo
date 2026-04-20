@@ -19,7 +19,6 @@ import {
   Save as SaveIcon,
   CheckBox as CheckBoxIcon,
   Groups as GroupsIcon,
-  RefreshOutlined as ResetIcon,
   CheckBoxOutlined,
   CheckBoxOutlineBlank,
 } from "@mui/icons-material";
@@ -356,25 +355,36 @@ const MarkAttendance = () => {
 
       {/* Reset icon button */}
       <Tooltip title="Reset filters" arrow>
-        <IconButton
+        <Box
           onClick={resetFilters}
-          size="small"
           sx={{
-            border: `1.5px solid ${colorTokens.border.default}`,
-            borderRadius: "12px",
-            p: 0.9,
-            bgcolor: "#ffffff",
-            color: colorTokens.text.secondary,
-            "&:hover": {
-              borderColor: colorTokens.preschool.turquoise.main,
-              color: colorTokens.preschool.turquoise.main,
-              bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.06),
-            },
-            transition: "all 0.2s",
+            position: "relative",
+            display: "inline-flex",
+            alignItems: "center",
+            cursor: "pointer",
           }}
         >
-          <ResetIcon fontSize="small" />
-        </IconButton>
+          <Box
+            component="img"
+            src="/icons/reset.png"
+            alt="Reset filters"
+            sx={{
+              width: 38,
+              height: 38,
+              objectFit: "contain",
+              transition: "all 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
+              filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))",
+              "&:hover": {
+                transform: "scale(1.1) translateY(-1px)",
+                filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.22))",
+              },
+              "&:active": {
+                transform: "scale(0.92)",
+                filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.1))",
+              },
+            }}
+          />
+        </Box>
       </Tooltip>
     </Stack>
   );
