@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -13,12 +13,10 @@ import {
   Alert,
   Stack,
   alpha,
-  IconButton,
 } from "@mui/material";
 import {
   Save as SaveIcon,
   CheckBox as CheckBoxIcon,
-  Groups as GroupsIcon,
   CheckBoxOutlined,
   CheckBoxOutlineBlank,
 } from "@mui/icons-material";
@@ -31,7 +29,7 @@ import { colorTokens } from "../../tokens/colors";
 
 // ── Shared select style ───────────────────────────────────────────────────────
 const filterSelectSx = {
-  minWidth: { xs: "100%", sm: 148 },
+  minWidth: { xs: "100%", sm: 140 },
   "& .MuiOutlinedInput-root": {
     borderRadius: "15px",
     fontSize: "0.85rem",
@@ -43,8 +41,8 @@ const filterSelectSx = {
   },
 };
 
-// ── Legend pill ───────────────────────────────────────────────────────────────
-const LegendPill = ({
+// ── Legend Item ───────────────────────────────────────────────────────────────
+const LegendItem = ({
   icon,
   label,
   color,
@@ -55,7 +53,7 @@ const LegendPill = ({
 }) => (
   <Stack direction="row" alignItems="center" gap={0.6}>
     <Box sx={{ color, fontSize: 16, lineHeight: 1, display: "flex" }}>{icon}</Box>
-    <Typography variant="caption" sx={{ fontWeight: 700, color, lineHeight: 1 }}>
+    <Typography variant="caption" sx={{ fontWeight: 700, color, lineHeight: 1, fontSize: "0.75rem" }}>
       {label}
     </Typography>
   </Stack>
@@ -64,6 +62,8 @@ const LegendPill = ({
 // ── Main Component ────────────────────────────────────────────────────────────
 const MarkAttendance = () => {
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const [page, setPage] = React.useState(0);
+  const [rowsPerPage, setRowsPerPage] = React.useState(10);
 
   const controller = useMarkAttendanceController();
 
@@ -87,8 +87,14 @@ const MarkAttendance = () => {
     isTeacher,
   } = controller;
 
+  // Paginate students
+  const paginatedStudents = students.slice(
+    page * rowsPerPage,
+    (page + 1) * rowsPerPage
+  );
+
   // ── Column definitions ────────────────────────────────────────────────────
-  const columns = React.useMemo(() => {
+  const columns = useMemo(() => {
     const baseColumns = createMarkAttendanceColumns({
       onStatusChange: updateStudentStatus,
       onRemarksChange: updateStudentRemarks,
@@ -174,14 +180,14 @@ const MarkAttendance = () => {
     });
   }, [updateStudentStatus, updateStudentRemarks]);
 
-  // ── Filter toolbar (placed in PageHeader actions) ─────────────────────────
-  const filterToolbar = (
+  // ── Filters Section ─────────────────────────────────────────────────────────
+  const filtersSection = (
     <Stack
       direction={{ xs: "column", sm: "row" }}
       alignItems={{ xs: "stretch", sm: "center" }}
       gap={1.5}
       flexWrap="wrap"
-      sx={{ width: { xs: "100%", sm: "auto" }, minWidth: 0 }}
+      sx={{ width: "100%" }}
     >
       {/* Academic Year */}
       <Select
@@ -205,7 +211,7 @@ const MarkAttendance = () => {
         ))}
       </Select>
 
-      {/* Teacher — locked for TEACHER role, full list for Admin */}
+      {/* Teacher */}
       <Select
         value={filters.teacher_id || ""}
         displayEmpty
@@ -229,7 +235,6 @@ const MarkAttendance = () => {
           }),
         }}
       >
-        {/* Admin only: "All Teachers" option */}
         {!isTeacher && (
           <MenuItem value="">
             <Typography variant="body2" color="text.secondary">
@@ -260,7 +265,7 @@ const MarkAttendance = () => {
       >
         <MenuItem value="">
           <Typography variant="body2" color="text.secondary">
-            Select Class
+            Class
           </Typography>
         </MenuItem>
         {filteredClasses.map((cls) => (
@@ -283,7 +288,7 @@ const MarkAttendance = () => {
       >
         <MenuItem value="">
           <Typography variant="body2" color="text.secondary">
-            Select Division
+            Division
           </Typography>
         </MenuItem>
         {filteredDivisions.map((div) => (
@@ -293,7 +298,7 @@ const MarkAttendance = () => {
         ))}
       </Select>
 
-      {/* Date — hidden native input triggered by 3D calendar icon only */}
+      {/* Date Picker */}
       <Tooltip title={filters.attendance_date || "Select Date"} arrow>
         <Box
           sx={{
@@ -310,7 +315,6 @@ const MarkAttendance = () => {
             }
           }}
         >
-          {/* Invisible native date input sits behind, triggered via ref */}
           <input
             ref={dateInputRef}
             type="date"
@@ -329,7 +333,6 @@ const MarkAttendance = () => {
               pointerEvents: "none",
             }}
           />
-          {/* Visible: 3D calendar image icon with responsive transitions */}
           <Box
             component="img"
             src="/icons/3d-calendar.png"
@@ -353,7 +356,7 @@ const MarkAttendance = () => {
         </Box>
       </Tooltip>
 
-      {/* Reset icon button */}
+      {/* Reset Button */}
       <Tooltip title="Reset filters" arrow>
         <Box
           onClick={resetFilters}
@@ -399,51 +402,57 @@ const MarkAttendance = () => {
             { title: "Mark Attendance", path: "/attendance/mark" },
           ]}
           homePath="/"
-          actions={filterToolbar}
+          actions={filtersSection}
         />
       }
     >
-      {/* ── Legend bar ──────────────────────────────────────────────────── */}
+      {/* ── Legend Bar ───────────────────────────────────────────────────– */}
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: 2.5,
-          px: 2.5,
-          py: 1.2,
+          gap: { xs: 1.5, sm: 2.5 },
+          px: { xs: 2, sm: 2.5 },
+          py: 1,
           borderBottom: `1px solid ${colorTokens.border.subtle}`,
-          bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.04),
+          bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.02),
           flexWrap: "wrap",
         }}
       >
         <Typography
           variant="caption"
-          sx={{ fontWeight: 800, color: colorTokens.text.secondary, textTransform: "uppercase", letterSpacing: 0.8 }}
+          sx={{
+            fontWeight: 800,
+            color: colorTokens.text.secondary,
+            textTransform: "uppercase",
+            letterSpacing: 0.8,
+            fontSize: "0.7rem",
+          }}
         >
-          Legend:
+          Legend
         </Typography>
-        <LegendPill
+        <LegendItem
           icon={<CheckBoxOutlined sx={{ fontSize: 16 }} />}
           label="Present"
           color="#2e7d32"
         />
-        <LegendPill
+        <LegendItem
           icon={<CheckBoxOutlineBlank sx={{ fontSize: 16 }} />}
           label="Absent"
           color="#c62828"
         />
-        <LegendPill
+        <LegendItem
           icon={
-            <Typography component="span" sx={{ fontWeight: 800, fontSize: "0.72rem", color: "#e65100", lineHeight: 1 }}>
+            <Typography component="span" sx={{ fontWeight: 800, fontSize: "0.7rem", color: "#e65100", lineHeight: 1 }}>
               HD
             </Typography>
           }
           label="Half Day"
           color="#e65100"
         />
-        <LegendPill
+        <LegendItem
           icon={
-            <Typography component="span" sx={{ fontWeight: 800, fontSize: "0.72rem", color: "#0277bd", lineHeight: 1 }}>
+            <Typography component="span" sx={{ fontWeight: 800, fontSize: "0.7rem", color: "#0277bd", lineHeight: 1 }}>
               L
             </Typography>
           }
@@ -452,128 +461,26 @@ const MarkAttendance = () => {
         />
       </Box>
 
-      {/* ── Student List section ─────────────────────────────────────────── */}
-      {students.length > 0 && (
-        <>
-          {/* Sub-header: title + actions */}
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              px: 2,
-              py: 1.5,
-              borderBottom: `1px solid ${colorTokens.border.subtle}`,
-              bgcolor: colorTokens.background.subtle,
-              flexWrap: "wrap",
-              gap: 1,
-            }}
-          >
-            <Stack direction="row" alignItems="center" gap={1.5}>
-              <GroupsIcon sx={{ color: colorTokens.menuColors.academics, fontSize: 22 }} />
-              <Typography variant="subtitle1" fontWeight={700} color={colorTokens.text.primary}>
-                Student List
-              </Typography>
-              <Chip
-                label={`${students.length} Students`}
-                size="small"
-                sx={{
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.1),
-                  color: colorTokens.preschool.turquoise.dark,
-                  border: `1px solid ${alpha(colorTokens.preschool.turquoise.main, 0.25)}`,
-                }}
-              />
-            </Stack>
+      {/* ── Table Section ────────────────────────────────────────────────– */}
+      <EntityTableSection<any>
+        label="Attendance"
+        loading={loading}
+        totalRows={students.length}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        onPageChange={setPage}
+        onRowsPerPageChange={(v) => {
+          setRowsPerPage(v);
+          setPage(0);
+        }}
+        columns={columns}
+        data={paginatedStudents}
+        showPagination={students.length > 0}
+        showInfoBar={students.length > 0}
+        getRowKey={(row) => String(row.student_id)}
+      />
 
-            <Stack direction="row" gap={1} flexWrap="wrap">
-              <Button
-                variant="outlined"
-                startIcon={<CheckBoxIcon />}
-                onClick={markAllPresent}
-                size="small"
-                sx={{
-                  borderRadius: "10px",
-                  textTransform: "none",
-                  fontWeight: 600,
-                  fontSize: "0.8rem",
-                  borderColor: colorTokens.success.main,
-                  color: colorTokens.success.main,
-                  "&:hover": {
-                    bgcolor: alpha(colorTokens.success.main, 0.06),
-                    borderColor: colorTokens.success.dark,
-                  },
-                }}
-              >
-                Mark All Present
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={
-                  saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />
-                }
-                onClick={saveAttendance}
-                disabled={saving}
-                size="small"
-                sx={{
-                  borderRadius: "10px",
-                  textTransform: "none",
-                  fontWeight: 700,
-                  fontSize: "0.8rem",
-                  px: 2.5,
-                  background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
-                  boxShadow: `0 4px 10px ${alpha(colorTokens.preschool.turquoise.main, 0.3)}`,
-                  "&:hover": {
-                    boxShadow: `0 6px 14px ${alpha(colorTokens.preschool.turquoise.main, 0.4)}`,
-                    transform: "translateY(-1px)",
-                  },
-                  transition: "all 0.2s ease",
-                }}
-              >
-                {saving ? "Saving..." : "Save Attendance"}
-              </Button>
-            </Stack>
-          </Box>
-
-          <EntityTableSection<any>
-            label="Attendance Student List"
-            loading={loading}
-            totalRows={students.length}
-            page={0}
-            rowsPerPage={students.length}
-            onPageChange={() => {}}
-            onRowsPerPageChange={() => {}}
-            columns={columns}
-            data={students}
-            showPagination={false}
-            showInfoBar={false}
-            getRowKey={(row) => String(row.student_id)}
-          />
-        </>
-      )}
-
-      {/* ── Loading state ────────────────────────────────────────────────── */}
-      {loading && (
-        <Box
-          sx={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            py: 10,
-            gap: 2,
-          }}
-        >
-          <CircularProgress size={44} sx={{ color: colorTokens.preschool.turquoise.main }} />
-          <Typography variant="body2" color="text.secondary">
-            Loading student list...
-          </Typography>
-        </Box>
-      )}
-
-      {/* ── Empty state ──────────────────────────────────────────────────── */}
+      {/* ── Empty State ──────────────────────────────────────────────────– */}
       {!students.length && !loading && (
         <Box
           sx={{
@@ -594,16 +501,96 @@ const MarkAttendance = () => {
             alt="calendar"
             sx={{ width: 72, height: 72, objectFit: "contain" }}
           />
-          <Typography variant="h6" fontWeight={600} color={colorTokens.text.primary}>
+          <Typography variant="h6" fontWeight={600} color={colorTokens.text.primary} sx={{ fontSize: "1rem" }}>
             Select filters to load students
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Choose class &amp; division — students will load automatically.
+            Choose academic year, teacher, class & division — students will load automatically.
           </Typography>
         </Box>
       )}
 
-      {/* ── Snackbar ─────────────────────────────────────────────────────── */}
+      {/* ── Loading State ────────────────────────────────────────────────– */}
+      {loading && (
+        <Box
+          sx={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            py: 10,
+            gap: 2,
+          }}
+        >
+          <CircularProgress size={44} sx={{ color: colorTokens.preschool.turquoise.main }} />
+          <Typography variant="body2" color="text.secondary">
+            Loading student list...
+          </Typography>
+        </Box>
+      )}
+
+      {/* ── Action Buttons (Mark All Present & Save) ──────────────────────– */}
+      {students.length > 0 && (
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            px: { xs: 2, sm: 2.5 },
+            py: 2,
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+          }}
+        >
+          <Button
+            variant="outlined"
+            startIcon={<CheckBoxIcon />}
+            onClick={markAllPresent}
+            size="small"
+            sx={{
+              borderRadius: "10px",
+              textTransform: "none",
+              fontWeight: 600,
+              fontSize: "0.8rem",
+              borderColor: colorTokens.success.main,
+              color: colorTokens.success.main,
+              "&:hover": {
+                bgcolor: alpha(colorTokens.success.main, 0.06),
+                borderColor: colorTokens.success.dark,
+              },
+            }}
+          >
+            Mark All Present
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={
+              saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />
+            }
+            onClick={saveAttendance}
+            disabled={saving}
+            size="small"
+            sx={{
+              borderRadius: "10px",
+              textTransform: "none",
+              fontWeight: 700,
+              fontSize: "0.8rem",
+              px: 2.5,
+              background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
+              boxShadow: `0 4px 10px ${alpha(colorTokens.preschool.turquoise.main, 0.3)}`,
+              "&:hover": {
+                boxShadow: `0 6px 14px ${alpha(colorTokens.preschool.turquoise.main, 0.4)}`,
+                transform: "translateY(-1px)",
+              },
+              transition: "all 0.2s ease",
+            }}
+          >
+            {saving ? "Saving..." : "Save Attendance"}
+          </Button>
+        </Box>
+      )}
+
+      {/* ── Snackbar ─────────────────────────────────────────────────────– */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
