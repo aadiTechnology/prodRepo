@@ -361,134 +361,132 @@ const MarkAttendance = () => {
         />
       }
     >
-      {students.length > 0 ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%', flex: 1, minHeight: 0 }}>
-          <Card 
-            elevation={0}
-            sx={{ 
-              borderRadius: "20px", 
-              bgcolor: "#ffffff",
-              border: `1px solid ${colorTokens.border.subtle}`,
-              boxShadow: "0px 8px 24px rgba(0, 0, 0, 0.02)",
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              flex: 1, 
-              minHeight: 0
-            }}
-          >
-            <Box sx={{ 
-              px: { xs: 2.5, sm: 3.5 }, py: { xs: 2.5, sm: 3 }, 
-              borderBottom: `1px solid ${colorTokens.border.subtle}`,
-              display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, 
-              justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 3,
-              bgcolor: alpha(colorTokens.primary.main, 0.015)
-            }}>
-               <Box>
-                 <Typography variant="h6" sx={{ fontWeight: 800, color: colorTokens.text.primary, fontSize: '1.15rem' }}>
-                    Daily Attendance Roster
-                 </Typography>
-                 <Stack direction="row" spacing={3} sx={{ mt: 1 }}>
-                    <LegendItem label="Present" short="P" color={colorTokens.preschool.mint.main} />
-                    <LegendItem label="Absent" short="A" color={colorTokens.preschool.coral.main} />
-                    <LegendItem label="Half Day" short="HD" color={colorTokens.preschool.peach.main} />
-                    <LegendItem label="Leave" short="L" color={colorTokens.preschool.lavender.main} />
-                 </Stack>
-               </Box>
-               <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Tooltip title="Mark All Present">
-                    <IconButton
-                      onClick={markAllPresent}
-                      sx={{
-                        color: allRowsPresent ? colorTokens.text.secondary : colorTokens.preschool.turquoise.main,
-                        backgroundColor: alpha(allRowsPresent ? colorTokens.text.secondary : colorTokens.preschool.turquoise.main, 0.08),
-                        borderRadius: "12px",
-                        width: 44,
-                        height: 44,
-                        border: `1.5px solid ${alpha(allRowsPresent ? colorTokens.text.secondary : colorTokens.preschool.turquoise.main, 0.2)}`,
-                        "&:hover": { backgroundColor: alpha(allRowsPresent ? colorTokens.text.secondary : colorTokens.preschool.turquoise.main, 0.15) },
-                      }}
-                    >
-                      <DoneAllIcon sx={{ fontSize: 22 }} />
-                    </IconButton>
-                  </Tooltip>
-
-                  <FormHeaderIconAction
-                    variant="save"
-                    tooltipTitle="Save Attendance"
-                    onClick={saveAttendance}
-                    loading={saving}
-                  />
-               </Stack>
-            </Box>
-            <EntityTableSection<any>
-              label=""
-              loading={loading}
-              totalRows={students.length}
-              page={page}
-              rowsPerPage={rowsPerPage}
-              onPageChange={setPage}
-              onRowsPerPageChange={(v) => {
-                setRowsPerPage(v);
-                setPage(0);
-              }}
-              columns={columns}
-              data={paginatedStudents}
-              showPagination={true}
-              showInfoBar={false}
-              getRowKey={(row) => String(row.student_id)}
-            />
-          </Card>
-        </Box>
-      ) : (
-        !loading && (
-          <Box
-            sx={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              py: 10,
-              gap: 2,
-              textAlign: "center",
-              opacity: 0.55,
-            }}
-          >
-            <Box
-              component="img"
-              src="/icons/3d-calendar.png"
-              alt="calendar"
-              sx={{ width: 84, height: 84, objectFit: "contain", opacity: 0.8 }}
-            />
-            <Typography variant="h6" fontWeight={700} color={colorTokens.text.primary} sx={{ fontSize: "1.1rem", mt: 1 }}>
-              Ready to mark attendance?
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 350, lineHeight: 1.6 }}>
-              Select Date, Class & Division filter from the top bar to load your student roster.
-            </Typography>
-          </Box>
-        )
-      )}
-
-      {loading && students.length === 0 && (
-        <Box
-          sx={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            py: 10,
-            gap: 2,
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%', flex: 1, minHeight: 0 }}>
+        <Card 
+          elevation={0}
+          sx={{ 
+            borderRadius: "20px", 
+            bgcolor: "#ffffff",
+            border: `1px solid ${colorTokens.border.subtle}`,
+            boxShadow: "0px 8px 24px rgba(0, 0, 0, 0.02)",
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1, 
+            minHeight: 0
           }}
         >
-          <CircularProgress size={44} sx={{ color: colorTokens.preschool.turquoise.main }} />
-          <Typography variant="body2" color="text.secondary">
-            Loading roster...
-          </Typography>
-        </Box>
-      )}
+          <Box sx={{ 
+            px: { xs: 2.5, sm: 3.5 }, py: { xs: 2.5, sm: 3 }, 
+            borderBottom: `1px solid ${colorTokens.border.subtle}`,
+            display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, 
+            justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 3,
+            bgcolor: alpha(colorTokens.primary.main, 0.015)
+          }}>
+             <Box>
+               <Typography variant="h6" sx={{ fontWeight: 800, color: colorTokens.text.primary, fontSize: '1.15rem' }}>
+                  Daily Attendance Roster
+               </Typography>
+               <Stack direction="row" spacing={3} sx={{ mt: 1 }}>
+                  <LegendItem label="Present" short="P" color={colorTokens.preschool.mint.main} />
+                  <LegendItem label="Absent" short="A" color={colorTokens.preschool.coral.main} />
+                  <LegendItem label="Half Day" short="HD" color={colorTokens.preschool.peach.main} />
+                  <LegendItem label="Leave" short="L" color={colorTokens.preschool.lavender.main} />
+               </Stack>
+             </Box>
+             <Stack direction="row" spacing={1.5} alignItems="center">
+                <Tooltip title="Mark All Present">
+                  <IconButton
+                    onClick={markAllPresent}
+                    sx={{
+                      color: allRowsPresent ? colorTokens.text.secondary : colorTokens.preschool.turquoise.main,
+                      backgroundColor: alpha(allRowsPresent ? colorTokens.text.secondary : colorTokens.preschool.turquoise.main, 0.08),
+                      borderRadius: "12px",
+                      width: 44,
+                      height: 44,
+                      border: `1.5px solid ${alpha(allRowsPresent ? colorTokens.text.secondary : colorTokens.preschool.turquoise.main, 0.2)}`,
+                      "&:hover": { backgroundColor: alpha(allRowsPresent ? colorTokens.text.secondary : colorTokens.preschool.turquoise.main, 0.15) },
+                    }}
+                  >
+                    <DoneAllIcon sx={{ fontSize: 22 }} />
+                  </IconButton>
+                </Tooltip>
+
+                <FormHeaderIconAction
+                  variant="save"
+                  tooltipTitle="Save Attendance"
+                  onClick={saveAttendance}
+                  loading={saving}
+                />
+             </Stack>
+          </Box>
+
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            {loading && students.length === 0 ? (
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  py: 15,
+                  gap: 2,
+                }}
+              >
+                <CircularProgress size={44} sx={{ color: colorTokens.preschool.turquoise.main }} />
+                <Typography variant="body2" color="text.secondary">
+                  Loading roster...
+                </Typography>
+              </Box>
+            ) : students.length > 0 ? (
+              <EntityTableSection<any>
+                label=""
+                loading={loading}
+                totalRows={students.length}
+                page={page}
+                rowsPerPage={rowsPerPage}
+                onPageChange={setPage}
+                onRowsPerPageChange={(v) => {
+                  setRowsPerPage(v);
+                  setPage(0);
+                }}
+                columns={columns}
+                data={paginatedStudents}
+                showPagination={true}
+                showInfoBar={false}
+                getRowKey={(row) => String(row.student_id)}
+              />
+            ) : (
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  py: 15,
+                  gap: 2,
+                  textAlign: "center",
+                }}
+              >
+                <Box
+                  component="img"
+                  src="/icons/3d-calendar.png"
+                  alt="calendar"
+                  sx={{ width: 84, height: 84, objectFit: "contain", opacity: 0.8 }}
+                />
+                <Typography variant="h6" fontWeight={700} color={colorTokens.text.primary} sx={{ fontSize: "1.1rem", mt: 1 }}>
+                  Ready to mark attendance?
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 350, lineHeight: 1.6, opacity: 0.7 }}>
+                  Select Date, Class & Division filter from the top bar to load your student roster.
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Card>
+      </Box>
 
       <Snackbar
         open={snackbar.open}
