@@ -45,6 +45,7 @@ from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, 
 
 from app.routers import fee_discount, fee_category_router
 from app.routers import installment_tracking, fee_installment_status, fee_collection
+from app.routers import invoice
 from app.routers import lead as lead_router
 from app.routers import enrollment as enrollment_router
 from app.routers import attendance_router
@@ -114,6 +115,7 @@ app.include_router(fee_structure.router)
 app.include_router(installment_tracking.router)
 app.include_router(fee_installment_status.router)
 app.include_router(fee_collection.router)
+app.include_router(invoice.router)
 app.include_router(reports.router)
 app.include_router(sprint.router)
 app.include_router(task_effort.router)
