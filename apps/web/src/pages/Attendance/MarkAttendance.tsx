@@ -14,14 +14,18 @@ import {
   alpha,
   Checkbox,
   FormControlLabel,
+  IconButton,
 } from "@mui/material";
 import {
   CheckBoxOutlined,
   CheckBoxOutlineBlank,
+  Refresh as RefreshIcon,
+  DoneAll as DoneAllIcon,
 } from "@mui/icons-material";
 
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout, EntityTableSection } from "../../components/reusable";
+import FormHeaderIconAction from "../../components/primitives/FormHeaderIconAction";
 import { useMarkAttendanceController } from "../../hooks/useMarkAttendanceController";
 import { ATTENDANCE_STATUSES, createMarkAttendanceColumns } from "./MarkAttendance.config";
 import { colorTokens } from "../../tokens/colors";
@@ -305,37 +309,48 @@ const MarkAttendance = () => {
 
       {/* Action Buttons */}
       {students.length > 0 && (
-        <>
-          <FormControlLabel
-            sx={{ ml: { xs: 0, sm: 1 } }}
-            control={
-              <Checkbox
-                checked={allRowsPresent}
-                onChange={markAllPresent}
-              />
-            }
-            label={
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Select All (Mark All Present)
-              </Typography>
-            }
-          />
-          <Button
-            variant="outlined"
-            onClick={resetFilters}
-            sx={{ borderRadius: "12px", textTransform: "none" }}
-          >
-            Reset
-          </Button>
-          <Button
-            variant="contained"
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ ml: { xs: 0, sm: "auto" } }}>
+          <Tooltip title="Select All (Mark All Present)">
+            <IconButton
+              onClick={markAllPresent}
+              sx={{
+                color: allRowsPresent ? colorTokens.text.secondary : colorTokens.preschool.turquoise.main,
+                backgroundColor: alpha(allRowsPresent ? colorTokens.text.secondary : colorTokens.preschool.turquoise.main, 0.08),
+                borderRadius: "12px",
+                width: 44,
+                height: 44,
+                border: `1.5px solid ${alpha(allRowsPresent ? colorTokens.text.secondary : colorTokens.preschool.turquoise.main, 0.2)}`,
+                "&:hover": { backgroundColor: alpha(allRowsPresent ? colorTokens.text.secondary : colorTokens.preschool.turquoise.main, 0.15) },
+              }}
+            >
+              <DoneAllIcon sx={{ fontSize: 22 }} />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Reset Filters">
+            <IconButton
+              onClick={resetFilters}
+              sx={{
+                color: colorTokens.text.secondary,
+                backgroundColor: alpha(colorTokens.text.secondary, 0.08),
+                borderRadius: "12px",
+                width: 44,
+                height: 44,
+                border: `1.5px solid ${alpha(colorTokens.text.secondary, 0.2)}`,
+                "&:hover": { backgroundColor: alpha(colorTokens.text.secondary, 0.15) },
+              }}
+            >
+              <RefreshIcon sx={{ fontSize: 22 }} />
+            </IconButton>
+          </Tooltip>
+
+          <FormHeaderIconAction
+            variant="save"
+            tooltipTitle="Save Attendance"
             onClick={saveAttendance}
-            disabled={saving}
-            sx={{ borderRadius: "12px", textTransform: "none", px: 2.5 }}
-          >
-            {saving ? <CircularProgress size={20} color="inherit" /> : "Save"}
-          </Button>
-        </>
+            loading={saving}
+          />
+        </Stack>
       )}
     </Stack>
   );
