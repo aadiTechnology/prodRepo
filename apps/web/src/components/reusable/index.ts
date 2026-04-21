@@ -68,3 +68,6 @@ export type { TableRowActionsProps } from "./TableRowActions";
 
 export { default as EntityTableSection } from "./EntityTableSection";
 export type { EntityTableSectionProps } from "./EntityTableSection";
+
+export { default as HeaderIconAction } from "./HeaderIconAction";
+export type { HeaderIconActionProps } from "./HeaderIconAction";

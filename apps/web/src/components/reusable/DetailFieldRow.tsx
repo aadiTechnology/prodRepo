@@ -14,6 +14,8 @@ export interface DetailFieldRowProps {
   last?: boolean;
   /** Min width for label column. Default 180. */
   labelMinWidth?: number;
+  /** Tighter padding for compact detail screens (e.g. profile panels). */
+  dense?: boolean;
   sx?: SxProps<Theme>;
 }
 
@@ -22,6 +24,7 @@ export default function DetailFieldRow({
   children,
   last = false,
   labelMinWidth = 180,
+  dense = false,
   sx,
 }: DetailFieldRowProps) {
   return (
@@ -30,9 +33,9 @@ export default function DetailFieldRow({
         sx={(theme) => ({
           display: "flex",
           alignItems: "flex-start",
-          gap: 2,
-          py: 2.5,
-          px: 3,
+          gap: dense ? 1.5 : 2,
+          py: dense ? 1.25 : 2.5,
+          px: dense ? 2 : 3,
           flexWrap: { xs: "wrap", sm: "nowrap" },
         })}
       >
