@@ -2,53 +2,53 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Typography,
-  Card,
-  CardContent,
-  Grid,
   Select,
   MenuItem,
-  FormControl,
-  InputLabel,
-  Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   TextField,
   Chip,
   Tooltip,
   CircularProgress,
   Snackbar,
   Alert,
-  Divider,
+  Stack,
   alpha,
-  useTheme,
-  TablePagination
+  IconButton,
+  Grid,
+  Card,
+  Button,
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
   Search as SearchIcon,
   FileDownload as ExportIcon,
-  Assessment as AssessmentIcon,
-  EventNote as EventNoteIcon,
-  People as PeopleIcon,
-  Cancel as CancelIcon,
   CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon,
   Warning as WarningIcon,
-  Info as InfoIcon
+  EventNote as EventNoteIcon,
 } from "@mui/icons-material";
-import { PageHeader } from "../../components/layout";
+import { PageHeader, PageLayout } from "../../components/layout";
+import { EntityTableSection } from "../../components/reusable";
+import { colorTokens } from "../../tokens/colors";
 import schoolClassService, { SchoolClass, ClassDivision } from "../../api/services/schoolClassService";
 import academicYearService, { AcademicYear } from "../../api/services/academicYearService";
-import attendanceService, { AttendanceReportResponse, AttendanceReportItem } from "../../api/services/attendanceService";
+import attendanceService, { AttendanceReportResponse } from "../../api/services/attendanceService";
 import studentService from "../../api/services/studentService";
 
-const AttendanceReport = () => {
-  const theme = useTheme();
+// ── Shared select style ───────────────────────────────────────────────────────
+const filterSelectSx = {
+  minWidth: { xs: "100%", sm: 140 },
+  "& .MuiOutlinedInput-root": {
+    borderRadius: "15px",
+    fontSize: "0.85rem",
+    fontWeight: 600,
+    bgcolor: "#ffffff",
+    "& fieldset": { borderColor: colorTokens.border.subtle },
+    "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
+    "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
+  },
+};
 
+const AttendanceReport = () => {
   // State
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
@@ -119,8 +119,6 @@ const AttendanceReport = () => {
             class_id: filters.class_id,
             limit: 1000
           });
-          // Note: Backend student.list currently doesn't filter by division_id in the API service
-          // but we can filter on frontend if needed or just show all for that class
           setStudents(items);
         } catch (err) {
           console.error("Failed to load students", err);
@@ -150,11 +148,6 @@ const AttendanceReport = () => {
         offset: page * rowsPerPage
       });
       setReportData(data);
-      if (data.records.length === 0) {
-        setSnackbar({ open: true, message: "No attendance records found", severity: 'error' });
-      } else {
-        setSnackbar({ open: true, message: "Report generated successfully", severity: 'success' });
-      }
     } catch (err) {
       console.error("Failed to fetch report", err);
       setSnackbar({ open: true, message: "Unable to load attendance data", severity: 'error' });
@@ -164,10 +157,8 @@ const AttendanceReport = () => {
   }, [filters, page, rowsPerPage]);
 
   useEffect(() => {
-    if (reportData) {
-      fetchReport();
-    }
-  }, [page, rowsPerPage]);
+    fetchReport();
+  }, [fetchReport]);
 
   const handleExport = () => {
     if (!reportData || reportData.records.length === 0) return;
@@ -197,282 +188,490 @@ const AttendanceReport = () => {
   };
 
   const getStatusChip = (status: string) => {
+    let color: string = colorTokens.text.secondary;
     switch (status) {
-      case 'Present': return <Chip label="Present" color="success" size="small" icon={<CheckCircleIcon />} />;
-      case 'Absent': return <Chip label="Absent" color="error" size="small" icon={<CancelIcon />} />;
-      case 'Half Day': return <Chip label="Half Day" color="warning" size="small" icon={<WarningIcon />} />;
-      case 'Leave': return <Chip label="Leave" color="info" size="small" icon={<EventNoteIcon />} />;
-      default: return <Chip label={status} size="small" />;
+      case 'Present': color = colorTokens.preschool.mint.main; break;
+      case 'Absent': color = colorTokens.preschool.coral.main; break;
+      case 'Half Day': color = colorTokens.preschool.peach.main; break;
+      case 'Leave': color = colorTokens.preschool.lavender.main; break;
     }
+
+    return (
+      <Chip 
+        label={status} 
+        size="small" 
+        sx={{ 
+          fontWeight: 800,
+          fontSize: '0.7rem',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          bgcolor: alpha(color, 0.1),
+          color: color,
+          border: `1px solid ${alpha(color, 0.2)}`,
+          borderRadius: '8px',
+          height: '24px',
+          '& .MuiChip-label': { px: 1 }
+        }} 
+      />
+    );
   };
 
-  return (
-    <Box sx={{ p: 4, background: `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.05)} 0%, ${alpha(theme.palette.background.default, 1)} 100%)`, minHeight: '100vh' }}>
-      <PageHeader
-        links={[{ title: "Attendance", path: "/attendance/mark" }, { title: "Attendance Report", path: "/attendance/report" }]}
-        homePath="/"
+  const columns = useMemo(() => [
+    {
+      id: "date",
+      label: "DATE",
+      width: "15%",
+      render: (row: any) => (
+        <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.primary }}>
+          {new Date(row.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+        </Typography>
+      )
+    },
+    {
+      id: "roll_no",
+      label: "ROLL #",
+      width: "10%",
+      render: (row: any) => <Typography variant="body2">{row.roll_no || '-'}</Typography>
+    },
+    {
+      id: "student_name",
+      label: "NAME",
+      width: "25%",
+      render: (row: any) => (
+        <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.primary }}>
+          {row.student_name}
+        </Typography>
+      )
+    },
+    {
+      id: "status",
+      label: "STATUS",
+      width: "15%",
+      align: "center" as const,
+      render: (row: any) => getStatusChip(row.status)
+    },
+    {
+      id: "type",
+      label: "TYPE",
+      width: "15%",
+      align: "center" as const,
+      render: (row: any) => row.type ? <Typography variant="caption" sx={{ fontWeight: 700, px: 2, py: 0.5, border: `1px solid ${colorTokens.border.subtle}`, borderRadius: '15px' }}>{row.type}</Typography> : '-'
+    },
+    {
+      id: "remarks",
+      label: "REMARKS",
+      width: "20%",
+      render: (row: any) => <Typography variant="body2" color="text.secondary">{row.remarks || '-'}</Typography>
+    }
+  ], []);
+
+  const filtersSection = (
+    <Stack
+      direction={{ xs: "column", sm: "row" }}
+      alignItems={{ xs: "stretch", sm: "center" }}
+      gap={1.5}
+      flexWrap="wrap"
+      sx={{ width: "100%" }}
+    >
+      <TextField
+        label="From Date"
+        type="date"
+        size="small"
+        value={filters.from_date}
+        InputLabelProps={{ shrink: true }}
+        onChange={(e) => {
+          setPage(0);
+          setFilters(prev => ({ ...prev, from_date: e.target.value }));
+        }}
+        sx={{
+          minWidth: { xs: "100%", sm: 140 },
+          "& .MuiOutlinedInput-root": {
+            borderRadius: "15px",
+            fontSize: "0.85rem",
+            fontWeight: 600,
+            bgcolor: "#ffffff",
+          },
+        }}
+      />
+      
+      <TextField
+        label="To Date"
+        type="date"
+        size="small"
+        value={filters.to_date}
+        InputLabelProps={{ shrink: true }}
+        onChange={(e) => {
+          setPage(0);
+          setFilters(prev => ({ ...prev, to_date: e.target.value }));
+        }}
+        sx={{
+          minWidth: { xs: "100%", sm: 140 },
+          "& .MuiOutlinedInput-root": {
+            borderRadius: "15px",
+            fontSize: "0.85rem",
+            fontWeight: 600,
+            bgcolor: "#ffffff",
+          },
+        }}
       />
 
-      <Card sx={{
-        mt: 3,
-        borderRadius: 4,
-        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
-        backdropFilter: 'blur(4px)',
-        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-        overflow: 'visible'
-      }}>
-        <CardContent sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6" fontWeight={700}>Search Filters</Typography>
-            <Button
-              variant="contained"
-              color="secondary"
-              startIcon={<ExportIcon />}
-              onClick={handleExport}
-              disabled={!reportData || reportData.records.length === 0}
-              sx={{ borderRadius: 2, textTransform: 'none' }}
-            >
-              Export CSV
-            </Button>
-          </Box>
+      <Select
+        value={filters.class_id || ""}
+        displayEmpty
+        size="small"
+        onChange={(e) => {
+          setPage(0);
+          setFilters(prev => ({ ...prev, class_id: Number(e.target.value) }));
+        }}
+        sx={filterSelectSx}
+      >
+        <MenuItem value="">
+          <Typography variant="body2" color="text.secondary">All Classes</Typography>
+        </MenuItem>
+        {classes.map(cls => (
+          <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
+        ))}
+      </Select>
 
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={3}>
-              <TextField
-                fullWidth
-                size="small"
-                type="date"
-                label="From Date"
-                InputLabelProps={{ shrink: true }}
-                value={filters.from_date}
-                onChange={(e) => setFilters(prev => ({ ...prev, from_date: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                fullWidth
-                size="small"
-                type="date"
-                label="To Date"
-                InputLabelProps={{ shrink: true }}
-                value={filters.to_date}
-                onChange={(e) => setFilters(prev => ({ ...prev, to_date: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Class</InputLabel>
-                <Select
-                  value={filters.class_id}
-                  label="Class"
-                  onChange={(e) => setFilters(prev => ({ ...prev, class_id: Number(e.target.value) }))}
-                >
-                  <MenuItem value={0}>All Classes</MenuItem>
-                  {classes.map(cls => (
-                    <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Division</InputLabel>
-                <Select
-                  value={filters.division_id}
-                  label="Division"
-                  onChange={(e) => setFilters(prev => ({ ...prev, division_id: Number(e.target.value) }))}
-                  disabled={!filters.class_id}
-                >
-                  <MenuItem value={0}>All Divisions</MenuItem>
-                  {divisions.map(div => (
-                    <MenuItem key={div.id} value={div.id}>{div.division_name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Student</InputLabel>
-                <Select
-                  value={filters.student_id}
-                  label="Student"
-                  onChange={(e) => setFilters(prev => ({ ...prev, student_id: Number(e.target.value) }))}
-                  disabled={!filters.division_id}
-                >
-                  <MenuItem value={0}>All Students</MenuItem>
-                  {students.map(s => (
-                    <MenuItem key={s.id} value={s.id}>{s.student_name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
+      <Select
+        value={filters.division_id || ""}
+        displayEmpty
+        size="small"
+        disabled={!filters.class_id}
+        onChange={(e) => {
+          setPage(0);
+          setFilters(prev => ({ ...prev, division_id: Number(e.target.value) }));
+        }}
+        sx={filterSelectSx}
+      >
+        <MenuItem value="">
+          <Typography variant="body2" color="text.secondary">All Divisions</Typography>
+        </MenuItem>
+        {divisions.map(div => (
+          <MenuItem key={div.id} value={div.id}>{div.division_name}</MenuItem>
+        ))}
+      </Select>
 
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={() => {
-                setFilters({
-                  academic_year_id: academicYears.find(y => y.is_active)?.id || 0,
-                  class_id: 0,
-                  division_id: 0,
-                  student_id: 0,
-                  from_date: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
-                  to_date: new Date().toISOString().split('T')[0]
-                });
-                setReportData(null);
-                setPage(0);
-              }}
-              sx={{ borderRadius: 2, textTransform: 'none' }}
-            >
-              Reset
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<SearchIcon />}
-              onClick={fetchReport}
-              disabled={loading}
-              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, px: 4 }}
-            >
-              Search
-            </Button>
-          </Box>
-        </CardContent>
-      </Card>
+      <Select
+        value={filters.student_id || ""}
+        displayEmpty
+        size="small"
+        disabled={!filters.division_id}
+        onChange={(e) => {
+          setPage(0);
+          setFilters(prev => ({ ...prev, student_id: Number(e.target.value) }));
+        }}
+        sx={filterSelectSx}
+      >
+        <MenuItem value="">
+          <Typography variant="body2" color="text.secondary">All Students</Typography>
+        </MenuItem>
+        {students.map(s => (
+          <MenuItem key={s.id} value={s.id}>{s.student_name}</MenuItem>
+        ))}
+      </Select>
 
+      {/* Action Buttons */}
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ ml: { xs: 0, sm: "auto" } }}>
+        <Tooltip title="Reset Filters">
+          <IconButton
+            onClick={() => {
+              setFilters({
+                academic_year_id: academicYears.find(y => y.is_active)?.id || 0,
+                class_id: 0,
+                division_id: 0,
+                student_id: 0,
+                from_date: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
+                to_date: new Date().toISOString().split('T')[0]
+              });
+              setReportData(null);
+              setPage(0);
+            }}
+            sx={{
+              color: colorTokens.text.secondary,
+              backgroundColor: alpha(colorTokens.text.secondary, 0.08),
+              borderRadius: "12px",
+              width: 44,
+              height: 44,
+              border: `1.5px solid ${alpha(colorTokens.text.secondary, 0.2)}`,
+              "&:hover": { backgroundColor: alpha(colorTokens.text.secondary, 0.15) },
+            }}
+          >
+            <RefreshIcon sx={{ fontSize: 22 }} />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+    </Stack>
+  );
+
+  return (
+    <PageLayout
+      pageBackground={true}
+      header={
+        <PageHeader
+          links={[{ title: "Attendance", path: "/attendance/mark" }, { title: "Attendance Report", path: "/attendance/report" }]}
+          homePath="/"
+          actions={filtersSection}
+        />
+      }
+    >
       {reportData && (
-        <Box sx={{ mt: 4 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%', flex: 1, minHeight: 0 }}>
           {/* Summary Cards */}
-          <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid container spacing={3}>
+            {/* Present Card */}
             <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '4px solid ' + theme.palette.success.main }}>
-                <CardContent sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ p: 1.5, borderRadius: 2, backgroundColor: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.main }}>
+              <Card elevation={0} sx={{ borderRadius: "16px", bgcolor: alpha(colorTokens.preschool.mint.main, 0.12) }}>
+                <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.secondary }}>
+                      Total Present
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 1 }}>
+                      {reportData.summary.total_present}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.mint.dark, display: 'block', mt: 2 }}>
+                      Logged attendances
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                    width: 56, height: 56, borderRadius: '16px', 
+                    bgcolor: colorTokens.preschool.mint.main, color: "#ffffff",
+                    boxShadow: `0 8px 16px ${alpha(colorTokens.preschool.mint.main, 0.3)}`
+                  }}>
                     <CheckCircleIcon />
                   </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Present</Typography>
-                    <Typography variant="h5" fontWeight={700}>{reportData.summary.total_present}</Typography>
-                  </Box>
-                </CardContent>
+                </Box>
               </Card>
             </Grid>
+
+            {/* Absent Card */}
             <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '4px solid ' + theme.palette.error.main }}>
-                <CardContent sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ p: 1.5, borderRadius: 2, backgroundColor: alpha(theme.palette.error.main, 0.1), color: theme.palette.error.main }}>
+              <Card elevation={0} sx={{ borderRadius: "16px", bgcolor: alpha(colorTokens.preschool.coral.main, 0.1) }}>
+                <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.secondary }}>
+                      Total Absent
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 1 }}>
+                      {reportData.summary.total_absent}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.coral.dark, display: 'block', mt: 2 }}>
+                      Missed sessions
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                    width: 56, height: 56, borderRadius: '16px', 
+                    bgcolor: colorTokens.preschool.coral.main, color: "#ffffff",
+                    boxShadow: `0 8px 16px ${alpha(colorTokens.preschool.coral.main, 0.3)}`
+                  }}>
                     <CancelIcon />
                   </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Absent</Typography>
-                    <Typography variant="h5" fontWeight={700}>{reportData.summary.total_absent}</Typography>
-                  </Box>
-                </CardContent>
+                </Box>
               </Card>
             </Grid>
+
+            {/* Half Day Card */}
             <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '4px solid ' + theme.palette.warning.main }}>
-                <CardContent sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ p: 1.5, borderRadius: 2, backgroundColor: alpha(theme.palette.warning.main, 0.1), color: theme.palette.warning.main }}>
+              <Card elevation={0} sx={{ borderRadius: "16px", bgcolor: alpha(colorTokens.preschool.peach.main, 0.15) }}>
+                <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.secondary }}>
+                      Half Days
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 1 }}>
+                      {reportData.summary.total_half_day}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.peach.dark, display: 'block', mt: 2 }}>
+                      Partial attendance
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                    width: 56, height: 56, borderRadius: '16px', 
+                    bgcolor: colorTokens.preschool.peach.main, color: "#ffffff",
+                    boxShadow: `0 8px 16px ${alpha(colorTokens.preschool.peach.main, 0.3)}`
+                  }}>
                     <WarningIcon />
                   </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Half Day</Typography>
-                    <Typography variant="h5" fontWeight={700}>{reportData.summary.total_half_day}</Typography>
-                  </Box>
-                </CardContent>
+                </Box>
               </Card>
             </Grid>
+
+            {/* Leave Card */}
             <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '4px solid ' + theme.palette.info.main }}>
-                <CardContent sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ p: 1.5, borderRadius: 2, backgroundColor: alpha(theme.palette.info.main, 0.1), color: theme.palette.info.main }}>
+              <Card elevation={0} sx={{ borderRadius: "16px", bgcolor: alpha(colorTokens.preschool.lavender.main, 0.15) }}>
+                <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.secondary }}>
+                      On Leave
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 1 }}>
+                      {reportData.summary.total_leave}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.lavender.dark, display: 'block', mt: 2 }}>
+                      Approved time off
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                    width: 56, height: 56, borderRadius: '16px', 
+                    bgcolor: colorTokens.preschool.lavender.main, color: "#ffffff",
+                    boxShadow: `0 8px 16px ${alpha(colorTokens.preschool.lavender.main, 0.3)}`
+                  }}>
                     <EventNoteIcon />
                   </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Leave</Typography>
-                    <Typography variant="h5" fontWeight={700}>{reportData.summary.total_leave}</Typography>
-                  </Box>
-                </CardContent>
+                </Box>
               </Card>
             </Grid>
           </Grid>
 
-          <TableContainer component={Paper} sx={{ borderRadius: 4, boxShadow: '0 4px 20px 0 rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-            <Table size="medium">
-              <TableHead sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.03) }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
-                  <TableCell width="100" sx={{ fontWeight: 700 }}>Roll #</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Student Name</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700 }}>Status</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700 }}>Type</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Remarks</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {reportData.records.map((record, index) => (
-                  <TableRow key={index} hover>
-                    <TableCell>{new Date(record.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</TableCell>
-                    <TableCell>{record.roll_no || '-'}</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>{record.student_name}</TableCell>
-                    <TableCell align="center">{getStatusChip(record.status)}</TableCell>
-                    <TableCell align="center">
-                      {record.type ? <Chip label={record.type} size="small" variant="outlined" sx={{ fontWeight: 700 }} /> : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">{record.remarks || '-'}</Typography>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25, 50]}
-              component="div"
-              count={reportData.total_count}
-              rowsPerPage={rowsPerPage}
+          {/* Elegant Table Wrapper */}
+          <Card 
+            elevation={0}
+            sx={{ 
+              borderRadius: "20px", 
+              bgcolor: "#ffffff",
+              border: `1px solid ${colorTokens.border.subtle}`,
+              boxShadow: "0px 8px 24px rgba(0, 0, 0, 0.02)",
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              flex: 1, 
+              minHeight: 0
+            }}
+          >
+            <Box sx={{ 
+              px: { xs: 2.5, sm: 3.5 }, py: { xs: 2.5, sm: 3 }, 
+              borderBottom: `1px solid ${colorTokens.border.subtle}`,
+              display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, 
+              justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2,
+              bgcolor: alpha(colorTokens.primary.main, 0.015)
+            }}>
+               <Box>
+                 <Typography variant="h6" sx={{ fontWeight: 800, color: colorTokens.text.primary, fontSize: '1.15rem' }}>
+                    Attendance Analytics Ledger
+                 </Typography>
+                 <Typography variant="body2" sx={{ color: colorTokens.text.secondary, mt: 0.5, fontWeight: 500 }}>
+                    Detailed breakdown of student attendance logs
+                 </Typography>
+               </Box>
+               <Stack direction="row" spacing={3} alignItems="center">
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 900, color: colorTokens.preschool.turquoise.main, lineHeight: 1 }}>
+                      {Math.round((reportData.summary.total_present / Math.max(1, (reportData.summary.total_present + reportData.summary.total_absent + reportData.summary.total_half_day + reportData.summary.total_leave))) * 100)}%
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Overall Rate
+                    </Typography>
+                  </Box>
+                  <Button 
+                    variant="contained" 
+                    onClick={handleExport}
+                    disabled={!reportData || reportData.records.length === 0}
+                    sx={{ 
+                      borderRadius: '14px', 
+                      px: 3, py: 1.25,
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      boxShadow: '0 8px 20px rgba(6, 185, 114, 0.25)',
+                      background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, #049d5f 100%)`,
+                      "&:hover": {
+                         boxShadow: '0 8px 20px rgba(6, 185, 114, 0.4)',
+                      }
+                    }}
+                  >
+                    Export CSV
+                  </Button>
+               </Stack>
+            </Box>
+            <EntityTableSection<any>
+              label=""
+              loading={loading}
+              totalRows={reportData.total_count}
               page={page}
-              onPageChange={(e, newPage) => {
-                setPage(newPage);
-                // Trigger re-fetch logic should be here or handled via useEffect on page change
-              }}
-              onRowsPerPageChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value, 10));
+              rowsPerPage={rowsPerPage}
+              onPageChange={setPage}
+              onRowsPerPageChange={(v) => {
+                setRowsPerPage(v);
                 setPage(0);
               }}
+              columns={columns}
+              data={reportData.records}
+              showPagination={true}
+              showInfoBar={false}
+              getRowKey={(row, index) => String(index)}
             />
-          </TableContainer>
-        </Box>
-      )}
-
-      {loading && (
-        <Box sx={{ mt: 10, textAlign: 'center' }}>
-          <CircularProgress size={40} />
-          <Typography sx={{ mt: 2 }}>Generating report...</Typography>
+          </Card>
         </Box>
       )}
 
       {!reportData && !loading && (
-        <Box sx={{ mt: 10, textAlign: 'center', opacity: 0.5 }}>
-          <AssessmentIcon sx={{ fontSize: 80, mb: 2, color: theme.palette.primary.main }} />
-          <Typography variant="h6">Select filters and search to generate attendance report</Typography>
-          <Typography variant="body2">Monitor trends, identify absentees, and export data.</Typography>
+        <Box
+          sx={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            py: 10,
+            gap: 2,
+            textAlign: "center",
+            opacity: 0.55,
+          }}
+        >
+          <Box
+            component="img"
+            src="/icons/3d-folder.png"
+            onError={(e) => (e.currentTarget.src = "/icons/3d-calendar.png")}
+            alt="Report"
+            sx={{ width: 84, height: 84, objectFit: "contain", opacity: 0.8 }}
+          />
+          <Typography variant="h6" fontWeight={700} color={colorTokens.text.primary} sx={{ fontSize: "1.1rem", mt: 1 }}>
+            No Data Available
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 350, lineHeight: 1.6 }}>
+            Select your filters from the toolbar above to generate the Attendance Analytics Dashboard.
+          </Typography>
+        </Box>
+      )}
+
+      {loading && !reportData && (
+        <Box
+          sx={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            py: 10,
+            gap: 2,
+          }}
+        >
+          <CircularProgress size={44} sx={{ color: colorTokens.preschool.turquoise.main }} />
+          <Typography variant="body2" color="text.secondary">
+            Generating report...
+          </Typography>
         </Box>
       )}
 
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
-        <Alert severity={snackbar.severity} variant="filled" sx={{ width: '100%', borderRadius: 3 }}>
+        <Alert
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: "12px", fontWeight: 600 }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </PageLayout>
   );
 };
 
