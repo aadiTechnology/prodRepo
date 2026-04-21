@@ -113,7 +113,7 @@ export default function TeacherDetails() {
       </PageLayout>
     );
   }
-
+//
   if (error || !teacher) {
     return (
       <PageLayout pageBackground maxWidth="lg">
