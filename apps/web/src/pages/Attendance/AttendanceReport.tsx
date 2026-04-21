@@ -33,6 +33,9 @@ import schoolClassService, { SchoolClass, ClassDivision } from "../../api/servic
 import academicYearService, { AcademicYear } from "../../api/services/academicYearService";
 import attendanceService, { AttendanceReportResponse } from "../../api/services/attendanceService";
 import studentService from "../../api/services/studentService";
+import teacherService, { TeacherResponse } from "../../api/services/teacherService";
+import { useAuth } from "../../context/AuthContext";
+import { useRBAC } from "../../context/RBACContext";
 
 // ── Shared select style ───────────────────────────────────────────────────────
 const filterSelectSx = {
@@ -49,11 +52,16 @@ const filterSelectSx = {
 };
 
 const AttendanceReport = () => {
+  const { user } = useAuth();
+  const { hasRole } = useRBAC();
+  const isTeacher = hasRole("TEACHER");
+
   // State
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [divisions, setDivisions] = useState<ClassDivision[]>([]);
   const [students, setStudents] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<TeacherResponse[]>([]);
 
   const [filters, setFilters] = useState({
     academic_year_id: 0,
@@ -79,16 +87,36 @@ const AttendanceReport = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const [years, classList] = await Promise.all([
+        const [years, classList, teacherList] = await Promise.all([
           academicYearService.getAll(),
-          schoolClassService.getAll()
+          schoolClassService.getAll(),
+          teacherService.list({ limit: 1000 })
         ]);
 
         setAcademicYears(years);
         setClasses(classList);
+        setTeachers(teacherList.items);
 
         const activeYear = years.find(y => y.is_active);
-        if (activeYear) {
+        if (isTeacher && user?.id) {
+          let myTeacher = teacherList.items.find((t) => String(t.user_id) === String(user.id));
+          if (!myTeacher && user?.email) {
+            myTeacher = teacherList.items.find(
+              (t) => t.email?.toLowerCase() === user.email?.toLowerCase()
+            );
+          }
+          if (myTeacher) {
+            setFilters((prev) => ({
+              ...prev,
+              academic_year_id: activeYear?.id ?? prev.academic_year_id,
+              class_id: myTeacher.class_id || 0,
+              division_id: myTeacher.class_division_id || 0,
+              student_id: 0,
+            }));
+          } else if (activeYear) {
+            setFilters((prev) => ({ ...prev, academic_year_id: activeYear.id }));
+          }
+        } else if (activeYear) {
           setFilters(prev => ({ ...prev, academic_year_id: activeYear.id }));
         }
       } catch (err) {
@@ -96,19 +124,59 @@ const AttendanceReport = () => {
       }
     };
     loadInitialData();
-  }, []);
+  }, [isTeacher, user?.id, user?.email]);
+
+  const filteredClasses = useMemo(() => {
+    if (!isTeacher) return classes;
+    if (!teachers.length) return classes;
+    const myTeacher = teachers.find(
+      (t) =>
+        String(t.user_id) === String(user?.id) ||
+        (user?.email && t.email?.toLowerCase() === user.email.toLowerCase())
+    );
+    if (!myTeacher?.class_id) return [];
+    return classes.filter((c) => c.id === myTeacher.class_id);
+  }, [isTeacher, classes, teachers, user?.id, user?.email]);
+
+  const filteredDivisions = useMemo(() => {
+    if (!filters.class_id) return [];
+    const selectedClass = filteredClasses.find((c) => c.id === filters.class_id);
+    const classDivisions = selectedClass?.divisions || [];
+    if (!isTeacher) return classDivisions;
+    const myTeacher = teachers.find(
+      (t) =>
+        String(t.user_id) === String(user?.id) ||
+        (user?.email && t.email?.toLowerCase() === user.email.toLowerCase())
+    );
+    if (!myTeacher?.class_division_id) return classDivisions;
+    return classDivisions.filter((d) => d.id === myTeacher.class_division_id);
+  }, [filters.class_id, filteredClasses, isTeacher, teachers, user?.id, user?.email]);
 
   // Update divisions when class changes
   useEffect(() => {
     if (filters.class_id) {
-      const selectedClass = classes.find(c => c.id === filters.class_id);
-      setDivisions(selectedClass?.divisions || []);
-      setFilters(prev => ({ ...prev, division_id: 0, student_id: 0 }));
+      const selectedClass = filteredClasses.find(c => c.id === filters.class_id);
+      const nextDivisions = selectedClass?.divisions || [];
+      setDivisions(nextDivisions);
+      if (!nextDivisions.some((d) => d.id === filters.division_id)) {
+        setFilters(prev => ({ ...prev, division_id: 0, student_id: 0 }));
+      }
     } else {
       setDivisions([]);
       setFilters(prev => ({ ...prev, division_id: 0, student_id: 0 }));
     }
-  }, [filters.class_id, classes]);
+  }, [filters.class_id, filteredClasses, filters.division_id]);
+
+  useEffect(() => {
+    setDivisions(filteredDivisions);
+    if (filteredDivisions.length === 0) {
+      setFilters((prev) => ({ ...prev, division_id: 0, student_id: 0 }));
+      return;
+    }
+    if (!filteredDivisions.some((d) => d.id === filters.division_id)) {
+      setFilters((prev) => ({ ...prev, division_id: filteredDivisions[0].id, student_id: 0 }));
+    }
+  }, [filteredDivisions, filters.division_id]);
 
   // Update students list when division changes
   useEffect(() => {
@@ -333,6 +401,7 @@ const AttendanceReport = () => {
         value={filters.class_id || ""}
         displayEmpty
         size="small"
+        disabled={isTeacher}
         onChange={(e) => {
           setPage(0);
           setFilters(prev => ({ ...prev, class_id: Number(e.target.value) }));
@@ -342,7 +411,7 @@ const AttendanceReport = () => {
         <MenuItem value="">
           <Typography variant="body2" color="text.secondary">All Classes</Typography>
         </MenuItem>
-        {classes.map(cls => (
+        {filteredClasses.map(cls => (
           <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
         ))}
       </Select>
@@ -351,7 +420,7 @@ const AttendanceReport = () => {
         value={filters.division_id || ""}
         displayEmpty
         size="small"
-        disabled={!filters.class_id}
+        disabled={!filters.class_id || isTeacher}
         onChange={(e) => {
           setPage(0);
           setFilters(prev => ({ ...prev, division_id: Number(e.target.value) }));
@@ -390,10 +459,15 @@ const AttendanceReport = () => {
         <Tooltip title="Reset Filters">
           <IconButton
             onClick={() => {
+              const myTeacher = teachers.find(
+                (t) =>
+                  String(t.user_id) === String(user?.id) ||
+                  (user?.email && t.email?.toLowerCase() === user.email.toLowerCase())
+              );
               setFilters({
                 academic_year_id: academicYears.find(y => y.is_active)?.id || 0,
-                class_id: 0,
-                division_id: 0,
+                class_id: isTeacher ? (myTeacher?.class_id || 0) : 0,
+                division_id: isTeacher ? (myTeacher?.class_division_id || 0) : 0,
                 student_id: 0,
                 from_date: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
                 to_date: new Date().toISOString().split('T')[0]
