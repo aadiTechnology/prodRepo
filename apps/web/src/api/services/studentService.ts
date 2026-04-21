@@ -56,7 +56,16 @@ const studentService = {
     const { data } = await axiosInstance.post("/api/students", payload);
     return data;
   },
-  async list(params?: { page?: number; limit?: number; search?: string; class_id?: number; class?: string; status?: string }) {
+  async list(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    class_id?: number;
+    division_id?: number;
+    class_division_id?: number;
+    class?: string;
+    status?: string;
+  }) {
     const { data } = await axiosInstance.get("/api/students", { params });
     // Support both { data, pagination } and { items, total }
     if (Array.isArray(data.data)) {

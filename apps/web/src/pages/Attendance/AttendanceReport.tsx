@@ -115,13 +115,27 @@ const AttendanceReport = () => {
     const loadStudents = async () => {
       if (filters.class_id && filters.division_id) {
         try {
-          const { items } = await studentService.list({
-            class_id: filters.class_id,
-            limit: 1000
-          });
-          setStudents(items);
+          const pageSize = 100;
+          let currentPage = 1;
+          let total = 0;
+          let allItems: any[] = [];
+
+          do {
+            const { items, total: totalCount } = await studentService.list({
+              class_id: filters.class_id,
+              division_id: filters.division_id,
+              limit: pageSize,
+              page: currentPage,
+            });
+            total = totalCount || 0;
+            allItems = [...allItems, ...items];
+            currentPage += 1;
+          } while (allItems.length < total);
+
+          setStudents(allItems);
         } catch (err) {
           console.error("Failed to load students", err);
+          setStudents([]);
         }
       } else {
         setStudents([]);
@@ -367,7 +381,7 @@ const AttendanceReport = () => {
           <Typography variant="body2" color="text.secondary">All Students</Typography>
         </MenuItem>
         {students.map(s => (
-          <MenuItem key={s.id} value={s.id}>{s.student_name}</MenuItem>
+          <MenuItem key={s.id} value={s.id}>{s.student_name || s.name}</MenuItem>
         ))}
       </Select>
 

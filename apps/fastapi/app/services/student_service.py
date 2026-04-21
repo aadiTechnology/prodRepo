@@ -13,7 +13,7 @@ class StudentService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_students(self, page=1, limit=10, search=None, class_id=None, class_=None, status=None, tenant_id=None):
+    def get_students(self, page=1, limit=10, search=None, class_id=None, class_=None, status=None, tenant_id=None, division_id=None):
         from app.schemas.student_schema import StudentListItem, Pagination, StudentListResponse
         query = (
             self.db.query(Student, SchoolClass, ClassDivision)
@@ -29,6 +29,8 @@ class StudentService:
             filters.append(or_(Student.student_name.ilike(like), Student.student_code.ilike(like), Student.mobile_number.ilike(like)))
         if class_id is not None:
             filters.append(Student.class_id == class_id)
+        if division_id is not None:
+            filters.append(Student.class_division_id == division_id)
         if class_ is not None and isinstance(class_, str) and class_.strip() != "":
             filters.append(SchoolClass.name == class_.strip())
         if status is not None and isinstance(status, str) and status.strip() != "":
@@ -50,7 +52,7 @@ class StudentService:
                 class_display = f"Class {student.class_id}" if student.class_id else "Unknown"
             data.append(
                 StudentListItem(
-                    id=student.student_code or str(student.id),
+                    id=str(student.id),
                     name=student.student_name,
                     gender=student.gender,
                     mobile=student.mobile_number,

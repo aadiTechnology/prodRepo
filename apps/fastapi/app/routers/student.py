@@ -32,13 +32,23 @@ def get_students(
     limit: int = Query(10, ge=1, le=100),
     search: Optional[str] = None,
     class_id: Optional[int] = None,
+    division_id: Optional[int] = None,
     class_: Optional[str] = Query(None, alias="class"),
     status: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ):
     try:
-        result = StudentService(db).get_students(page, limit, search, class_id, class_, status, tenant_id=current_user.tenant_id)
+        result = StudentService(db).get_students(
+            page,
+            limit,
+            search,
+            class_id,
+            class_,
+            status,
+            tenant_id=current_user.tenant_id,
+            division_id=division_id,
+        )
         return result.dict(by_alias=True)
     except Exception as e:
         print("Error in get_students:", e)

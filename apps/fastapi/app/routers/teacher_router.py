@@ -16,6 +16,7 @@ def map_db_model_to_response(teacher) -> TeacherResponse:
     return TeacherResponse(
         id=teacher.id,
         tenant_id=teacher.tenant_id,
+        user_id=teacher.user_id,
         teacher_code=teacher.teacher_code,
         full_name=teacher.full_name,
         date_of_birth=teacher.date_of_birth,

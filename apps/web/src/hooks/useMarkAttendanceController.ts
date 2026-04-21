@@ -104,7 +104,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         if (isTeacher && user?.id) {
           // Primary match: teacher.user_id === logged-in user.id (most reliable)
           // Fallback : match by email for legacy records where user_id may be null
-          let myTeacher = teacherList.items.find(t => t.user_id === user.id);
+          let myTeacher = teacherList.items.find(t => String(t.user_id) === String(user.id));
           if (!myTeacher && user?.email) {
             myTeacher = teacherList.items.find(
               t => t.email?.toLowerCase() === user.email?.toLowerCase()
@@ -133,7 +133,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     };
     loadInitialData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTeacher, user?.email]);
+  }, [isTeacher, user?.id, user?.email]);
 
   // Derived filtered classes
   const filteredClasses = useMemo(() => {
