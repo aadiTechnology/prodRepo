@@ -13,7 +13,6 @@ import {
   Typography,
 } from "@mui/material";
 import {
-  ArrowBack as BackIcon,
   Edit as EditIcon,
   PersonOutline as PersonOutlineIcon,
   ContactPhone as ContactPhoneIcon,
@@ -27,7 +26,7 @@ import {
 import teacherService, { type TeacherResponse } from "../../api/services/teacherService";
 import { PageHeader, PageLayout } from "../../components/layout";
 import { DetailFieldRow } from "../../components/reusable";
-import HeaderIconAction from "../../components/reusable/HeaderIconAction";
+import PrimaryActionButton from "../../components/reusable/PrimaryActionButton";
 import StatusChip from "../../components/roles/StatusChip";
 import { formatShortDate } from "../../utils/formatters";
 import { colorTokens } from "../../tokens/colors";
@@ -41,7 +40,7 @@ function SectionHeader({ title, icon }: { title: string; icon: React.ReactNode }
         gap: 1,
         px: 2,
         py: 1.25,
-        bgcolor: colorTokens.background.subtle,
+        bgcolor: colorTokens.surface.card,
         borderBottom: "1px solid",
         borderColor: colorTokens.border.default,
       }}
@@ -134,29 +133,24 @@ export default function TeacherDetails() {
           ]}
           homePath="/"
           actions={
-            <>
-              <HeaderIconAction
-                icon={<BackIcon fontSize="small" />}
-                tooltip="Back to teachers"
-                tone="neutral"
-                onClick={() => navigate("/teachers")}
-              />
-              <HeaderIconAction
-                icon={<EditIcon fontSize="small" />}
-                tooltip="Edit teacher"
-                tone="primary"
-                onClick={() => navigate(`/teachers/${teacher.id}/edit`)}
-              />
-            </>
+            <PrimaryActionButton
+              onClick={() => navigate(`/teachers/${teacher.id}/edit`)}
+              icon={<EditIcon sx={{ fontSize: 20 }} />}
+              label="Edit teacher"
+            />
           }
         />
       }
     >
       <Grid container spacing={2} alignItems="stretch">
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={4} sx={{ display: "flex" }}>
           <Card
             variant="outlined"
             sx={{
+              flex: 1,
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
               borderRadius: 2,
               borderColor: colorTokens.border.strong,
               overflow: "hidden",
@@ -233,60 +227,79 @@ export default function TeacherDetails() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={8}>
+        <Grid item xs={12} md={8} sx={{ display: "flex" }}>
           <Card
             variant="outlined"
             sx={{
+              flex: 1,
               borderRadius: 2,
               borderColor: colorTokens.border.strong,
               overflow: "hidden",
               boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
               bgcolor: colorTokens.surface.card,
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
-            <Grid container>
-              <Grid item xs={12} sm={6} sx={{ borderRight: { sm: "1px solid" }, borderColor: colorTokens.border.default }}>
-                <SectionHeader title="Personal" icon={<PersonOutlineIcon fontSize="small" />} />
-                <DetailFieldRow label="Gender" dense labelMinWidth={120}>
-                  <Typography variant="body2">{teacher.gender || "N/A"}</Typography>
-                </DetailFieldRow>
-                <DetailFieldRow label="Date of Birth" dense labelMinWidth={120} last>
-                  <Typography variant="body2">
-                    {formatShortDate(teacher.date_of_birth, { emptyPlaceholder: "N/A" })}
-                  </Typography>
-                </DetailFieldRow>
+            <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5, flex: 1 }}>
+              <Grid container spacing={1.5}>
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined" sx={{ borderColor: colorTokens.border.default, borderRadius: 1.5, boxShadow: "none", height: "100%" }}>
+                    <SectionHeader title="Personal" icon={<PersonOutlineIcon fontSize="small" />} />
+                    <DetailFieldRow label="Gender" dense labelMinWidth={120}>
+                      <Typography variant="body2">{teacher.gender || "N/A"}</Typography>
+                    </DetailFieldRow>
+                    <DetailFieldRow label="Date of Birth" dense labelMinWidth={120} last>
+                      <Typography variant="body2">
+                        {formatShortDate(teacher.date_of_birth, { emptyPlaceholder: "N/A" })}
+                      </Typography>
+                    </DetailFieldRow>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined" sx={{ borderColor: colorTokens.border.default, borderRadius: 1.5, boxShadow: "none", height: "100%" }}>
+                    <SectionHeader title="Contact" icon={<ContactPhoneIcon fontSize="small" />} />
+                    <DetailFieldRow label="Mobile" dense labelMinWidth={120}>
+                      <Typography variant="body2">{teacher.mobile_number || "N/A"}</Typography>
+                    </DetailFieldRow>
+                    <DetailFieldRow label="Email" dense labelMinWidth={120} last>
+                      <Typography variant="body2">{teacher.email || "N/A"}</Typography>
+                    </DetailFieldRow>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined" sx={{ borderColor: colorTokens.border.default, borderRadius: 1.5, boxShadow: "none", height: "100%" }}>
+                    <SectionHeader title="Academic" icon={<SchoolIcon fontSize="small" />} />
+                    <DetailFieldRow label="Qualification" dense labelMinWidth={120}>
+                      <Typography variant="body2">{teacher.qualification || "N/A"}</Typography>
+                    </DetailFieldRow>
+                    <DetailFieldRow label="Experience" dense labelMinWidth={120} last>
+                      <Typography variant="body2">
+                        {teacher.experience_years != null ? `${teacher.experience_years} years` : "N/A"}
+                      </Typography>
+                    </DetailFieldRow>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined" sx={{ borderColor: colorTokens.border.default, borderRadius: 1.5, boxShadow: "none", height: "100%" }}>
+                    <SectionHeader title="Assignment" icon={<AssignmentIndIcon fontSize="small" />} />
+                    <DetailFieldRow label="Class/Division" dense labelMinWidth={120}>
+                      <Typography variant="body2">{assignment}</Typography>
+                    </DetailFieldRow>
+                    <DetailFieldRow label="Status" dense labelMinWidth={120} last>
+                      <Typography variant="body2">
+                        {teacher.is_active ? "Active" : "Inactive"}
+                      </Typography>
+                    </DetailFieldRow>
+                  </Card>
+                </Grid>
               </Grid>
 
-              <Grid item xs={12} sm={6}>
-                <SectionHeader title="Contact" icon={<ContactPhoneIcon fontSize="small" />} />
-                <DetailFieldRow label="Mobile" dense labelMinWidth={120}>
-                  <Typography variant="body2">{teacher.mobile_number || "N/A"}</Typography>
-                </DetailFieldRow>
-                <DetailFieldRow label="Email" dense labelMinWidth={120} last>
-                  <Typography variant="body2">{teacher.email || "N/A"}</Typography>
-                </DetailFieldRow>
-              </Grid>
-
-              <Grid item xs={12} sm={6} sx={{ borderTop: "1px solid", borderRight: { sm: "1px solid" }, borderColor: colorTokens.border.default }}>
-                <SectionHeader title="Academic" icon={<SchoolIcon fontSize="small" />} />
-                <DetailFieldRow label="Qualification" dense labelMinWidth={120}>
-                  <Typography variant="body2">{teacher.qualification || "N/A"}</Typography>
-                </DetailFieldRow>
-                <DetailFieldRow label="Experience" dense labelMinWidth={120} last>
-                  <Typography variant="body2">
-                    {teacher.experience_years != null ? `${teacher.experience_years} years` : "N/A"}
-                  </Typography>
-                </DetailFieldRow>
-              </Grid>
-
-              <Grid item xs={12} sm={6} sx={{ borderTop: "1px solid", borderColor: colorTokens.border.default }}>
-                <SectionHeader title="Assignment" icon={<AssignmentIndIcon fontSize="small" />} />
-                <DetailFieldRow label="Class/Division" dense labelMinWidth={120} last>
-                  <Typography variant="body2">{assignment}</Typography>
-                </DetailFieldRow>
-              </Grid>
-
-              <Grid item xs={12} sx={{ borderTop: "1px solid", borderColor: colorTokens.border.default }}>
+              <Card variant="outlined" sx={{ borderColor: colorTokens.border.default, borderRadius: 1.5, boxShadow: "none" }}>
                 <SectionHeader title="Address" icon={<HomeIcon fontSize="small" />} />
                 <DetailFieldRow label="Full Address" dense labelMinWidth={120}>
                   <Typography variant="body2">{fullAddress}</Typography>
@@ -299,8 +312,8 @@ export default function TeacherDetails() {
                     {teacher.state || "N/A"} {teacher.pincode ? `- ${teacher.pincode}` : ""}
                   </Typography>
                 </DetailFieldRow>
-              </Grid>
-            </Grid>
+              </Card>
+            </Box>
           </Card>
         </Grid>
       </Grid>
