@@ -23,7 +23,7 @@ const Home = lazy(() => import("../pages/Home"));
 const Users = lazy(() => import("../pages/Users"));
 const TeacherList = lazy(() => import("../pages/teachers/TeacherList"));
 const AddTeacher = lazy(() => import("../pages/teachers/AddTeacher"));
-const TeacherDetails = lazy(() => import("../pages/teachers/TeacherDetails"));
+const TeacherDetails = lazy(() => import("../pages/teachers/TeacherDetailsPage"));
 const MarkAttendance = lazy(() => import("../pages/Attendance/MarkAttendance"));
 const AttendanceReport = lazy(() => import("../pages/Attendance/AttendanceReport"));
 
