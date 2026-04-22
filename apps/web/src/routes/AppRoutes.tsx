@@ -24,6 +24,8 @@ const Users = lazy(() => import("../pages/Users"));
 const TeacherList = lazy(() => import("../pages/teachers/TeacherList"));
 const AddTeacher = lazy(() => import("../pages/teachers/AddTeacher"));
 const TeacherDetails = lazy(() => import("../pages/teachers/TeacherDetailsPage"));
+const TeacherAssignmentsPage = lazy(() => import("../pages/teacher/TeacherAssignmentsPage"));
+const AssignTeacher = lazy(() => import("../pages/teacher/AssignTeacher"));
 const MarkAttendance = lazy(() => import("../pages/Attendance/MarkAttendance"));
 const AttendanceReport = lazy(() => import("../pages/Attendance/AttendanceReport"));
 
@@ -175,7 +177,10 @@ export default function AppRoutes() {
           <Route path="/teachers/add" element={<ProtectedRoute requiredPermissions="TEACHER_MGMT:create"><AddTeacher /></ProtectedRoute>} />
           <Route path="/teachers/:id" element={<ProtectedRoute requiredPermissions="TEACHER_MGMT:view"><TeacherDetails /></ProtectedRoute>} />
           <Route path="/teachers/:id/edit" element={<ProtectedRoute requiredPermissions="TEACHER_MGMT:edit"><AddTeacher /></ProtectedRoute>} />
-
+          <Route path="/teacher-assignments" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:view"><TeacherAssignmentsPage /></ProtectedRoute>} />
+          <Route path="/teacher-assignments/assign" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:create"><AssignTeacher /></ProtectedRoute>} />
+          <Route path="/teacher-assignments/add" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:create"><AssignTeacher /></ProtectedRoute>} />
+          
           {/* AI Features */}
           <Route
             path="/ai/generate"
