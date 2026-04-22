@@ -4,7 +4,7 @@ import type { SelectItemOption } from "../components/semantic";
 export type AssignTeacherFormData = {
   academic_year_id: number | null;
   class_id: number | null;
-  class_division_id: number | null;
+  class_division_ids: number[];
   teacher_id: number | null;
 };
 
@@ -65,18 +65,18 @@ export function assignTeacherFormConfig({
           coerceToNumber: true,
         },
       },
-      class_division_id: {
-        name: "class_division_id",
+      class_division_ids: {
+        name: "class_division_ids",
         label: "Division",
         type: "select",
         required: true,
-        helperText: "Select division",
+        helperText: "Select one or more divisions",
         props: {
           options: divisionOptions,
           loading: divisionsLoading,
-          emptyOptionLabel: "Select Division",
           disabled: disableDivision,
-          coerceToNumber: true,
+          multiple: true,
+          coerceToNumberArray: true,
         },
       },
       teacher_id: {
@@ -108,7 +108,7 @@ export function assignTeacherFormConfig({
       {
         kind: "fields",
         grid: { xs: 12, md: 6 },
-        fieldNames: ["class_division_id"],
+        fieldNames: ["class_division_ids"],
       },
       {
         kind: "fields",

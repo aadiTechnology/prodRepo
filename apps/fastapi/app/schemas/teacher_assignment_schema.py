@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class AcademicYearOption(BaseModel):
@@ -26,8 +26,17 @@ class TeacherOption(BaseModel):
 class TeacherAssignmentUpsertRequest(BaseModel):
     academic_year_id: int
     class_id: int
-    class_division_id: int
+    class_division_id: Optional[int] = None
+    class_division_ids: Optional[list[int]] = None
     teacher_id: int
+
+    @model_validator(mode="after")
+    def validate_divisions(self):
+        has_single = self.class_division_id is not None
+        has_multi = bool(self.class_division_ids)
+        if not has_single and not has_multi:
+            raise ValueError("At least one division is required")
+        return self
 
 
 class TeacherAssignmentUpsertResponse(BaseModel):
@@ -40,11 +49,17 @@ class TeacherAssignmentCheckResponse(BaseModel):
     teacher_name: Optional[str] = None
 
 
+class TeacherAssignmentAssignedMapResponse(BaseModel):
+    class_ids: list[int]
+    class_division_ids: list[int]
+
+
 class TeacherAssignmentDetailResponse(BaseModel):
     assignment_id: int
     academic_year_id: Optional[int] = None
     class_id: Optional[int] = None
     class_division_id: Optional[int] = None
+    class_division_ids: Optional[list[int]] = None
     teacher_id: Optional[int] = None
 
 
@@ -53,6 +68,7 @@ class TeacherAssignmentItem(BaseModel):
     academic_year_id: Optional[int] = None
     class_id: Optional[int] = None
     class_division_id: Optional[int] = None
+    class_division_ids: Optional[list[int]] = None
     class_name: Optional[str] = None
     division_name: Optional[str] = None
     teacher_id: Optional[int] = None

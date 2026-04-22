@@ -18,6 +18,7 @@ export default function AssignTeacher() {
     canShowAssignmentHint,
     handleConfirmSubmit,
     assignTeacherPending,
+    hasAssignedLegend,
     isEditMode,
     error,
     setError,
@@ -60,15 +61,19 @@ export default function AssignTeacher() {
       }
       submitLabelCreate={isEditMode ? "Update" : "Save"}
       formTopSlot={
-        canShowAssignmentHint && assignmentCheck?.is_assigned ? (
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              px: 1,
-              py: 0.5,
-            }}
-          >
+        <Box sx={{ px: 1, py: 0.5, display: "flex", flexDirection: "column", gap: 0.5 }}>
+          {hasAssignedLegend ? (
+            <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.88rem" }}>
+              <Box component="span" sx={{ color: "#29b6f6", fontWeight: 700 }}>
+                ●
+              </Box>{" "}
+              <Box component="span" sx={{ color: "#29b6f6", fontWeight: 700 }}>
+                Sky blue options
+              </Box>{" "}
+              indicate already assigned class/division.
+            </Typography>
+          ) : null}
+          {canShowAssignmentHint && assignmentCheck?.is_assigned ? (
             <Typography
               variant="body2"
               sx={{ color: "success.main", fontWeight: 600, fontSize: "0.9rem" }}
@@ -76,8 +81,8 @@ export default function AssignTeacher() {
               {"● Already assigned class teacher"}
               {assignmentChecking ? "..." : assignmentCheck.teacher_name ? `: ${assignmentCheck.teacher_name}` : ""}
             </Typography>
-          </Box>
-        ) : null
+          ) : null}
+        </Box>
       }
     />
   );

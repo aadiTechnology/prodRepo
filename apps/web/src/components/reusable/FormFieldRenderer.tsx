@@ -125,10 +125,15 @@ export default function FormFieldRenderer<T extends Record<string, unknown>>({
       );
     case "select": {
       const coerceToNumber = extra.coerceToNumber === true;
+      const coerceToNumberArray = extra.coerceToNumberArray === true;
+      const isMultiple = extra.multiple === true;
       const options = (extra.options as SelectItemOption[] | undefined) ?? [];
       const loading = Boolean(extra.loading);
-      const strVal =
-        formData[name] === null || formData[name] === undefined
+      const strVal = isMultiple
+        ? Array.isArray(formData[name])
+          ? (formData[name] as unknown[]).map((v) => String(v))
+          : []
+        : formData[name] === null || formData[name] === undefined
           ? ""
           : String(formData[name]);
       return (
@@ -144,6 +149,16 @@ export default function FormFieldRenderer<T extends Record<string, unknown>>({
           disableWhenEmpty={extra.disableWhenEmpty !== false}
           required={field.required ?? true}
           onValueChange={(v) => {
+            if (coerceToNumberArray) {
+              const values = Array.isArray(v) ? v : [v];
+              handleFieldValueChange(
+                name,
+                values
+                  .filter((item) => item !== "")
+                  .map((item) => Number(item))
+              );
+              return;
+            }
             if (coerceToNumber) {
               handleFieldValueChange(name, v === "" ? null : Number(v));
             } else {
@@ -163,6 +178,7 @@ export default function FormFieldRenderer<T extends Record<string, unknown>>({
                   "emptyOptionLabel",
                   "disableWhenEmpty",
                   "coerceToNumber",
+                  "coerceToNumberArray",
                 ].includes(k)
             )
           ) as Record<string, unknown>)}

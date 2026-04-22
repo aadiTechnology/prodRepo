@@ -1,7 +1,6 @@
 import type { NavigateFunction } from "react-router-dom";
 import {
   Box,
-  Avatar,
   Typography,
   IconButton,
   Tooltip,
@@ -32,15 +31,9 @@ export function createStudentListConfig({
         id: "name",
         label: "Student Name",
         render: (row) => (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Avatar sx={{ width: 32, height: 32 }}>
-              {row.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")}
-            </Avatar>
-            <Typography variant="body2">{row.name}</Typography>
-          </Box>
+          <Typography variant="body2" sx={{ fontWeight: 400, color: "text.primary", fontSize: "0.9rem" }}>
+            {row.name}
+          </Typography>
         ),
       },
       {

@@ -5,12 +5,14 @@ export type SelectItemOption = {
   id: string;
   value: string;
   label: string;
+  textColor?: string;
+  fontWeight?: number;
 };
 
 export interface SelectItemProps extends Omit<SelectProps, "children" | "label" | "name" | "onChange"> {
   options: SelectItemOption[];
   loading?: boolean;
-  onValueChange: (value: string) => void;
+  onValueChange: (value: string | string[]) => void;
   label?: string;
   name?: string;
   emptyOptionLabel?: string;
@@ -37,6 +39,7 @@ export default function SelectItem({
 }: SelectItemProps) {
   const computedDisabled =
     disabled ?? (loading || (disableWhenEmpty && options.length === 0));
+  const isMultiple = Boolean((props as { multiple?: boolean }).multiple);
 
   return (
     <Select
@@ -48,6 +51,14 @@ export default function SelectItem({
       disabled={computedDisabled}
       onChange={(event) => {
         const v = event.target.value;
+        if (isMultiple) {
+          if (Array.isArray(v)) {
+            onValueChange(v.map((item) => String(item)));
+          } else {
+            onValueChange(String(v ?? "").split(",").filter(Boolean));
+          }
+          return;
+        }
         onValueChange(typeof v === "string" ? v : String(v ?? ""));
       }}
       sx={[
@@ -74,7 +85,14 @@ export default function SelectItem({
               ]
             : []),
           ...options.map((option) => (
-            <MenuItem key={option.id} value={String(option.value)}>
+            <MenuItem
+              key={option.id}
+              value={String(option.value)}
+              sx={{
+                color: option.textColor,
+                fontWeight: option.fontWeight,
+              }}
+            >
               {option.label}
             </MenuItem>
           )),

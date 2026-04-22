@@ -9,6 +9,7 @@ from app.schemas.teacher_assignment_schema import (
     ClassOption,
     DivisionOption,
     TeacherOption,
+    TeacherAssignmentAssignedMapResponse,
     TeacherAssignmentDetailResponse,
     TeacherAssignmentCheckResponse,
     TeacherAssignmentUpsertRequest,
@@ -70,6 +71,20 @@ def list_active_teachers(
     )
 
 
+@router.get("/teacher-assignments/assigned-map", response_model=TeacherAssignmentAssignedMapResponse)
+def get_teacher_assignment_assigned_map(
+    academic_year_id: int = Query(..., ge=1),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_admin),
+):
+    result = teacher_assignment_service.get_assigned_map(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        academic_year_id=academic_year_id,
+    )
+    return TeacherAssignmentAssignedMapResponse(**result)
+
+
 @router.get("/teacher-assignments", response_model=TeacherAssignmentListResponse)
 def list_teacher_assignments(
     page: int = Query(default=1, ge=1),
@@ -107,8 +122,9 @@ def assign_teacher(
         tenant_id=current_user.tenant_id,
         academic_year_id=payload.academic_year_id,
         class_id=payload.class_id,
-        class_division_id=payload.class_division_id,
+        class_division_id=(payload.class_division_id or (payload.class_division_ids or [None])[0]),
         teacher_id=payload.teacher_id,
+        class_division_ids=payload.class_division_ids,
     )
     if result["assignment_id"] is None:
         raise HTTPException(status_code=400, detail=result["message"])
@@ -128,8 +144,9 @@ def update_teacher_assignment(
         assignment_id=assignment_id,
         academic_year_id=payload.academic_year_id,
         class_id=payload.class_id,
-        class_division_id=payload.class_division_id,
+        class_division_id=(payload.class_division_id or (payload.class_division_ids or [None])[0]),
         teacher_id=payload.teacher_id,
+        class_division_ids=payload.class_division_ids,
     )
     if result["assignment_id"] is None:
         raise HTTPException(status_code=400, detail=result["message"])

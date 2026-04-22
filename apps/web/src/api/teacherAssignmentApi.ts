@@ -22,11 +22,17 @@ export interface TeacherOption {
   full_name: string;
 }
 
+export interface TeacherAssignmentAssignedMap {
+  class_ids: number[];
+  class_division_ids: number[];
+}
+
 export interface TeacherAssignmentApiItem {
   id: number;
   academic_year_id: number | null;
   class_id: number | null;
   class_division_id: number | null;
+  class_division_ids?: number[] | null;
   class_name: string | null;
   division_name: string | null;
   teacher_id: number | null;
@@ -52,7 +58,8 @@ export interface TeacherAssignmentsQueryParams {
 export interface AssignTeacherPayload {
   academic_year_id: number;
   class_id: number;
-  class_division_id: number;
+  class_division_id?: number | null;
+  class_division_ids?: number[];
   teacher_id: number;
 }
 
@@ -78,10 +85,11 @@ export interface CheckAssignmentResponse {
 
 export interface TeacherAssignmentDetailResponse {
   assignment_id: number;
-  academic_year_id: number;
-  class_id: number;
-  class_division_id: number;
-  teacher_id: number;
+  academic_year_id: number | null;
+  class_id: number | null;
+  class_division_id: number | null;
+  class_division_ids?: number[] | null;
+  teacher_id: number | null;
 }
 
 const teacherAssignmentApi = {
@@ -139,6 +147,13 @@ const teacherAssignmentApi = {
     return response.data;
   },
 
+  getAssignedMap: async (academicYearId: number): Promise<TeacherAssignmentAssignedMap> => {
+    const response = await axiosInstance.get("/api/teacher-assignments/assigned-map", {
+      params: { academic_year_id: academicYearId },
+    });
+    return response.data;
+  },
+
   checkAssignment: async (
     params: CheckAssignmentParams
   ): Promise<CheckAssignmentResponse> => {
@@ -148,6 +163,14 @@ const teacherAssignmentApi = {
 
   assignTeacher: async (payload: AssignTeacherPayload): Promise<AssignTeacherResponse> => {
     const response = await axiosInstance.post("/api/teacher-assignments", payload);
+    return response.data;
+  },
+
+  updateTeacherAssignment: async (
+    assignmentId: number,
+    payload: AssignTeacherPayload
+  ): Promise<AssignTeacherResponse> => {
+    const response = await axiosInstance.put(`/api/teacher-assignments/${assignmentId}`, payload);
     return response.data;
   },
 

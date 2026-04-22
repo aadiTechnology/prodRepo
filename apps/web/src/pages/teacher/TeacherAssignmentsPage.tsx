@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   Snackbar,
@@ -15,7 +14,6 @@ import {
 } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
 import StatusChip from "../../components/roles/StatusChip";
-import { colorTokens } from "../../tokens/colors";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import type { ListConfig } from "../../components/reusable";
 import {
@@ -54,37 +52,17 @@ export default function TeacherAssignmentsPage() {
   const listConfig = useMemo<ListConfig<TeacherAssignmentRow, "class">>(
     () => ({
       columns: [
-        { id: "class", label: "Class", field: "class" },
-        { id: "division", label: "Division", field: "division" },
         {
           id: "teacherName",
           label: "Teacher Name",
           render: (row: TeacherAssignmentRow) => (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
-              <Avatar
-                sx={{
-                  width: 30,
-                  height: 30,
-                  fontSize: "0.75rem",
-                  bgcolor: colorTokens.preschool.turquoise.main,
-                  color: "#ffffff",
-                }}
-              >
-                {row.teacherName
-                  ? row.teacherName
-                      .split(" ")
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .map((v) => v[0]?.toUpperCase())
-                      .join("")
-                  : "NA"}
-              </Avatar>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {row.teacherName || "None assigned"}
-              </Typography>
-            </Box>
+            <Typography variant="body2" sx={{ fontWeight: 400, color: "text.primary", fontSize: "0.9rem" }}>
+              {row.teacherName || "None assigned"}
+            </Typography>
           ),
         },
+        { id: "class", label: "Class", field: "class" },
+        { id: "division", label: "Division", field: "division" },
         {
           id: "status",
           label: "Status",
@@ -143,6 +121,7 @@ export default function TeacherAssignmentsPage() {
             if (row.academicYearId != null) params.set("academicYearId", String(row.academicYearId));
             if (row.classId != null) params.set("classId", String(row.classId));
             if (row.classDivisionId != null) params.set("divisionId", String(row.classDivisionId));
+            if (row.classDivisionIds.length > 0) params.set("class_division_ids", row.classDivisionIds.join(","));
             if (row.teacherId != null) params.set("teacherId", String(row.teacherId));
             if (row.class && row.class !== "-") params.set("className", row.class);
             if (row.division && row.division !== "-") params.set("divisionName", row.division);

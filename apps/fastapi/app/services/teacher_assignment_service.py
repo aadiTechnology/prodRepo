@@ -125,13 +125,108 @@ def get_teachers(db: Session, tenant_id: Optional[int]) -> list[dict]:
         return []
 
 
+def get_assigned_map(
+    db: Session,
+    tenant_id: Optional[int],
+    academic_year_id: int,
+) -> dict:
+    assignment_query = text(
+        """
+        SELECT
+            ta.class_id,
+            ta.class_division_id
+        FROM teacher_assignments ta
+        WHERE ta.is_active = 1
+          AND ta.academic_year_id = :academic_year_id
+          AND (:tenant_id IS NULL OR ta.tenant_id = :tenant_id)
+        """
+    )
+    legacy_query = text(
+        """
+        SELECT
+            t.class_id,
+            t.class_division_id
+        FROM teachers t
+        LEFT JOIN classes c ON c.id = t.class_id
+        WHERE t.is_active = 1
+          AND t.is_deleted = 0
+          AND t.class_id IS NOT NULL
+          AND c.academic_year_id = :academic_year_id
+          AND (:tenant_id IS NULL OR t.tenant_id = :tenant_id)
+        """
+    )
+    try:
+        _ensure_teacher_assignments_table(db)
+        rows = db.execute(
+            assignment_query,
+            {"tenant_id": tenant_id, "academic_year_id": academic_year_id},
+        ).mappings().all()
+    except SQLAlchemyError:
+        rows = []
+
+    try:
+        legacy_rows = db.execute(
+            legacy_query,
+            {"tenant_id": tenant_id, "academic_year_id": academic_year_id},
+        ).mappings().all()
+    except SQLAlchemyError:
+        legacy_rows = []
+
+    class_division_ids = sorted(
+        {
+            int(r["class_division_id"])
+            for r in [*rows, *legacy_rows]
+            if r.get("class_division_id") is not None
+        }
+    )
+    all_class_divisions_query = text(
+        """
+        SELECT
+            c.id AS class_id,
+            cd.id AS class_division_id
+        FROM classes c
+        INNER JOIN class_divisions cd ON cd.class_id = c.id
+        WHERE c.is_deleted = 0
+          AND c.academic_year_id = :academic_year_id
+          AND (:tenant_id IS NULL OR c.tenant_id = :tenant_id)
+        """
+    )
+    try:
+        all_class_divisions = db.execute(
+            all_class_divisions_query,
+            {"tenant_id": tenant_id, "academic_year_id": academic_year_id},
+        ).mappings().all()
+    except SQLAlchemyError:
+        all_class_divisions = []
+
+    divisions_by_class: dict[int, set[int]] = {}
+    for row in all_class_divisions:
+        class_id = row.get("class_id")
+        division_id = row.get("class_division_id")
+        if class_id is None or division_id is None:
+            continue
+        divisions_by_class.setdefault(int(class_id), set()).add(int(division_id))
+
+    assigned_division_set = set(class_division_ids)
+    class_ids = sorted(
+        [
+            class_id
+            for class_id, division_set in divisions_by_class.items()
+            if division_set and division_set.issubset(assigned_division_set)
+        ]
+    )
+
+    return {"class_ids": class_ids, "class_division_ids": class_division_ids}
+
+
 def assign_teacher(
     db: Session,
     tenant_id: Optional[int],
     academic_year_id: int,
     class_id: int,
-    class_division_id: int,
+    class_division_id: Optional[int],
     teacher_id: int,
+    class_division_ids: Optional[list[int]] = None,
 ) -> dict:
     teacher_exists_query = text(
         """
@@ -204,29 +299,43 @@ def assign_teacher(
         if effective_tenant_id is None:
             return {"message": "Teacher tenant not found", "assignment_id": None}
 
-        params = {
-            "tenant_id": effective_tenant_id,
-            "academic_year_id": academic_year_id,
-            "class_id": class_id,
-            "class_division_id": class_division_id,
-            "teacher_id": teacher_id,
-        }
+        division_ids = class_division_ids or [class_division_id]
+        division_ids = [int(d) for d in division_ids if d is not None]
+        if not division_ids:
+            return {"message": "At least one division is required", "assignment_id": None}
 
-        existing = db.execute(find_query, params).mappings().first()
-        if existing:
-            db.execute(update_query, {"id": existing["id"], "teacher_id": teacher_id})
-            db.commit()
+        first_assignment_id: Optional[int] = None
+        changed_existing = False
+        for division_id in division_ids:
+            params = {
+                "tenant_id": effective_tenant_id,
+                "academic_year_id": academic_year_id,
+                "class_id": class_id,
+                "class_division_id": division_id,
+                "teacher_id": teacher_id,
+            }
+
+            existing = db.execute(find_query, params).mappings().first()
+            if existing:
+                changed_existing = True
+                db.execute(update_query, {"id": existing["id"], "teacher_id": teacher_id})
+                if first_assignment_id is None:
+                    first_assignment_id = existing["id"]
+            else:
+                inserted_id = db.execute(insert_query, params).scalar() or None
+                if first_assignment_id is None:
+                    first_assignment_id = inserted_id
+
+        db.commit()
+        if changed_existing:
             return {
                 "message": "Teacher reassigned successfully",
-                "assignment_id": existing["id"],
+                "assignment_id": first_assignment_id,
             }
-        else:
-            inserted_id = db.execute(insert_query, params).scalar() or None
-            db.commit()
-            return {
-                "message": "Teacher assigned successfully",
-                "assignment_id": inserted_id,
-            }
+        return {
+            "message": "Teacher assigned successfully",
+            "assignment_id": first_assignment_id,
+        }
     except SQLAlchemyError:
         db.rollback()
         return {"message": "Unable to assign teacher", "assignment_id": None}
@@ -312,6 +421,87 @@ def get_teacher_assignments(
     limit: int = 10,
     search: Optional[str] = None,
 ) -> tuple[list[dict], int]:
+    def _fetch_merged_rows(for_tenant_id: Optional[int]) -> list[dict]:
+        params = {
+            "tenant_id": for_tenant_id,
+            "search_like": search_like,
+        }
+
+        try:
+            _ensure_teacher_assignments_table(db)
+            assignment_rows = db.execute(assignment_rows_query, params).mappings().all()
+        except SQLAlchemyError:
+            assignment_rows = []
+
+        try:
+            legacy_rows = db.execute(legacy_rows_query, params).mappings().all()
+        except SQLAlchemyError:
+            legacy_rows = []
+
+        merged_by_key: dict[tuple[int | None, int | None, int | None], dict] = {}
+        for row in assignment_rows:
+            key = (row["teacher_id"], row["class_id"], row["academic_year_id"])
+            if key not in merged_by_key:
+                merged_by_key[key] = {
+                    "id": row["id"],
+                    "academic_year_id": row["academic_year_id"],
+                    "class_id": row["class_id"],
+                    "class_division_id": row["class_division_id"],
+                    "class_division_ids": [row["class_division_id"]] if row["class_division_id"] else [],
+                    "class_name": row["class_name"],
+                    "division_name": row["division_name"] or "",
+                    "teacher_id": row["teacher_id"],
+                    "teacher_name": row["teacher_name"],
+                    "status": row["status"],
+                }
+            else:
+                if row["class_division_id"] and row["class_division_id"] not in merged_by_key[key]["class_division_ids"]:
+                    merged_by_key[key]["class_division_ids"].append(row["class_division_id"])
+                division_name = row["division_name"] or ""
+                existing_names = [x.strip() for x in str(merged_by_key[key]["division_name"]).split(",") if x.strip()]
+                if division_name and division_name not in existing_names:
+                    existing_names.append(division_name)
+                    merged_by_key[key]["division_name"] = ", ".join(existing_names)
+
+        for row in legacy_rows:
+            key = (row["teacher_id"], row["class_id"], row["academic_year_id"])
+            if key not in merged_by_key:
+                merged_by_key[key] = {
+                    "id": row["id"],
+                    "academic_year_id": row["academic_year_id"],
+                    "class_id": row["class_id"],
+                    "class_division_id": row["class_division_id"],
+                    "class_division_ids": [row["class_division_id"]] if row["class_division_id"] else [],
+                    "class_name": row["class_name"],
+                    "division_name": row["division_name"],
+                    "teacher_id": row["teacher_id"],
+                    "teacher_name": row["teacher_name"],
+                    "status": row["status"],
+                }
+            else:
+                if row["class_division_id"] and row["class_division_id"] not in merged_by_key[key]["class_division_ids"]:
+                    merged_by_key[key]["class_division_ids"].append(row["class_division_id"])
+                division_name = row["division_name"] or ""
+                existing_names = [x.strip() for x in str(merged_by_key[key]["division_name"]).split(",") if x.strip()]
+                if division_name and division_name not in existing_names:
+                    existing_names.append(division_name)
+                    merged_by_key[key]["division_name"] = ", ".join(existing_names)
+
+        merged_rows = sorted(
+            merged_by_key.values(),
+            key=lambda item: (
+                (item["teacher_name"] or "").upper(),
+                (item["class_name"] or "").upper(),
+                (item["division_name"] or "").upper(),
+                item["id"] or 0,
+            ),
+        )
+        for item in merged_rows:
+            item["class_division_ids"] = sorted(
+                [int(v) for v in item.get("class_division_ids", []) if v is not None]
+            )
+        return merged_rows
+
     offset = (page - 1) * limit
     search_like = f"%{search.strip()}%" if search and search.strip() else None
     assignment_rows_query = text(
@@ -369,68 +559,9 @@ def get_teacher_assignments(
         """
     )
 
-    params = {
-        "tenant_id": tenant_id,
-        "search_like": search_like,
-    }
-
-    # Merge source 1 (teacher_assignments) + source 2 (legacy teacher mapping)
-    # and deduplicate by logical class/division key while preferring assignment rows.
-    try:
-        _ensure_teacher_assignments_table(db)
-        assignment_rows = db.execute(assignment_rows_query, params).mappings().all()
-    except SQLAlchemyError:
-        assignment_rows = []
-
-    try:
-        legacy_rows = db.execute(legacy_rows_query, params).mappings().all()
-    except SQLAlchemyError:
-        legacy_rows = []
-
-    merged_by_key: dict[tuple[str, str], dict] = {}
-    for row in assignment_rows:
-        key = (
-            (row["class_name"] or "").strip().upper(),
-            (row["division_name"] or "").strip().upper(),
-        )
-        merged_by_key[key] = {
-            "id": row["id"],
-            "academic_year_id": row["academic_year_id"],
-            "class_id": row["class_id"],
-            "class_division_id": row["class_division_id"],
-            "class_name": row["class_name"],
-            "division_name": row["division_name"],
-            "teacher_id": row["teacher_id"],
-            "teacher_name": row["teacher_name"],
-            "status": row["status"],
-        }
-
-    for row in legacy_rows:
-        key = (
-            (row["class_name"] or "").strip().upper(),
-            (row["division_name"] or "").strip().upper(),
-        )
-        if key not in merged_by_key:
-            merged_by_key[key] = {
-                "id": row["id"],
-                "academic_year_id": row["academic_year_id"],
-                "class_id": row["class_id"],
-                "class_division_id": row["class_division_id"],
-                "class_name": row["class_name"],
-                "division_name": row["division_name"],
-                "teacher_id": row["teacher_id"],
-                "teacher_name": row["teacher_name"],
-                "status": row["status"],
-            }
-
-    merged_rows = sorted(
-        merged_by_key.values(),
-        key=lambda item: (
-            (item["class_name"] or "").upper(),
-            (item["division_name"] or "").upper(),
-            item["id"] or 0,
-        ),
-    )
+    merged_rows = _fetch_merged_rows(tenant_id)
+    if len(merged_rows) == 0 and tenant_id is not None:
+        merged_rows = _fetch_merged_rows(None)
     total = len(merged_rows)
     data = merged_rows[offset : offset + limit]
 
@@ -456,6 +587,18 @@ def get_teacher_assignment_by_id(
         WHERE ta.id = :assignment_id
           AND ta.is_active = 1
           AND (:tenant_id IS NULL OR ta.tenant_id = :tenant_id)
+        """
+    )
+    grouped_divisions_query = text(
+        """
+        SELECT ta.class_division_id
+        FROM teacher_assignments ta
+        WHERE ta.teacher_id = :teacher_id
+          AND ta.class_id = :class_id
+          AND ta.academic_year_id = :academic_year_id
+          AND ta.is_active = 1
+          AND (:tenant_id IS NULL OR ta.tenant_id = :tenant_id)
+        ORDER BY ta.class_division_id ASC
         """
     )
     legacy_query = text(
@@ -495,11 +638,27 @@ def get_teacher_assignment_by_id(
             ).mappings().first()
             if not row:
                 return None
+        class_division_ids = [
+            r["class_division_id"]
+            for r in db.execute(
+                grouped_divisions_query,
+                {
+                    "teacher_id": row["teacher_id"],
+                    "class_id": row["class_id"],
+                    "academic_year_id": row["academic_year_id"],
+                    "tenant_id": tenant_id,
+                },
+            ).mappings().all()
+            if r["class_division_id"] is not None
+        ]
+        if not class_division_ids and row["class_division_id"] is not None:
+            class_division_ids = [row["class_division_id"]]
         return {
             "assignment_id": row["assignment_id"],
             "academic_year_id": row["academic_year_id"],
             "class_id": row["class_id"],
             "class_division_id": row["class_division_id"],
+            "class_division_ids": class_division_ids,
             "teacher_id": row["teacher_id"],
         }
     except SQLAlchemyError:
@@ -512,8 +671,9 @@ def update_teacher_assignment(
     assignment_id: int,
     academic_year_id: int,
     class_id: int,
-    class_division_id: int,
+    class_division_id: Optional[int],
     teacher_id: int,
+    class_division_ids: Optional[list[int]] = None,
 ) -> dict:
     teacher_exists_query = text(
         """
@@ -525,7 +685,7 @@ def update_teacher_assignment(
     )
     find_assignment_query = text(
         """
-        SELECT TOP 1 ta.id
+        SELECT TOP 1 ta.id, ta.teacher_id, ta.class_id, ta.academic_year_id
         FROM teacher_assignments ta
         WHERE ta.id = :assignment_id
           AND ta.is_active = 1
@@ -541,6 +701,18 @@ def update_teacher_assignment(
             teacher_id = :teacher_id,
             updated_at = GETDATE()
         WHERE id = :assignment_id
+        """
+    )
+    deactivate_existing_for_group_query = text(
+        """
+        UPDATE teacher_assignments
+        SET is_active = 0,
+            updated_at = GETDATE()
+        WHERE teacher_id = :teacher_id
+          AND class_id = :class_id
+          AND academic_year_id = :academic_year_id
+          AND (:tenant_id IS NULL OR tenant_id = :tenant_id)
+          AND is_active = 1
         """
     )
     legacy_exists_query = text(
@@ -580,19 +752,37 @@ def update_teacher_assignment(
             {"assignment_id": assignment_id, "tenant_id": tenant_id},
         ).mappings().first()
 
+        division_ids = class_division_ids or [class_division_id]
+        division_ids = [int(d) for d in division_ids if d is not None]
+        if not division_ids:
+            return {"message": "At least one division is required", "assignment_id": None}
+
         if assignment_row:
             db.execute(
-                update_assignment_query,
+                deactivate_existing_for_group_query,
                 {
-                    "assignment_id": assignment_id,
-                    "academic_year_id": academic_year_id,
-                    "class_id": class_id,
-                    "class_division_id": class_division_id,
-                    "teacher_id": teacher_id,
+                    "teacher_id": assignment_row["teacher_id"],
+                    "class_id": assignment_row["class_id"],
+                    "academic_year_id": assignment_row["academic_year_id"],
+                    "tenant_id": tenant_id,
                 },
             )
+            new_result = assign_teacher(
+                db=db,
+                tenant_id=effective_tenant_id,
+                academic_year_id=academic_year_id,
+                class_id=class_id,
+                class_division_id=division_ids[0],
+                teacher_id=teacher_id,
+                class_division_ids=division_ids,
+            )
+            if new_result["assignment_id"] is None:
+                return {"message": "Unable to update teacher assignment", "assignment_id": None}
             db.commit()
-            return {"message": "Teacher assignment updated successfully", "assignment_id": assignment_id}
+            return {
+                "message": "Teacher assignment updated successfully",
+                "assignment_id": new_result["assignment_id"],
+            }
 
         legacy_row = db.execute(
             legacy_exists_query,
@@ -607,8 +797,9 @@ def update_teacher_assignment(
             tenant_id=effective_tenant_id,
             academic_year_id=academic_year_id,
             class_id=class_id,
-            class_division_id=class_division_id,
+            class_division_id=division_ids[0],
             teacher_id=teacher_id,
+            class_division_ids=division_ids,
         )
         if result["assignment_id"] is None:
             return {"message": "Unable to update teacher assignment", "assignment_id": None}

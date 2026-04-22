@@ -11,6 +11,7 @@ export type TeacherAssignmentRow = {
   academicYearId: number | null;
   classId: number | null;
   classDivisionId: number | null;
+  classDivisionIds: number[];
   class: string;
   division: string;
   teacherId: number | null;
@@ -65,6 +66,7 @@ export function useTeacherAssignmentsController() {
         academicYearId: item.academic_year_id,
         classId: item.class_id,
         classDivisionId: item.class_division_id,
+        classDivisionIds: item.class_division_ids || (item.class_division_id ? [item.class_division_id] : []),
         class: item.class_name || "-",
         division: item.division_name || "-",
         teacherId: item.teacher_id,

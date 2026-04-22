@@ -15,7 +15,7 @@ import {
 const emptyFormValues = (): AssignTeacherFormData => ({
   academic_year_id: null,
   class_id: null,
-  class_division_id: null,
+  class_division_ids: [],
   teacher_id: null,
 });
 
@@ -31,7 +31,7 @@ export function useAssignTeacherController() {
     () => ({
       academic_year_id: [{ type: "required", message: "Academic Year is required" }],
       class_id: [{ type: "required", message: "Class is required" }],
-      class_division_id: [{ type: "required", message: "Division is required" }],
+      class_division_ids: [{ type: "required", message: "At least one division is required" }],
       teacher_id: [{ type: "required", message: "Teacher is required" }],
     }),
     []
@@ -60,6 +60,7 @@ export function useAssignTeacherController() {
       !!searchParams.get("class_id") ||
       !!searchParams.get("divisionId") ||
       !!searchParams.get("class_division_id") ||
+      !!searchParams.get("class_division_ids") ||
       !!searchParams.get("teacherId")
     );
   }, [searchParams]);
@@ -89,6 +90,7 @@ export function useAssignTeacherController() {
       searchParams.get("divisionId") ??
       searchParams.get("classDivisionId") ??
       searchParams.get("class_division_id");
+    const divisionsRaw = searchParams.get("class_division_ids");
     const teacherRaw = searchParams.get("teacherId");
 
     if (!academicYearRaw && !classRaw && !divisionRaw && !teacherRaw) {
@@ -97,10 +99,17 @@ export function useAssignTeacherController() {
 
     const academicYearId = academicYearRaw ? Number(academicYearRaw) : null;
     const classId = classRaw ? Number(classRaw) : null;
-    const divisionId = divisionRaw ? Number(divisionRaw) : null;
+    const divisionIds = divisionsRaw
+      ? divisionsRaw
+          .split(",")
+          .map((v) => Number(v.trim()))
+          .filter((v) => !Number.isNaN(v))
+      : divisionRaw
+        ? [Number(divisionRaw)]
+        : [];
     const teacherId = teacherRaw ? Number(teacherRaw) : null;
 
-    const hasAnyInvalidNumber = [academicYearId, classId, divisionId, teacherId]
+    const hasAnyInvalidNumber = [academicYearId, classId, teacherId]
       .filter((value) => value !== null)
       .some((value) => Number.isNaN(value as number));
     if (hasAnyInvalidNumber) {
@@ -113,7 +122,7 @@ export function useAssignTeacherController() {
       ...prev,
       academic_year_id: academicYearId,
       class_id: classId,
-      class_division_id: divisionId,
+      class_division_ids: divisionIds,
       teacher_id: teacherId,
     }));
     setError(null);
@@ -122,7 +131,7 @@ export function useAssignTeacherController() {
   const hasManualPrefillIds =
     !!formData.academic_year_id &&
     !!formData.class_id &&
-    !!formData.class_division_id &&
+    (formData.class_division_ids?.length || 0) > 0 &&
     !!formData.teacher_id;
 
   const { data: assignmentDetail } = useQuery({
@@ -139,7 +148,12 @@ export function useAssignTeacherController() {
       ...prev,
       academic_year_id: assignmentDetail.academic_year_id,
       class_id: assignmentDetail.class_id,
-      class_division_id: assignmentDetail.class_division_id,
+      class_division_ids:
+        assignmentDetail.class_division_ids && assignmentDetail.class_division_ids.length > 0
+          ? assignmentDetail.class_division_ids
+          : assignmentDetail.class_division_id
+            ? [assignmentDetail.class_division_id]
+            : [],
       teacher_id: assignmentDetail.teacher_id,
     }));
     setError(null);
@@ -154,7 +168,7 @@ export function useAssignTeacherController() {
     const resolveMissingIdsByName = async () => {
       if (!isEditMode) return;
       if (!classNameFromQuery || !divisionNameFromQuery) return;
-      if (formData.academic_year_id && formData.class_id && formData.class_division_id) return;
+      if (formData.academic_year_id && formData.class_id && (formData.class_division_ids?.length || 0) > 0) return;
       if (academicYearsLoading || academicYears.length === 0) return;
 
       for (const ay of academicYears) {
@@ -178,7 +192,10 @@ export function useAssignTeacherController() {
             ...prev,
             academic_year_id: prev.academic_year_id ?? ay.id,
             class_id: prev.class_id ?? matchedClass.id,
-            class_division_id: prev.class_division_id ?? matchedDivision.id,
+            class_division_ids:
+              prev.class_division_ids && prev.class_division_ids.length > 0
+                ? prev.class_division_ids
+                : [matchedDivision.id],
           }));
           return;
         } catch {
@@ -194,7 +211,7 @@ export function useAssignTeacherController() {
     divisionNameFromQuery,
     formData.academic_year_id,
     formData.class_id,
-    formData.class_division_id,
+    formData.class_division_ids,
     academicYearsLoading,
     academicYears,
     setFormData,
@@ -240,6 +257,12 @@ export function useAssignTeacherController() {
     enabled: !!formData.academic_year_id,
   });
 
+  const { data: assignedMap } = useQuery({
+    queryKey: ["assign-teacher", "assigned-map", formData.academic_year_id],
+    queryFn: () => teacherAssignmentApi.getAssignedMap(formData.academic_year_id as number),
+    enabled: !!formData.academic_year_id,
+  });
+
   const { data: divisions = [], isLoading: divisionsLoading } = useQuery({
     queryKey: ["assign-teacher", "divisions", formData.class_id],
     queryFn: () => teacherAssignmentApi.getDivisions(formData.class_id as number),
@@ -256,17 +279,19 @@ export function useAssignTeacherController() {
       "assign-teacher",
       "check-assignment",
       formData.class_id,
-      formData.class_division_id,
+      formData.class_division_ids,
       formData.academic_year_id,
     ],
     queryFn: () =>
       teacherAssignmentApi.checkAssignment({
         class_id: formData.class_id as number,
-        division_id: formData.class_division_id as number,
+        division_id: formData.class_division_ids[0] as number,
         academic_year_id: formData.academic_year_id as number,
       }),
     enabled:
-      !!formData.class_id && !!formData.class_division_id && !!formData.academic_year_id,
+      !!formData.class_id &&
+      (formData.class_division_ids?.length || 0) === 1 &&
+      !!formData.academic_year_id,
   });
 
   useEffect(() => {
@@ -277,7 +302,7 @@ export function useAssignTeacherController() {
     setFormData((prev) => {
       if (
         prev.class_id === null &&
-        prev.class_division_id === null &&
+        (prev.class_division_ids?.length || 0) === 0 &&
         prev.teacher_id === null
       ) {
         return prev;
@@ -285,7 +310,7 @@ export function useAssignTeacherController() {
       return {
         ...prev,
         class_id: null,
-        class_division_id: null,
+        class_division_ids: [],
         teacher_id: null,
       };
     });
@@ -297,12 +322,12 @@ export function useAssignTeacherController() {
       return;
     }
     setFormData((prev) => {
-      if (prev.class_division_id === null && prev.teacher_id === null) {
+      if ((prev.class_division_ids?.length || 0) === 0 && prev.teacher_id === null) {
         return prev;
       }
       return {
         ...prev,
-        class_division_id: null,
+        class_division_ids: [],
         teacher_id: null,
       };
     });
@@ -327,9 +352,14 @@ export function useAssignTeacherController() {
       classes.map((item) => ({
         id: String(item.id),
         value: String(item.id),
-        label: item.name,
+        label:
+          assignedMap?.class_ids?.includes(item.id)
+            ? `${item.name} (Already assigned)`
+            : item.name,
+        textColor: assignedMap?.class_ids?.includes(item.id) ? "#29b6f6" : undefined,
+        fontWeight: assignedMap?.class_ids?.includes(item.id) ? 700 : undefined,
       })),
-    [classes]
+    [classes, assignedMap?.class_ids]
   );
 
   const divisionOptions = useMemo<SelectItemOption[]>(
@@ -337,9 +367,14 @@ export function useAssignTeacherController() {
       divisions.map((item) => ({
         id: String(item.id),
         value: String(item.id),
-        label: item.division_name,
+        label:
+          assignedMap?.class_division_ids?.includes(item.id)
+            ? `${item.division_name} (Already assigned)`
+            : item.division_name,
+        textColor: assignedMap?.class_division_ids?.includes(item.id) ? "#29b6f6" : undefined,
+        fontWeight: assignedMap?.class_division_ids?.includes(item.id) ? 700 : undefined,
       })),
-    [divisions]
+    [divisions, assignedMap?.class_division_ids]
   );
 
   const teacherOptions = useMemo<SelectItemOption[]>(
@@ -365,7 +400,7 @@ export function useAssignTeacherController() {
         teachersLoading,
         disableClass: !formData.academic_year_id,
         disableDivision: !formData.class_id,
-        disableTeacher: !formData.class_division_id,
+        disableTeacher: (formData.class_division_ids?.length || 0) === 0,
       }),
     [
       academicYearOptions,
@@ -378,7 +413,7 @@ export function useAssignTeacherController() {
       teachersLoading,
       formData.academic_year_id,
       formData.class_id,
-      formData.class_division_id,
+      formData.class_division_ids,
     ]
   );
 
@@ -386,7 +421,7 @@ export function useAssignTeacherController() {
     if (
       !formData.academic_year_id ||
       !formData.class_id ||
-      !formData.class_division_id ||
+      (formData.class_division_ids?.length || 0) === 0 ||
       !formData.teacher_id
     ) {
       return;
@@ -394,12 +429,17 @@ export function useAssignTeacherController() {
 
     setError(null);
     try {
-      await assignTeacherMutation.mutateAsync({
+      const payload = {
         academic_year_id: formData.academic_year_id,
         class_id: formData.class_id,
-        class_division_id: formData.class_division_id,
+        class_division_ids: formData.class_division_ids,
         teacher_id: formData.teacher_id,
-      });
+      };
+      if (isEditMode && assignmentId) {
+        await teacherAssignmentApi.updateTeacherAssignment(assignmentId, payload);
+      } else {
+        await assignTeacherMutation.mutateAsync(payload);
+      }
       setSnackbar(isEditMode ? "Teacher assignment updated successfully!" : "Teacher assigned successfully!");
       setTimeout(() => {
         resetForm(emptyFormValues());
@@ -417,7 +457,9 @@ export function useAssignTeacherController() {
   };
 
   const canShowAssignmentHint =
-    !!formData.academic_year_id && !!formData.class_id && !!formData.class_division_id;
+    !!formData.academic_year_id &&
+    !!formData.class_id &&
+    (formData.class_division_ids?.length || 0) === 1;
 
   return {
     formData,
@@ -433,6 +475,9 @@ export function useAssignTeacherController() {
     canShowAssignmentHint,
     handleConfirmSubmit,
     assignTeacherPending: assignTeacherMutation.isPending,
+    hasAssignedLegend:
+      (assignedMap?.class_ids?.length || 0) > 0 ||
+      (assignedMap?.class_division_ids?.length || 0) > 0,
     isEditMode,
     error,
     setError,
