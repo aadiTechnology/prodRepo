@@ -2,6 +2,11 @@ from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel, EmailStr
 
+class TeacherAssignmentRow(BaseModel):
+    class_id: Optional[int] = None
+    class_name: Optional[str] = None
+    division_names: list[str] = []
+
 # Base properties
 class TeacherBase(BaseModel):
     full_name: str
@@ -59,6 +64,7 @@ class TeacherResponse(TeacherBase):
     # Extended properties
     class_name: Optional[str] = None
     division_name: Optional[str] = None
+    assignment_rows: list[TeacherAssignmentRow] = []
 
     class Config:
         from_attributes = True

@@ -97,6 +97,11 @@ export default function TeacherDetails() {
     return `${className}${divisionName}`;
   }, [teacher]);
 
+  const assignmentRows = useMemo(() => {
+    if (!teacher?.assignment_rows || teacher.assignment_rows.length === 0) return [];
+    return teacher.assignment_rows.filter((row) => row.class_name);
+  }, [teacher]);
+
   const fullAddress = useMemo(() => {
     if (!teacher) return "N/A";
     const parts = [teacher.address, teacher.city, teacher.state, teacher.pincode].filter(Boolean);
@@ -288,7 +293,21 @@ export default function TeacherDetails() {
                   <Card variant="outlined" sx={{ borderColor: colorTokens.border.default, borderRadius: 1.5, boxShadow: "none", height: "100%" }}>
                     <SectionHeader title="Assignment" icon={<AssignmentIndIcon fontSize="small" />} />
                     <DetailFieldRow label="Class/Division" dense labelMinWidth={120}>
-                      <Typography variant="body2">{assignment}</Typography>
+                      {assignmentRows.length <= 1 ? (
+                        <Typography variant="body2">
+                          {assignmentRows.length === 1
+                            ? `${assignmentRows[0].class_name || "N/A"}${assignmentRows[0].division_names?.length ? ` - ${assignmentRows[0].division_names.join(", ")}` : ""}`
+                            : assignment}
+                        </Typography>
+                      ) : (
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.4 }}>
+                          {assignmentRows.map((row) => (
+                            <Typography key={`${row.class_id}-${row.class_name}`} variant="body2">
+                              {`${row.class_name || "N/A"}${row.division_names?.length ? ` - ${row.division_names.join(", ")}` : ""}`}
+                            </Typography>
+                          ))}
+                        </Box>
+                      )}
                     </DetailFieldRow>
                     <DetailFieldRow label="Status" dense labelMinWidth={120} last>
                       <Typography variant="body2">

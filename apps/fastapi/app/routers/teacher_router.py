@@ -12,7 +12,9 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/teachers", tags=["Teachers"])
 
-def map_db_model_to_response(teacher: Any) -> TeacherResponse:
+def map_db_model_to_response(teacher: Any, assignment_rows: list[dict] | None = None) -> TeacherResponse:
+    assignment_rows = assignment_rows or []
+
     if isinstance(teacher, Mapping):
         return TeacherResponse(
             id=teacher["id"],
@@ -38,6 +40,7 @@ def map_db_model_to_response(teacher: Any) -> TeacherResponse:
             updated_at=teacher.get("updated_at"),
             class_name=teacher.get("class_name"),
             division_name=teacher.get("division_name"),
+            assignment_rows=assignment_rows,
         )
 
     return TeacherResponse(
@@ -63,7 +66,8 @@ def map_db_model_to_response(teacher: Any) -> TeacherResponse:
         created_at=teacher.created_at,
         updated_at=teacher.updated_at,
         class_name=teacher.class_model.name if teacher.class_model else None,
-        division_name=teacher.division.division_name if teacher.division else None
+        division_name=teacher.division.division_name if teacher.division else None,
+        assignment_rows=assignment_rows,
     )
 
 @router.get("/", response_model=TeacherListResponse)
@@ -103,7 +107,8 @@ async def get_teacher(
 ):
     """Get a specific teacher by ID."""
     db_teacher = teacher_service.get_teacher_by_id(db, teacher_id, current_user.tenant_id)
-    return map_db_model_to_response(db_teacher)
+    assignment_rows = teacher_service.get_teacher_assignment_rows(db, current_user.tenant_id, teacher_id)
+    return map_db_model_to_response(db_teacher, assignment_rows=assignment_rows)
 
 @router.post("/", response_model=TeacherResponse, status_code=status.HTTP_201_CREATED)
 async def create_teacher(

@@ -9,6 +9,44 @@ from app.services import user_service
 from app.core.exceptions import ConflictException, NotFoundException
 from fastapi import HTTPException, status
 
+def get_teacher_assignment_rows(db: Session, tenant_id: int, teacher_id: int) -> list[dict]:
+    try:
+        rows = db.execute(
+            text(
+                """
+                SELECT
+                    ta.class_id,
+                    c.name AS class_name,
+                    ta.class_division_id,
+                    cd.division_name
+                FROM teacher_assignments ta
+                LEFT JOIN classes c ON c.id = ta.class_id
+                LEFT JOIN class_divisions cd ON cd.id = ta.class_division_id
+                WHERE ta.tenant_id = :tenant_id
+                  AND ta.teacher_id = :teacher_id
+                  AND ta.is_active = 1
+                ORDER BY c.name ASC, cd.division_name ASC, ta.id ASC
+                """
+            ),
+            {"tenant_id": tenant_id, "teacher_id": teacher_id},
+        ).mappings().all()
+    except SQLAlchemyError:
+        return []
+
+    grouped: dict[tuple[Optional[int], str], dict] = {}
+    for row in rows:
+        key = (row["class_id"], row["class_name"] or "")
+        if key not in grouped:
+            grouped[key] = {
+                "class_id": row["class_id"],
+                "class_name": row["class_name"],
+                "division_names": [],
+            }
+        if row["division_name"] and row["division_name"] not in grouped[key]["division_names"]:
+            grouped[key]["division_names"].append(row["division_name"])
+
+    return list(grouped.values())
+
 def get_all_teachers(
     db: Session, 
     tenant_id: int, 

@@ -28,6 +28,12 @@ export interface TeacherCreate extends TeacherBase {}
 
 export interface TeacherUpdate extends Partial<TeacherBase> {}
 
+export interface TeacherAssignmentRow {
+  class_id?: number | null;
+  class_name?: string | null;
+  division_names: string[];
+}
+
 export interface TeacherResponse extends TeacherBase {
   id: number;
   tenant_id: number;
@@ -38,6 +44,7 @@ export interface TeacherResponse extends TeacherBase {
   user_id?: number | null;
   class_name?: string | null;
   division_name?: string | null;
+  assignment_rows?: TeacherAssignmentRow[];
 }
 
 export interface TeacherListResponse {
