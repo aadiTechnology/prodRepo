@@ -117,6 +117,7 @@ export function addTeacherFormConfig({
         name: "class_id",
         label: "Assigned Class",
         type: "select",
+        required: false,
         props: {
           options: classOptions,
           loading: classesLoading,
@@ -127,6 +128,7 @@ export function addTeacherFormConfig({
         name: "class_division_id",
         label: "Assigned Division",
         type: "select",
+        required: false,
         props: {
           options: divisionOptions,
           loading: divisionsLoading,
