@@ -3,6 +3,7 @@ import schoolClassService, { SchoolClass, ClassDivision } from "../api/services/
 import academicYearService, { AcademicYear } from "../api/services/academicYearService";
 import attendanceService, { AttendanceResponse } from "../api/services/attendanceService";
 import teacherService, { TeacherResponse } from "../api/services/teacherService";
+import teacherAssignmentApi, { TeacherAssignmentApiItem } from "../api/teacherAssignmentApi";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 
@@ -36,6 +37,10 @@ export interface UseMarkAttendanceControllerResult {
   filteredDivisions: ClassDivision[];
   /** true when the current user is a teacher (lock teacher dropdown) */
   isTeacher: boolean;
+  /** true when teacher has only one class assignment */
+  lockClassFilter: boolean;
+  /** true when teacher has only one division assignment for selected class */
+  lockDivisionFilter: boolean;
 }
 
 export function useMarkAttendanceController(): UseMarkAttendanceControllerResult {
@@ -49,6 +54,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
   const [teachers, setTeachers] = useState<TeacherResponse[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [divisions, setDivisions] = useState<ClassDivision[]>([]);
+  const [assignmentMappings, setAssignmentMappings] = useState<TeacherAssignmentApiItem[]>([]);
 
   // Page State
   const [filters, setFilters] = useState<AttendanceFilters>({
@@ -85,18 +91,58 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     return fallback;
   };
 
+  const fetchAllTeacherAssignments = useCallback(async (): Promise<TeacherAssignmentApiItem[]> => {
+    const pageSize = 100;
+    let page = 1;
+    let total = 0;
+    let collected: TeacherAssignmentApiItem[] = [];
+
+    do {
+      const response = await teacherAssignmentApi.getTeacherAssignments({
+        page,
+        limit: pageSize,
+      });
+      const rows = response.data || [];
+      collected = collected.concat(rows);
+      total = response.pagination?.total || collected.length;
+      page += 1;
+    } while (collected.length < total);
+
+    return collected;
+  }, []);
+
   // Load initial metadata
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const [years, teacherList, classList] = await Promise.all([
+        const [yearsResult, teacherListResult, classListResult, assignmentResult] = await Promise.allSettled([
           academicYearService.getAll(),
           teacherService.list({ limit: 1000 }),
-          schoolClassService.getAll()
+          schoolClassService.getAll(),
+          fetchAllTeacherAssignments(),
         ]);
+
+        const years = yearsResult.status === "fulfilled" ? yearsResult.value : [];
+        const teacherList =
+          teacherListResult.status === "fulfilled"
+            ? teacherListResult.value
+            : { items: [], total: 0 };
+        const classList = classListResult.status === "fulfilled" ? classListResult.value : [];
+        const assignmentList =
+          assignmentResult.status === "fulfilled"
+            ? assignmentResult.value
+            : [];
 
         setAcademicYears(years);
         setClasses(classList);
+        setAssignmentMappings(assignmentList || []);
+
+        // Keep teacher dropdown unique by teacher id.
+        const uniqueTeachersById = new Map<number, TeacherResponse>();
+        teacherList.items.forEach((t) => {
+          if (!uniqueTeachersById.has(t.id)) uniqueTeachersById.set(t.id, t);
+        });
+        const uniqueTeachers = Array.from(uniqueTeachersById.values());
 
         // Find active year
         const activeYear = years.find(y => y.is_active);
@@ -104,9 +150,9 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         if (isTeacher && user?.id) {
           // Primary match: teacher.user_id === logged-in user.id (most reliable)
           // Fallback : match by email for legacy records where user_id may be null
-          let myTeacher = teacherList.items.find(t => String(t.user_id) === String(user.id));
+          let myTeacher = uniqueTeachers.find(t => String(t.user_id) === String(user.id));
           if (!myTeacher && user?.email) {
-            myTeacher = teacherList.items.find(
+            myTeacher = uniqueTeachers.find(
               t => t.email?.toLowerCase() === user.email?.toLowerCase()
             );
           }
@@ -124,7 +170,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
           }
         } else {
           // Admin / Tenant-Admin: show all teachers
-          setTeachers(teacherList.items);
+          setTeachers(uniqueTeachers);
           if (activeYear) setFilters(prev => ({ ...prev, academic_year_id: activeYear.id }));
         }
       } catch (err) {
@@ -133,16 +179,33 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     };
     loadInitialData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTeacher, user?.id, user?.email]);
+  }, [isTeacher, user?.id, user?.email, fetchAllTeacherAssignments]);
+
+  const teacherScopedMappings = useMemo(() => {
+    if (!filters.teacher_id) return [];
+    return assignmentMappings.filter((a) => a.teacher_id === filters.teacher_id);
+  }, [assignmentMappings, filters.teacher_id]);
 
   // Derived filtered classes
   const filteredClasses = useMemo(() => {
     if (!filters.teacher_id) return classes;
-    const selectedTeacherAssignments = teachers.filter(t => t.id === filters.teacher_id);
-    const assignedClassIds = selectedTeacherAssignments.map(t => t.class_id).filter(Boolean);
-    if (assignedClassIds.length === 0) return [];
-    return classes.filter(c => assignedClassIds.includes(c.id));
-  }, [classes, teachers, filters.teacher_id]);
+
+    const assignedClassIds = Array.from(
+      new Set(teacherScopedMappings.map((a) => a.class_id).filter(Boolean))
+    ) as number[];
+
+    if (assignedClassIds.length > 0) {
+      return classes.filter(c => assignedClassIds.includes(c.id));
+    }
+
+    // Fallback in case assignment API is unavailable.
+    const selectedTeacherRows = teachers.filter((t) => t.id === filters.teacher_id);
+    const legacyClassIds = Array.from(
+      new Set(selectedTeacherRows.map((t) => t.class_id).filter(Boolean))
+    ) as number[];
+    if (legacyClassIds.length === 0) return [];
+    return classes.filter(c => legacyClassIds.includes(c.id));
+  }, [classes, teachers, teacherScopedMappings, filters.teacher_id]);
 
   // Derived filtered divisions
   const filteredDivisions = useMemo(() => {
@@ -152,13 +215,32 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     const allDivisions = selectedClass.divisions || [];
     if (!filters.teacher_id) return allDivisions;
 
-    const selectedTeacherAssignments = teachers.filter(t =>
-      t.id === filters.teacher_id && t.class_id === filters.class_id
+    const assignedDivisionIds = Array.from(
+      new Set(
+        teacherScopedMappings
+          .filter((a) => a.class_id === filters.class_id)
+          .map((a) => a.class_division_id)
+          .filter(Boolean)
+      )
+    ) as number[];
+
+    if (assignedDivisionIds.length > 0) {
+      return allDivisions.filter(d => assignedDivisionIds.includes(d.id));
+    }
+
+    // Fallback in case assignment API is unavailable.
+    const selectedTeacherRows = teachers.filter(
+      (t) => t.id === filters.teacher_id && t.class_id === filters.class_id
     );
-    const assignedDivisionIds = selectedTeacherAssignments.map(t => t.class_division_id).filter(Boolean);
-    if (assignedDivisionIds.length === 0) return allDivisions;
-    return allDivisions.filter(d => assignedDivisionIds.includes(d.id));
-  }, [classes, teachers, filters.teacher_id, filters.class_id]);
+    const legacyDivisionIds = Array.from(
+      new Set(selectedTeacherRows.map((t) => t.class_division_id).filter(Boolean))
+    ) as number[];
+    if (legacyDivisionIds.length === 0) return [];
+    return allDivisions.filter(d => legacyDivisionIds.includes(d.id));
+  }, [classes, teachers, teacherScopedMappings, filters.teacher_id, filters.class_id]);
+
+  const lockClassFilter = isTeacher && filteredClasses.length === 1;
+  const lockDivisionFilter = isTeacher && filteredDivisions.length === 1;
 
   // Sync divisions dropdown
   useEffect(() => {
@@ -350,5 +432,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     filteredClasses,
     filteredDivisions,
     isTeacher,
+    lockClassFilter,
+    lockDivisionFilter,
   };
 }
