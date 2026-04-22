@@ -16,6 +16,8 @@ import permissionService, {
   Role,
   RoleMenuPermission,
 } from "../../api/services/permissionService";
+import tenantService from "../../api/services/tenantService";
+import type { Tenant } from "../../types/tenant";
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout, EntityTableSection, ListPageToolbar } from "../../components/reusable";
 import { useAuth } from "../../context/AuthContext";
@@ -50,6 +52,8 @@ const PermissionManagementPage = () => {
   const [permissions, setPermissions] = useState<Map<number, RoleMenuPermission>>(new Map());
   const [originalPermissions, setOriginalPermissions] = useState<Map<number, RoleMenuPermission>>(new Map());
   const [searchQuery, setSearchQuery] = useState("");
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState<string>("all");
 
   // ── UI State ────────────────────────────────────────────────────────────
   const [loadingRoles, setLoadingRoles] = useState(true);
@@ -76,6 +80,40 @@ const PermissionManagementPage = () => {
   useEffect(() => {
     fetchRoles();
   }, [fetchRoles]);
+
+  // ── Fetch Tenants (System Admin only) ────────────────────────────────────
+  const fetchTenants = useCallback(async () => {
+    if (!isSystemAdmin) return;
+    try {
+      const pageSize = 100;
+      let page = 1;
+      let allTenants: Tenant[] = [];
+      let total = 0;
+
+      do {
+        const data = await tenantService.list({ page, page_size: pageSize });
+        const pageItems = data?.items || [];
+        total = data?.total || pageItems.length;
+        allTenants = [...allTenants, ...pageItems];
+        page += 1;
+      } while (allTenants.length < total);
+
+      setTenants(allTenants);
+    } catch {
+      // Keep page usable even if tenant list fails; roles can still load.
+      setTenants([]);
+    }
+  }, [isSystemAdmin]);
+
+  useEffect(() => {
+    fetchTenants();
+  }, [fetchTenants]);
+
+  useEffect(() => {
+    if (!isSystemAdmin) {
+      setSelectedTenantId(user?.tenant_id != null ? String(user.tenant_id) : "all");
+    }
+  }, [isSystemAdmin, user?.tenant_id]);
 
   // ── Expanded Modules State ──────────────────────────────────────────────
   const [expandedModuleIds, setExpandedModuleIds] = useState<Set<number>>(
@@ -122,6 +160,17 @@ const PermissionManagementPage = () => {
     },
     [roles]
   );
+
+  // ── Handle Tenant Change ──────────────────────────────────────────────────
+  const handleTenantChange = useCallback((tenantId: string) => {
+    setSelectedTenantId(tenantId);
+    setSelectedRole(null);
+    setMenuTree([]);
+    setPermissions(new Map());
+    setOriginalPermissions(new Map());
+    setExpandedModuleIds(new Set());
+    setPage(0);
+  }, []);
 
   // ── Transform Tree Into Flat Rows ────────────────────────────────────────
   const allRows: PermissionTableRow[] = useMemo(() => {
@@ -350,9 +399,28 @@ const PermissionManagementPage = () => {
 
   // ── Filtered Roles ────────────────────────────────────────────────────
   const filteredRoles = useMemo(
-    () => (isSystemAdmin ? roles : roles.filter((r) => r.tenant_id === user?.tenant_id)),
-    [roles, isSystemAdmin, user?.tenant_id]
+    () => {
+      if (!isSystemAdmin) {
+        return roles.filter((r) => r.tenant_id === user?.tenant_id);
+      }
+
+      if (selectedTenantId === "all") return roles;
+      if (selectedTenantId === "platform") return roles.filter((r) => !r.tenant_id);
+
+      const tenantId = Number(selectedTenantId);
+      return roles.filter((r) => r.tenant_id === tenantId);
+    },
+    [roles, isSystemAdmin, user?.tenant_id, selectedTenantId]
   );
+
+  const tenantOptions = useMemo(() => {
+    if (!isSystemAdmin) return [];
+    return [
+      { label: "All Tenants", value: "all" },
+      { label: "Platform", value: "platform" },
+      ...tenants.map((t) => ({ label: t.name, value: String(t.id) })),
+    ];
+  }, [isSystemAdmin, tenants]);
 
   // ── Table Configuration ──────────────────────────────────────────────────
   const columnConfig = useMemo(
@@ -398,6 +466,16 @@ const PermissionManagementPage = () => {
                 searchPlaceholder="Search modules..."
                 actionsAfterSearch
                 filters={[
+                  ...(isSystemAdmin
+                    ? [
+                        {
+                          label: "Tenant",
+                          value: selectedTenantId,
+                          onChange: handleTenantChange,
+                          options: tenantOptions,
+                        },
+                      ]
+                    : []),
                   {
                     label: "Role",
                     value: selectedRole?.id?.toString() || "",

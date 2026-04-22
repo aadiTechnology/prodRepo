@@ -64,6 +64,7 @@ def get_login_context(
     # 4. RBAC Resolution
     roles = [role.code for role in rbac_service.get_user_roles(db, user.id)]
     permissions, menus = rbac_service.resolve_user_permissions_and_menus(db, user)
+    rbac_version = rbac_service.compute_rbac_version(db, user)
 
     # 5. Role Selection (Primary role for token)
     # Use roles[0] if available, else fall back to user.role enum
@@ -101,4 +102,5 @@ def get_login_context(
         permissions=permissions,
         menus=menus,
         tenant=tenant_info,
+        rbac_version=rbac_version,
     )

@@ -21,4 +21,6 @@ export interface LoginContextResponse {
   permissions: string[];
   menus: MenuNode[];
   tenant?: TenantInfo | null;
+  /** Opaque version string from backend; changes when effective RBAC changes. */
+  rbac_version?: string | null;
 }

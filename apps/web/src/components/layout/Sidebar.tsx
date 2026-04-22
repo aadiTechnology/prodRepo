@@ -311,7 +311,6 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
     }
 
     if (!menus || menus.length === 0) return [];
-
     return menus.map(node => {
       const path = (node.path || "").toLowerCase();
       const name = (node.name || "").toLowerCase();
@@ -341,7 +340,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         }))
       };
     });
-  }, [menus, user]);
+  }, [menus, user, rbacRoles]);
 
   const toggleSection = (id: string) => {
     setExpandedSections((prev) => {

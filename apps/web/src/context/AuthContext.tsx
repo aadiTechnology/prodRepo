@@ -173,6 +173,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(userWithExtras);
       saveUser(userWithExtras);
 
+      // Populate RBAC (roles, menus, permissions, rbac_version) here so every
+      // caller of loginWithContext gets a consistent RBAC state without having
+      // to remember to call setRBACData themselves.
+      setRBACData({
+        roles: response.roles,
+        menus: response.menus,
+        permissions: response.permissions,
+        rbac_version: response.rbac_version ?? null,
+      });
+
       return response;
     } catch (error) {
       clearAuthData();
@@ -182,7 +192,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setRBACData]);
 
   const applyLoginContextResponse = useCallback((response: LoginContextResponse) => {
     setToken(response.access_token);
@@ -196,7 +206,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setUser(userWithExtras);
     saveUser(userWithExtras);
-    setRBACData({ roles: response.roles, menus: response.menus, permissions: response.permissions });
+    setRBACData({
+      roles: response.roles,
+      menus: response.menus,
+      permissions: response.permissions,
+      rbac_version: response.rbac_version ?? null,
+    });
   }, [setRBACData]);
 
   /**

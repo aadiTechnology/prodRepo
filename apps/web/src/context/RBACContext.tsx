@@ -4,11 +4,14 @@
  * Manages roles, permissions, and menu hierarchy for the entire application
  */
 
-import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode, useRef } from "react";
 import { RBACState, LoginContextResponse } from "../types/rbac";
 import { MenuNode, Feature } from "../types/menu";
 import { authService } from "../api/services/authService";
 import { useEffect } from "react";
+
+const AUTH_TOKEN_KEY = "auth_token";
+const RBAC_POLL_INTERVAL_MS = 5_000;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Type Definitions - RBAC Context interface and methods
@@ -29,14 +32,18 @@ interface RBACContextType extends RBACState {
   getMenuFeatures: (menuId: number) => Feature[];
   
   // Actions
-  setRBACData: (data: Pick<LoginContextResponse, "roles" | "menus" | "permissions">) => void;
+  setRBACData: (data: Pick<LoginContextResponse, "roles" | "menus" | "permissions"> & { rbac_version?: string | null }) => void;
   refreshRBAC: () => Promise<void>;
   clearRBACData: () => void;
+
+  /** Version string reported by backend; changes whenever effective RBAC changes. */
+  rbacVersion: string | null;
 }
 
 const RBACContext = createContext<RBACContextType | undefined>(undefined);
 
 const RBAC_STORAGE_KEY = "rbac_data";
+const RBAC_VERSION_STORAGE_KEY = "rbac_version";
 
 const normalizeRole = (value: string): string => value.trim().toLowerCase();
 
@@ -123,19 +130,51 @@ export function RBACProvider({ children }: RBACProviderProps) {
   const [permissions, setPermissions] = useState<string[]>(storedData?.permissions || []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rbacVersion, setRbacVersion] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(RBAC_VERSION_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
+
+  // Latest version seen by polling; ref so the interval closure always sees it.
+  const rbacVersionRef = useRef<string | null>(rbacVersion);
+  useEffect(() => {
+    rbacVersionRef.current = rbacVersion;
+  }, [rbacVersion]);
 
   /**
    * Set RBAC data (called after login)
    */
-  const setRBACData = useCallback((data: Pick<LoginContextResponse, "roles" | "menus" | "permissions">) => {
-    const normalized = normalizeRoles(data.roles);
-    const effectivePermissions = data.permissions?.length ? data.permissions : extractPermissions(data.menus);
-    setRoles(normalized);
-    setMenus(data.menus);
-    setPermissions(effectivePermissions);
-    saveRBACData({ roles: normalized, menus: data.menus, permissions: effectivePermissions });
-    setError(null);
-  }, []);
+  const setRBACData = useCallback(
+    (
+      data: Pick<LoginContextResponse, "roles" | "menus" | "permissions"> & {
+        rbac_version?: string | null;
+      }
+    ) => {
+      const normalized = normalizeRoles(data.roles);
+      const effectivePermissions = data.permissions?.length
+        ? data.permissions
+        : extractPermissions(data.menus);
+      setRoles(normalized);
+      setMenus(data.menus);
+      setPermissions(effectivePermissions);
+      saveRBACData({ roles: normalized, menus: data.menus, permissions: effectivePermissions });
+      if (data.rbac_version !== undefined) {
+        const nextVersion = data.rbac_version ?? null;
+        setRbacVersion(nextVersion);
+        try {
+          if (nextVersion) localStorage.setItem(RBAC_VERSION_STORAGE_KEY, nextVersion);
+          else localStorage.removeItem(RBAC_VERSION_STORAGE_KEY);
+        } catch {
+          // non-fatal
+        }
+      }
+      setError(null);
+    },
+    []
+  );
 
   /**
    * Clear RBAC data (called on logout)
@@ -144,24 +183,47 @@ export function RBACProvider({ children }: RBACProviderProps) {
     setRoles([]);
     setMenus([]);
     setPermissions([]);
+    setRbacVersion(null);
     clearStoredRBACData();
+    try {
+      localStorage.removeItem(RBAC_VERSION_STORAGE_KEY);
+    } catch {
+      // non-fatal
+    }
     setError(null);
   }, []);
 
   /**
-   * Refresh RBAC data from backend
+   * Refresh RBAC data from backend. If the server-reported rbac_version has
+   * not changed since the last refresh we skip replacing state, keeping
+   * identity stable for memoized consumers (e.g. the Sidebar).
    */
   const refreshRBAC = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const data = await authService.getRBACContext();
+      const nextVersion = data.rbac_version ?? null;
+
+      if (nextVersion && rbacVersionRef.current && nextVersion === rbacVersionRef.current) {
+        return;
+      }
+
       const normalized = normalizeRoles(data.roles);
-      const effectivePermissions = data.permissions?.length ? data.permissions : extractPermissions(data.menus);
+      const effectivePermissions = data.permissions?.length
+        ? data.permissions
+        : extractPermissions(data.menus);
       setRoles(normalized);
       setMenus(data.menus);
       setPermissions(effectivePermissions);
       saveRBACData({ roles: normalized, menus: data.menus, permissions: effectivePermissions });
+      setRbacVersion(nextVersion);
+      try {
+        if (nextVersion) localStorage.setItem(RBAC_VERSION_STORAGE_KEY, nextVersion);
+        else localStorage.removeItem(RBAC_VERSION_STORAGE_KEY);
+      } catch {
+        // non-fatal
+      }
     } catch (err: any) {
       console.error("Failed to refresh RBAC data:", err);
       setError(err.message || "Failed to refresh permissions");
@@ -171,13 +233,49 @@ export function RBACProvider({ children }: RBACProviderProps) {
   }, []);
 
   /**
-   * Auto-refresh on mount if we have stored data (meaning we are likely logged in)
+   * Auto-refresh on mount when we have an auth token (rehydrate after reload).
    */
   useEffect(() => {
-    const hasToken = !!localStorage.getItem("token"); // Assuming token is stored in localStorage
+    const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY);
     if (hasToken) {
       refreshRBAC();
     }
+  }, [refreshRBAC]);
+
+  /**
+   * Live polling so an already-logged-in user picks up permission/menu
+   * changes (e.g. an admin saves a new grant) within a few seconds.
+   * Gated on: tab visible + auth token present.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    const shouldPoll = () =>
+      !cancelled &&
+      typeof document !== "undefined" &&
+      document.visibilityState === "visible" &&
+      !!localStorage.getItem(AUTH_TOKEN_KEY);
+
+    const tick = () => {
+      if (shouldPoll()) {
+        void refreshRBAC();
+      }
+    };
+
+    const interval = window.setInterval(tick, RBAC_POLL_INTERVAL_MS);
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && !!localStorage.getItem(AUTH_TOKEN_KEY)) {
+        void refreshRBAC();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [refreshRBAC]);
 
   /**
@@ -294,6 +392,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
       menus,
       isLoading,
       error,
+      rbacVersion,
       hasPermission,
       hasAnyPermission,
       hasAllPermissions,
@@ -312,6 +411,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
       menus,
       isLoading,
       error,
+      rbacVersion,
       hasPermission,
       hasAnyPermission,
       hasAllPermissions,

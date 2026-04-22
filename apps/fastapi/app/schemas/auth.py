@@ -69,6 +69,10 @@ class LoginContextResponse(BaseModel):
     permissions: List[str]
     menus: List[MenuNode]
     tenant: Optional[TenantInfo] = None
+    rbac_version: Optional[str] = None
+    """Opaque version string that changes whenever this user's effective RBAC changes.
+    Frontends can poll /auth/rbac/context and compare this to decide if state
+    should be replaced, enabling near real-time sidebar/permission updates."""
 
 def create_user_with_role(user):
     """Create a user with role."""

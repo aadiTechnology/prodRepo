@@ -70,14 +70,19 @@ def get_role_permission_matrix(
         (current_user.role == "ADMIN" and current_user.tenant_id is None)
     )
 
-    tenant_id = role.tenant_id if role.tenant_id is not None else current_user.tenant_id
-
+    # Scope menus strictly to the role being edited:
+    # - Platform role (role.tenant_id is None): only global menus (Menu.tenant_id IS NULL).
+    # - Tenant role: global menus + that tenant's own menus.
     query = db.query(Menu).filter(
         Menu.is_active == True,  # noqa: E712
         Menu.is_deleted == False,  # noqa: E712
-    ).filter(
-        (Menu.tenant_id == None) | (Menu.tenant_id == tenant_id)  # noqa: E712
     )
+    if role.tenant_id is None:
+        query = query.filter(Menu.tenant_id.is_(None))
+    else:
+        query = query.filter(
+            (Menu.tenant_id.is_(None)) | (Menu.tenant_id == role.tenant_id)
+        )
     
     all_menus_raw = query.all()
     

@@ -3,7 +3,7 @@
 from enum import Enum
 from typing import List, Tuple, Dict, Any, Optional
 
-from sqlalchemy import insert
+from sqlalchemy import insert, func, Integer
 from sqlalchemy.orm import Session
 
 from app.core.logging_config import get_logger
@@ -31,13 +31,29 @@ class RoleScope(str, Enum):
 
 
 def _include_menu_with_parents(db: Session, menu: Menu, menu_rows: List[Menu], seen_menu_ids: set[int]) -> None:
+    """
+    Include a menu and all of its ancestors (level-1 parents) in menu_rows.
+    Ancestors are included even if they have no explicit RoleMenuPermission entry,
+    so the sidebar can render the full hierarchy. Soft-deleted or inactive
+    ancestors are skipped (walk aborts).
+    """
     current = menu
     while current and current.id not in seen_menu_ids:
+        if not current.is_active or current.is_deleted:
+            return
         menu_rows.append(current)
         seen_menu_ids.add(current.id)
         if not current.parent_id:
-            break
-        current = db.query(Menu).get(current.parent_id)
+            return
+        current = (
+            db.query(Menu)
+            .filter(
+                Menu.id == current.parent_id,
+                Menu.is_active == True,  # noqa: E712
+                Menu.is_deleted == False,  # noqa: E712
+            )
+            .first()
+        )
 
 
 def get_user_roles(db: Session, user_id: int) -> List[Role]:
@@ -248,6 +264,96 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
     
     menu_tree = menu_service.build_menu_tree(menu_rows) if menu_rows else []
     return list(permission_codes), menu_tree
+
+
+def compute_rbac_version(db: Session, user: User) -> str:
+    """
+    Return an opaque version string that changes whenever this user's effective
+    RBAC could change: role assignments, role-menu permissions, or menu catalog.
+
+    Used by clients to poll /auth/rbac/context cheaply and decide if they should
+    replace local state (driving "live" sidebar updates).
+    """
+    role_ids = [r.id for r in get_user_roles(db, user.id)]
+
+    # Latest change across this user's RoleMenuPermission rows.
+    perms_ts = None
+    perms_count = 0
+    perms_signature = 0
+    if role_ids:
+        perms_ts = (
+            db.query(
+                func.max(
+                    func.coalesce(RoleMenuPermission.updated_at, RoleMenuPermission.created_at)
+                )
+            )
+            .filter(RoleMenuPermission.role_id.in_(role_ids))
+            .scalar()
+        )
+        perms_count = (
+            db.query(RoleMenuPermission.id)
+            .filter(RoleMenuPermission.role_id.in_(role_ids))
+            .count()
+        )
+        perms_signature = (
+            db.query(
+                func.coalesce(
+                    func.sum(
+                        (RoleMenuPermission.can_view.cast(Integer) * 1)
+                        + (RoleMenuPermission.can_create.cast(Integer) * 2)
+                        + (RoleMenuPermission.can_edit.cast(Integer) * 4)
+                        + (RoleMenuPermission.can_delete.cast(Integer) * 8)
+                    ),
+                    0,
+                )
+            )
+            .filter(RoleMenuPermission.role_id.in_(role_ids))
+            .scalar()
+            or 0
+        )
+
+    # Also include the user's role-assignment changes and menu catalog changes,
+    # so revoking a role or toggling a menu active flag also bumps the version.
+    # Association column name differs by environment (`assigned_at` vs `granted_at`),
+    # so resolve defensively to avoid hard crashes on login/context.
+    user_roles_ts_col = None
+    if hasattr(user_roles.c, "assigned_at"):
+        user_roles_ts_col = user_roles.c.assigned_at
+    elif hasattr(user_roles.c, "granted_at"):
+        user_roles_ts_col = user_roles.c.granted_at
+
+    user_roles_ts = None
+    if user_roles_ts_col is not None:
+        user_roles_ts = (
+            db.query(func.max(user_roles_ts_col))
+            .filter(user_roles.c.user_id == user.id)
+            .scalar()
+        )
+
+    menus_filter = Menu.tenant_id.is_(None)
+    if user.tenant_id is not None:
+        menus_filter = (Menu.tenant_id.is_(None)) | (Menu.tenant_id == user.tenant_id)
+    menus_ts = (
+        db.query(func.max(func.coalesce(Menu.updated_at, Menu.created_at)))
+        .filter(menus_filter)
+        .scalar()
+    )
+
+    # Keep sub-second precision to avoid missing rapid consecutive edits.
+    def _ts_to_str(ts):
+        if not ts:
+            return "0"
+        return ts.isoformat()
+
+    parts = [
+        _ts_to_str(perms_ts),
+        _ts_to_str(user_roles_ts),
+        _ts_to_str(menus_ts),
+        str(len(role_ids)),
+        str(perms_count),
+        str(perms_signature),
+    ]
+    return ".".join(parts)
 
 
 def _path_from_name(name: str) -> str:
