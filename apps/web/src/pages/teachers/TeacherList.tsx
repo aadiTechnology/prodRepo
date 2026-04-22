@@ -95,10 +95,6 @@ export default function TeacherList() {
     setPage(0);
   };
 
-  const classOptions = useMemo(() => {
-    return classes.map(c => ({ label: c.name, value: String(c.id) }));
-  }, [classes]);
-
   const divisionOptions = useMemo(() => {
     if (!classFilter) return [];
     const selectedClass = classes.find(c => String(c.id) === classFilter);

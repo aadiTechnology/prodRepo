@@ -26,9 +26,9 @@ export function createTeacherListConfig({
   return {
     columns: [
       { id: "full_name", label: "Name", field: "full_name" },
-      { id: "teacher_code", label: "ID", field: "teacher_code", render: (t: TeacherResponse) => t.teacher_code || "-" },
       { id: "mobile_number", label: "Contact", field: "mobile_number" },
-      { id: "class", label: "Class", render: (t: TeacherResponse) => t.class_name ? `${t.class_name} ${t.division_name ? ' - ' + t.division_name : ''}` : "-" },
+      { id: "class", label: "Class", render: (t: TeacherResponse) => t.class_name || "-" },
+      { id: "division", label: "Division", render: (t: TeacherResponse) => t.division_name || "-" },
       {
         id: "status",
         label: "Status",

@@ -1,4 +1,6 @@
 from typing import List, Optional, Tuple
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from app.models.teacher import Teacher
 from app.schemas.teacher_schema import TeacherCreate, TeacherUpdate
@@ -17,35 +19,192 @@ def get_all_teachers(
     skip: int = 0, 
     limit: int = 100
 ) -> Tuple[List[Teacher], int]:
-    query = db.query(Teacher).filter(
-        Teacher.tenant_id == tenant_id,
-        Teacher.is_deleted == False
-    )
-    
-    if search:
-        search_filter = f"%{search}%"
-        query = query.filter(
-            (Teacher.full_name.ilike(search_filter)) | 
-            (Teacher.mobile_number.ilike(search_filter)) |
-            (Teacher.teacher_code.ilike(search_filter))
+    try:
+        teacher_assignments_exist = bool(
+            db.execute(
+                text(
+                    """
+                    SELECT TOP 1 1
+                    FROM teacher_assignments
+                    WHERE tenant_id = :tenant_id
+                      AND is_active = 1
+                    """
+                ),
+                {"tenant_id": tenant_id},
+            ).scalar()
         )
-        
-    if status is not None:
-        if status.lower() == "active":
-            query = query.filter(Teacher.is_active == True)
-        elif status.lower() == "inactive":
-            query = query.filter(Teacher.is_active == False)
-            
-    if class_id is not None:
-        query = query.filter(Teacher.class_id == class_id)
+    except SQLAlchemyError:
+        teacher_assignments_exist = False
 
-    if class_division_id is not None:
-        query = query.filter(Teacher.class_division_id == class_division_id)
-            
-    total = query.count()
-    teachers = query.order_by(Teacher.full_name.asc()).offset(skip).limit(limit).all()
-    
-    return teachers, total
+    if teacher_assignments_exist:
+        try:
+            teacher_rows = db.execute(
+                text(
+                    """
+                    SELECT
+                        t.id,
+                        t.tenant_id,
+                        t.user_id,
+                        t.teacher_code,
+                        t.full_name,
+                        t.date_of_birth,
+                        t.gender,
+                        t.mobile_number,
+                        t.email,
+                        t.qualification,
+                        t.experience_years,
+                        t.photo_url,
+                        t.is_active,
+                        t.address,
+                        t.city,
+                        t.state,
+                        t.pincode,
+                        t.created_at,
+                        t.updated_at,
+                        t.class_id AS legacy_class_id,
+                        t.class_division_id AS legacy_class_division_id
+                    FROM teachers t
+                    WHERE t.tenant_id = :tenant_id
+                      AND t.is_deleted = 0
+                      AND (
+                            :status IS NULL
+                            OR (:status = 'active' AND t.is_active = 1)
+                            OR (:status = 'inactive' AND t.is_active = 0)
+                      )
+                      AND (
+                            :search_like IS NULL
+                            OR t.full_name LIKE :search_like
+                            OR t.mobile_number LIKE :search_like
+                            OR t.teacher_code LIKE :search_like
+                      )
+                    ORDER BY t.full_name ASC
+                    """
+                ),
+                {
+                    "tenant_id": tenant_id,
+                    "status": status.lower() if status else None,
+                    "search_like": f"%{search.strip()}%" if search and search.strip() else None,
+                },
+            ).mappings().all()
+
+            assignment_rows = db.execute(
+                text(
+                    """
+                    SELECT
+                        ta.teacher_id,
+                        ta.class_id,
+                        c.name AS class_name,
+                        ta.class_division_id,
+                        cd.division_name
+                    FROM teacher_assignments ta
+                    LEFT JOIN classes c ON c.id = ta.class_id
+                    LEFT JOIN class_divisions cd ON cd.id = ta.class_division_id
+                    WHERE ta.tenant_id = :tenant_id
+                      AND ta.is_active = 1
+                    """
+                ),
+                {"tenant_id": tenant_id},
+            ).mappings().all()
+
+            grouped: dict[tuple[int, Optional[int]], dict] = {}
+            for row in assignment_rows:
+                t_id = row["teacher_id"]
+                c_id = row["class_id"]
+                key = (t_id, c_id)
+                if key not in grouped:
+                    grouped[key] = {
+                        "teacher_id": t_id,
+                        "class_id": c_id,
+                        "class_name": row["class_name"],
+                        "division_ids": set(),
+                        "division_names": [],
+                    }
+                if row["class_division_id"] is not None:
+                    grouped[key]["division_ids"].add(row["class_division_id"])
+                if row["division_name"] and row["division_name"] not in grouped[key]["division_names"]:
+                    grouped[key]["division_names"].append(row["division_name"])
+
+            grouped_by_teacher: dict[int, list[dict]] = {}
+            for group in grouped.values():
+                grouped_by_teacher.setdefault(group["teacher_id"], []).append(group)
+
+            flattened: list[dict] = []
+            for teacher in teacher_rows:
+                teacher_dict = dict(teacher)
+                teacher_groups = grouped_by_teacher.get(teacher_dict["id"], [])
+
+                if not teacher_groups:
+                    flattened.append({
+                        **teacher_dict,
+                        "class_id": None,
+                        "class_division_id": None,
+                        "class_name": None,
+                        "division_name": None,
+                        "_division_ids": set(),
+                    })
+                    continue
+
+                teacher_groups.sort(key=lambda item: ((item["class_name"] or "").upper(), item["class_id"] or 0))
+                for grp in teacher_groups:
+                    flattened.append({
+                        **teacher_dict,
+                        "class_id": grp["class_id"],
+                        "class_division_id": None,
+                        "class_name": grp["class_name"],
+                        "division_name": ", ".join(grp["division_names"]) if grp["division_names"] else None,
+                        "_division_ids": grp["division_ids"],
+                    })
+
+            if class_id is not None:
+                flattened = [row for row in flattened if row["class_id"] == class_id]
+
+            if class_division_id is not None:
+                flattened = [
+                    row for row in flattened
+                    if class_division_id in (row.get("_division_ids") or set())
+                ]
+
+            total = len(flattened)
+            data = flattened[skip: skip + limit]
+            for row in data:
+                row.pop("_division_ids", None)
+
+            return data, total
+        except SQLAlchemyError:
+            pass
+
+    try:
+        # Fallback to legacy source when teacher_assignments is unavailable.
+        query = db.query(Teacher).filter(
+            Teacher.tenant_id == tenant_id,
+            Teacher.is_deleted == False
+        )
+
+        if search:
+            search_filter = f"%{search}%"
+            query = query.filter(
+                (Teacher.full_name.ilike(search_filter)) |
+                (Teacher.mobile_number.ilike(search_filter)) |
+                (Teacher.teacher_code.ilike(search_filter))
+            )
+
+        if status is not None:
+            if status.lower() == "active":
+                query = query.filter(Teacher.is_active == True)
+            elif status.lower() == "inactive":
+                query = query.filter(Teacher.is_active == False)
+
+        if class_id is not None:
+            query = query.filter(Teacher.class_id == class_id)
+
+        if class_division_id is not None:
+            query = query.filter(Teacher.class_division_id == class_division_id)
+
+        total = query.count()
+        teachers = query.order_by(Teacher.full_name.asc()).offset(skip).limit(limit).all()
+        return teachers, total
+    except SQLAlchemyError:
+        return [], 0
 
 def get_teacher_by_id(db: Session, teacher_id: int, tenant_id: int) -> Teacher:
     teacher = db.query(Teacher).filter(

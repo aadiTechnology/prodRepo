@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, Mapping, Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,34 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/teachers", tags=["Teachers"])
 
-def map_db_model_to_response(teacher) -> TeacherResponse:
+def map_db_model_to_response(teacher: Any) -> TeacherResponse:
+    if isinstance(teacher, Mapping):
+        return TeacherResponse(
+            id=teacher["id"],
+            tenant_id=teacher["tenant_id"],
+            user_id=teacher.get("user_id"),
+            teacher_code=teacher.get("teacher_code"),
+            full_name=teacher["full_name"],
+            date_of_birth=teacher.get("date_of_birth"),
+            gender=teacher.get("gender"),
+            mobile_number=teacher["mobile_number"],
+            email=teacher.get("email"),
+            qualification=teacher.get("qualification"),
+            experience_years=teacher.get("experience_years"),
+            photo_url=teacher.get("photo_url"),
+            class_id=teacher.get("class_id"),
+            class_division_id=teacher.get("class_division_id"),
+            is_active=teacher["is_active"],
+            address=teacher.get("address"),
+            city=teacher.get("city"),
+            state=teacher.get("state"),
+            pincode=teacher.get("pincode"),
+            created_at=teacher["created_at"],
+            updated_at=teacher.get("updated_at"),
+            class_name=teacher.get("class_name"),
+            division_name=teacher.get("division_name"),
+        )
+
     return TeacherResponse(
         id=teacher.id,
         tenant_id=teacher.tenant_id,
