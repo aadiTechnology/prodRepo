@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models import Feature, Menu 
 from datetime import datetime
+from app.services import rbac_service
 
 def seed_rbac_data():
     db: Session = SessionLocal()
@@ -88,6 +89,7 @@ def seed_rbac_data():
                 "children": [
                     {"name": "Staff List", "path": "/staff", "feature": "STAFF_MGMT"},
                     {"name": "Teachers", "path": "/teachers", "feature": "TEACHER_MGMT"},
+                    {"name": "Assigned Class Teachers", "path": "/teacher-assignments", "feature": "TEACHER_MGMT"},
                 ]
             },
             {
@@ -149,6 +151,15 @@ def seed_rbac_data():
                         child.path = c_data["path"]
                         child.feature_id = fid
                         print(f"[SEED] Updated Child: {c_data['name']}")
+
+        # Ensure newly seeded global menus are granted to tenant ADMIN roles,
+        # so they become visible in Permission Mapping for admin delegation.
+        rm_added, rmp_added = rbac_service.sync_global_menus_to_tenant_admin_roles(db)
+        if rm_added or rmp_added:
+            print(
+                f"[SEED] Synced global menus to tenant ADMIN roles: "
+                f"role_menus +{rm_added}, role_menu_permissions +{rmp_added}"
+            )
 
         db.commit()
         print("[SEED] RBAC seeding completed successfully.")
