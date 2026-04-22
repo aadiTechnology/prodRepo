@@ -20,12 +20,13 @@ import { useRBAC } from "../../context/RBACContext";
 import { useFormManager } from "../../hooks/useFormManager";
 import leadService from "../../api/services/leadService";
 import enrollmentService, { type EnrollmentCreatePayload } from "../../api/services/enrollmentService";
-import studentService from "../../api/services/studentService";
+import studentService, { type StudentDetails } from "../../api/services/studentService";
 import academicYearService from "../../api/services/academicYearService";
 import schoolClassService, { type SchoolClass, type ClassDivision } from "../../api/services/schoolClassService";
 import feeDiscountService from "../../api/services/feeDiscountService";
 import apiClient from "../../api/client";
 import { createEnrollmentFormConfig, type EnrollmentFormData } from "./EnrollmentPage.formConfig";
+import StudentDetailsView from "./StudentDetailsView";
 
 interface LeadOption {
   id: number;
@@ -147,6 +148,7 @@ export default function EnrollmentPage() {
   const [feePlans, setFeePlans] = useState<FeePlanOption[]>([]);
   const [discounts, setDiscounts] = useState<DiscountOption[]>([]);
   const [studentViewMeta, setStudentViewMeta] = useState<StudentViewMeta>({});
+  const [studentRecord, setStudentRecord] = useState<StudentDetails | null>(null);
 
   // Document upload state
   const [uploadingBirthCert, setUploadingBirthCert] = useState(false);
@@ -282,6 +284,7 @@ export default function EnrollmentPage() {
     studentService
       .getStudentById(editStudentId)
       .then((student) => {
+        setStudentRecord(student);
         setStudentViewMeta({
           academic_year_name: student.academic_year_name,
           class_name: student.class_name || student.className,
@@ -976,6 +979,29 @@ export default function EnrollmentPage() {
     isEditMode,
     isStudentFlow,
   ]);
+
+  if (isViewMode) {
+    return (
+      <StudentDetailsView
+        formData={formData}
+        studentViewMeta={studentViewMeta}
+        selectedDiscountLabel={selectedDiscountLabel}
+        feePreview={feePreview}
+        loading={fetchLoading}
+        error={error}
+        studentId={editStudentId || undefined}
+        studentRecord={studentRecord}
+        onBack={() => navigate(-1)}
+        onEdit={() =>
+          navigate(
+            editStudentId
+              ? `/admissions/enrollment?studentId=${encodeURIComponent(editStudentId)}&mode=edit&source=students`
+              : "/admissions/enrollment?mode=edit&source=students"
+          )
+        }
+      />
+    );
+  }
 
   return (
     <>
