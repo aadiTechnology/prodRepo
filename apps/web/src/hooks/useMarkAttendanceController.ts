@@ -111,6 +111,64 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     return collected;
   }, []);
 
+  const getAssignmentDivisionIds = useCallback((assignment: TeacherAssignmentApiItem): number[] => {
+    const ids = [
+      ...(assignment.class_division_ids || []),
+      ...(assignment.class_division_id ? [assignment.class_division_id] : []),
+    ];
+    return Array.from(new Set(ids.filter((id): id is number => Boolean(id))));
+  }, []);
+
+  const buildTeacherFallbackMappings = useCallback(
+    (teacher: TeacherResponse, classList: SchoolClass[]): TeacherAssignmentApiItem[] => {
+      const rows = teacher.assignment_rows || [];
+      const mappingsFromRows: TeacherAssignmentApiItem[] = rows.flatMap((row, index) => {
+        if (!row.class_name || !row.division_names?.length) return [];
+        const matchedClass = classList.find((c) => c.name === row.class_name);
+        if (!matchedClass) return [];
+        const matchedDivisionIds = matchedClass.divisions
+          .filter((d) => row.division_names.includes(d.division_name))
+          .map((d) => d.id);
+        if (!matchedDivisionIds.length) return [];
+        return [
+          {
+            id: -(index + 1),
+            academic_year_id: matchedClass.academic_year_id ?? null,
+            class_id: matchedClass.id,
+            class_division_id: matchedDivisionIds[0],
+            class_division_ids: matchedDivisionIds,
+            class_name: matchedClass.name,
+            division_name: row.division_names.join(", "),
+            teacher_id: teacher.id,
+            teacher_name: teacher.full_name,
+            status: "ASSIGNED",
+          },
+        ];
+      });
+
+      const mappingsFromLegacyIds: TeacherAssignmentApiItem[] =
+        teacher.class_id && teacher.class_division_id
+          ? [
+              {
+                id: -9999,
+                academic_year_id: null,
+                class_id: teacher.class_id,
+                class_division_id: teacher.class_division_id,
+                class_division_ids: [teacher.class_division_id],
+                class_name: teacher.class_name || null,
+                division_name: teacher.division_name || null,
+                teacher_id: teacher.id,
+                teacher_name: teacher.full_name,
+                status: "ASSIGNED",
+              },
+            ]
+          : [];
+
+      return [...mappingsFromRows, ...mappingsFromLegacyIds];
+    },
+    []
+  );
+
   // Load initial metadata
   useEffect(() => {
     const loadInitialData = async () => {
@@ -119,7 +177,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
           academicYearService.getAll(),
           teacherService.list({ limit: 1000 }),
           schoolClassService.getAll(),
-          fetchAllTeacherAssignments(),
+          isTeacher ? Promise.resolve([]) : fetchAllTeacherAssignments(),
         ]);
 
         const years = yearsResult.status === "fulfilled" ? yearsResult.value : [];
@@ -157,12 +215,22 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
             );
           }
           if (myTeacher) {
-            setTeachers([myTeacher]); // only their own name
+            let teacherDetail = myTeacher;
+            try {
+              teacherDetail = await teacherService.getById(myTeacher.id);
+            } catch (detailError) {
+              console.warn("Failed to fetch teacher detail for assignment fallback", detailError);
+            }
+
+            setTeachers([teacherDetail]); // only their own name
+            if (assignmentList.length === 0) {
+              setAssignmentMappings(buildTeacherFallbackMappings(teacherDetail, classList));
+            }
             setFilters(prev => ({
               ...prev,
               academic_year_id: activeYear?.id ?? prev.academic_year_id,
-              teacher_id: myTeacher!.id,
-              class_id: myTeacher!.class_id || prev.class_id,
+              teacher_id: teacherDetail.id,
+              class_id: teacherDetail.class_id || prev.class_id,
             }));
           } else {
             setTeachers([]);
@@ -179,12 +247,18 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     };
     loadInitialData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTeacher, user?.id, user?.email, fetchAllTeacherAssignments]);
+  }, [isTeacher, user?.id, user?.email, fetchAllTeacherAssignments, buildTeacherFallbackMappings]);
 
   const teacherScopedMappings = useMemo(() => {
     if (!filters.teacher_id) return [];
-    return assignmentMappings.filter((a) => a.teacher_id === filters.teacher_id);
-  }, [assignmentMappings, filters.teacher_id]);
+    return assignmentMappings.filter(
+      (a) =>
+        a.teacher_id === filters.teacher_id &&
+        (!filters.academic_year_id ||
+          a.academic_year_id === filters.academic_year_id ||
+          a.academic_year_id === null)
+    );
+  }, [assignmentMappings, filters.teacher_id, filters.academic_year_id]);
 
   // Derived filtered classes
   const filteredClasses = useMemo(() => {
@@ -219,13 +293,27 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
       new Set(
         teacherScopedMappings
           .filter((a) => a.class_id === filters.class_id)
-          .map((a) => a.class_division_id)
-          .filter(Boolean)
+          .flatMap((a) => getAssignmentDivisionIds(a))
       )
     ) as number[];
 
     if (assignedDivisionIds.length > 0) {
       return allDivisions.filter(d => assignedDivisionIds.includes(d.id));
+    }
+
+    // Some assignment APIs return division name without IDs.
+    const assignedDivisionNames = Array.from(
+      new Set(
+        teacherScopedMappings
+          .filter((a) => a.class_id === filters.class_id)
+          .map((a) => a.division_name?.trim().toLowerCase())
+          .filter((name): name is string => Boolean(name))
+      )
+    );
+    if (assignedDivisionNames.length > 0) {
+      return allDivisions.filter((d) =>
+        assignedDivisionNames.includes(d.division_name.trim().toLowerCase())
+      );
     }
 
     // Fallback in case assignment API is unavailable.
@@ -237,7 +325,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     ) as number[];
     if (legacyDivisionIds.length === 0) return [];
     return allDivisions.filter(d => legacyDivisionIds.includes(d.id));
-  }, [classes, teachers, teacherScopedMappings, filters.teacher_id, filters.class_id]);
+  }, [classes, teachers, teacherScopedMappings, filters.teacher_id, filters.class_id, getAssignmentDivisionIds]);
 
   const lockClassFilter = isTeacher && filteredClasses.length === 1;
   const lockDivisionFilter = isTeacher && filteredDivisions.length === 1;
@@ -263,6 +351,8 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
       if (!isCurrentClassInFiltered) {
         setFilters(prev => ({ ...prev, class_id: filteredClasses[0].id }));
       }
+    } else if (!filters.class_id && filteredClasses.length > 0) {
+      setFilters(prev => ({ ...prev, class_id: filteredClasses[0].id }));
     } else if (filteredClasses.length === 0 && filters.class_id !== 0) {
       setFilters(prev => ({ ...prev, class_id: 0 }));
     }
