@@ -76,6 +76,7 @@ def seed_rbac_data():
             {
                 "name": "Fees", "level": 1, "icon": "feesIcon", "sort_order": 4,
                 "children": [
+                    {"name": "Invoice List", "path": "/fees/invoices", "feature": "FEE_MGMT"},
                     {"name": "Fee Collection", "path": "/fees/collection", "feature": "FEE_MGMT"},
                     {"name": "Fee Category", "path": "/fees/categories", "feature": "FEE_MGMT"},
                     {"name": "Fee Structure", "path": "/fees/setup", "feature": "FEE_MGMT"},
@@ -149,7 +150,8 @@ def seed_rbac_data():
                         print(f"[SEED] Created Child: {c_data['name']} under {p_data['name']}")
                     else:
                         child.path = c_data["path"]
-                        child.feature_id = fid
+                        if fid is not None:
+                            child.feature_id = fid
                         print(f"[SEED] Updated Child: {c_data['name']}")
 
         # Ensure newly seeded global menus are granted to tenant ADMIN roles,
