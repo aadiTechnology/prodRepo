@@ -5,6 +5,7 @@ from datetime import date
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.models.student_invoice import StudentInvoice
 
 def list_invoices(
     db: Session,
@@ -142,36 +143,22 @@ def insert_invoice(
     due_date: date,
     status: str,
 ) -> int:
-    sql = text(
-        """
-        INSERT INTO student_invoices (
-            tenant_id, student_id, academic_year_id, class_id, fee_structure_id,
-            invoice_no, total_amount, paid_amount, due_amount, due_date, status, created_at
-        )
-        VALUES (
-            :tenant_id, :student_id, :academic_year_id, :class_id, :fee_structure_id,
-            :invoice_no, :total_amount, :paid_amount, :due_amount, :due_date, :status, GETUTCDATE()
-        );
-        SELECT CAST(SCOPE_IDENTITY() AS INT) AS id;
-        """
+    entity = StudentInvoice(
+        tenant_id=tenant_id,
+        student_id=student_id,
+        academic_year_id=academic_year_id,
+        class_id=class_id,
+        fee_structure_id=fee_structure_id,
+        invoice_no=invoice_no,
+        total_amount=total_amount,
+        paid_amount=paid_amount,
+        due_amount=due_amount,
+        due_date=due_date,
+        status=status,
     )
-    row = db.execute(
-        sql,
-        {
-            "tenant_id": tenant_id,
-            "student_id": student_id,
-            "academic_year_id": academic_year_id,
-            "class_id": class_id,
-            "fee_structure_id": fee_structure_id,
-            "invoice_no": invoice_no,
-            "total_amount": total_amount,
-            "paid_amount": paid_amount,
-            "due_amount": due_amount,
-            "due_date": due_date,
-            "status": status,
-        },
-    ).first()
-    return int(row[0])
+    db.add(entity)
+    db.flush()
+    return int(entity.id)
 
 
 def update_invoice(
