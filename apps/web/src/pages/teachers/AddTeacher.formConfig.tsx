@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import DeleteIcon from "@mui/icons-material/Delete";
+import PersonIcon from "@mui/icons-material/Person";
+import { Tooltip } from "@mui/material";
 import type { FormConfig, FormLayoutContext } from "../../components/reusable/formFramework.types";
-import { MediaUploadField, type MediaUploadSlotItem, type SelectItemOption } from "../../components/semantic";
+import { type MediaUploadSlotItem, type SelectItemOption } from "../../components/semantic";
+import { Box, IconButton } from "../../components/primitives";
 
 export type AddTeacherFormData = {
   full_name: string;
@@ -184,21 +190,134 @@ export function addTeacherFormConfig({
         kind: "custom",
         grid: { xs: 12, sm: 2 },
         show: () => true,
-        render: (ctx) => (
-          <MediaUploadField
-            label="Profile Image"
-            items={uploadItems}
-            onAddFiles={handleAddMediaFiles}
-            onRemoveItem={handleRemoveMediaItem}
-            accept="image/*"
-            multiple={false}
-            maxFiles={1}
-            size="small"
-            tooltipChoose="Upload"
-            tooltipAdd="Change"
-            tooltip="Upload Teacher Photo"
-          />
-        ),
+        render: () => {
+          const selectedItem = uploadItems[0];
+          return (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "flex-start",
+                width: "100%",
+                minHeight: 68,
+                pt: 0,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 68,
+                  height: 68,
+                  borderRadius: "50%",
+                  border: "1px solid",
+                  borderColor: "grey.300",
+                  bgcolor: "background.paper",
+                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: 1,
+                  flexShrink: 0,
+                  position: "relative",
+                }}
+              >
+                {selectedItem?.previewUrl ? (
+                  <Tooltip title="View photo" arrow>
+                    <Box
+                      component="button"
+                      type="button"
+                      onClick={() => window.open(selectedItem.previewUrl, "_blank", "noopener,noreferrer")}
+                      sx={{
+                        p: 0,
+                        m: 0,
+                        width: 68,
+                        height: 68,
+                        border: "none",
+                        borderRadius: "50%",
+                        overflow: "hidden",
+                        bgcolor: "transparent",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Box
+                        component="img"
+                        src={selectedItem.previewUrl}
+                        alt="Teacher profile"
+                        sx={{ width: 68, height: 68, objectFit: "cover", display: "block" }}
+                      />
+                    </Box>
+                  </Tooltip>
+                ) : (
+                  <PersonIcon sx={{ fontSize: 30, color: "text.disabled" }} />
+                )}
+
+                <Tooltip title={selectedItem ? "Change photo" : "Upload photo"} arrow>
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      const input = document.getElementById("teacher-photo-upload") as HTMLInputElement | null;
+                      input?.click();
+                    }}
+                    sx={{
+                      position: "absolute",
+                      right: 2,
+                      bottom: 2,
+                      width: 18,
+                      height: 18,
+                      minWidth: 18,
+                      bgcolor: "primary.main",
+                      color: "common.white",
+                      border: "1px solid",
+                      borderColor: "common.white",
+                      "&:hover": { bgcolor: "primary.dark" },
+                    }}
+                    aria-label="Upload teacher photo"
+                  >
+                    <PhotoCameraIcon sx={{ fontSize: 10 }} />
+                  </IconButton>
+                </Tooltip>
+
+                {selectedItem ? (
+                  <Tooltip title="Remove photo" arrow>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleRemoveMediaItem(selectedItem.id)}
+                      sx={{
+                        position: "absolute",
+                        left: 2,
+                        top: 2,
+                        width: 18,
+                        height: 18,
+                        minWidth: 18,
+                        bgcolor: "error.main",
+                        color: "common.white",
+                        border: "1px solid",
+                        borderColor: "common.white",
+                        "&:hover": { bgcolor: "error.dark" },
+                      }}
+                      aria-label="Remove teacher photo"
+                    >
+                      <DeleteIcon sx={{ fontSize: 10 }} />
+                    </IconButton>
+                  </Tooltip>
+                ) : null}
+              </Box>
+
+              <input
+                id="teacher-photo-upload"
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(event) => {
+                  const { files } = event.target;
+                  if (files?.length) void handleAddMediaFiles(files);
+                  event.target.value = "";
+                }}
+              />
+
+            </Box>
+          );
+        },
       },
       {
         kind: "fields",
