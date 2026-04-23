@@ -63,14 +63,16 @@ export default function AssignTeacher() {
       formTopSlot={
         <Box sx={{ px: 1, py: 0.5, display: "flex", flexDirection: "column", gap: 0.5 }}>
           {hasAssignedLegend ? (
-            <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.88rem" }}>
+            <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.83rem" }}>
+              <Box component="span" sx={{ fontWeight: 700, color: "text.primary" }}>
+                Legend:
+              </Box>{" "}
               <Box component="span" sx={{ color: "#29b6f6", fontWeight: 700 }}>
                 ●
               </Box>{" "}
               <Box component="span" sx={{ color: "#29b6f6", fontWeight: 700 }}>
-                Sky blue options
-              </Box>{" "}
-              indicate already assigned class/division.
+                Already Assigned class/ division
+              </Box>
             </Typography>
           ) : null}
           {canShowAssignmentHint && assignmentCheck?.is_assigned ? (
