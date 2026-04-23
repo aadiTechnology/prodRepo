@@ -46,6 +46,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
   confirmMessage,
   submitLabelCreate = "Save",
   submitLabelEdit = "Save",
+  headerRightBelowSlot,
   formTopSlot,
   canSubmit = true,
   hideFooterActions = false,
@@ -126,6 +127,11 @@ export default function BaseForm<T extends Record<string, unknown>>({
                 </Box>
               }
             />
+            {headerRightBelowSlot ? (
+              <Box sx={{ mt: 1, display: "flex", justifyContent: "flex-end" }}>
+                {headerRightBelowSlot}
+              </Box>
+            ) : null}
             {error && (
               <Alert
                 severity="error"

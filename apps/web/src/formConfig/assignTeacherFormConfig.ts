@@ -103,17 +103,17 @@ export function assignTeacherFormConfig({
       {
         kind: "fields",
         grid: { xs: 12, md: 6 },
+        fieldNames: ["teacher_id"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, md: 6 },
         fieldNames: ["class_id"],
       },
       {
         kind: "fields",
         grid: { xs: 12, md: 6 },
         fieldNames: ["class_division_ids"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["teacher_id"],
       },
     ],
   };

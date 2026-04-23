@@ -18,7 +18,6 @@ export default function AssignTeacher() {
     canShowAssignmentHint,
     handleConfirmSubmit,
     assignTeacherPending,
-    hasAssignedLegend,
     isEditMode,
     error,
     setError,
@@ -60,21 +59,32 @@ export default function AssignTeacher() {
           : "Are you sure you want to assign this teacher?"
       }
       submitLabelCreate={isEditMode ? "Update" : "Save"}
+      headerRightBelowSlot={
+        <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.83rem" }}>
+          <Box component="span" sx={{ fontWeight: 700, color: "text.primary" }}>
+            Legend:
+          </Box>{" "}
+          <Box
+            component="span"
+            sx={{
+              display: "inline-block",
+              width: 20,
+              height: 20,
+              bgcolor: "#d6f0ff",
+              border: "1px solid #d6f0ff",
+              verticalAlign: "middle",
+              mr: 0.5,
+            }}
+          >
+            {" "}
+          </Box>{" "}
+          <Box component="span" sx={{ color: "text.primary", fontWeight: 400 }}>
+            Already Assigned class/ division
+          </Box>
+        </Typography>
+      }
       formTopSlot={
         <Box sx={{ px: 1, py: 0.5, display: "flex", flexDirection: "column", gap: 0.5 }}>
-          {hasAssignedLegend ? (
-            <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.83rem" }}>
-              <Box component="span" sx={{ fontWeight: 700, color: "text.primary" }}>
-                Legend:
-              </Box>{" "}
-              <Box component="span" sx={{ color: "#29b6f6", fontWeight: 700 }}>
-                ●
-              </Box>{" "}
-              <Box component="span" sx={{ color: "#29b6f6", fontWeight: 700 }}>
-                Already Assigned class/ division
-              </Box>
-            </Typography>
-          ) : null}
           {canShowAssignmentHint && assignmentCheck?.is_assigned ? (
             <Typography
               variant="body2"

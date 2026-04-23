@@ -7,6 +7,7 @@ export type SelectItemOption = {
   label: string;
   textColor?: string;
   fontWeight?: number;
+  backgroundColor?: string;
 };
 
 export interface SelectItemProps extends Omit<SelectProps, "children" | "label" | "name" | "onChange"> {
@@ -91,6 +92,7 @@ export default function SelectItem({
               sx={{
                 color: option.textColor,
                 fontWeight: option.fontWeight,
+                backgroundColor: option.backgroundColor,
               }}
             >
               {option.label}

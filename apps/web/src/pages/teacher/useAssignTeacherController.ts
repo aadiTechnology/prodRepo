@@ -356,8 +356,9 @@ export function useAssignTeacherController() {
           assignedMap?.class_ids?.includes(item.id)
             ? `${item.name} (Already assigned)`
             : item.name,
-        textColor: assignedMap?.class_ids?.includes(item.id) ? "#29b6f6" : undefined,
-        fontWeight: assignedMap?.class_ids?.includes(item.id) ? 700 : undefined,
+        textColor: undefined,
+        fontWeight: undefined,
+        backgroundColor: assignedMap?.class_ids?.includes(item.id) ? "#d6f0ff" : undefined,
       })),
     [classes, assignedMap?.class_ids]
   );
@@ -371,8 +372,9 @@ export function useAssignTeacherController() {
           assignedMap?.class_division_ids?.includes(item.id)
             ? `${item.division_name} (Already assigned)`
             : item.division_name,
-        textColor: assignedMap?.class_division_ids?.includes(item.id) ? "#29b6f6" : undefined,
-        fontWeight: assignedMap?.class_division_ids?.includes(item.id) ? 700 : undefined,
+        textColor: undefined,
+        fontWeight: undefined,
+        backgroundColor: assignedMap?.class_division_ids?.includes(item.id) ? "#d6f0ff" : undefined,
       })),
     [divisions, assignedMap?.class_division_ids]
   );
@@ -400,7 +402,7 @@ export function useAssignTeacherController() {
         teachersLoading,
         disableClass: !formData.academic_year_id,
         disableDivision: !formData.class_id,
-        disableTeacher: (formData.class_division_ids?.length || 0) === 0,
+        disableTeacher: !formData.academic_year_id,
       }),
     [
       academicYearOptions,
