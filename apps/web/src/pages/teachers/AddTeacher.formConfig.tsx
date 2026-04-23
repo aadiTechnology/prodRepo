@@ -24,6 +24,7 @@ type AddTeacherFormConfigFactoryArgs = {
   isEditMode: boolean;
   classOptions: SelectItemOption[];
   divisionOptions: SelectItemOption[];
+  disableAssignmentFields?: boolean;
   classesLoading: boolean;
   divisionsLoading: boolean;
   uploadItems: MediaUploadSlotItem[];
@@ -44,6 +45,7 @@ export function addTeacherFormConfig({
   isEditMode,
   classOptions,
   divisionOptions,
+  disableAssignmentFields = false,
   classesLoading,
   divisionsLoading,
   uploadItems,
@@ -122,6 +124,7 @@ export function addTeacherFormConfig({
           options: classOptions,
           loading: classesLoading,
           emptyListLabel: "No classes available",
+          disabled: disableAssignmentFields,
         }
       },
       class_division_id: {
@@ -133,7 +136,7 @@ export function addTeacherFormConfig({
           options: divisionOptions,
           loading: divisionsLoading,
           emptyListLabel: "No divisions available",
-          disabled: divisionOptions.length === 0,
+          disabled: disableAssignmentFields || divisionOptions.length === 0,
         }
       },
       

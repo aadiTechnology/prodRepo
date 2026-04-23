@@ -6,13 +6,16 @@ import SchoolIcon from "@mui/icons-material/School";
 import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
 import HomeIcon from "@mui/icons-material/Home";
 
-import teacherService, { type TeacherCreate, type TeacherUpdate } from "../../api/services/teacherService";
+import teacherService, { type TeacherCreate, type TeacherResponse, type TeacherUpdate } from "../../api/services/teacherService";
 import schoolClassService, { type SchoolClass } from "../../api/services/schoolClassService";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
 import { useFormManager } from "../../hooks/useFormManager";
 import BaseForm from "../../components/reusable/BaseForm";
 import type { SelectItemOption, MediaUploadSlotItem } from "../../components/semantic";
 import { addTeacherFormConfig, type AddTeacherFormData } from "./AddTeacher.formConfig";
+
+const MULTI_ASSIGNED_CLASS_VALUE = "__multi_assigned_class__";
+const MULTI_ASSIGNED_DIVISION_VALUE = "__multi_assigned_division__";
 
 const emptyForm = (): AddTeacherFormData => ({
   full_name: "",
@@ -45,6 +48,7 @@ export default function AddTeacher() {
   // Dropdown states
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [classesLoading, setClassesLoading] = useState(false);
+  const [loadedTeacher, setLoadedTeacher] = useState<TeacherResponse | null>(null);
   
   // Media states
   const [uploadItems, setUploadItems] = useState<MediaUploadSlotItem[]>([]);
@@ -100,6 +104,7 @@ export default function AddTeacher() {
     if (!id) return;
     try {
       const teacher = await teacherService.getById(Number(id));
+      setLoadedTeacher(teacher);
       setFormData({
         full_name: teacher.full_name,
         date_of_birth: teacher.date_of_birth || null,
@@ -129,6 +134,67 @@ export default function AddTeacher() {
     }
   }, [id, setFormData]);
 
+  const assignmentSummaryRows = useMemo(() => {
+    if (!loadedTeacher?.assignment_rows || loadedTeacher.assignment_rows.length === 0) return [];
+    return loadedTeacher.assignment_rows.filter((row) => !!row.class_name);
+  }, [loadedTeacher]);
+
+  const hasMultipleAssignments = isEditMode && assignmentSummaryRows.length > 1;
+
+  useEffect(() => {
+    if (!isEditMode || !loadedTeacher || classesLoading || classes.length === 0) return;
+    if (formData.class_id) return;
+
+    const normalize = (value?: string | null) => value?.trim().toLowerCase();
+    const resolveByNames = (className?: string | null, divisionName?: string | null) => {
+      const normalizedClass = normalize(className);
+      if (!normalizedClass) return null;
+
+      const matchedClass = classes.find((c: SchoolClass) => normalize(c.name) === normalizedClass);
+      if (!matchedClass) return null;
+
+      const normalizedDivision = normalize(divisionName);
+      const matchedDivision = normalizedDivision
+        ? matchedClass.divisions?.find((d: any) => normalize(d.division_name) === normalizedDivision)
+        : undefined;
+
+      return {
+        class_id: String(matchedClass.id),
+        class_division_id: matchedDivision ? String(matchedDivision.id) : null,
+      };
+    };
+
+    if (hasMultipleAssignments) {
+      setFormData((prev) => ({
+        ...prev,
+        class_id: prev.class_id || MULTI_ASSIGNED_CLASS_VALUE,
+        class_division_id: prev.class_division_id || MULTI_ASSIGNED_DIVISION_VALUE,
+      }));
+      return;
+    }
+
+    const singleAssignmentRow = assignmentSummaryRows.length === 1 ? assignmentSummaryRows[0] : null;
+    const hasSingleDivisionInSingleRow =
+      !!singleAssignmentRow && (singleAssignmentRow.division_names?.length || 0) === 1;
+    const resolvedFromAssignmentRow =
+      singleAssignmentRow && hasSingleDivisionInSingleRow
+        ? resolveByNames(
+            singleAssignmentRow.class_name,
+            singleAssignmentRow.division_names?.[0] || null
+          )
+        : null;
+    const resolvedFromTeacherFields = resolveByNames(loadedTeacher.class_name, loadedTeacher.division_name);
+    const resolved = resolvedFromAssignmentRow || resolvedFromTeacherFields;
+
+    if (!resolved) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      class_id: prev.class_id || resolved.class_id,
+      class_division_id: prev.class_division_id || resolved.class_division_id,
+    }));
+  }, [isEditMode, loadedTeacher, classesLoading, classes, formData.class_id, setFormData, assignmentSummaryRows, hasMultipleAssignments]);
+
   useEffect(() => {
     loadClasses();
     if (isEditMode) {
@@ -138,14 +204,42 @@ export default function AddTeacher() {
 
   // Derive dropdown options
   const classOptions: SelectItemOption[] = useMemo(() => {
-    return classes.map((c: SchoolClass) => ({
+    const baseOptions = classes.map((c: SchoolClass) => ({
       id: String(c.id),
       value: String(c.id),
       label: c.name
     }));
-  }, [classes]);
+    if (!hasMultipleAssignments) return baseOptions;
+    const classLabels = assignmentSummaryRows
+      .map((row) => row.class_name?.trim())
+      .filter((name): name is string => !!name);
+    return [
+      {
+        id: MULTI_ASSIGNED_CLASS_VALUE,
+        value: MULTI_ASSIGNED_CLASS_VALUE,
+        label: classLabels.join(", "),
+      },
+      ...baseOptions,
+    ];
+  }, [classes, hasMultipleAssignments, assignmentSummaryRows]);
 
   const divisionOptions: SelectItemOption[] = useMemo(() => {
+    if (hasMultipleAssignments) {
+      const divisionLabel = assignmentSummaryRows
+        .map((row) => {
+          const className = row.class_name || "N/A";
+          const divisions = row.division_names?.length ? row.division_names.join(", ") : "N/A";
+          return `${className}: ${divisions}`;
+        })
+        .join(" | ");
+      return [
+        {
+          id: MULTI_ASSIGNED_DIVISION_VALUE,
+          value: MULTI_ASSIGNED_DIVISION_VALUE,
+          label: divisionLabel,
+        },
+      ];
+    }
     if (!formData.class_id) return [];
     const selectedClass = classes.find((c: SchoolClass) => String(c.id) === formData.class_id);
     if (!selectedClass || !selectedClass.divisions) return [];
@@ -154,7 +248,7 @@ export default function AddTeacher() {
       value: String(d.id),
       label: d.division_name
     }));
-  }, [classes, formData.class_id]);
+  }, [classes, formData.class_id, hasMultipleAssignments, assignmentSummaryRows]);
 
   // When class changes, reset division
   useEffect(() => {
@@ -192,6 +286,7 @@ export default function AddTeacher() {
         isEditMode,
         classOptions,
         divisionOptions,
+        disableAssignmentFields: isEditMode,
         classesLoading,
         divisionsLoading: false, // Divs load with classes
         uploadItems,
@@ -214,6 +309,13 @@ export default function AddTeacher() {
     setLoading(true);
     setError(null);
     try {
+      const parseNumericSelect = (value: string | null) => {
+        if (!value) return null;
+        return /^[0-9]+$/.test(value) ? Number(value) : null;
+      };
+      const parsedClassId = parseNumericSelect(values.class_id);
+      const parsedDivisionId = parseNumericSelect(values.class_division_id);
+
       const payload: TeacherCreate | TeacherUpdate = {
         full_name: values.full_name,
         date_of_birth: values.date_of_birth,
@@ -222,8 +324,8 @@ export default function AddTeacher() {
         email: values.email,
         qualification: values.qualification,
         experience_years: values.experience_years ? Number(values.experience_years) : null,
-        class_id: values.class_id ? Number(values.class_id) : null,
-        class_division_id: values.class_division_id ? Number(values.class_division_id) : null,
+        class_id: parsedClassId,
+        class_division_id: parsedDivisionId,
         photo_url: values.photo_url || null,
         is_active: values.is_active,
         address: values.address,
@@ -233,6 +335,12 @@ export default function AddTeacher() {
       };
 
       if (isEditMode && id) {
+        if (hasMultipleAssignments && (payload as TeacherUpdate).class_id === null) {
+          delete (payload as TeacherUpdate).class_id;
+        }
+        if (hasMultipleAssignments && (payload as TeacherUpdate).class_division_id === null) {
+          delete (payload as TeacherUpdate).class_division_id;
+        }
         await teacherService.update(Number(id), payload as TeacherUpdate);
         setSnackbar("Teacher updated successfully");
         setTimeout(() => navigate("/teachers"), 1000);
