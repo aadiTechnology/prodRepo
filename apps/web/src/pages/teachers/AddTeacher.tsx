@@ -283,7 +283,6 @@ export default function AddTeacher() {
   const formConfig = useMemo(
     () =>
       addTeacherFormConfig({
-        isEditMode,
         classOptions,
         divisionOptions,
         disableAssignmentFields: isEditMode,

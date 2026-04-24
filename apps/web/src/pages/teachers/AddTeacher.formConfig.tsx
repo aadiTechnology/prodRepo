@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
-import VisibilityIcon from "@mui/icons-material/Visibility";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PersonIcon from "@mui/icons-material/Person";
 import { Tooltip } from "@mui/material";
-import type { FormConfig, FormLayoutContext } from "../../components/reusable/formFramework.types";
+import type { FormConfig } from "../../components/reusable/formFramework.types";
 import { type MediaUploadSlotItem, type SelectItemOption } from "../../components/semantic";
 import { Box, IconButton } from "../../components/primitives";
 
@@ -27,7 +26,6 @@ export type AddTeacherFormData = {
 };
 
 type AddTeacherFormConfigFactoryArgs = {
-  isEditMode: boolean;
   classOptions: SelectItemOption[];
   divisionOptions: SelectItemOption[];
   disableAssignmentFields?: boolean;
@@ -48,7 +46,6 @@ type AddTeacherFormConfigFactoryArgs = {
 
 
 export function addTeacherFormConfig({
-  isEditMode,
   classOptions,
   divisionOptions,
   disableAssignmentFields = false,
@@ -150,7 +147,6 @@ export function addTeacherFormConfig({
         name: "is_active",
         label: "Is Active",
         type: "switch",
-        conditionalRender: () => isEditMode,
       },
 
       // Address Details
@@ -188,7 +184,7 @@ export function addTeacherFormConfig({
       },
       {
         kind: "custom",
-        grid: { xs: 12, sm: 2 },
+        grid: { xs: 12, sm: 2, md: 2 },
         show: () => true,
         render: () => {
           const selectedItem = uploadItems[0];
@@ -200,23 +196,23 @@ export function addTeacherFormConfig({
                 alignItems: "center",
                 justifyContent: "flex-start",
                 width: "100%",
-                minHeight: 68,
+                minHeight: { xs: 76, sm: 76 },
                 pt: 0,
               }}
             >
               <Box
                 sx={{
-                  width: 68,
-                  height: 68,
+                  width: { xs: 76, sm: 72, md: 76 },
+                  height: { xs: 76, sm: 72, md: 76 },
                   borderRadius: "50%",
-                  border: "1px solid",
-                  borderColor: "grey.300",
+                  border: "2px solid",
+                  borderColor: "grey.200",
                   bgcolor: "background.paper",
                   overflow: "hidden",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: 1,
+                  boxShadow: "0 4px 10px rgba(0,0,0,0.08)",
                   flexShrink: 0,
                   position: "relative",
                 }}
@@ -230,8 +226,8 @@ export function addTeacherFormConfig({
                       sx={{
                         p: 0,
                         m: 0,
-                        width: 68,
-                        height: 68,
+                        width: "100%",
+                        height: "100%",
                         border: "none",
                         borderRadius: "50%",
                         overflow: "hidden",
@@ -243,64 +239,73 @@ export function addTeacherFormConfig({
                         component="img"
                         src={selectedItem.previewUrl}
                         alt="Teacher profile"
-                        sx={{ width: 68, height: 68, objectFit: "cover", display: "block" }}
+                        sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                       />
                     </Box>
                   </Tooltip>
                 ) : (
-                  <PersonIcon sx={{ fontSize: 30, color: "text.disabled" }} />
+                  <PersonIcon sx={{ fontSize: 34, color: "text.disabled" }} />
                 )}
 
-                <Tooltip title={selectedItem ? "Change photo" : "Upload photo"} arrow>
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      const input = document.getElementById("teacher-photo-upload") as HTMLInputElement | null;
-                      input?.click();
-                    }}
-                    sx={{
-                      position: "absolute",
-                      right: 2,
-                      bottom: 2,
-                      width: 18,
-                      height: 18,
-                      minWidth: 18,
-                      bgcolor: "primary.main",
-                      color: "common.white",
-                      border: "1px solid",
-                      borderColor: "common.white",
-                      "&:hover": { bgcolor: "primary.dark" },
-                    }}
-                    aria-label="Upload teacher photo"
-                  >
-                    <PhotoCameraIcon sx={{ fontSize: 10 }} />
-                  </IconButton>
-                </Tooltip>
-
-                {selectedItem ? (
-                  <Tooltip title="Remove photo" arrow>
+                <Box
+                  sx={{
+                    position: "absolute",
+                    bottom: 2,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.5,
+                    px: 0.5,
+                    py: 0.25,
+                    borderRadius: 999,
+                    bgcolor: "rgba(255,255,255,0.9)",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.16)",
+                  }}
+                >
+                  <Tooltip title={selectedItem ? "Change photo" : "Upload photo"} arrow>
                     <IconButton
                       size="small"
-                      onClick={() => handleRemoveMediaItem(selectedItem.id)}
-                      sx={{
-                        position: "absolute",
-                        left: 2,
-                        top: 2,
-                        width: 18,
-                        height: 18,
-                        minWidth: 18,
-                        bgcolor: "error.main",
-                        color: "common.white",
-                        border: "1px solid",
-                        borderColor: "common.white",
-                        "&:hover": { bgcolor: "error.dark" },
+                      onClick={() => {
+                        const input = document.getElementById("teacher-photo-upload") as HTMLInputElement | null;
+                        input?.click();
                       }}
-                      aria-label="Remove teacher photo"
+                      sx={{
+                        width: 20,
+                        height: 20,
+                        border: "1px solid",
+                        borderColor: "primary.main",
+                        color: "primary.main",
+                        bgcolor: "background.paper",
+                        "&:hover": { bgcolor: "action.hover" },
+                      }}
+                      aria-label="Upload teacher photo"
                     >
-                      <DeleteIcon sx={{ fontSize: 10 }} />
+                      <PhotoCameraIcon sx={{ fontSize: 12 }} />
                     </IconButton>
                   </Tooltip>
-                ) : null}
+
+                  {selectedItem ? (
+                    <Tooltip title="Remove photo" arrow>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleRemoveMediaItem(selectedItem.id)}
+                        sx={{
+                          width: 20,
+                          height: 20,
+                          border: "1px solid",
+                          borderColor: "error.main",
+                          color: "error.main",
+                          bgcolor: "background.paper",
+                          "&:hover": { bgcolor: "action.hover" },
+                        }}
+                        aria-label="Remove teacher photo"
+                      >
+                        <DeleteIcon sx={{ fontSize: 12 }} />
+                      </IconButton>
+                    </Tooltip>
+                  ) : null}
+                </Box>
               </Box>
 
               <input
@@ -321,12 +326,12 @@ export function addTeacherFormConfig({
       },
       {
         kind: "fields",
-        grid: { xs: 12, sm: 7 },
+        grid: { xs: 12, sm: 7, md: 7 },
         fieldNames: ["full_name"],
       },
       {
         kind: "fields",
-        grid: { xs: 12, sm: 3 },
+        grid: { xs: 12, sm: 3, md: 3 },
         fieldNames: ["gender"],
       },
 
@@ -376,7 +381,6 @@ export function addTeacherFormConfig({
         kind: "fields",
         grid: { xs: 12, sm: 4 },
         fieldNames: ["is_active"],
-        show: (c: FormLayoutContext) => c.isEditMode,
       },
 
       {
