@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.fee import FeeStructure
@@ -10,18 +11,30 @@ def list_fee_structures(
     academicYear: int = Query(..., alias="academicYear"),
     classId: int = Query(..., alias="classId"),
     tenantId: int = Query(..., alias="tenantId"),
+    classDivisionId: int | None = Query(None, alias="classDivisionId"),
     db: Session = Depends(get_db)
 ):
-    fee_structures = (
-        db.query(FeeStructure)
-        .filter(
-            FeeStructure.academic_year_id == academicYear,
-            FeeStructure.class_id == classId,
-            FeeStructure.tenant_id == tenantId,
-            FeeStructure.is_active == True
-        )
-        .all()
+    query = db.query(FeeStructure).filter(
+        FeeStructure.academic_year_id == academicYear,
+        FeeStructure.class_id == classId,
+        FeeStructure.tenant_id == tenantId,
+        FeeStructure.is_active == True
     )
+
+    # Division rule:
+    # - if division selected: include generic (no division) + selected division
+    # - if no division selected: include only generic (no division)
+    if classDivisionId is None:
+        query = query.filter(FeeStructure.class_division_id.is_(None))
+    else:
+        query = query.filter(
+            or_(
+                FeeStructure.class_division_id.is_(None),
+                FeeStructure.class_division_id == classDivisionId
+            )
+        )
+
+    fee_structures = query.all()
     result = []
     for f in fee_structures:
         # Always use fee structure name if present, otherwise fallback to 'Fee Structure #{id}'

@@ -135,6 +135,10 @@ const FeeStructureForm = () => {
   // Reset category selection if selected categories belong to a different class
   useEffect(() => {
     const ids = formData.fee_category_ids as string[];
+    if (!categories.length) {
+      return;
+    }
+
     if (ids && ids.length > 0 && formData.class_id) {
       const allMatch = ids.every(id => {
         const cat = categories.find(c => String(c.id) === String(id));
@@ -187,18 +191,21 @@ const FeeStructureForm = () => {
       setFetchLoading(true);
       const found = await feeService.getFeeStructure(Number(id));
       if (found) {
+        const normalizedCategoryIds =
+          found.fee_category_ids && found.fee_category_ids.length > 0
+            ? found.fee_category_ids.map((categoryId) => String(categoryId))
+            : found.fee_category_id
+              ? [String(found.fee_category_id)]
+              : [];
+
         setFormData({
           name: found.name || "",
-          academic_year_id: found.academic_year_id,
-          class_id: found.class_id,
+          academic_year_id: found.academic_year_id || "",
+          class_id: found.class_id || "",
           class_division_id: found.class_division_id || "",
-          // Support both legacy single id and new array
-          fee_category_ids: found.fee_category_ids && found.fee_category_ids.length > 0
-            ? found.fee_category_ids
-            : found.fee_category_id
-            ? [String(found.fee_category_id)]
-            : [],
-          total_amount: found.total_amount,
+          // Support both legacy single id and new array while keeping ids as strings for Select.
+          fee_category_ids: normalizedCategoryIds,
+          total_amount: found.total_amount || "",
           installment_type: found.installment_type as any,
           num_installments: found.num_installments,
           description: found.description || "",

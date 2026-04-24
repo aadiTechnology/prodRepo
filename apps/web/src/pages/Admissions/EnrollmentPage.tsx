@@ -368,6 +368,7 @@ export default function EnrollmentPage() {
           academicYear: Number(formData.academic_year_id),
           classId: Number(formData.class_id),
           tenantId: Number(tenantId),
+          classDivisionId: formData.class_division_id ? Number(formData.class_division_id) : undefined,
         },
       })
       .then((res) => {
@@ -381,7 +382,7 @@ export default function EnrollmentPage() {
         );
       })
       .catch(() => setFeePlans([]));
-  }, [formData.academic_year_id, formData.class_id, tenantId]);
+  }, [formData.academic_year_id, formData.class_id, formData.class_division_id, tenantId]);
 
   // Document upload handler
   const uploadDocument = async (
