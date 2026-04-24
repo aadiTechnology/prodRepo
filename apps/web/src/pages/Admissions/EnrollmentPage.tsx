@@ -76,6 +76,8 @@ const viewModeFieldSx = {
   },
 } as const;
 
+const sectionTitleSx = { mt: 1.25 } as const;
+
 const emptyForm = (): EnrollmentFormData => ({
   student_name: "",
   date_of_birth: "",
@@ -797,7 +799,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(studentNameIdx, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: (ctx) => <FormSectionLabel title="Student Information" icon={<ChildCareIcon />} sx={{ mt: 2 }} />,
+        render: (ctx) => <FormSectionLabel title="Student Information" icon={<ChildCareIcon />} sx={sectionTitleSx} />,
       });
     }
 
@@ -809,7 +811,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(admissionNoIdx, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: (ctx) => <FormSectionLabel title="Admission Details" icon={<AssignmentIcon />} sx={{ mt: 2 }} />,
+        render: (ctx) => <FormSectionLabel title="Admission Details" icon={<AssignmentIcon />} sx={sectionTitleSx} />,
       });
     }
 
@@ -821,7 +823,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(classIdIdx, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: (ctx) => <FormSectionLabel title="Class Allocation" icon={<ClassIcon />} sx={{ mt: 2 }} />,
+        render: (ctx) => <FormSectionLabel title="Class Allocation" icon={<ClassIcon />} sx={sectionTitleSx} />,
       });
     }
 
@@ -833,7 +835,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(parentNameIdx, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: (ctx) => <FormSectionLabel title="Parent Details" icon={<Groups2Icon />} sx={{ mt: 2 }} />,
+        render: (ctx) => <FormSectionLabel title="Parent Details" icon={<Groups2Icon />} sx={sectionTitleSx} />,
       });
     }
 
@@ -845,7 +847,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(feeStructureIdx, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: (ctx) => <FormSectionLabel title="Fee Details" icon={<PaymentsIcon />} sx={{ mt: 2 }} />,
+        render: (ctx) => <FormSectionLabel title="Fee Details" icon={<PaymentsIcon />} sx={sectionTitleSx} />,
       });
     }
 
@@ -858,19 +860,45 @@ export default function EnrollmentPage() {
         kind: "custom" as const,
         grid: { xs: 12 },
         render: (ctx) => (
-          <Box sx={{ bgcolor: "grey.50", border: "1px dashed", borderColor: "grey.300", borderRadius: 2, p: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              Discount: <strong>{selectedDiscountLabel}</strong>
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Total: Rs. {feePreview.total.toFixed(2)}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Discount: Rs. {feePreview.discountAmount.toFixed(2)}
-            </Typography>
-            <Typography variant="body2" color="success.main" sx={{ fontWeight: 600 }}>
-              Final: Rs. {feePreview.finalAmount.toFixed(2)}
-            </Typography>
+          <Box
+            sx={{
+              bgcolor: "grey.50",
+              border: "1px solid",
+              borderColor: "grey.200",
+              borderRadius: 2,
+              p: { xs: 1.5, sm: 2 },
+            }}
+          >
+            <Grid container spacing={1}>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Selected Discount
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {selectedDiscountLabel}
+                </Typography>
+              </Grid>
+              <Grid size={{ xs: 6, sm: 3 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Total
+                </Typography>
+                <Typography variant="body2">Rs. {feePreview.total.toFixed(2)}</Typography>
+              </Grid>
+              <Grid size={{ xs: 6, sm: 2.5 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Discount
+                </Typography>
+                <Typography variant="body2">Rs. {feePreview.discountAmount.toFixed(2)}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 2.5 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Final Amount
+                </Typography>
+                <Typography variant="body2" color="success.main" sx={{ fontWeight: 700 }}>
+                  Rs. {feePreview.finalAmount.toFixed(2)}
+                </Typography>
+              </Grid>
+            </Grid>
           </Box>
         ),
       });
@@ -884,7 +912,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(birthCertIdx, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: (ctx) => <FormSectionLabel title="Documents Upload" icon={<UploadFileIcon />} sx={{ mt: 2 }} />,
+        render: (ctx) => <FormSectionLabel title="Documents Upload" icon={<UploadFileIcon />} sx={sectionTitleSx} />,
       });
     }
 
@@ -899,60 +927,76 @@ export default function EnrollmentPage() {
         render: (ctx) => (
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => birthCertInputRef.current?.click()}
-                disabled={uploadingBirthCert}
-              >
-                {uploadingBirthCert ? "Uploading..." : "Upload Birth Cert"}
-              </Button>
-              {birthCertName && (
-                <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, px: 1 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {birthCertName}
-                  </Typography>
-                  <IconButton 
-                    size="small" 
-                    color="error" 
-                    onClick={() => {
-                      setBirthCertName("");
-                      setFormData(prev => ({ ...prev, birth_certificate_url: "" }));
-                    }}
-                    sx={{ p: 0.5 }}
+              <Box sx={{ border: "1px solid", borderColor: "grey.200", borderRadius: 2, p: 1.25 }}>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  startIcon={<UploadFileIcon />}
+                  onClick={() => birthCertInputRef.current?.click()}
+                  disabled={uploadingBirthCert}
+                  sx={{ justifyContent: "flex-start", textTransform: "none" }}
+                >
+                  {uploadingBirthCert ? "Uploading birth certificate..." : "Upload Birth Certificate"}
+                </Button>
+                <Box sx={{ display: "flex", alignItems: "center", mt: 0.75, minHeight: 24 }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
-                    <ClearIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
+                    {birthCertName || "No file selected"}
+                  </Typography>
+                  {birthCertName ? (
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => {
+                        setBirthCertName("");
+                        setFormData((prev) => ({ ...prev, birth_certificate_url: "" }));
+                      }}
+                      sx={{ p: 0.5 }}
+                    >
+                      <ClearIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  ) : null}
                 </Box>
-              )}
+              </Box>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => photoInputRef.current?.click()}
-                disabled={uploadingPhoto}
-              >
-                {uploadingPhoto ? "Uploading..." : "Upload Photo"}
-              </Button>
-              {photoName && (
-                <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, px: 1 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {photoName}
-                  </Typography>
-                  <IconButton 
-                    size="small" 
-                    color="error" 
-                    onClick={() => {
-                      setPhotoName("");
-                      setFormData(prev => ({ ...prev, photo_url: "" }));
-                    }}
-                    sx={{ p: 0.5 }}
+              <Box sx={{ border: "1px solid", borderColor: "grey.200", borderRadius: 2, p: 1.25 }}>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  startIcon={<UploadFileIcon />}
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  sx={{ justifyContent: "flex-start", textTransform: "none" }}
+                >
+                  {uploadingPhoto ? "Uploading photo..." : "Upload Student Photo"}
+                </Button>
+                <Box sx={{ display: "flex", alignItems: "center", mt: 0.75, minHeight: 24 }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
-                    <ClearIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
+                    {photoName || "No file selected"}
+                  </Typography>
+                  {photoName ? (
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => {
+                        setPhotoName("");
+                        setFormData((prev) => ({ ...prev, photo_url: "" }));
+                      }}
+                      sx={{ p: 0.5 }}
+                    >
+                      <ClearIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  ) : null}
                 </Box>
-              )}
+              </Box>
             </Grid>
           </Grid>
         ),
