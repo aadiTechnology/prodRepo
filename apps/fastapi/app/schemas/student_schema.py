@@ -31,6 +31,8 @@ class StudentDetailResponse(BaseModel):
     parent_name: Optional[str] = None
     parent_mobile: Optional[str] = None
     admission_no: Optional[str] = None
+    birth_certificate_url: Optional[str] = None
+    photo_url: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -58,6 +60,9 @@ class StudentUpdateRequest(BaseModel):
     pincode: Optional[str] = None
     class_id: Optional[int] = None
     class_division_id: Optional[int] = None
+    admission_no: Optional[str] = None
+    birth_certificate_url: Optional[str] = None
+    photo_url: Optional[str] = None
     is_active: Optional[bool] = None
     parent: Optional[ParentCreateRequest] = None
 

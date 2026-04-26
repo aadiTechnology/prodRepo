@@ -1,5 +1,6 @@
 
 import axiosInstance from "../client";
+import { apiBaseUrl } from "../../config";
 
 export interface StudentDropdownItem {
   id: string;
@@ -45,6 +46,17 @@ export interface StudentDetails {
   birth_certificate_url?: string;
   photo_url?: string;
 }
+
+const toAbsoluteMediaUrl = (path?: string | null): string | undefined => {
+  if (!path || typeof path !== "string") return undefined;
+  const trimmed = path.trim();
+  if (!trimmed) return undefined;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (!trimmed.startsWith("/")) return trimmed;
+
+  const apiRoot = apiBaseUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
+  return `${apiRoot}${trimmed}`;
+};
 
 
 const studentService = {
@@ -119,6 +131,8 @@ const studentService = {
       parent_mobile: d.parent_mobile,
       tenant_id: d.tenant_id,
       admission_no: d.admission_no,
+      birth_certificate_url: toAbsoluteMediaUrl(d.birth_certificate_url),
+      photo_url: toAbsoluteMediaUrl(d.photo_url),
       created_at: d.created_at,
       updated_at: d.updated_at,
       className: d.className || d.class_name,

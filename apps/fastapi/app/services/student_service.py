@@ -152,6 +152,8 @@ class StudentService:
             parent_name=parent_name,
             parent_mobile=parent_mobile,
             admission_no=student.admission_no,
+            birth_certificate_url=student.birth_certificate_url,
+            photo_url=student.photo_url,
             created_at=student.created_at.isoformat() if student.created_at else None,
             updated_at=student.updated_at.isoformat() if student.updated_at else None
         )
