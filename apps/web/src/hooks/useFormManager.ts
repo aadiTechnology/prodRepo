@@ -31,6 +31,8 @@ export type UseFormManagerResult<T extends Record<string, unknown>> = {
   resetForm: (next?: T) => void;
 };
 
+const EMPTY_DEPENDENT_FIELD_PAIRS: readonly DependentFieldPair<Record<string, unknown>>[] = [];
+
 function applyDependentPairValidation<T extends Record<string, unknown>>(
   config: FormValidationConfig<T>,
   next: T,
@@ -49,7 +51,10 @@ function applyDependentPairValidation<T extends Record<string, unknown>>(
 export function useFormManager<T extends Record<string, unknown>>(
   options: UseFormManagerOptions<T>
 ): UseFormManagerResult<T> {
-  const { validationConfig, dependentFieldPairs = [], onClearError } = options;
+  const { validationConfig, onClearError } = options;
+  const dependentFieldPairs =
+    (options.dependentFieldPairs as readonly DependentFieldPair<T>[] | undefined) ??
+    (EMPTY_DEPENDENT_FIELD_PAIRS as readonly DependentFieldPair<T>[]);
 
   const [formData, setFormData] = useState<T>(() => options.initialValues);
   const [fieldErrors, setFieldErrors] = useState<

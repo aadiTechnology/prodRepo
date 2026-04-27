@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import feeService from "../../api/services/feeService";
 import BaseForm from "../../components/reusable/BaseForm";
@@ -97,7 +97,7 @@ const FeeStructureForm = () => {
   const { formData, setFormData, handleFieldValueChange, resetForm } = formManager;
 
   // Use a ref to track if we are currently fetching the structure to avoid clearing data
-  const isInitialLoadRef = React.useRef(isEditMode);
+  const isInitialLoadRef = useRef(isEditMode);
 
   // Fetch Lookups
   useEffect(() => {
@@ -118,24 +118,43 @@ const FeeStructureForm = () => {
 
   // Fetch Classes when Academic Year changes
   useEffect(() => {
-    if (!formData.academic_year_id) {
+    const academicYearId = Number(formData.academic_year_id);
+    if (!academicYearId) {
       setClasses([]);
       if (!isInitialLoadRef.current) {
-        handleFieldValueChange("class_id", "");
-        handleFieldValueChange("fee_category_ids", []);
-      }
-      return;
-    }
-    
-    feeService.getClasses(Number(formData.academic_year_id)).then((res) => {
-      setClasses(res);
-      // Validate current class_id - only if not currently fetching initial data
-      if (!isInitialLoadRef.current && formData.class_id && !res.find((c) => c.id === Number(formData.class_id))) {
         handleFieldValueChange("class_id", "");
         handleFieldValueChange("class_division_id", "");
         handleFieldValueChange("fee_category_ids", []);
       }
-    });
+      return;
+    }
+
+    let isCancelled = false;
+    feeService
+      .getClasses(academicYearId)
+      .then((res) => {
+        if (isCancelled) return;
+        setClasses(res);
+        // Validate current class_id - only if not currently fetching initial data
+        if (
+          !isInitialLoadRef.current &&
+          formData.class_id &&
+          !res.find((c) => c.id === Number(formData.class_id))
+        ) {
+          handleFieldValueChange("class_id", "");
+          handleFieldValueChange("class_division_id", "");
+          handleFieldValueChange("fee_category_ids", []);
+        }
+      })
+      .catch((err) => {
+        if (isCancelled) return;
+        console.error("Failed to load classes", err);
+        setClasses([]);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
   }, [formData.academic_year_id, handleFieldValueChange]);
 
   // Reset category selection if selected categories belong to a different class
@@ -203,6 +222,17 @@ const FeeStructureForm = () => {
       isInitialLoadRef.current = true;
       const found = await feeService.getFeeStructure(Number(id));
       if (found) {
+        const structureAcademicYearId = Number(found.academic_year_id);
+        if (structureAcademicYearId) {
+          try {
+            const yearClasses = await feeService.getClasses(structureAcademicYearId);
+            setClasses(yearClasses);
+          } catch (classErr) {
+            console.error("Failed to preload classes for fee structure edit", classErr);
+            setClasses([]);
+          }
+        }
+
         const normalizedCategoryIds =
           found.fee_category_ids && found.fee_category_ids.length > 0
             ? found.fee_category_ids.map((categoryId) => String(categoryId))
@@ -229,11 +259,7 @@ const FeeStructureForm = () => {
       setError("Failed to load fee structure.");
     } finally {
       setFetchLoading(false);
-      // Wait for all dependent effects to potentially run before clearing the ref
-      // We use a longer timeout or a better mechanism if needed
-      setTimeout(() => {
-        isInitialLoadRef.current = false;
-      }, 1000);
+      isInitialLoadRef.current = false;
     }
   }, [id, resetForm]);
 
