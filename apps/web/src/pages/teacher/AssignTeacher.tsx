@@ -1,7 +1,8 @@
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, alpha } from "@mui/material";
 
 import BaseForm from "../../components/reusable/BaseForm";
 import type { AssignTeacherFormData } from "../../formConfig/assignTeacherFormConfig";
+import { colorTokens } from "../../tokens/colors";
 import { useAssignTeacherController } from "./useAssignTeacherController";
 
 export default function AssignTeacher() {
@@ -60,28 +61,45 @@ export default function AssignTeacher() {
       }
       submitLabelCreate={isEditMode ? "Update" : "Save"}
       headerRightBelowSlot={
-        <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.83rem" }}>
-          <Box component="span" sx={{ fontWeight: 700, color: "text.primary" }}>
-            Legend:
-          </Box>{" "}
+        <Box
+          sx={{
+            display: "flex",
+            width: "100%",
+            justifyContent: "flex-end",
+            px: { xs: 2, sm: 2.5 },
+            py: 1.25,
+            bgcolor: "#ffffff",
+            border: `1px solid ${colorTokens.border.default}`,
+            borderRadius: "14px",
+            boxShadow: "0 4px 14px rgba(0, 0, 0, 0.03)",
+          }}
+        >
           <Box
-            component="span"
             sx={{
-              display: "inline-block",
-              width: 20,
-              height: 20,
-              bgcolor: "#d6f0ff",
-              border: "1px solid #d6f0ff",
-              verticalAlign: "middle",
-              mr: 0.5,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 0.75,
+              backgroundColor: "transparent",
             }}
           >
-            {" "}
-          </Box>{" "}
-          <Box component="span" sx={{ color: "text.primary", fontWeight: 400 }}>
-            Already Assigned class/ division
+            <Typography variant="body2" sx={{ fontSize: "0.83rem", fontWeight: 700, color: "text.primary" }}>
+              Legend:
+            </Typography>
+            <Box
+              component="span"
+              sx={{
+                display: "inline-block",
+                width: 20,
+                height: 20,
+                bgcolor: "#d6f0ff",
+                border: "1px solid #d6f0ff",
+              }}
+            />
+            <Typography variant="body2" sx={{ fontSize: "0.83rem", color: "text.primary", fontWeight: 400 }}>
+              Already Assigned class/ division
+            </Typography>
           </Box>
-        </Typography>
+        </Box>
       }
       formTopSlot={
         <Box sx={{ px: 1, py: 0.5, display: "flex", flexDirection: "column", gap: 0.5 }}>

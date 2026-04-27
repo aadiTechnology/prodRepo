@@ -42,7 +42,6 @@ export function assignTeacherFormConfig({
         label: "Academic Year",
         type: "select",
         required: true,
-        helperText: "Select academic year",
         props: {
           options: academicYearOptions,
           loading: academicYearsLoading,
@@ -56,7 +55,6 @@ export function assignTeacherFormConfig({
         label: "Class",
         type: "select",
         required: true,
-        helperText: "Select class",
         props: {
           options: classOptions,
           loading: classesLoading,
@@ -70,7 +68,6 @@ export function assignTeacherFormConfig({
         label: "Division",
         type: "select",
         required: true,
-        helperText: "Select one or more divisions",
         props: {
           options: divisionOptions,
           loading: divisionsLoading,
@@ -84,7 +81,6 @@ export function assignTeacherFormConfig({
         label: "Teacher",
         type: "select",
         required: true,
-        helperText: "Select class teacher",
         props: {
           options: teacherOptions,
           loading: teachersLoading,
