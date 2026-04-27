@@ -66,7 +66,7 @@ const FeeStructureForm = () => {
   );
 
   // Field-level validation config
-  const validationConfig: FormValidationConfig<FeeStructureFormData> = {
+  const validationConfig = useMemo<FormValidationConfig<FeeStructureFormData>>(() => ({
     name: [ { type: "required", message: "Fee structure name is required." } ],
     academic_year_id: [ { type: "required", message: "Academic year is required." } ],
     class_id: [ { type: "required", message: "Class is required." } ],
@@ -87,14 +87,17 @@ const FeeStructureForm = () => {
       { type: "required", message: "Number of installments is required." },
       { type: "pattern", regex: /^\d+$/, message: "Enter a valid number." },
     ],
-  };
+  }), []);
 
   const formManager = useFormManager<FeeStructureFormData>({
     initialValues,
     validationConfig,
   });
 
-  const { formData, setFormData, handleFieldValueChange } = formManager;
+  const { formData, setFormData, handleFieldValueChange, resetForm } = formManager;
+
+  // Use a ref to track if we are currently fetching the structure to avoid clearing data
+  const isInitialLoadRef = React.useRef(isEditMode);
 
   // Fetch Lookups
   useEffect(() => {
@@ -117,14 +120,17 @@ const FeeStructureForm = () => {
   useEffect(() => {
     if (!formData.academic_year_id) {
       setClasses([]);
-      handleFieldValueChange("class_id", "");
-      handleFieldValueChange("fee_category_ids", []);
+      if (!isInitialLoadRef.current) {
+        handleFieldValueChange("class_id", "");
+        handleFieldValueChange("fee_category_ids", []);
+      }
       return;
     }
+    
     feeService.getClasses(Number(formData.academic_year_id)).then((res) => {
       setClasses(res);
-      // Validate current class_id
-      if (formData.class_id && !res.find((c) => c.id === Number(formData.class_id))) {
+      // Validate current class_id - only if not currently fetching initial data
+      if (!isInitialLoadRef.current && formData.class_id && !res.find((c) => c.id === Number(formData.class_id))) {
         handleFieldValueChange("class_id", "");
         handleFieldValueChange("class_division_id", "");
         handleFieldValueChange("fee_category_ids", []);
@@ -134,6 +140,8 @@ const FeeStructureForm = () => {
 
   // Reset category selection if selected categories belong to a different class
   useEffect(() => {
+    if (isInitialLoadRef.current) return;
+
     const ids = formData.fee_category_ids as string[];
     if (!categories.length) {
       return;
@@ -167,6 +175,9 @@ const FeeStructureForm = () => {
   useEffect(() => {
     const ids = formData.fee_category_ids as string[];
     if (!ids || ids.length === 0) return;
+    
+    if (isInitialLoadRef.current) return;
+
     const sum = ids.reduce((acc, id) => {
       const cat = categories.find((c) => String(c.id) === String(id));
       return acc + (cat?.amount ? Number(cat.amount) : 0);
@@ -189,6 +200,7 @@ const FeeStructureForm = () => {
     if (!id) return;
     try {
       setFetchLoading(true);
+      isInitialLoadRef.current = true;
       const found = await feeService.getFeeStructure(Number(id));
       if (found) {
         const normalizedCategoryIds =
@@ -198,7 +210,7 @@ const FeeStructureForm = () => {
               ? [String(found.fee_category_id)]
               : [];
 
-        setFormData({
+        resetForm({
           name: found.name || "",
           academic_year_id: found.academic_year_id || "",
           class_id: found.class_id || "",
@@ -217,8 +229,13 @@ const FeeStructureForm = () => {
       setError("Failed to load fee structure.");
     } finally {
       setFetchLoading(false);
+      // Wait for all dependent effects to potentially run before clearing the ref
+      // We use a longer timeout or a better mechanism if needed
+      setTimeout(() => {
+        isInitialLoadRef.current = false;
+      }, 1000);
     }
-  }, [id, setFormData]);
+  }, [id, resetForm]);
 
   useEffect(() => {
     if (isEditMode) fetchStructure();

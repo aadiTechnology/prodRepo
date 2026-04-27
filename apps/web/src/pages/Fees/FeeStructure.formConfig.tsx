@@ -73,7 +73,6 @@ export function createFeeStructureFormConfig({
         required: true,
         props: {
           options: classes
-            .filter((c, idx, arr) => arr.findIndex((x) => x.name.toLowerCase() === c.name.toLowerCase()) === idx)
             .map((c) => ({ value: c.id, label: c.name })),
           disabled: classes.length === 0,
         },
