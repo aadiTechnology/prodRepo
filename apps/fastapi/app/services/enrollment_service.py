@@ -32,6 +32,17 @@ class EnrollmentService:
             raise HTTPException(status_code=404, detail="Lead not found")
 
         parent = lead.parent
+        converted_student: Student | None = None
+        if lead.converted_to_student_id:
+            converted_student = (
+                self.db.query(Student)
+                .filter(
+                    Student.id == lead.converted_to_student_id,
+                    Student.tenant_id == tenant_id,
+                )
+                .first()
+            )
+
         return {
             "lead_id": lead.id,
             "student_name": lead.child_name,
@@ -43,6 +54,8 @@ class EnrollmentService:
             "academic_year_id": lead.preferred_academic_year_id,
             "class_id": lead.preferred_class_id,
             "expected_admission_date": lead.expected_admission_date,
+            "birth_certificate_url": converted_student.birth_certificate_url if converted_student else None,
+            "photo_url": converted_student.photo_url if converted_student else None,
         }
 
     def _get_or_create_parent(

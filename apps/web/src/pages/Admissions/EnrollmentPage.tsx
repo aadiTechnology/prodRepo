@@ -117,6 +117,14 @@ const normalizeGender = (value?: string | null): string => {
   return "";
 };
 
+const fileNameFromUrl = (url?: string | null): string => {
+  const trimmed = String(url || "").trim();
+  if (!trimmed) return "";
+  const cleanUrl = trimmed.split("?")[0].split("#")[0];
+  const parts = cleanUrl.split("/");
+  return decodeURIComponent(parts[parts.length - 1] || "");
+};
+
 export default function EnrollmentPage() {
   const navigate = useNavigate();
   const { leadId, studentId: routeStudentId } = useParams<{ leadId?: string; studentId?: string }>();
@@ -267,7 +275,11 @@ export default function EnrollmentPage() {
           academic_year_id: prefill.academic_year_id ? String(prefill.academic_year_id) : prev.academic_year_id,
           class_id: prefill.class_id ? String(prefill.class_id) : prev.class_id,
           admission_date: prefill.expected_admission_date ?? prev.admission_date,
+          birth_certificate_url: prefill.birth_certificate_url ?? "",
+          photo_url: prefill.photo_url ?? "",
         }));
+        setBirthCertName(fileNameFromUrl(prefill.birth_certificate_url));
+        setPhotoName(fileNameFromUrl(prefill.photo_url));
       })
       .catch(() => { })
       .finally(() => setFetchLoading(false));
@@ -704,7 +716,11 @@ export default function EnrollmentPage() {
       academic_year_id: prefill.academic_year_id ? String(prefill.academic_year_id) : prev.academic_year_id,
       class_id: prefill.class_id ? String(prefill.class_id) : prev.class_id,
       admission_date: prefill.expected_admission_date ?? prev.admission_date,
+      birth_certificate_url: prefill.birth_certificate_url ?? "",
+      photo_url: prefill.photo_url ?? "",
     }));
+    setBirthCertName(fileNameFromUrl(prefill.birth_certificate_url));
+    setPhotoName(fileNameFromUrl(prefill.photo_url));
   };
 
   const formConfig = useMemo(() => {

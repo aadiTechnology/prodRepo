@@ -11,6 +11,8 @@ export interface EnrollmentPrefill {
   academic_year_id?: number | null;
   class_id?: number | null;
   expected_admission_date?: string | null;
+  birth_certificate_url?: string | null;
+  photo_url?: string | null;
 }
 
 export interface EnrollmentCreatePayload {

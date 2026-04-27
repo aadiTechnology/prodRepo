@@ -15,6 +15,8 @@ class EnrollmentPrefillResponse(BaseModel):
     academic_year_id: Optional[int] = None
     class_id: Optional[int] = None
     expected_admission_date: Optional[date] = None
+    birth_certificate_url: Optional[str] = None
+    photo_url: Optional[str] = None
 
 
 class EnrollmentCreateRequest(BaseModel):
