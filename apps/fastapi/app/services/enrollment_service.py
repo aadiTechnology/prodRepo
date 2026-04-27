@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models.lead import Lead, LeadStatus, LeadParent
 from app.models.student import Student
+from app.models.student_fee_assignment import StudentFeeAssignment
 from app.schemas.student_fee_assignment import StudentFeeAssignmentCreate
 from app.services import student_fee_assignment_service
 
@@ -33,6 +34,7 @@ class EnrollmentService:
 
         parent = lead.parent
         converted_student: Student | None = None
+        latest_fee_assignment: StudentFeeAssignment | None = None
         if lead.converted_to_student_id:
             converted_student = (
                 self.db.query(Student)
@@ -42,6 +44,13 @@ class EnrollmentService:
                 )
                 .first()
             )
+            if converted_student:
+                latest_fee_assignment = (
+                    self.db.query(StudentFeeAssignment)
+                    .filter(StudentFeeAssignment.student_id == converted_student.id)
+                    .order_by(StudentFeeAssignment.id.desc())
+                    .first()
+                )
 
         return {
             "lead_id": lead.id,
@@ -51,8 +60,15 @@ class EnrollmentService:
             "parent_name": parent.parent_name if parent else None,
             "mobile_number": parent.mobile_number if parent else None,
             "email": parent.email if parent else None,
-            "academic_year_id": lead.preferred_academic_year_id,
-            "class_id": lead.preferred_class_id,
+            "academic_year_id": (
+                (latest_fee_assignment.academic_year_id if latest_fee_assignment else None)
+                or (converted_student.academic_year_id if converted_student else None)
+                or lead.preferred_academic_year_id
+            ),
+            "class_id": (converted_student.class_id if converted_student else None) or lead.preferred_class_id,
+            "class_division_id": converted_student.class_division_id if converted_student else None,
+            "fee_structure_id": latest_fee_assignment.fee_structure_id if latest_fee_assignment else None,
+            "discount_id": latest_fee_assignment.discount_id if latest_fee_assignment else None,
             "expected_admission_date": lead.expected_admission_date,
             "birth_certificate_url": converted_student.birth_certificate_url if converted_student else None,
             "photo_url": converted_student.photo_url if converted_student else None,

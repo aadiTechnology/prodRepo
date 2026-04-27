@@ -10,6 +10,9 @@ export interface EnrollmentPrefill {
   email?: string | null;
   academic_year_id?: number | null;
   class_id?: number | null;
+  class_division_id?: number | null;
+  fee_structure_id?: number | null;
+  discount_id?: number | null;
   expected_admission_date?: string | null;
   birth_certificate_url?: string | null;
   photo_url?: string | null;

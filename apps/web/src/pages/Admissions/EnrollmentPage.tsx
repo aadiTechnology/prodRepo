@@ -125,6 +125,15 @@ const fileNameFromUrl = (url?: string | null): string => {
   return decodeURIComponent(parts[parts.length - 1] || "");
 };
 
+const toAbsoluteAssetUrl = (url?: string | null): string => {
+  const trimmed = String(url || "").trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const base = (apiClient.defaults.baseURL || "").replace(/\/$/, "");
+  const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return `${base}${normalizedPath}`;
+};
+
 export default function EnrollmentPage() {
   const navigate = useNavigate();
   const { leadId, studentId: routeStudentId } = useParams<{ leadId?: string; studentId?: string }>();
@@ -274,7 +283,10 @@ export default function EnrollmentPage() {
           email: prefill.email ?? prev.email,
           academic_year_id: prefill.academic_year_id ? String(prefill.academic_year_id) : prev.academic_year_id,
           class_id: prefill.class_id ? String(prefill.class_id) : prev.class_id,
+          class_division_id: prefill.class_division_id ? String(prefill.class_division_id) : prev.class_division_id,
           admission_date: prefill.expected_admission_date ?? prev.admission_date,
+          fee_structure_id: prefill.fee_structure_id ? String(prefill.fee_structure_id) : prev.fee_structure_id,
+          discount_id: prefill.discount_id ? String(prefill.discount_id) : "",
           birth_certificate_url: prefill.birth_certificate_url ?? "",
           photo_url: prefill.photo_url ?? "",
         }));
@@ -365,7 +377,12 @@ export default function EnrollmentPage() {
     const selectedClass = classes.find((x) => x.id === Number(formData.class_id));
     const nextDivisions = selectedClass?.divisions || [];
     setDivisions(nextDivisions);
-    if (formData.class_division_id && !nextDivisions.some((d) => d.id === Number(formData.class_division_id))) {
+    // Preserve prefilled division while class/division options are still loading.
+    if (
+      selectedClass &&
+      formData.class_division_id &&
+      !nextDivisions.some((d) => d.id === Number(formData.class_division_id))
+    ) {
       setFormData((prev) => ({ ...prev, class_division_id: "" }));
     }
   }, [formData.class_id, classes, formData.class_division_id, setFormData]);
@@ -687,16 +704,20 @@ export default function EnrollmentPage() {
   useEffect(() => {
     if (isViewMode) return;
     if (!formData.discount_id) return;
+    // Avoid clearing prefilled discount before class/discount options load.
+    if (!classes.length || !discounts.length) return;
     const stillValid = filteredDiscounts.some((discount) => discount.id === Number(formData.discount_id));
     if (!stillValid) {
       setFormData((prev) => ({ ...prev, discount_id: "" }));
     }
-  }, [filteredDiscounts, formData.discount_id, setFormData, isViewMode]);
+  }, [filteredDiscounts, formData.discount_id, setFormData, isViewMode, classes.length, discounts.length]);
 
   // Sync fee plan validity when options change
   useEffect(() => {
     if (isViewMode) return;
     if (!formData.fee_structure_id) return;
+    // Avoid clearing prefilled fee plan before fee plan options load.
+    if (!feePlans.length) return;
     const stillValid = feePlans.some((plan) => plan.id === Number(formData.fee_structure_id));
     if (!stillValid) {
       setFormData((prev) => ({ ...prev, fee_structure_id: "" }));
@@ -715,7 +736,10 @@ export default function EnrollmentPage() {
       email: prefill.email ?? prev.email,
       academic_year_id: prefill.academic_year_id ? String(prefill.academic_year_id) : prev.academic_year_id,
       class_id: prefill.class_id ? String(prefill.class_id) : prev.class_id,
+      class_division_id: prefill.class_division_id ? String(prefill.class_division_id) : prev.class_division_id,
       admission_date: prefill.expected_admission_date ?? prev.admission_date,
+      fee_structure_id: prefill.fee_structure_id ? String(prefill.fee_structure_id) : prev.fee_structure_id,
+      discount_id: prefill.discount_id ? String(prefill.discount_id) : "",
       birth_certificate_url: prefill.birth_certificate_url ?? "",
       photo_url: prefill.photo_url ?? "",
     }));
@@ -1012,6 +1036,22 @@ export default function EnrollmentPage() {
                     </IconButton>
                   ) : null}
                 </Box>
+                {formData.photo_url ? (
+                  <Box
+                    component="img"
+                    src={toAbsoluteAssetUrl(formData.photo_url)}
+                    alt="Student preview"
+                    sx={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 1,
+                      objectFit: "cover",
+                      border: "1px solid",
+                      borderColor: "grey.300",
+                      mt: 1,
+                    }}
+                  />
+                ) : null}
               </Box>
             </Grid>
           </Grid>
@@ -1027,6 +1067,7 @@ export default function EnrollmentPage() {
     discountOptions,
     feePlanOptions,
     feePreview,
+    formData.photo_url,
     leadOptions,
     photoName,
     selectedDiscountLabel,
