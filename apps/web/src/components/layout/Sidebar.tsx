@@ -47,6 +47,13 @@ import schoolIcon from "../../assets/icons/school.png";
 import assetsIcon from "../../assets/icons/assets.png";
 import moneyIcon from "../../assets/icons/money.png";
 import feesIcon from "../../assets/icons/fees.png";
+import staffIcon from "../../assets/icons/staff.png";
+import calendarIcon from "../../assets/icons/calendar.png";
+import educationalIcon from "../../assets/icons/educational.png";
+import groupingIcon from "../../assets/icons/grouping.png";
+import idCardIcon from "../../assets/icons/id-card.png";
+import letterIcon from "../../assets/icons/letter.png";
+import bloggerIcon from "../../assets/icons/blogger.png";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -190,17 +197,18 @@ interface MenuItemData {
 // ═══════════════════════════════════════════════════════════════════════════
 const ICON_MAP: Record<string, string> = {
   "dashboard": workingIcon,
-  "students": userIcon,
-  "academics": schoolIcon,
-  "academic-years": schoolIcon,
+  "students": idCardIcon,
+  "academics": educationalIcon,
+  "academic-years": calendarIcon,
   "fees": feesIcon,
-  "staff": teamworkIcon,
+  "staff": staffIcon,
   "finance": moneyIcon,
   "settings": assetsIcon,
-  "tenants": schoolIcon,
+  "tenants": groupingIcon,
   "users": userIcon,
-  "attendance": schoolIcon,
+  "attendance": calendarIcon,
   "config": assetsIcon,
+  "admissions": letterIcon,
   "default": workingIcon
 };
 
@@ -232,7 +240,7 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
   {
     id: "tenants",
     label: "Tenants",
-    icon: schoolIcon,
+    icon: groupingIcon,
     color: colorTokens.menuColors.students,
     children: [
       { id: "tenant-management", label: "Tenant Management", path: "/tenants" }
@@ -241,7 +249,7 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
   {
     id: "attendance",
     label: "Attendance",
-    icon: schoolIcon,
+    icon: calendarIcon,
     color: colorTokens.menuColors.academics,
     children: [
       { id: "mark-attendance", label: "Mark Attendance", path: "/attendance/mark" }
@@ -317,9 +325,15 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
       
       let icon = workingIcon;
       if (path.includes("fee") || name.includes("fee")) icon = feesIcon;
-      else if (path.includes("user") || path.includes("student") || name.includes("user") || name.includes("student")) icon = userIcon;
-      else if (path.includes("academic") || path.includes("class") || name.includes("academic") || name.includes("class") || path.includes("tenant") || name.includes("tenant")) icon = schoolIcon;
-      else if (path.includes("staff") || path.includes("role") || name.includes("staff") || name.includes("role") || path.includes("permission") || name.includes("permission")) icon = teamworkIcon;
+      else if (path.includes("administration") || name.includes("administration")) icon = groupingIcon;
+      else if (path.includes("admission") || name.includes("admission")) icon = letterIcon;
+      else if (path.includes("student") || name.includes("student")) icon = idCardIcon;
+      else if (path.includes("user") || name.includes("user")) icon = userIcon;
+      else if (path.includes("academic") || path.includes("class") || name.includes("academic") || name.includes("class")) icon = educationalIcon;
+      else if (path.includes("tenant") || name.includes("tenant")) icon = groupingIcon;
+      else if (path.includes("attendance") || name.includes("attendance")) icon = calendarIcon;
+      else if (path.includes("staff") || name.includes("staff")) icon = staffIcon;
+      else if (path.includes("role") || name.includes("role") || path.includes("permission") || name.includes("permission")) icon = teamworkIcon;
       else if (path.includes("finance") || name.includes("finance")) icon = moneyIcon;
       else if (path.includes("setting") || path.includes("config") || path.includes("admin") || name.includes("setting") || name.includes("config") || name.includes("theme")) icon = assetsIcon;
 
@@ -393,7 +407,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                 boxShadow: "0 4px 10px rgba(0,0,0,0.1)"
               }}
             >
-              <img src={schoolIcon} alt="Logo" style={{ width: "100%", height: "100%" }} />
+              <img src={educationalIcon} alt="Logo" style={{ width: "100%", height: "100%" }} />
             </Box>
             <Typography variant="h6" sx={{ fontWeight: 900, fontSize: "1rem", color: "#ffffff" }}>
               {user?.tenant?.name || "Campus Axis"}
