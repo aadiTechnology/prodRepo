@@ -83,7 +83,7 @@ export function createFeeStructureFormConfig({
         type: "select",
         props: {
           options: [{ value: "", label: "All Divisions" }, ...divisions.map((d) => ({ value: d.id, label: d.division_name }))],
-          disabled: divisions.length === 0,
+          disabled: false,
         },
       },
       fee_category_ids: {
@@ -203,28 +203,39 @@ export function createFeeStructureFormConfig({
     },
     layoutRows: [
       {
+        kind: "section",
+        title: "Academic Context",
+        grid: { xs: 12 },
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, md: 6 },
+        fieldNames: ["academic_year_id", "class_id", "fee_category_ids"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, md: 6 },
+        fieldNames: ["name", "class_division_id", ...(isEditMode ? ["is_active"] : [])],
+      },
+      {
+        kind: "section",
+        title: "Installment Setup",
+        grid: { xs: 12 },
+      },
+      {
         kind: "fields",
         grid: { xs: 12, md: 6 },
         fieldNames: [
-          "name",
-          "academic_year_id",
-          "class_id",
-          "class_division_id",
-          "fee_category_ids",
-          ...(isEditMode ? ["is_active"] : []),
-          "description",
+          "total_amount",
+          "installment_type",
+          "num_installments",
         ],
       },
       {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["total_amount", "installment_type", "num_installments"],
-      },
-      {
         kind: "custom",
-        grid: { xs: 12 },
+        grid: { xs: 12, md: 6 },
         render: (ctx: FormRenderContext<FeeStructureFormData>) => (
-          <Box sx={{ mt: 2 }}>
+          <Box sx={{ mt: { xs: 1, md: 0 } }}>
             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
               Installment Schedule Preview
             </Typography>
@@ -248,6 +259,11 @@ export function createFeeStructureFormConfig({
             )}
           </Box>
         ),
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12 },
+        fieldNames: ["description"],
       },
     ],
   };
