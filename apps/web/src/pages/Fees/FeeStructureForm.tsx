@@ -42,6 +42,7 @@ const FeeStructureForm = () => {
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
 
   // Lookups
   const [categories, setCategories] = useState<FeeCategory[]>([]);
@@ -94,7 +95,8 @@ const FeeStructureForm = () => {
     validationConfig,
   });
 
-  const { formData, setFormData, handleFieldValueChange, resetForm } = formManager;
+  const { formData, setFormData, handleFieldValueChange, resetForm, setFieldErrors } = formManager;
+  const displayFieldErrors = hasTriedSubmit ? formManager.fieldErrors : {};
 
   // Use a ref to track if we are currently fetching the structure to avoid clearing data
   const isInitialLoadRef = useRef(isEditMode);
@@ -122,9 +124,18 @@ const FeeStructureForm = () => {
     if (!academicYearId) {
       setClasses([]);
       if (!isInitialLoadRef.current) {
-        handleFieldValueChange("class_id", "");
-        handleFieldValueChange("class_division_id", "");
-        handleFieldValueChange("fee_category_ids", []);
+        setFormData((prev) => ({
+          ...prev,
+          class_id: "",
+          class_division_id: "",
+          fee_category_ids: [],
+        }));
+        setFieldErrors((prev) => ({
+          ...prev,
+          class_id: "",
+          class_division_id: "",
+          fee_category_ids: "",
+        }));
       }
       return;
     }
@@ -141,9 +152,18 @@ const FeeStructureForm = () => {
           formData.class_id &&
           !res.find((c) => c.id === Number(formData.class_id))
         ) {
-          handleFieldValueChange("class_id", "");
-          handleFieldValueChange("class_division_id", "");
-          handleFieldValueChange("fee_category_ids", []);
+          setFormData((prev) => ({
+            ...prev,
+            class_id: "",
+            class_division_id: "",
+            fee_category_ids: [],
+          }));
+          setFieldErrors((prev) => ({
+            ...prev,
+            class_id: "",
+            class_division_id: "",
+            fee_category_ids: "",
+          }));
         }
       })
       .catch((err) => {
@@ -155,7 +175,7 @@ const FeeStructureForm = () => {
     return () => {
       isCancelled = true;
     };
-  }, [formData.academic_year_id, handleFieldValueChange]);
+  }, [formData.academic_year_id, handleFieldValueChange, formData.class_id, setFormData, setFieldErrors]);
 
   // Reset category selection if selected categories belong to a different class
   useEffect(() => {
@@ -172,11 +192,13 @@ const FeeStructureForm = () => {
         return cat && cat.class_id === Number(formData.class_id);
       });
       if (!allMatch) {
-        handleFieldValueChange("fee_category_ids", []);
+        setFormData((prev) => ({ ...prev, fee_category_ids: [] }));
+        setFieldErrors((prev) => ({ ...prev, fee_category_ids: "" }));
       }
     } else if (ids && ids.length > 0 && !formData.class_id) {
       // If class is cleared, clear categories
-      handleFieldValueChange("fee_category_ids", []);
+      setFormData((prev) => ({ ...prev, fee_category_ids: [] }));
+      setFieldErrors((prev) => ({ ...prev, fee_category_ids: "" }));
     }
 
     // Reset division if class changes
@@ -184,11 +206,12 @@ const FeeStructureForm = () => {
     if (formData.class_division_id) {
       const isValidDiv = selectedClass?.divisions?.find(d => d.id === Number(formData.class_division_id));
       if (!isValidDiv) {
-        handleFieldValueChange("class_division_id", "");
+        setFormData((prev) => ({ ...prev, class_division_id: "" }));
+        setFieldErrors((prev) => ({ ...prev, class_division_id: "" }));
       }
     }
 
-  }, [formData.class_id, classes, formData.class_division_id, categories, handleFieldValueChange]);
+  }, [formData.class_id, classes, formData.class_division_id, categories, setFormData, setFieldErrors]);
 
   // Auto-sum selected category amounts → total_amount (read-only when categories selected)
   useEffect(() => {
@@ -202,17 +225,7 @@ const FeeStructureForm = () => {
       return acc + (cat?.amount ? Number(cat.amount) : 0);
     }, 0);
     handleFieldValueChange("total_amount", sum > 0 ? sum : "");
-
-    // Auto-populate name if empty
-    if (!formData.name && categories.length > 0) {
-      const selectedNames = ids
-        .map((id) => categories.find((c) => String(c.id) === String(id))?.name)
-        .filter(Boolean);
-      if (selectedNames.length > 0) {
-        handleFieldValueChange("name", selectedNames.join(" + "));
-      }
-    }
-  }, [formData.fee_category_ids, categories, handleFieldValueChange, formData.name]);
+  }, [formData.fee_category_ids, categories, handleFieldValueChange]);
 
   // Fetch existing data
   const fetchStructure = useCallback(async () => {
@@ -384,10 +397,13 @@ const FeeStructureForm = () => {
       formConfig={formConfig}
       formData={formData}
       setFormData={setFormData}
-      fieldErrors={formManager.fieldErrors}
+      fieldErrors={displayFieldErrors}
       handleChange={formManager.handleChange}
       handleFieldValueChange={handleFieldValueChange}
-      handleSubmit={formManager.handleSubmit}
+      handleSubmit={(e, onValid) => {
+        setHasTriedSubmit(true);
+        formManager.handleSubmit(e, onValid);
+      }}
       setFormError={setError}
       onConfirmSubmit={onConfirmSubmit}
       isEditMode={isEditMode}
