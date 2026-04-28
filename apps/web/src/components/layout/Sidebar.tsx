@@ -293,10 +293,16 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [mounted, setMounted] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Reset logo error when tenant changes
+  useEffect(() => {
+    setLogoError(false);
+  }, [user?.tenant?.id, user?.tenant?.logo_url]);
 
   // Initialize expandedSections based on current path and menuItems
   useEffect(() => {
@@ -407,7 +413,12 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                 boxShadow: "0 4px 10px rgba(0,0,0,0.1)"
               }}
             >
-              <img src={educationalIcon} alt="Logo" style={{ width: "100%", height: "100%" }} />
+              <img 
+                src={user?.tenant?.logo_url && !logoError ? user.tenant.logo_url : educationalIcon} 
+                alt="Logo" 
+                style={{ width: "100%", height: "100%", objectFit: "contain" }} 
+                onError={() => setLogoError(true)}
+              />
             </Box>
             <Typography variant="h6" sx={{ fontWeight: 900, fontSize: "1rem", color: "#ffffff" }}>
               {user?.tenant?.name || "Campus Axis"}
