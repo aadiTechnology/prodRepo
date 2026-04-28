@@ -4,10 +4,20 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser
 from app.routers.installment_tracking import require_installment_tracking_access
-from app.schemas.invoice import InvoiceCreateRequest, InvoiceListResponse, InvoiceResponse, InvoiceUpdateRequest
+from app.schemas.invoice import (
+    FeePlanResponse,
+    GenerateInvoiceRequest,
+    GenerateInvoiceResponse,
+    InvoiceCreateRequest,
+    InvoiceListResponse,
+    InvoiceResponse,
+    InvoiceStudentItem,
+    InvoiceUpdateRequest,
+)
 from app.services import invoice_service
 
 router = APIRouter(prefix="/fees/invoices", tags=["Fees - Invoice"])
+api_router = APIRouter(prefix="/api", tags=["Invoice Generation"])
 
 
 @router.get("", response_model=InvoiceListResponse)
@@ -74,3 +84,50 @@ async def delete_student_invoice(
 ):
     invoice_service.delete_invoice(db, tenant_id=current_user.tenant_id, invoice_id=invoice_id)
     return None
+
+
+@api_router.get("/fee-plans", response_model=FeePlanResponse | None)
+async def get_fee_plan(
+    class_id: int = Query(..., ge=1),
+    division_id: int | None = Query(None, ge=1),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_installment_tracking_access),
+):
+    return invoice_service.get_fee_plan(
+        db,
+        tenant_id=current_user.tenant_id,
+        class_id=class_id,
+        division_id=division_id,
+    )
+
+
+@api_router.get("/students", response_model=list[InvoiceStudentItem])
+async def get_students_for_invoice(
+    class_id: int = Query(..., ge=1),
+    division_id: int = Query(..., ge=1),
+    academic_year_id: int = Query(..., ge=1),
+    installment_name: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_installment_tracking_access),
+):
+    return invoice_service.get_students_for_invoice(
+        db,
+        tenant_id=current_user.tenant_id,
+        class_id=class_id,
+        division_id=division_id,
+        academic_year_id=academic_year_id,
+        installment_name=installment_name,
+    )
+
+
+@api_router.post("/invoices/generate", response_model=GenerateInvoiceResponse)
+async def generate_invoices(
+    payload: GenerateInvoiceRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_installment_tracking_access),
+):
+    return invoice_service.generate_invoices(
+        db,
+        tenant_id=current_user.tenant_id,
+        payload=payload,
+    )

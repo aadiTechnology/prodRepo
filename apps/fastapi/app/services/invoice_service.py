@@ -10,7 +10,16 @@ from app.models.academic import AcademicYear, SchoolClass
 from app.models.fee import FeeStructure
 from app.models.student import Student
 from app.repositories import invoice_repository
-from app.schemas.invoice import InvoiceCreateRequest, InvoiceListResponse, InvoiceResponse, InvoiceUpdateRequest
+from app.schemas.invoice import (
+    FeePlanResponse,
+    GenerateInvoiceRequest,
+    GenerateInvoiceResponse,
+    InvoiceCreateRequest,
+    InvoiceListResponse,
+    InvoiceResponse,
+    InvoiceStudentItem,
+    InvoiceUpdateRequest,
+)
 
 ALLOWED_INVOICE_STATUSES = {"Paid", "Partial", "Pending", "Overdue"}
 
@@ -238,3 +247,225 @@ def delete_invoice(db: Session, *, tenant_id: int, invoice_id: int) -> None:
         raise NotFoundException("StudentInvoice", invoice_id)
     invoice_repository.delete_invoice(db, tenant_id=tenant_id, invoice_id=invoice_id)
     db.commit()
+
+
+def get_fee_plan(
+    db: Session,
+    *,
+    tenant_id: int,
+    class_id: int,
+    division_id: int | None,
+) -> FeePlanResponse | None:
+    q = (
+        db.query(FeeStructure)
+        .filter(
+            FeeStructure.tenant_id == tenant_id,
+            FeeStructure.class_id == class_id,
+            FeeStructure.is_deleted == False,  # noqa: E712
+            FeeStructure.is_active == True,  # noqa: E712
+        )
+        .order_by(FeeStructure.id.desc())
+    )
+    if division_id is not None:
+        q = q.filter(FeeStructure.class_division_id == division_id)
+    else:
+        q = q.filter(FeeStructure.class_division_id.is_(None))
+
+    plan = q.first()
+    if not plan and division_id is not None:
+        plan = (
+            db.query(FeeStructure)
+            .filter(
+                FeeStructure.tenant_id == tenant_id,
+                FeeStructure.class_id == class_id,
+                FeeStructure.class_division_id.is_(None),
+                FeeStructure.is_deleted == False,  # noqa: E712
+                FeeStructure.is_active == True,  # noqa: E712
+            )
+            .order_by(FeeStructure.id.desc())
+            .first()
+        )
+    if not plan:
+        return None
+
+    return FeePlanResponse(
+        id=int(plan.id),
+        class_id=int(plan.class_id),
+        division_id=int(plan.class_division_id) if plan.class_division_id else None,
+        academic_year_id=int(plan.academic_year_id),
+        total_amount=float(plan.total_amount or 0),
+        name=plan.name,
+    )
+
+
+def get_students_for_invoice(
+    db: Session,
+    *,
+    tenant_id: int,
+    class_id: int,
+    division_id: int,
+    academic_year_id: int,
+    installment_name: str | None = None,
+) -> list[InvoiceStudentItem]:
+    students = (
+        db.query(Student)
+        .filter(
+            Student.tenant_id == tenant_id,
+            Student.class_id == class_id,
+            Student.class_division_id == division_id,
+            Student.academic_year_id == academic_year_id,
+            Student.is_active == True,  # noqa: E712
+        )
+        .order_by(Student.student_name.asc(), Student.id.asc())
+        .all()
+    )
+    if not students:
+        return []
+
+    student_ids = [int(s.id) for s in students]
+    existing_invoice_rows = (
+        db.query(invoice_repository.StudentInvoice.student_id, invoice_repository.StudentInvoice.invoice_no)
+        .filter(
+            invoice_repository.StudentInvoice.tenant_id == tenant_id,
+            invoice_repository.StudentInvoice.academic_year_id == academic_year_id,
+            invoice_repository.StudentInvoice.student_id.in_(student_ids),
+        )
+        .all()
+    )
+
+    if installment_name:
+        token = _normalized_installment_token(installment_name)
+        generated_set = {
+            int(row[0])
+            for row in existing_invoice_rows
+            if token in str((row[1] or "")).lower()
+        }
+    else:
+        generated_set = {int(row[0]) for row in existing_invoice_rows}
+
+    return [
+        InvoiceStudentItem(
+            id=int(s.id),
+            student_name=s.student_name,
+            roll_no=s.roll_no,
+            is_invoice_generated=int(s.id) in generated_set,
+        )
+        for s in students
+    ]
+
+
+def _normalized_installment_token(installment_name: str) -> str:
+    cleaned = "".join(ch.lower() if ch.isalnum() else "-" for ch in installment_name.strip())
+    compact = "-".join([part for part in cleaned.split("-") if part])
+    return compact[:20] or "installment"
+
+
+def _invoice_no_for_generation(*, academic_year_id: int, installment_name: str, student_id: int) -> str:
+    token = _normalized_installment_token(installment_name)
+    return f"INV-{academic_year_id}-{token}-{student_id}"[:50]
+
+
+def generate_invoices(
+    db: Session,
+    *,
+    tenant_id: int,
+    payload: GenerateInvoiceRequest,
+) -> GenerateInvoiceResponse:
+    if not payload.student_ids:
+        return GenerateInvoiceResponse(
+            created_count=0,
+            skipped_count=0,
+            message="No students selected",
+            skipped_student_ids=[],
+        )
+    if payload.due_date < payload.invoice_date:
+        raise ValidationException("due_date cannot be earlier than invoice_date")
+
+    target_students = (
+        db.query(Student.id)
+        .filter(
+            Student.tenant_id == tenant_id,
+            Student.id.in_(payload.student_ids),
+            Student.class_id == payload.class_id,
+            Student.class_division_id == payload.division_id,
+            Student.academic_year_id == payload.academic_year_id,
+            Student.is_active == True,  # noqa: E712
+        )
+        .all()
+    )
+    valid_student_ids = {int(s[0]) for s in target_students}
+    skipped_set = {int(sid) for sid in payload.student_ids if int(sid) not in valid_student_ids}
+    if not valid_student_ids:
+        return GenerateInvoiceResponse(
+            created_count=0,
+            skipped_count=len(skipped_set),
+            message="No valid students found for selected filters",
+            skipped_student_ids=sorted(skipped_set),
+        )
+
+    fee_plan = get_fee_plan(
+        db,
+        tenant_id=tenant_id,
+        class_id=payload.class_id,
+        division_id=payload.division_id,
+    )
+    if not fee_plan:
+        raise ValidationException("No fee plan assigned for selected class/division")
+
+    installment_token = _normalized_installment_token(payload.installment_name)
+    existing = (
+        db.query(invoice_repository.StudentInvoice.student_id, invoice_repository.StudentInvoice.invoice_no)
+        .filter(
+            invoice_repository.StudentInvoice.tenant_id == tenant_id,
+            invoice_repository.StudentInvoice.academic_year_id == payload.academic_year_id,
+            invoice_repository.StudentInvoice.student_id.in_(list(valid_student_ids)),
+        )
+        .all()
+    )
+    existing_student_ids = {
+        int(row[0])
+        for row in existing
+        if installment_token in str((row[1] or "")).lower()
+    }
+    skipped_set.update(existing_student_ids)
+    to_create_ids = sorted(list(valid_student_ids - existing_student_ids))
+    if not to_create_ids:
+        return GenerateInvoiceResponse(
+            created_count=0,
+            skipped_count=len(skipped_set),
+            message="Invoices already generated for selected students",
+            skipped_student_ids=sorted(skipped_set),
+        )
+
+    rows = [
+        invoice_repository.StudentInvoice(
+            tenant_id=tenant_id,
+            student_id=student_id,
+            academic_year_id=payload.academic_year_id,
+            class_id=payload.class_id,
+            fee_structure_id=fee_plan.id,
+            invoice_no=_invoice_no_for_generation(
+                academic_year_id=payload.academic_year_id,
+                installment_name=payload.installment_name,
+                student_id=student_id,
+            ),
+            total_amount=fee_plan.total_amount,
+            paid_amount=0,
+            due_amount=fee_plan.total_amount,
+            due_date=payload.due_date,
+            status="PENDING",
+        )
+        for student_id in to_create_ids
+    ]
+    db.bulk_save_objects(rows)
+    db.commit()
+
+    msg = "Invoices generated successfully"
+    if skipped_set:
+        msg = f"Invoices generated with warnings. Skipped {len(skipped_set)} students"
+    return GenerateInvoiceResponse(
+        created_count=len(to_create_ids),
+        skipped_count=len(skipped_set),
+        message=msg,
+        skipped_student_ids=sorted(skipped_set),
+    )

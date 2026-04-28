@@ -57,3 +57,36 @@ class InvoiceListResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+class FeePlanResponse(BaseModel):
+    id: int
+    class_id: int
+    division_id: Optional[int] = None
+    academic_year_id: int
+    total_amount: float
+    name: Optional[str] = None
+
+
+class InvoiceStudentItem(BaseModel):
+    id: int
+    student_name: str
+    roll_no: Optional[str] = None
+    is_invoice_generated: bool
+
+
+class GenerateInvoiceRequest(BaseModel):
+    academic_year_id: int = Field(..., ge=1)
+    class_id: int = Field(..., ge=1)
+    division_id: int = Field(..., ge=1)
+    installment_name: str = Field(..., min_length=1, max_length=100)
+    invoice_date: date
+    due_date: date
+    student_ids: list[int] = Field(default_factory=list)
+
+
+class GenerateInvoiceResponse(BaseModel):
+    created_count: int
+    skipped_count: int
+    message: str
+    skipped_student_ids: list[int] = Field(default_factory=list)
