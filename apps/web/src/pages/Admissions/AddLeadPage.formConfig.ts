@@ -138,10 +138,8 @@ export function createAddLeadFormConfig({
       child_dob: {
         name: "child_dob",
         label: "Date of Birth",
-        type: "text",
-        placeholder: "YYYY-MM-DD",
+        type: "date",
         required: false,
-        props: { type: "date" },
       },
       child_gender: {
         name: "child_gender",
@@ -216,10 +214,8 @@ export function createAddLeadFormConfig({
       expected_admission_date: {
         name: "expected_admission_date",
         label: "Expected Admission Date",
-        type: "text",
-        placeholder: "YYYY-MM-DD",
+        type: "date",
         required: false,
-        props: { type: "date" },
       },
       assigned_to: {
         name: "assigned_to",
