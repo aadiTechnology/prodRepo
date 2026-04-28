@@ -11,6 +11,7 @@ import {
   Select,
   Typography,
 } from "@mui/material";
+import { Add as AddIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
 import { EntityTableSection, ListPageLayout, ListPageToolbar } from "../../components/reusable";
@@ -58,6 +59,9 @@ export default function InvoiceList() {
                 searchValue={controller.search}
                 onSearchChange={controller.setSearch}
                 searchPlaceholder="Search by student name..."
+                onAddClick={() => navigate("/fees/generate-invoice")}
+                addLabel="Generate Invoice"
+                addIcon={<AddIcon sx={{ fontSize: 24 }} />}
                 renderActions={
                   <>
                     <Select

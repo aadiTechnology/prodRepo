@@ -50,6 +50,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
   formTopSlot,
   canSubmit = true,
   hideFooterActions = false,
+  footerActionOrder = "save-first",
 }: BaseFormProps<T>) {
   const formId = useId();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -194,12 +195,25 @@ export default function BaseForm<T extends Record<string, unknown>>({
                 mt: 4,
               }}
             >
-              <SaveButton type="submit" disabled={!canSubmit} loading={loading}>
-                {isEditMode ? submitLabelEdit : submitLabelCreate}
-              </SaveButton>
-              <CancelButton onClick={onCancelNavigate} disabled={loading}>
-                Cancel
-              </CancelButton>
+              {footerActionOrder === "cancel-first" ? (
+                <>
+                  <CancelButton onClick={onCancelNavigate} disabled={loading}>
+                    Cancel
+                  </CancelButton>
+                  <SaveButton type="submit" disabled={!canSubmit} loading={loading}>
+                    {isEditMode ? submitLabelEdit : submitLabelCreate}
+                  </SaveButton>
+                </>
+              ) : (
+                <>
+                  <SaveButton type="submit" disabled={!canSubmit} loading={loading}>
+                    {isEditMode ? submitLabelEdit : submitLabelCreate}
+                  </SaveButton>
+                  <CancelButton onClick={onCancelNavigate} disabled={loading}>
+                    Cancel
+                  </CancelButton>
+                </>
+              )}
             </Box>
           )}
         </form>

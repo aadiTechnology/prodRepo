@@ -118,4 +118,6 @@ export type BaseFormProps<T extends Record<string, unknown>> = {
   canSubmit?: boolean;
   /** Hide bottom Save/Cancel bar (useful for read-only detail pages). */
   hideFooterActions?: boolean;
+  /** Controls footer action order; defaults to save then cancel. */
+  footerActionOrder?: "save-first" | "cancel-first";
 };
