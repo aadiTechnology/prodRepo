@@ -80,10 +80,52 @@ export function createFeeStructureFormConfig({
       class_division_id: {
         name: "class_division_id",
         label: "Division (Optional)",
-        type: "select",
-        props: {
-          options: [{ value: "", label: "All Divisions" }, ...divisions.map((d) => ({ value: d.id, label: d.division_name }))],
-          disabled: false,
+        type: "custom",
+        render: (ctx: FormRenderContext<FeeStructureFormData>) => {
+          const selectedValue = ctx.formData.class_division_id;
+          const allDivisionsText = divisions.length > 0 ? divisions.map(d => d.division_name).join(", ") : "";
+          
+          return (
+            <FormControl fullWidth>
+              <InputLabel
+                shrink
+                sx={{
+                  fontSize: "0.85rem",
+                  color: "primary.main",
+                }}
+              >
+                Division (Optional)
+              </InputLabel>
+              <Select
+                value={selectedValue || ""}
+                onChange={(e) => {
+                  ctx.handleFieldValueChange("class_division_id", e.target.value || "");
+                }}
+                input={<OutlinedInput notched label="Division (Optional)" />}
+                displayEmpty
+                renderValue={(value) => {
+                  if (!value || value === "") {
+                    return (
+                      <Typography variant="body2" sx={{ color: allDivisionsText ? "text.primary" : "text.disabled" }}>
+                        {allDivisionsText || "All Divisions"}
+                      </Typography>
+                    );
+                  }
+                  const selectedDiv = divisions.find(d => d.id === value);
+                  return <Typography variant="body2">{selectedDiv?.division_name || value}</Typography>;
+                }}
+              >
+                <MenuItem value="">
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>All Divisions</Typography>
+                </MenuItem>
+                {divisions.map((d) => (
+                  <MenuItem key={d.id} value={d.id}>
+                    <Typography variant="body2">{d.division_name}</Typography>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          );
         },
       },
       fee_category_ids: {
@@ -228,15 +270,22 @@ export function createFeeStructureFormConfig({
         fieldNames: [
           "total_amount",
           "installment_type",
+        ],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, md: 6 },
+        fieldNames: [
           "num_installments",
+          "description",
         ],
       },
       {
         kind: "custom",
-        grid: { xs: 12, md: 6 },
+        grid: { xs: 12 },
         render: (ctx: FormRenderContext<FeeStructureFormData>) => (
-          <Box sx={{ mt: { xs: 1, md: 0 } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700 }}>
               Installment Schedule Preview
             </Typography>
             {installments.length > 0 ? (
@@ -259,11 +308,6 @@ export function createFeeStructureFormConfig({
             )}
           </Box>
         ),
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12 },
-        fieldNames: ["description"],
       },
     ],
   };
