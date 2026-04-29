@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+import re
 
 from sqlalchemy.orm import Session
 
@@ -160,9 +161,7 @@ def create_invoice(
     if Decimal(str(payload.due_amount)) != expected_due:
         raise ValidationException("due_amount must be equal to total_amount - paid_amount")
 
-    existing = invoice_repository.get_invoice_by_number(db, tenant_id=tenant_id, invoice_no=payload.invoice_no)
-    if existing:
-        raise ConflictException("Invoice number already exists.")
+    invoice_no = _format_invoice_no(_next_invoice_sequence(db))
 
     status = _calc_status(
         total_amount=Decimal(str(payload.total_amount)),
@@ -179,7 +178,7 @@ def create_invoice(
         academic_year_id=payload.academic_year_id,
         class_id=payload.class_id,
         fee_structure_id=payload.fee_structure_id,
-        invoice_no=payload.invoice_no,
+        invoice_no=invoice_no,
         total_amount=payload.total_amount,
         paid_amount=payload.paid_amount,
         due_amount=payload.due_amount,
@@ -333,15 +332,7 @@ def get_students_for_invoice(
         .all()
     )
 
-    if installment_name:
-        token = _normalized_installment_token(installment_name)
-        generated_set = {
-            int(row[0])
-            for row in existing_invoice_rows
-            if token in str((row[1] or "")).lower()
-        }
-    else:
-        generated_set = {int(row[0]) for row in existing_invoice_rows}
+    generated_set = {int(row[0]) for row in existing_invoice_rows}
 
     return [
         InvoiceStudentItem(
@@ -354,15 +345,24 @@ def get_students_for_invoice(
     ]
 
 
-def _normalized_installment_token(installment_name: str) -> str:
-    cleaned = "".join(ch.lower() if ch.isalnum() else "-" for ch in installment_name.strip())
-    compact = "-".join([part for part in cleaned.split("-") if part])
-    return compact[:20] or "installment"
+def _next_invoice_sequence(db: Session) -> int:
+    invoice_rows = (
+        db.query(invoice_repository.StudentInvoice.invoice_no)
+        .filter(invoice_repository.StudentInvoice.invoice_no.like("INV-%"))
+        .all()
+    )
+    max_seq = 0
+    for row in invoice_rows:
+        value = str(row[0] or "").strip()
+        match = re.fullmatch(r"INV-(\d+)", value)
+        if not match:
+            continue
+        max_seq = max(max_seq, int(match.group(1)))
+    return max_seq + 1
 
 
-def _invoice_no_for_generation(*, academic_year_id: int, installment_name: str, student_id: int) -> str:
-    token = _normalized_installment_token(installment_name)
-    return f"INV-{academic_year_id}-{token}-{student_id}"[:50]
+def _format_invoice_no(sequence: int) -> str:
+    return f"INV-{sequence:02d}"
 
 
 def generate_invoices(
@@ -412,7 +412,6 @@ def generate_invoices(
     if not fee_plan:
         raise ValidationException("No fee plan assigned for selected class/division")
 
-    installment_token = _normalized_installment_token(payload.installment_name)
     existing = (
         db.query(invoice_repository.StudentInvoice.student_id, invoice_repository.StudentInvoice.invoice_no)
         .filter(
@@ -422,11 +421,7 @@ def generate_invoices(
         )
         .all()
     )
-    existing_student_ids = {
-        int(row[0])
-        for row in existing
-        if installment_token in str((row[1] or "")).lower()
-    }
+    existing_student_ids = {int(row[0]) for row in existing}
     skipped_set.update(existing_student_ids)
     to_create_ids = sorted(list(valid_student_ids - existing_student_ids))
     if not to_create_ids:
@@ -437,6 +432,7 @@ def generate_invoices(
             skipped_student_ids=sorted(skipped_set),
         )
 
+    next_invoice_seq = _next_invoice_sequence(db)
     rows = [
         invoice_repository.StudentInvoice(
             tenant_id=tenant_id,
@@ -444,18 +440,14 @@ def generate_invoices(
             academic_year_id=payload.academic_year_id,
             class_id=payload.class_id,
             fee_structure_id=fee_plan.id,
-            invoice_no=_invoice_no_for_generation(
-                academic_year_id=payload.academic_year_id,
-                installment_name=payload.installment_name,
-                student_id=student_id,
-            ),
+            invoice_no=_format_invoice_no(next_invoice_seq + index),
             total_amount=fee_plan.total_amount,
             paid_amount=0,
             due_amount=fee_plan.total_amount,
             due_date=payload.due_date,
             status="PENDING",
         )
-        for student_id in to_create_ids
+        for index, student_id in enumerate(to_create_ids)
     ]
     db.bulk_save_objects(rows)
     db.commit()

@@ -48,6 +48,22 @@ export interface GenerateInvoiceResponse {
   skipped_student_ids?: number[];
 }
 
+export interface InstallmentOption {
+  value: string;
+  label: string;
+  due_date?: string;
+}
+
+const toDateInputValue = (raw: unknown): string | undefined => {
+  if (!raw) return undefined;
+  const text = String(raw).trim();
+  if (!text) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString().split("T")[0];
+};
+
 const invoiceApi = {
   normalizeStudents(raw: unknown[]): InvoiceStudentItem[] {
     return raw
@@ -91,10 +107,42 @@ const invoiceApi = {
     return response.data ?? null;
   },
 
+  async getInstallmentOptions(params: {
+    class_id: number;
+    division_id: number;
+    academic_year_id: number;
+  }): Promise<InstallmentOption[]> {
+    const feePlan = await this.getFeePlan(params.class_id, params.division_id);
+    if (!feePlan) return [];
+    if (feePlan.academic_year_id !== params.academic_year_id) return [];
+
+    const response = await axiosInstance.get(`/fees/structures/${feePlan.id}`);
+    const installments = Array.isArray(response.data?.installments) ? response.data.installments : [];
+
+    const normalized = installments
+      .map((item: unknown) => {
+        const row = item as Record<string, unknown>;
+        const numberValue = Number(row.installment_number);
+        const description = String(row.description ?? "").trim();
+        const label = description || `Installment ${Number.isNaN(numberValue) ? "" : numberValue}`.trim();
+        const dueDateValue = toDateInputValue(row.due_date);
+        if (!label) return null;
+        return {
+          value: label,
+          label,
+          due_date: dueDateValue,
+        };
+      })
+      .filter((item): item is InstallmentOption => item !== null);
+
+    return Array.from(new Map(normalized.map((item) => [item.value, item])).values());
+  },
+
   async getStudents(params: {
     class_id: number;
     division_id: number;
     academic_year_id: number;
+    installment_name?: string;
   }): Promise<InvoiceStudentItem[]> {
     const response = await axiosInstance.get("/api/students", { params });
     if (Array.isArray(response.data)) return this.normalizeStudents(response.data);

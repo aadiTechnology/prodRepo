@@ -3,7 +3,6 @@ import {
   Box,
   Checkbox,
   CircularProgress,
-  FormControlLabel,
   Paper,
   Typography,
 } from "@mui/material";
@@ -32,13 +31,6 @@ const defaultFormData = (): GenerateInvoiceFormData => ({
   invoice_date: "",
   due_date: "",
 });
-
-const installmentOptions: SelectItemOption[] = [
-  { id: "term-1-registration", value: "Term 1 - Registration", label: "Term 1 - Registration" },
-  { id: "term-1-tuition", value: "Term 1 - Tuition", label: "Term 1 - Tuition" },
-  { id: "term-2-tuition", value: "Term 2 - Tuition", label: "Term 2 - Tuition" },
-  { id: "annual", value: "Annual Fee", label: "Annual Fee" },
-];
 
 export default function GenerateInvoice() {
   const navigate = useNavigate();
@@ -115,9 +107,28 @@ export default function GenerateInvoice() {
       formData.class_id,
       formData.division_id,
       formData.academic_year_id,
+      formData.installment_name,
     ],
     queryFn: () =>
       invoiceApi.getStudents({
+        class_id: formData.class_id as number,
+        division_id: formData.division_id as number,
+        academic_year_id: formData.academic_year_id as number,
+        installment_name: formData.installment_name || undefined,
+      }),
+    enabled: filtersReady,
+  });
+
+  const { data: installmentNameOptions = [], isLoading: installmentsLoading } = useQuery({
+    queryKey: [
+      "generate-invoice",
+      "installments",
+      formData.class_id,
+      formData.division_id,
+      formData.academic_year_id,
+    ],
+    queryFn: () =>
+      invoiceApi.getInstallmentOptions({
         class_id: formData.class_id as number,
         division_id: formData.division_id as number,
         academic_year_id: formData.academic_year_id as number,
@@ -158,6 +169,31 @@ export default function GenerateInvoice() {
     setSelectedStudentIds([]);
     setStudentsPage(0);
   }, [formData.division_id]);
+
+  useEffect(() => {
+    if (!formData.installment_name) return;
+    const isValid = installmentNameOptions.some(
+      (option) => option.value === formData.installment_name
+    );
+    if (!isValid) {
+      setFormData((prev) => ({ ...prev, installment_name: "" }));
+    }
+  }, [formData.installment_name, installmentNameOptions, setFormData]);
+
+  useEffect(() => {
+    if (!formData.installment_name) return;
+    const selectedInstallment = installmentNameOptions.find(
+      (option) => option.value === formData.installment_name
+    );
+    if (!selectedInstallment?.due_date) return;
+    setFormData((prev) => {
+      if (prev.due_date === selectedInstallment.due_date) return prev;
+      return {
+        ...prev,
+        due_date: selectedInstallment.due_date,
+      };
+    });
+  }, [formData.installment_name, installmentNameOptions, setFormData]);
 
   const academicYearOptions = useMemo<SelectItemOption[]>(
     () =>
@@ -275,6 +311,14 @@ export default function GenerateInvoice() {
       {
         id: "select",
         label: "Select",
+        renderHeader: () => (
+          <Checkbox
+            checked={isAllSelected}
+            indeterminate={!isAllSelected && selectedStudentIds.length > 0}
+            onChange={(e) => handleSelectAll(e.target.checked)}
+            inputProps={{ "aria-label": "Select all students" }}
+          />
+        ),
         width: 90,
         render: (student: (typeof students)[number]) => (
           <Checkbox
@@ -313,21 +357,11 @@ export default function GenerateInvoice() {
         render: (student: (typeof students)[number]) => student.roll_no || "-",
       },
     ],
-    [selectedStudentIds, handleToggleStudent]
+    [selectedStudentIds, handleToggleStudent, isAllSelected, handleSelectAll]
   );
 
   const studentsSection = useMemo(() => (
     <Box sx={{ px: 1, mt: 1 }}>
-      <Typography
-        sx={{
-          fontSize: "0.9rem",
-          fontWeight: 700,
-          color: colorTokens.text.primary,
-          mb: 1.5,
-        }}
-      >
-        Student Selection
-      </Typography>
       {!filtersReady ? (
         <Paper
           variant="outlined"
@@ -367,37 +401,24 @@ export default function GenerateInvoice() {
           </Typography>
         </Paper>
       ) : (
-        <>
-          <FormControlLabel
-            sx={{ mb: 1 }}
-            control={
-              <Checkbox
-                checked={isAllSelected}
-                indeterminate={!isAllSelected && selectedStudentIds.length > 0}
-                onChange={(e) => handleSelectAll(e.target.checked)}
-              />
-            }
-            label="Select All Students"
-          />
-          <EntityTableSection
-            label="Student Selection"
-            totalRows={students.length}
-            page={studentsPage}
-            rowsPerPage={studentsRowsPerPage}
-            onPageChange={setStudentsPage}
-            onRowsPerPageChange={(rows) => {
-              setStudentsRowsPerPage(rows);
-              setStudentsPage(0);
-            }}
-            columns={studentColumns}
-            data={paginatedStudents}
-            loading={false}
-            emptyMessage="No students found"
-            getRowKey={(row) => row.id}
-            showInfoBar={false}
-            showPagination={students.length > studentsRowsPerPage}
-          />
-        </>
+        <EntityTableSection
+          label="Student Selection"
+          totalRows={students.length}
+          page={studentsPage}
+          rowsPerPage={studentsRowsPerPage}
+          onPageChange={setStudentsPage}
+          onRowsPerPageChange={(rows) => {
+            setStudentsRowsPerPage(rows);
+            setStudentsPage(0);
+          }}
+          columns={studentColumns}
+          data={paginatedStudents}
+          loading={false}
+          emptyMessage="No students found"
+          getRowKey={(row) => row.id}
+          showInfoBar={false}
+          showPagination={students.length > 0}
+        />
       )}
     </Box>
   ), [
@@ -412,6 +433,16 @@ export default function GenerateInvoice() {
     paginatedStudents,
   ]);
 
+  const installmentOptions = useMemo<SelectItemOption[]>(
+    () =>
+      installmentNameOptions.map((option) => ({
+        id: option.value,
+        value: option.value,
+        label: option.label,
+      })),
+    [installmentNameOptions]
+  );
+
   const formConfig = useMemo(
     () =>
       generateInvoiceFormConfig({
@@ -424,7 +455,7 @@ export default function GenerateInvoice() {
         divisionsLoading,
         disableClass: !formData.academic_year_id || classesLoading,
         disableDivision: !formData.class_id || divisionsLoading,
-        disableInstallment: !filtersReady,
+        disableInstallment: !filtersReady || installmentsLoading || installmentOptions.length === 0,
         disableDates: false,
         studentSelectionSlot: studentsSection,
       }),
@@ -435,9 +466,11 @@ export default function GenerateInvoice() {
       academicYearsLoading,
       classesLoading,
       divisionsLoading,
+      installmentsLoading,
       formData.academic_year_id,
       formData.class_id,
       filtersReady,
+      installmentOptions,
       studentsSection,
     ]
   );
@@ -462,7 +495,7 @@ export default function GenerateInvoice() {
       onSnackbarClose={() => setSnackbar(null)}
       headerConfig={{
         links: [
-          { title: "Fees", path: "/fees/invoices" },
+          { title: "Invoice List", path: "/fees/invoices" },
           { title: "Generate Invoice", path: "#" },
         ],
         homePath: "/",
