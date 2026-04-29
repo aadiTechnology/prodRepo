@@ -16,8 +16,13 @@ from app.schemas.invoice import (
     GenerateInvoiceRequest,
     GenerateInvoiceResponse,
     InvoiceCreateRequest,
+    InvoiceDetailResponse,
+    InvoiceFeeBreakdownItem,
     InvoiceListResponse,
+    InvoicePaymentHistoryItem,
+    InvoicePaymentSummary,
     InvoiceResponse,
+    InvoiceStudentInfo,
     InvoiceStudentItem,
     InvoiceUpdateRequest,
 )
@@ -140,6 +145,73 @@ def get_invoice(db: Session, *, tenant_id: int, invoice_id: int) -> InvoiceRespo
     if not row:
         raise NotFoundException("StudentInvoice", invoice_id)
     return _to_invoice_response(row)
+
+
+def get_invoice_detail(
+    db: Session,
+    *,
+    tenant_id: int,
+    invoice_id: int,
+) -> InvoiceDetailResponse:
+    invoice_row = invoice_repository.get_invoice_by_id(db, tenant_id=tenant_id, invoice_id=invoice_id)
+    if not invoice_row:
+        raise NotFoundException("StudentInvoice", invoice_id)
+
+    student_info_row = invoice_repository.get_invoice_student_info(
+        db, tenant_id=tenant_id, invoice_id=invoice_id
+    )
+    fee_breakdown_rows = invoice_repository.get_invoice_fee_breakdown(db, invoice_id=invoice_id)
+    payment_history_rows = invoice_repository.get_invoice_payment_history(
+        db,
+        tenant_id=tenant_id,
+        student_id=int(invoice_row["student_id"]),
+        fee_installment_id=invoice_row.get("fee_installment_id"),
+    )
+
+    invoice = _to_invoice_response(invoice_row)
+    paid_amount = float(invoice_row["paid_amount"] or 0)
+    due_amount = float(invoice_row["due_amount"] or 0)
+    available_actions: list[str] = ["download_invoice", "print_invoice", "back"]
+    if due_amount > 0:
+        available_actions.extend(["pay_now", "collect_payment"])
+
+    return InvoiceDetailResponse(
+        invoice=invoice,
+        student_info=InvoiceStudentInfo(
+            student_id=int(student_info_row["student_id"]),
+            student_name=str(student_info_row["student_name"]),
+            admission_no=student_info_row.get("admission_no"),
+            class_id=int(student_info_row["class_id"]),
+            class_name=student_info_row.get("class_name"),
+            division_id=student_info_row.get("division_id"),
+            division_name=student_info_row.get("division_name"),
+        ),
+        fee_breakdown=[
+            InvoiceFeeBreakdownItem(
+                id=int(item["id"]),
+                fee_category_id=item.get("fee_category_id"),
+                fee_category_name=item.get("fee_category_name"),
+                amount=float(item["amount"] or 0),
+            )
+            for item in fee_breakdown_rows
+        ],
+        payment_summary=InvoicePaymentSummary(
+            total_amount=float(invoice_row["total_amount"] or 0),
+            paid_amount=paid_amount,
+            due_amount=due_amount,
+        ),
+        payment_history=[
+            InvoicePaymentHistoryItem(
+                payment_id=int(item["payment_id"]),
+                payment_date=item["payment_date"],
+                amount=float(item["amount"] or 0),
+                payment_method=str(item["payment_method"]),
+                reference_no=item.get("reference_no"),
+            )
+            for item in payment_history_rows
+        ],
+        available_actions=available_actions,
+    )
 
 
 def create_invoice(

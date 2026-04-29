@@ -1,16 +1,5 @@
 import { useMemo } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  MenuItem,
-  Select,
-  Typography,
-} from "@mui/material";
+import { Alert, MenuItem, Select, Typography } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
@@ -18,17 +7,13 @@ import { EntityTableSection, ListPageLayout, ListPageToolbar } from "../../compo
 import { useInvoiceListController } from "../../hooks/useInvoiceListController";
 import { createInvoiceListConfig } from "./InvoiceList.listConfig";
 
-function detailMoney(value: number): string {
-  return `₹${Number(value || 0).toLocaleString()}`;
-}
-
 export default function InvoiceList() {
   const navigate = useNavigate();
   const controller = useInvoiceListController();
   const config = useMemo(
     () =>
       createInvoiceListConfig({
-        onViewInvoice: (invoice) => void controller.openInvoiceDetails(invoice.id),
+        onViewInvoice: (invoice) => navigate(`/fees/invoices/${invoice.id}/detail`),
         onCollectPayment: (invoice) =>
           navigate("/fees/installment-status", {
             state: {
@@ -44,7 +29,7 @@ export default function InvoiceList() {
             },
           }),
       }),
-    [controller.openInvoiceDetails, navigate]
+    [navigate]
   );
 
   return (
@@ -144,38 +129,6 @@ export default function InvoiceList() {
         emptyMessage={config.uiPolicy.emptyMessage}
         rowActions={config.actions.rowActions}
       />
-
-
-
-      <Dialog
-        open={Boolean(controller.selectedInvoice)}
-        onClose={controller.closeInvoiceDetails}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>Invoice Details</DialogTitle>
-        <DialogContent dividers>
-          {controller.detailsLoading && <Typography>Loading...</Typography>}
-          {controller.selectedInvoice && (
-            <Box sx={{ display: "grid", gap: 1.5 }}>
-              <Typography>Invoice No: {controller.selectedInvoice.invoice_no}</Typography>
-              <Typography>Student: {controller.selectedInvoice.student_name}</Typography>
-              <Typography>Admission No: {controller.selectedInvoice.admission_no || "-"}</Typography>
-              <Typography>Class: {controller.selectedInvoice.class_name || "-"}</Typography>
-              <Typography>Total Amount: {detailMoney(controller.selectedInvoice.total_amount)}</Typography>
-              <Typography>Paid Amount: {detailMoney(controller.selectedInvoice.paid_amount)}</Typography>
-              <Typography>Due Amount: {detailMoney(controller.selectedInvoice.due_amount)}</Typography>
-              <Typography>
-                Due Date: {new Date(controller.selectedInvoice.due_date).toLocaleDateString()}
-              </Typography>
-              <Typography>Status: {controller.selectedInvoice.status}</Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={controller.closeInvoiceDetails}>Close</Button>
-        </DialogActions>
-      </Dialog>
     </ListPageLayout>
   );
 }

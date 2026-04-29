@@ -72,6 +72,7 @@ def list_invoices(
             si.fee_structure_id,
             si.invoice_no,
             LTRIM(RTRIM(ISNULL(si.[Installment], ''))) AS installment,
+            si.fee_installment_id,
             si.total_amount,
             si.paid_amount,
             si.due_amount,
@@ -116,6 +117,7 @@ def get_invoice_by_id(db: Session, *, tenant_id: int, invoice_id: int) -> dict |
             si.fee_structure_id,
             si.invoice_no,
             LTRIM(RTRIM(ISNULL(si.[Installment], ''))) AS installment,
+            si.fee_installment_id,
             si.total_amount,
             si.paid_amount,
             si.due_amount,
@@ -212,3 +214,81 @@ def delete_invoice(db: Session, *, tenant_id: int, invoice_id: int) -> None:
         """
     )
     db.execute(sql, {"tenant_id": tenant_id, "invoice_id": invoice_id})
+
+
+def get_invoice_student_info(db: Session, *, tenant_id: int, invoice_id: int) -> dict | None:
+    sql = text(
+        """
+        SELECT
+            si.student_id,
+            s.student_name,
+            s.admission_no,
+            si.class_id,
+            c.name AS class_name,
+            s.class_division_id AS division_id,
+            cd.division_name AS division_name
+        FROM student_invoices si
+        INNER JOIN students s ON s.id = si.student_id
+        INNER JOIN classes c ON c.id = si.class_id
+        LEFT JOIN class_divisions cd ON cd.id = s.class_division_id
+        WHERE si.tenant_id = :tenant_id AND si.id = :invoice_id
+        """
+    )
+    row = db.execute(sql, {"tenant_id": tenant_id, "invoice_id": invoice_id}).mappings().first()
+    return dict(row) if row else None
+
+
+def get_invoice_fee_breakdown(db: Session, *, invoice_id: int) -> list[dict]:
+    sql = text(
+        """
+        SELECT
+            sii.id,
+            sii.fee_category_id,
+            fc.name AS fee_category_name,
+            sii.amount
+        FROM student_invoice_items sii
+        LEFT JOIN fee_categories fc ON fc.id = TRY_CONVERT(varchar(36), sii.fee_category_id)
+        WHERE sii.invoice_id = :invoice_id
+        ORDER BY sii.id ASC
+        """
+    )
+    rows = db.execute(sql, {"invoice_id": invoice_id}).mappings().all()
+    return [dict(r) for r in rows]
+
+
+def get_invoice_payment_history(
+    db: Session,
+    *,
+    tenant_id: int,
+    student_id: int,
+    fee_installment_id: int | None,
+) -> list[dict]:
+    where_parts = [
+        "fp.tenant_id = :tenant_id",
+        "fp.student_id = :student_id",
+    ]
+    params: dict = {
+        "tenant_id": tenant_id,
+        "student_id": student_id,
+    }
+
+    if fee_installment_id is not None:
+        where_parts.append("fp.fee_installment_id = :fee_installment_id")
+        params["fee_installment_id"] = fee_installment_id
+
+    where_clause = " AND ".join(where_parts)
+    sql = text(
+        f"""
+        SELECT
+            fp.id AS payment_id,
+            fp.payment_date,
+            fp.total_amount AS amount,
+            fp.payment_method,
+            fp.reference_no
+        FROM fee_payments fp
+        WHERE {where_clause}
+        ORDER BY fp.payment_date DESC, fp.id DESC
+        """
+    )
+    rows = db.execute(sql, params).mappings().all()
+    return [dict(r) for r in rows]

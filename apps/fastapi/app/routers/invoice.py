@@ -9,6 +9,7 @@ from app.schemas.invoice import (
     GenerateInvoiceRequest,
     GenerateInvoiceResponse,
     InvoiceCreateRequest,
+    InvoiceDetailResponse,
     InvoiceListResponse,
     InvoiceResponse,
     InvoiceStudentItem,
@@ -52,6 +53,19 @@ async def get_student_invoice(
     current_user: CurrentUser = Depends(require_installment_tracking_access),
 ):
     return invoice_service.get_invoice(db, tenant_id=current_user.tenant_id, invoice_id=invoice_id)
+
+
+@router.get("/{invoice_id}/detail", response_model=InvoiceDetailResponse)
+async def get_student_invoice_detail(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_installment_tracking_access),
+):
+    return invoice_service.get_invoice_detail(
+        db,
+        tenant_id=current_user.tenant_id,
+        invoice_id=invoice_id,
+    )
 
 
 @router.post("", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)

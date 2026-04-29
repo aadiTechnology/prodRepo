@@ -53,6 +53,46 @@ class InvoiceResponse(BaseModel):
     created_at: datetime
 
 
+class InvoiceFeeBreakdownItem(BaseModel):
+    id: int
+    fee_category_id: Optional[int] = None
+    fee_category_name: Optional[str] = None
+    amount: float
+
+
+class InvoicePaymentHistoryItem(BaseModel):
+    payment_id: int
+    payment_date: datetime
+    amount: float
+    payment_method: str
+    reference_no: Optional[str] = None
+
+
+class InvoiceStudentInfo(BaseModel):
+    student_id: int
+    student_name: str
+    admission_no: Optional[str] = None
+    class_id: int
+    class_name: Optional[str] = None
+    division_id: Optional[int] = None
+    division_name: Optional[str] = None
+
+
+class InvoicePaymentSummary(BaseModel):
+    total_amount: float
+    paid_amount: float
+    due_amount: float
+
+
+class InvoiceDetailResponse(BaseModel):
+    invoice: InvoiceResponse
+    student_info: InvoiceStudentInfo
+    fee_breakdown: list[InvoiceFeeBreakdownItem]
+    payment_summary: InvoicePaymentSummary
+    payment_history: list[InvoicePaymentHistoryItem]
+    available_actions: list[str]
+
+
 class InvoiceListResponse(BaseModel):
     items: list[InvoiceResponse]
     total: int

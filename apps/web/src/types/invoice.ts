@@ -39,3 +39,44 @@ export interface InvoiceListParams {
   status?: InvoiceStatus;
   search?: string;
 }
+
+export interface InvoiceFeeBreakdownItem {
+  id: number;
+  fee_category_id?: number | null;
+  fee_category_name?: string | null;
+  amount: number;
+}
+
+export interface InvoicePaymentSummary {
+  total_amount: number;
+  paid_amount: number;
+  due_amount: number;
+}
+
+export interface InvoicePaymentHistoryItem {
+  payment_id: number;
+  payment_date: string;
+  amount: number;
+  payment_method: string;
+  reference_no?: string | null;
+}
+
+export interface InvoiceStudentInfo {
+  student_id: number;
+  student_name: string;
+  admission_no?: string | null;
+  roll_no?: string | null;
+  class_id: number;
+  class_name?: string | null;
+  division_id?: number | null;
+  division_name?: string | null;
+}
+
+export interface InvoiceDetailResponse {
+  invoice: InvoiceItem;
+  student_info: InvoiceStudentInfo;
+  fee_breakdown: InvoiceFeeBreakdownItem[];
+  payment_summary: InvoicePaymentSummary;
+  payment_history: InvoicePaymentHistoryItem[];
+  available_actions: string[];
+}

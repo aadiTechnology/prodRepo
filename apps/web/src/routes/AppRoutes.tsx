@@ -63,6 +63,7 @@ const AddLeadPage = lazy(() => import("../pages/Admissions/AddLeadPage"));
 const EnrollmentPage = lazy(() => import("../pages/Admissions/EnrollmentPage"));
 const EnrollmentPrintPage = lazy(() => import("../pages/Admissions/EnrollmentPrintPage"));
 const InvoiceList = lazy(() => import("../pages/Fees/InvoiceList"));
+const InvoiceDetail = lazy(() => import("../pages/Fees/InvoiceDetail"));
 const GenerateInvoice = lazy(() => import("../pages/Fees/GenerateInvoice"));
 // Loading fallback component
 const PageLoader = () => (
@@ -232,6 +233,10 @@ export default function AppRoutes() {
          <Route
             path="/fees/invoices"
             element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><InvoiceList /></ProtectedRoute>}
+          />
+          <Route
+            path="/fees/invoices/:invoiceId/detail"
+            element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><InvoiceDetail /></ProtectedRoute>}
           />
           <Route
             path="/fees/generate-invoice"

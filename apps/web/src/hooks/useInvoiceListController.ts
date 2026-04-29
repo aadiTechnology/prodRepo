@@ -56,8 +56,6 @@ export function useInvoiceListController() {
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [installmentOptions, setInstallmentOptions] = useState<{ label: string; value: string }[]>([]);
-  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceItem | null>(null);
-  const [detailsLoading, setDetailsLoading] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<InvoiceItem | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -157,23 +155,6 @@ export function useInvoiceListController() {
     }
   }, [academicYearId, classes]);
 
-  const openInvoiceDetails = useCallback(async (invoiceId: number) => {
-    try {
-      setDetailsLoading(true);
-      setError(null);
-      const details = await invoiceService.getInvoiceById(invoiceId);
-      setSelectedInvoice(details);
-    } catch (err: any) {
-      setError(err?.message || "Unable to load invoice details. Please try again.");
-    } finally {
-      setDetailsLoading(false);
-    }
-  }, []);
-
-  const closeInvoiceDetails = useCallback(() => {
-    setSelectedInvoice(null);
-  }, []);
-
   const handleDeleteClick = useCallback((invoice: InvoiceItem) => {
     setInvoiceToDelete(invoice);
     setConfirmDialogOpen(true);
@@ -246,10 +227,6 @@ export function useInvoiceListController() {
     classes,
     statusOptions,
     fetchInvoices,
-    selectedInvoice,
-    detailsLoading,
-    openInvoiceDetails,
-    closeInvoiceDetails,
     confirmDialogOpen,
     setConfirmDialogOpen,
     invoiceToDelete,
