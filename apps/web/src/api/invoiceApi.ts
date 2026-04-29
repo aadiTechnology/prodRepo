@@ -56,6 +56,7 @@ export interface InstallmentOption {
   value: string;
   label: string;
   due_date?: string;
+  amount?: number;
 }
 
 const toDateInputValue = (raw: unknown): string | undefined => {
@@ -139,6 +140,7 @@ const invoiceApi = {
           value: label,
           label,
           due_date: dueDateValue,
+          amount: row.amount ? Number(row.amount) : undefined,
         };
       })
       .filter((item: InstallmentOption | null): item is InstallmentOption => item !== null);

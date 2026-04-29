@@ -28,6 +28,7 @@ const defaultFormData = (): GenerateInvoiceFormData => ({
   class_id: null,
   division_id: null,
   installment_name: "",
+  payable_amount: null,
   invoice_date: "",
   due_date: "",
 });
@@ -48,6 +49,7 @@ export default function GenerateInvoice() {
       class_id: [{ type: "required", message: "Please select a class to continue" }],
       division_id: [{ type: "required", message: "Please select a division" }],
       installment_name: [{ type: "required", message: "Installment is required" }],
+      payable_amount: [],
       invoice_date: [{ type: "required", message: "Invoice date is required" }],
       due_date: [
         { type: "required", message: "Due date is required" },
@@ -136,6 +138,8 @@ export default function GenerateInvoice() {
     enabled: filtersReady,
   });
 
+
+
   const generateMutation = useMutation({
     mutationFn: invoiceApi.generateInvoices,
   });
@@ -185,13 +189,16 @@ export default function GenerateInvoice() {
     const selectedInstallment = installmentNameOptions.find(
       (option) => option.value === formData.installment_name
     );
-    if (!selectedInstallment?.due_date) return;
+    if (!selectedInstallment) return;
     setFormData((prev) => {
-      if (prev.due_date === selectedInstallment.due_date) return prev;
-      return {
-        ...prev,
-        due_date: selectedInstallment.due_date,
-      };
+      const updates: Partial<GenerateInvoiceFormData> = {};
+      if (selectedInstallment.due_date && prev.due_date !== selectedInstallment.due_date) {
+        updates.due_date = selectedInstallment.due_date;
+      }
+      if (selectedInstallment.amount !== undefined && prev.payable_amount !== selectedInstallment.amount) {
+        updates.payable_amount = selectedInstallment.amount;
+      }
+      return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
     });
   }, [formData.installment_name, installmentNameOptions, setFormData]);
 
@@ -224,6 +231,8 @@ export default function GenerateInvoice() {
       })),
     [divisions]
   );
+
+
 
   const selectableStudents = useMemo(
     () => students.filter((student) => !student.is_invoice_generated),
@@ -443,6 +452,8 @@ export default function GenerateInvoice() {
     [installmentNameOptions]
   );
 
+
+
   const formConfig = useMemo(
     () =>
       generateInvoiceFormConfig({
@@ -456,6 +467,7 @@ export default function GenerateInvoice() {
         disableClass: !formData.academic_year_id || classesLoading,
         disableDivision: !formData.class_id || divisionsLoading,
         disableInstallment: !filtersReady || installmentsLoading || installmentOptions.length === 0,
+        disablePayableAmount: true,
         disableDates: false,
         studentSelectionSlot: studentsSection,
       }),

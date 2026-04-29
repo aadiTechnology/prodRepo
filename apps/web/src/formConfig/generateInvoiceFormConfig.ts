@@ -7,6 +7,7 @@ export type GenerateInvoiceFormData = {
   class_id: number | null;
   division_id: number | null;
   installment_name: string;
+  payable_amount: number | null;
   invoice_date: string;
   due_date: string;
 };
@@ -23,6 +24,7 @@ type GenerateInvoiceFormConfigArgs = {
   disableDivision: boolean;
   disableInstallment: boolean;
   disableDates: boolean;
+  disablePayableAmount: boolean;
   studentSelectionSlot?: ReactNode;
 };
 
@@ -38,6 +40,7 @@ export function generateInvoiceFormConfig({
   disableDivision,
   disableInstallment,
   disableDates,
+  disablePayableAmount,
   studentSelectionSlot,
 }: GenerateInvoiceFormConfigArgs): FormConfig<GenerateInvoiceFormData> {
   return {
@@ -92,6 +95,16 @@ export function generateInvoiceFormConfig({
           disabled: disableInstallment,
         },
       },
+      payable_amount: {
+        name: "payable_amount",
+        label: "Payable Amount (₹)",
+        type: "text",
+        required: false,
+        props: {
+          disabled: disablePayableAmount,
+          readOnly: true,
+        },
+      },
       invoice_date: {
         name: "invoice_date",
         label: "Invoice Date",
@@ -118,6 +131,7 @@ export function generateInvoiceFormConfig({
       { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["division_id"] },
       { kind: "section", title: "Installment Time", grid: { xs: 12 } },
       { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["installment_name"] },
+      { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["payable_amount"] },
       { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["invoice_date"] },
       { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["due_date"] },
       { kind: "section", title: "Student Selection", grid: { xs: 12 } },
