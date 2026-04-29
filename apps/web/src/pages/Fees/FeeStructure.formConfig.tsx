@@ -11,6 +11,7 @@ import {
   FormControl,
   InputLabel,
   FormHelperText,
+  TextField,
 } from "@mui/material";
 import { type ClassEntity, type FeeCategory } from "../../types/fee";
 
@@ -40,6 +41,7 @@ export function createFeeStructureFormConfig({
   installments,
   categories,
   divisions,
+  onInstallmentUpdate,
 }: {
   isEditMode: boolean;
   academicYears: { id: number; name: string }[];
@@ -47,6 +49,7 @@ export function createFeeStructureFormConfig({
   installments: FeeInstallmentPreview[];
   categories: FeeCategory[];
   divisions: { id: number; division_name: string }[];
+  onInstallmentUpdate: (index: number, field: keyof FeeInstallmentPreview, value: any) => void;
 }): FormConfig<FeeStructureFormData> {
   return {
     fields: {
@@ -104,14 +107,14 @@ export function createFeeStructureFormConfig({
                 input={<OutlinedInput notched label="Division (Optional)" />}
                 displayEmpty
                 renderValue={(value) => {
-                  if (!value || value === "") {
+                  if (!value || String(value) === "") {
                     return (
                       <Typography variant="body2" sx={{ color: allDivisionsText ? "text.primary" : "text.disabled" }}>
                         {allDivisionsText || "All Divisions"}
                       </Typography>
                     );
                   }
-                  const selectedDiv = divisions.find(d => d.id === value);
+                  const selectedDiv = divisions.find(d => String(d.id) === String(value));
                   return <Typography variant="body2">{selectedDiv?.division_name || value}</Typography>;
                 }}
               >
@@ -292,9 +295,51 @@ export function createFeeStructureFormConfig({
               <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.25, overflow: "hidden" }}>
                 <DataTable
                   columns={[
-                    { id: "num", label: "#", render: (row: any) => row.installment_number },
-                    { id: "amt", label: "Amount", render: (row: any) => `₹${Number(row.amount).toLocaleString()}` },
-                    { id: "date", label: "Due Date", render: (row: any) => row.due_date },
+                    { 
+                      id: "num", 
+                      label: "Installment", 
+                      align: "left",
+                      width: "35%",
+                      render: (row: any) => (
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: "text.secondary" }}>
+                          Installment {row.installment_number}
+                        </Typography>
+                      )
+                    },
+                    { 
+                      id: "amt", 
+                      label: "Amount", 
+                      align: "right",
+                      width: "30%",
+                      render: (row: any) => (
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: "primary.main" }}>
+                          ₹{Number(row.amount).toLocaleString()}
+                        </Typography>
+                      )
+                    },
+                    { 
+                      id: "date", 
+                      label: "Due Date", 
+                      align: "center",
+                      width: "35%",
+                      render: (row: any, idx: number) => (
+                        <TextField
+                          type="date"
+                          size="small"
+                          value={row.due_date}
+                          onChange={(e) => onInstallmentUpdate(idx, 'due_date', e.target.value)}
+                          variant="standard"
+                          InputProps={{ 
+                            disableUnderline: false,
+                            sx: { 
+                              fontSize: '0.875rem',
+                              "& input": { textAlign: "center" }
+                            } 
+                          }}
+                          sx={{ width: "160px" }}
+                        />
+                      ) 
+                    },
                   ]}
                   data={installments}
                 />

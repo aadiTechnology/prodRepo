@@ -22,7 +22,7 @@ export interface DataTableColumn<T> {
   label: ReactNode;
   align?: "left" | "right" | "center";
   /** Custom cell render. If not set, renders row[id] or row[field]. */
-  render?: (row: T) => ReactNode;
+  render?: (row: T, index: number) => ReactNode;
   /** Field key when render is not provided. Defaults to id. */
   field?: keyof T | string;
   /** Custom header render. If provided, overrides label in header. */
@@ -174,7 +174,7 @@ export default function DataTable<T extends object>({
                         whiteSpace: { xs: 'nowrap', sm: 'normal' },
                       })}
                     >
-                      {col.render ? col.render(row) : getCellValue(row, (col.field as string) ?? col.id)}
+                      {col.render ? col.render(row, idx) : getCellValue(row, (col.field as string) ?? col.id)}
                     </TableCell>
                   ))}
                   {hasActions && (

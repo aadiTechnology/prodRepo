@@ -307,6 +307,17 @@ const FeeStructureForm = () => {
       setInstallments([]);
     }
   }, [formData.num_installments, formData.total_amount, formData.installment_type, formData.academic_year_id, academicYears]);
+  
+  const handleInstallmentUpdate = useCallback((index: number, field: keyof FeeInstallmentPreview, value: any) => {
+    setInstallments((prev) => {
+      const next = [...prev];
+      if (next[index]) {
+        next[index] = { ...next[index], [field]: value };
+      }
+      return next;
+    });
+  }, []);
+
 
   const selectedCategoryIds = formData.fee_category_ids as string[];
   const hasSelectedCategories = selectedCategoryIds && selectedCategoryIds.length > 0;
@@ -326,6 +337,7 @@ const FeeStructureForm = () => {
       installments,
       categories: filteredCategories,
       divisions,
+      onInstallmentUpdate: handleInstallmentUpdate,
     });
     // Make total_amount read-only when categories drive the value
     if (cfg.fields.total_amount && hasSelectedCategories) {
