@@ -461,6 +461,35 @@ def _format_invoice_no(sequence: int) -> str:
     return f"INV-{sequence:02d}"
 
 
+def _resolve_installment_for_generation(
+    *,
+    fee_structure: FeeStructure,
+    installment_name: str,
+) -> tuple[int, float]:
+    target_name = (installment_name or "").strip()
+    if not target_name:
+        raise ValidationException("Installment is required")
+
+    active_installments = [
+        inst
+        for inst in (fee_structure.installments or [])
+        if not bool(getattr(inst, "is_deleted", False))
+    ]
+
+    selected = None
+    for installment in active_installments:
+        description = (installment.description or "").strip()
+        fallback_name = f"Installment {int(installment.installment_number)}"
+        if description == target_name or fallback_name == target_name:
+            selected = installment
+            break
+
+    if not selected:
+        raise ValidationException("Selected installment is invalid for the fee structure")
+
+    return int(selected.id), float(selected.amount or 0)
+
+
 def generate_invoices(
     db: Session,
     *,
@@ -541,6 +570,11 @@ def generate_invoices(
             skipped_student_ids=sorted(skipped_set),
         )
 
+    selected_installment_id, selected_installment_amount = _resolve_installment_for_generation(
+        fee_structure=fee_structure,
+        installment_name=payload.installment_name,
+    )
+
     next_invoice_seq = _next_invoice_sequence(db)
     rows = [
         invoice_repository.StudentInvoice(
@@ -550,12 +584,13 @@ def generate_invoices(
             class_id=payload.class_id,
             fee_structure_id=int(fee_structure.id),
             invoice_no=_format_invoice_no(next_invoice_seq + index),
-            total_amount=float(fee_structure.total_amount or 0),
+            total_amount=selected_installment_amount,
             paid_amount=0,
-            due_amount=float(fee_structure.total_amount or 0),
+            due_amount=selected_installment_amount,
             due_date=payload.due_date,
             status="Pending",
             installment=payload.installment_name,
+            fee_installment_id=selected_installment_id,
         )
         for index, student_id in enumerate(to_create_ids)
     ]
