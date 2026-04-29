@@ -124,6 +124,7 @@ class GenerateInvoiceRequest(BaseModel):
     academic_year_id: int = Field(..., ge=1)
     class_id: int = Field(..., ge=1)
     division_id: int = Field(..., ge=1)
+    fee_structure_id: int = Field(..., ge=1)
     installment_name: str = Field(..., min_length=1, max_length=100)
     invoice_date: date
     due_date: date

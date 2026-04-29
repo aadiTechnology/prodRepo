@@ -6,6 +6,7 @@ export type GenerateInvoiceFormData = {
   academic_year_id: number | null;
   class_id: number | null;
   division_id: number | null;
+  fee_structure_id: number | null;
   installment_name: string;
   payable_amount: number | null;
   invoice_date: string;
@@ -16,12 +17,15 @@ type GenerateInvoiceFormConfigArgs = {
   academicYearOptions: SelectItemOption[];
   classOptions: SelectItemOption[];
   divisionOptions: SelectItemOption[];
+  feeStructureOptions: SelectItemOption[];
   installmentOptions: SelectItemOption[];
   academicYearsLoading: boolean;
   classesLoading: boolean;
   divisionsLoading: boolean;
+  feeStructuresLoading: boolean;
   disableClass: boolean;
   disableDivision: boolean;
+  disableFeeStructure: boolean;
   disableInstallment: boolean;
   disableDates: boolean;
   disablePayableAmount: boolean;
@@ -32,12 +36,15 @@ export function generateInvoiceFormConfig({
   academicYearOptions,
   classOptions,
   divisionOptions,
+  feeStructureOptions,
   installmentOptions,
   academicYearsLoading,
   classesLoading,
   divisionsLoading,
+  feeStructuresLoading,
   disableClass,
   disableDivision,
+  disableFeeStructure,
   disableInstallment,
   disableDates,
   disablePayableAmount,
@@ -84,6 +91,19 @@ export function generateInvoiceFormConfig({
           coerceToNumber: true,
         },
       },
+      fee_structure_id: {
+        name: "fee_structure_id",
+        label: "Fee Structure",
+        type: "select",
+        required: true,
+        props: {
+          options: feeStructureOptions,
+          loading: feeStructuresLoading,
+          emptyOptionLabel: "Select Fee Structure",
+          disabled: disableFeeStructure,
+          coerceToNumber: true,
+        },
+      },
       installment_name: {
         name: "installment_name",
         label: "Installment",
@@ -103,6 +123,16 @@ export function generateInvoiceFormConfig({
         props: {
           disabled: disablePayableAmount,
           readOnly: true,
+          sx: {
+            "& .MuiOutlinedInput-root.Mui-disabled .MuiInputBase-input.Mui-disabled": {
+              WebkitTextFillColor: "rgba(0, 0, 0, 0.87) !important",
+              color: "rgba(0, 0, 0, 0.87) !important",
+              opacity: "1 !important",
+            },
+            "& .MuiInputLabel-root.Mui-disabled": {
+              color: "rgba(0, 0, 0, 0.87) !important",
+            },
+          },
         },
       },
       invoice_date: {
@@ -129,6 +159,7 @@ export function generateInvoiceFormConfig({
       { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["academic_year_id"] },
       { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["class_id"] },
       { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["division_id"] },
+      { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["fee_structure_id"] },
       { kind: "section", title: "Installment Time", grid: { xs: 12 } },
       { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["installment_name"] },
       { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["payable_amount"] },

@@ -496,14 +496,26 @@ def generate_invoices(
             skipped_student_ids=sorted(skipped_set),
         )
 
-    fee_plan = get_fee_plan(
-        db,
-        tenant_id=tenant_id,
-        class_id=payload.class_id,
-        division_id=payload.division_id,
+    fee_structure = (
+        db.query(FeeStructure)
+        .filter(
+            FeeStructure.id == payload.fee_structure_id,
+            FeeStructure.tenant_id == tenant_id,
+            FeeStructure.class_id == payload.class_id,
+            FeeStructure.academic_year_id == payload.academic_year_id,
+            FeeStructure.is_deleted == False,  # noqa: E712
+            FeeStructure.is_active == True,  # noqa: E712
+        )
+        .first()
     )
-    if not fee_plan:
-        raise ValidationException("No fee plan assigned for selected class/division")
+    if not fee_structure:
+        raise ValidationException("Selected fee structure is invalid for selected class and academic year")
+
+    if (
+        fee_structure.class_division_id is not None
+        and int(fee_structure.class_division_id) != payload.division_id
+    ):
+        raise ValidationException("Selected fee structure does not belong to selected division")
 
     existing = (
         db.query(invoice_repository.StudentInvoice.student_id, invoice_repository.StudentInvoice.invoice_no)
@@ -533,11 +545,11 @@ def generate_invoices(
             student_id=student_id,
             academic_year_id=payload.academic_year_id,
             class_id=payload.class_id,
-            fee_structure_id=fee_plan.id,
+            fee_structure_id=int(fee_structure.id),
             invoice_no=_format_invoice_no(next_invoice_seq + index),
-            total_amount=fee_plan.total_amount,
+            total_amount=float(fee_structure.total_amount or 0),
             paid_amount=0,
-            due_amount=fee_plan.total_amount,
+            due_amount=float(fee_structure.total_amount or 0),
             due_date=payload.due_date,
             status="Pending",
             installment=payload.installment_name,

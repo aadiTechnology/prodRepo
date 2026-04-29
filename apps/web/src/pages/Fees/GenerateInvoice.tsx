@@ -27,6 +27,7 @@ const defaultFormData = (): GenerateInvoiceFormData => ({
   academic_year_id: null,
   class_id: null,
   division_id: null,
+  fee_structure_id: null,
   installment_name: "",
   payable_amount: null,
   invoice_date: "",
@@ -48,6 +49,7 @@ export default function GenerateInvoice() {
       academic_year_id: [{ type: "required", message: "Academic Year is required" }],
       class_id: [{ type: "required", message: "Please select a class to continue" }],
       division_id: [{ type: "required", message: "Please select a division" }],
+      fee_structure_id: [{ type: "required", message: "Please select a fee structure" }],
       installment_name: [{ type: "required", message: "Installment is required" }],
       payable_amount: [],
       invoice_date: [{ type: "required", message: "Invoice date is required" }],
@@ -109,6 +111,7 @@ export default function GenerateInvoice() {
       formData.class_id,
       formData.division_id,
       formData.academic_year_id,
+      formData.fee_structure_id,
       formData.installment_name,
     ],
     queryFn: () =>
@@ -116,7 +119,25 @@ export default function GenerateInvoice() {
         class_id: formData.class_id as number,
         division_id: formData.division_id as number,
         academic_year_id: formData.academic_year_id as number,
+        fee_structure_id: formData.fee_structure_id || undefined,
         installment_name: formData.installment_name || undefined,
+      }),
+    enabled: filtersReady,
+  });
+
+  const { data: feeStructures = [], isLoading: feeStructuresLoading } = useQuery({
+    queryKey: [
+      "generate-invoice",
+      "fee-structures",
+      formData.class_id,
+      formData.division_id,
+      formData.academic_year_id,
+    ],
+    queryFn: () =>
+      invoiceApi.getFeeStructureOptions({
+        class_id: formData.class_id as number,
+        division_id: formData.division_id as number,
+        academic_year_id: formData.academic_year_id as number,
       }),
     enabled: filtersReady,
   });
@@ -125,17 +146,11 @@ export default function GenerateInvoice() {
     queryKey: [
       "generate-invoice",
       "installments",
-      formData.class_id,
-      formData.division_id,
-      formData.academic_year_id,
+      formData.fee_structure_id,
     ],
     queryFn: () =>
-      invoiceApi.getInstallmentOptions({
-        class_id: formData.class_id as number,
-        division_id: formData.division_id as number,
-        academic_year_id: formData.academic_year_id as number,
-      }),
-    enabled: filtersReady,
+      invoiceApi.getInstallmentOptionsByFeeStructureId(formData.fee_structure_id as number),
+    enabled: !!formData.fee_structure_id,
   });
 
 
@@ -151,6 +166,9 @@ export default function GenerateInvoice() {
         ...prev,
         class_id: null,
         division_id: null,
+        fee_structure_id: null,
+        installment_name: "",
+        payable_amount: null,
       };
     });
     setSelectedStudentIds([]);
@@ -163,6 +181,9 @@ export default function GenerateInvoice() {
       return {
         ...prev,
         division_id: null,
+        fee_structure_id: null,
+        installment_name: "",
+        payable_amount: null,
       };
     });
     setSelectedStudentIds([]);
@@ -170,9 +191,37 @@ export default function GenerateInvoice() {
   }, [formData.class_id, setFormData]);
 
   useEffect(() => {
+    setFormData((prev) => {
+      if (
+        prev.fee_structure_id === null &&
+        !prev.installment_name &&
+        prev.payable_amount === null
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        fee_structure_id: null,
+        installment_name: "",
+        payable_amount: null,
+      };
+    });
     setSelectedStudentIds([]);
     setStudentsPage(0);
   }, [formData.division_id]);
+
+  useEffect(() => {
+    if (!formData.fee_structure_id) return;
+    const isValid = feeStructures.some((item) => item.id === formData.fee_structure_id);
+    if (!isValid) {
+      setFormData((prev) => ({
+        ...prev,
+        fee_structure_id: null,
+        installment_name: "",
+        payable_amount: null,
+      }));
+    }
+  }, [formData.fee_structure_id, feeStructures, setFormData]);
 
   useEffect(() => {
     if (!formData.installment_name) return;
@@ -232,6 +281,19 @@ export default function GenerateInvoice() {
     [divisions]
   );
 
+  const feeStructureOptions = useMemo<SelectItemOption[]>(
+    () =>
+      feeStructures.map((item) => ({
+        id: String(item.id),
+        value: String(item.id),
+        label:
+          item.class_division_id === formData.division_id
+            ? item.name
+            : `${item.name} (All Divisions)`,
+      })),
+    [feeStructures, formData.division_id]
+  );
+
 
 
   const selectableStudents = useMemo(
@@ -273,6 +335,7 @@ export default function GenerateInvoice() {
         academic_year_id: formData.academic_year_id as number,
         class_id: formData.class_id as number,
         division_id: formData.division_id as number,
+        fee_structure_id: formData.fee_structure_id as number,
         installment_name: formData.installment_name,
         invoice_date: formData.invoice_date,
         due_date: formData.due_date,
@@ -460,13 +523,17 @@ export default function GenerateInvoice() {
         academicYearOptions,
         classOptions,
         divisionOptions,
+        feeStructureOptions,
         installmentOptions,
         academicYearsLoading,
         classesLoading,
         divisionsLoading,
+        feeStructuresLoading,
         disableClass: !formData.academic_year_id || classesLoading,
         disableDivision: !formData.class_id || divisionsLoading,
-        disableInstallment: !filtersReady || installmentsLoading || installmentOptions.length === 0,
+        disableFeeStructure: !filtersReady || feeStructuresLoading || feeStructureOptions.length === 0,
+        disableInstallment:
+          !formData.fee_structure_id || installmentsLoading || installmentOptions.length === 0,
         disablePayableAmount: true,
         disableDates: false,
         studentSelectionSlot: studentsSection,
@@ -475,12 +542,15 @@ export default function GenerateInvoice() {
       academicYearOptions,
       classOptions,
       divisionOptions,
+      feeStructureOptions,
       academicYearsLoading,
       classesLoading,
       divisionsLoading,
+      feeStructuresLoading,
       installmentsLoading,
       formData.academic_year_id,
       formData.class_id,
+      formData.fee_structure_id,
       filtersReady,
       installmentOptions,
       studentsSection,

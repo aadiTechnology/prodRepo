@@ -39,6 +39,7 @@ export interface GenerateInvoicePayload {
   academic_year_id: number;
   class_id: number;
   division_id: number;
+  fee_structure_id: number;
   installment_name: string;
   invoice_date: string;
   due_date: string;
@@ -57,6 +58,12 @@ export interface InstallmentOption {
   label: string;
   due_date?: string;
   amount?: number;
+}
+
+export interface FeeStructureOption {
+  id: number;
+  name: string;
+  class_division_id?: number | null;
 }
 
 const toDateInputValue = (raw: unknown): string | undefined => {
@@ -116,16 +123,46 @@ const invoiceApi = {
     return response.data ?? null;
   },
 
-  async getInstallmentOptions(params: {
+  async getFeeStructureOptions(params: {
     class_id: number;
     division_id: number;
     academic_year_id: number;
-  }): Promise<InstallmentOption[]> {
-    const feePlan = await this.getFeePlan(params.class_id, params.division_id);
-    if (!feePlan) return [];
-    if (feePlan.academic_year_id !== params.academic_year_id) return [];
+  }): Promise<FeeStructureOption[]> {
+    const response = await axiosInstance.get("/fees/structures", {
+      params: {
+        page: 0,
+        size: 200,
+        class_id: params.class_id,
+        academic_year_id: params.academic_year_id,
+      },
+    });
 
-    const response = await axiosInstance.get(`/fees/structures/${feePlan.id}`);
+    const items = Array.isArray(response.data?.items) ? response.data.items : [];
+    return items
+      .map((item: unknown) => {
+        const row = item as Record<string, unknown>;
+        const id = Number(row.id);
+        if (!id || Number.isNaN(id)) return null;
+        return {
+          id,
+          name: String(row.name ?? `Fee Structure ${id}`),
+          class_division_id:
+            row.class_division_id === null || row.class_division_id === undefined
+              ? null
+              : Number(row.class_division_id),
+        } as FeeStructureOption;
+      })
+      .filter((item): item is FeeStructureOption => item !== null)
+      .filter(
+        (item) =>
+          item.class_division_id === params.division_id || item.class_division_id === null
+      );
+  },
+
+  async getInstallmentOptionsByFeeStructureId(
+    feeStructureId: number
+  ): Promise<InstallmentOption[]> {
+    const response = await axiosInstance.get(`/fees/structures/${feeStructureId}`);
     const installments = Array.isArray(response.data?.installments) ? response.data.installments : [];
 
     const normalized: InstallmentOption[] = installments
@@ -152,6 +189,7 @@ const invoiceApi = {
     class_id: number;
     division_id: number;
     academic_year_id: number;
+    fee_structure_id?: number;
     installment_name?: string;
   }): Promise<InvoiceStudentItem[]> {
     const response = await axiosInstance.get("/api/students", { params });
