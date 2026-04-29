@@ -6,12 +6,6 @@ function money(v: number): string {
   return `₹${Number(v || 0).toLocaleString()}`;
 }
 
-function formatDate(dateValue: string): string {
-  const dt = new Date(dateValue);
-  if (Number.isNaN(dt.getTime())) return "-";
-  return dt.toLocaleDateString();
-}
-
 type InvoiceListConfigArgs = {
   onViewInvoice: (invoice: InvoiceItem) => void;
   onCollectPayment: (invoice: InvoiceItem) => void;
@@ -25,27 +19,26 @@ export function createInvoiceListConfig({
     columns: [
       { id: "invoice_no", label: "Invoice No", render: (r: InvoiceItem) => r.invoice_no },
       { id: "student_name", label: "Student Name", render: (r: InvoiceItem) => r.student_name },
-      { id: "admission_no", label: "Admission No", render: (r: InvoiceItem) => r.admission_no || "-" },
       { id: "class_name", label: "Class", render: (r: InvoiceItem) => r.class_name || "-" },
+      { id: "installment", label: "Installment", render: (r: InvoiceItem) => r.installment || "-" },
       {
         id: "total_amount",
-        label: "Total Amount",
+        label: "Amount",
         align: "right" as const,
         render: (r: InvoiceItem) => money(r.total_amount),
       },
       {
         id: "paid_amount",
-        label: "Paid Amount",
+        label: "Paid",
         align: "right" as const,
         render: (r: InvoiceItem) => money(r.paid_amount),
       },
       {
         id: "due_amount",
-        label: "Due Amount",
+        label: "Due",
         align: "right" as const,
         render: (r: InvoiceItem) => money(r.due_amount),
       },
-      { id: "due_date", label: "Due Date", render: (r: InvoiceItem) => formatDate(r.due_date) },
       {
         id: "status",
         label: "Status",
@@ -55,7 +48,7 @@ export function createInvoiceListConfig({
     ],
     sortOptions: [],
     uiPolicy: {
-      emptyMessage: "No invoices available for selected filters.",
+      emptyMessage: "No invoices found",
       errorFallbackMessage: "Unable to load invoices. Please try again.",
       retryLabel: "Retry",
     },

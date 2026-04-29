@@ -44,6 +44,7 @@ class InvoiceResponse(BaseModel):
     class_name: Optional[str] = None
     fee_structure_id: int
     invoice_no: str
+    installment: Optional[str] = None
     total_amount: float
     paid_amount: float
     due_amount: float
@@ -71,7 +72,11 @@ class FeePlanResponse(BaseModel):
 class InvoiceStudentItem(BaseModel):
     id: int
     student_name: str
+    admission_no: Optional[str] = None
+    student_code: Optional[str] = None
     roll_no: Optional[str] = None
+    class_name: Optional[str] = None
+    division_name: Optional[str] = None
     is_invoice_generated: bool
 
 

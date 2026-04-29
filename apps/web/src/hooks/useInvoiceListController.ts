@@ -3,6 +3,7 @@ import invoiceService from "../api/services/invoiceService";
 import schoolClassService, { type SchoolClass } from "../api/services/schoolClassService";
 import academicYearService, { type AcademicYear } from "../api/services/academicYearService";
 import type { InvoiceItem, InvoiceStatus } from "../types/invoice";
+import invoiceApi from "../api/invoiceApi";
 
 const invoiceStatuses: InvoiceStatus[] = ["Paid", "Partial", "Pending", "Overdue"];
 
@@ -38,11 +39,6 @@ async function getInvoiceLookups(): Promise<InvoiceLookupPayload> {
   return invoiceLookupInFlight;
 }
 
-function isValidStudentNameSearch(input: string): boolean {
-  if (!input.trim()) return true;
-  return /^[a-zA-Z\s]+$/.test(input.trim());
-}
-
 export function useInvoiceListController() {
   const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,9 +51,11 @@ export function useInvoiceListController() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [academicYearId, setAcademicYearId] = useState("");
   const [classId, setClassId] = useState("");
+  const [installment, setInstallment] = useState("");
   const [status, setStatus] = useState("");
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [installmentOptions, setInstallmentOptions] = useState<{ label: string; value: string }[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceItem | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -86,13 +84,6 @@ export function useInvoiceListController() {
   }, [academicYearId]);
 
   const fetchInvoices = useCallback(async () => {
-    if (!isValidStudentNameSearch(search)) {
-      setInvoices([]);
-      setTotalRows(0);
-      setError("Please enter a valid student name.");
-      return;
-    }
-
     try {
       setLoading(true);
       setError(null);
@@ -104,6 +95,7 @@ export function useInvoiceListController() {
           ? Number(academicYearId)
           : undefined,
         class_id: classId ? Number(classId) : undefined,
+        installment: installment || undefined,
         status: (status || undefined) as InvoiceStatus | undefined,
       });
       const rows = response.items ?? [];
@@ -119,9 +111,6 @@ export function useInvoiceListController() {
       });
       setInvoices(sorted);
       setTotalRows(response.total ?? 0);
-      if (!rows.length) {
-        setError("No invoices available for selected filters.");
-      }
     } catch (err: any) {
       setInvoices([]);
       setTotalRows(0);
@@ -129,7 +118,44 @@ export function useInvoiceListController() {
     } finally {
       setLoading(false);
     }
-  }, [academicYearId, classId, page, rowsPerPage, search, sortBy, sortOrder, status]);
+  }, [
+    academicYearId,
+    classId,
+    installment,
+    page,
+    rowsPerPage,
+    search,
+    sortBy,
+    sortOrder,
+    status,
+  ]);
+
+  const fetchInstallments = useCallback(async () => {
+    if (!academicYearId || classes.length === 0) {
+      setInstallmentOptions([]);
+      return;
+    }
+    try {
+      const optionMap = new Map<string, { label: string; value: string }>();
+      const requests = classes.flatMap((schoolClass) => {
+        const divisions = schoolClass.divisions ?? [];
+        return divisions.map((division) =>
+          invoiceApi.getInstallmentOptions({
+            academic_year_id: Number(academicYearId),
+            class_id: schoolClass.id,
+            division_id: division.id,
+          })
+        );
+      });
+      const responses = await Promise.all(requests);
+      responses.flat().forEach((option) => {
+        optionMap.set(option.value, { label: option.label, value: option.value });
+      });
+      setInstallmentOptions(Array.from(optionMap.values()));
+    } catch {
+      setInstallmentOptions([]);
+    }
+  }, [academicYearId, classes]);
 
   const openInvoiceDetails = useCallback(async (invoiceId: number) => {
     try {
@@ -169,6 +195,16 @@ export function useInvoiceListController() {
     setPage(0);
   }, []);
 
+  const onClassChange = useCallback((value: string) => {
+    setClassId(value);
+    setPage(0);
+  }, []);
+
+  const onInstallmentChange = useCallback((value: string) => {
+    setInstallment(value);
+    setPage(0);
+  }, []);
+
   useEffect(() => {
     void fetchLookups();
   }, [fetchLookups]);
@@ -176,6 +212,10 @@ export function useInvoiceListController() {
   useEffect(() => {
     void fetchInvoices();
   }, [fetchInvoices]);
+
+  useEffect(() => {
+    void fetchInstallments();
+  }, [fetchInstallments]);
 
   return {
     invoices,
@@ -196,7 +236,10 @@ export function useInvoiceListController() {
     academicYearId,
     setAcademicYearId,
     classId,
-    setClassId,
+    setClassId: onClassChange,
+    installment,
+    setInstallment: onInstallmentChange,
+    installmentOptions,
     status,
     setStatus,
     years,

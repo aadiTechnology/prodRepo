@@ -9,8 +9,11 @@ export interface InvoiceItem {
   academic_year_id: number;
   class_id: number;
   class_name?: string | null;
+  division_id?: number | null;
+  division_name?: string | null;
   fee_structure_id: number;
   invoice_no: string;
+  installment?: string | null;
   total_amount: number;
   paid_amount: number;
   due_amount: number;
@@ -31,6 +34,8 @@ export interface InvoiceListParams {
   size?: number;
   academic_year_id?: number;
   class_id?: number;
+  division_id?: number;
+  installment?: string;
   status?: InvoiceStatus;
   search?: string;
 }

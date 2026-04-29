@@ -58,32 +58,12 @@ export default function InvoiceList() {
               <ListPageToolbar
                 searchValue={controller.search}
                 onSearchChange={controller.setSearch}
-                searchPlaceholder="Search by student name..."
+                searchPlaceholder="Search by student name / invoice ID..."
                 onAddClick={() => navigate("/fees/generate-invoice")}
                 addLabel="Generate Invoice"
                 addIcon={<AddIcon sx={{ fontSize: 24 }} />}
                 renderActions={
                   <>
-                    <Select
-                      value={controller.academicYearId}
-                      onChange={(e) =>
-                        controller.setAcademicYearId(e.target.value as string)
-                      }
-                      displayEmpty
-                      size="small"
-                      sx={{ minWidth: { xs: "100%", sm: 140 } }}
-                    >
-                      <MenuItem value="">
-                        <Typography variant="body2" color="text.secondary">
-                          Academic Year
-                        </Typography>
-                      </MenuItem>
-                      {controller.years.map((y) => (
-                        <MenuItem key={y.id} value={String(y.id)}>
-                          {y.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
                     <Select
                       value={controller.classId}
                       onChange={(e) => controller.setClassId(e.target.value as string)}
@@ -117,6 +97,24 @@ export default function InvoiceList() {
                       {controller.statusOptions.map((s) => (
                         <MenuItem key={s.value} value={s.value}>
                           {s.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Select
+                      value={controller.installment}
+                      onChange={(e) => controller.setInstallment(e.target.value as string)}
+                      displayEmpty
+                      size="small"
+                      sx={{ minWidth: { xs: "100%", sm: 180 } }}
+                    >
+                      <MenuItem value="">
+                        <Typography variant="body2" color="text.secondary">
+                          Installment
+                        </Typography>
+                      </MenuItem>
+                      {controller.installmentOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
                         </MenuItem>
                       ))}
                     </Select>

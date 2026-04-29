@@ -7,7 +7,7 @@ import re
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictException, NotFoundException, ValidationException
-from app.models.academic import AcademicYear, SchoolClass
+from app.models.academic import AcademicYear, ClassDivision, SchoolClass
 from app.models.fee import FeeStructure
 from app.models.student import Student
 from app.repositories import invoice_repository
@@ -48,6 +48,7 @@ def _to_invoice_response(row: dict) -> InvoiceResponse:
         class_name=row.get("class_name"),
         fee_structure_id=int(row["fee_structure_id"]),
         invoice_no=str(row["invoice_no"]),
+        installment=row.get("installment") or row.get("Installment"),
         total_amount=float(row["total_amount"]),
         paid_amount=float(row["paid_amount"] or 0),
         due_amount=float(row["due_amount"]),
@@ -111,6 +112,7 @@ def list_invoices(
     size: int,
     academic_year_id: int | None = None,
     class_id: int | None = None,
+    installment: str | None = None,
     status: str | None = None,
     search: str | None = None,
 ) -> InvoiceListResponse:
@@ -119,6 +121,7 @@ def list_invoices(
         tenant_id=tenant_id,
         academic_year_id=academic_year_id,
         class_id=class_id,
+        installment=installment,
         status=status,
         search=search,
         page=page,
@@ -307,7 +310,17 @@ def get_students_for_invoice(
     installment_name: str | None = None,
 ) -> list[InvoiceStudentItem]:
     students = (
-        db.query(Student)
+        db.query(
+            Student.id,
+            Student.student_name,
+            Student.admission_no,
+            Student.student_code,
+            Student.roll_no,
+            SchoolClass.name.label("class_name"),
+            ClassDivision.division_name.label("division_name"),
+        )
+        .outerjoin(SchoolClass, SchoolClass.id == Student.class_id)
+        .outerjoin(ClassDivision, ClassDivision.id == Student.class_division_id)
         .filter(
             Student.tenant_id == tenant_id,
             Student.class_id == class_id,
@@ -322,15 +335,19 @@ def get_students_for_invoice(
         return []
 
     student_ids = [int(s.id) for s in students]
-    existing_invoice_rows = (
-        db.query(invoice_repository.StudentInvoice.student_id, invoice_repository.StudentInvoice.invoice_no)
-        .filter(
-            invoice_repository.StudentInvoice.tenant_id == tenant_id,
-            invoice_repository.StudentInvoice.academic_year_id == academic_year_id,
-            invoice_repository.StudentInvoice.student_id.in_(student_ids),
-        )
-        .all()
+    existing_invoice_query = db.query(
+        invoice_repository.StudentInvoice.student_id,
+        invoice_repository.StudentInvoice.invoice_no,
+    ).filter(
+        invoice_repository.StudentInvoice.tenant_id == tenant_id,
+        invoice_repository.StudentInvoice.academic_year_id == academic_year_id,
+        invoice_repository.StudentInvoice.student_id.in_(student_ids),
     )
+    if installment_name:
+        existing_invoice_query = existing_invoice_query.filter(
+            invoice_repository.StudentInvoice.installment == installment_name
+        )
+    existing_invoice_rows = existing_invoice_query.all()
 
     generated_set = {int(row[0]) for row in existing_invoice_rows}
 
@@ -338,7 +355,11 @@ def get_students_for_invoice(
         InvoiceStudentItem(
             id=int(s.id),
             student_name=s.student_name,
+            admission_no=s.admission_no,
+            student_code=s.student_code,
             roll_no=s.roll_no,
+            class_name=s.class_name,
+            division_name=s.division_name,
             is_invoice_generated=int(s.id) in generated_set,
         )
         for s in students
@@ -418,6 +439,7 @@ def generate_invoices(
             invoice_repository.StudentInvoice.tenant_id == tenant_id,
             invoice_repository.StudentInvoice.academic_year_id == payload.academic_year_id,
             invoice_repository.StudentInvoice.student_id.in_(list(valid_student_ids)),
+            invoice_repository.StudentInvoice.installment == payload.installment_name,
         )
         .all()
     )
@@ -445,7 +467,8 @@ def generate_invoices(
             paid_amount=0,
             due_amount=fee_plan.total_amount,
             due_date=payload.due_date,
-            status="PENDING",
+            status="Pending",
+            installment=payload.installment_name,
         )
         for index, student_id in enumerate(to_create_ids)
     ]

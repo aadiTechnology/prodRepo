@@ -21,3 +21,5 @@ class StudentInvoice(Base):
     due_date = Column(Date, nullable=False)
     status = Column(String(20), nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    fee_installment_id = Column(Integer, ForeignKey("fee_installments.id", ondelete="NO ACTION"), nullable=True)
+    installment = Column("Installment", String(50), nullable=True)

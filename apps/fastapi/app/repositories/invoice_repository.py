@@ -13,6 +13,7 @@ def list_invoices(
     tenant_id: int,
     academic_year_id: int | None,
     class_id: int | None,
+    installment: str | None,
     status: str | None,
     search: str | None,
     page: int,
@@ -31,13 +32,26 @@ def list_invoices(
         where_sql.append("si.class_id = :class_id")
         params["class_id"] = class_id
 
+    if installment:
+        where_sql.append("LTRIM(RTRIM(ISNULL(si.[Installment], ''))) = :installment")
+        params["installment"] = installment.strip()
+
     if status:
         where_sql.append("si.status = :status")
         params["status"] = status
 
     if search:
-        where_sql.append("s.student_name LIKE :search")
-        params["search"] = f"%{search.strip()}%"
+        search_term = search.strip()
+        normalized_search = search_term.replace("-", "").replace(" ", "")
+        where_sql.append(
+            "("
+            "s.student_name LIKE :search "
+            "OR LTRIM(RTRIM(ISNULL(si.invoice_no, ''))) LIKE :search "
+            "OR REPLACE(LTRIM(RTRIM(ISNULL(si.invoice_no, ''))), '-', '') LIKE :search_no_dash"
+            ")"
+        )
+        params["search"] = f"%{search_term}%"
+        params["search_no_dash"] = f"%{normalized_search}%"
 
     where_clause = " AND ".join(where_sql)
     offset = page * size
@@ -57,6 +71,7 @@ def list_invoices(
             c.name AS class_name,
             si.fee_structure_id,
             si.invoice_no,
+            LTRIM(RTRIM(ISNULL(si.[Installment], ''))) AS installment,
             si.total_amount,
             si.paid_amount,
             si.due_amount,
@@ -100,6 +115,7 @@ def get_invoice_by_id(db: Session, *, tenant_id: int, invoice_id: int) -> dict |
             c.name AS class_name,
             si.fee_structure_id,
             si.invoice_no,
+            LTRIM(RTRIM(ISNULL(si.[Installment], ''))) AS installment,
             si.total_amount,
             si.paid_amount,
             si.due_amount,

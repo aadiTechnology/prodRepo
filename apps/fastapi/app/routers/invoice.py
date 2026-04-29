@@ -26,6 +26,7 @@ async def list_student_invoices(
     size: int = Query(10, ge=1),
     academic_year_id: int | None = Query(None, ge=1),
     class_id: int | None = Query(None, ge=1),
+    installment: str | None = Query(None),
     status_filter: str | None = Query(None, alias="status"),
     search: str | None = Query(None),
     db: Session = Depends(get_db),
@@ -38,6 +39,7 @@ async def list_student_invoices(
         size=size,
         academic_year_id=academic_year_id,
         class_id=class_id,
+        installment=installment,
         status=status_filter,
         search=search,
     )

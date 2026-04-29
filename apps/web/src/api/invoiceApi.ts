@@ -27,7 +27,11 @@ export interface FeePlanResponse {
 export interface InvoiceStudentItem {
   id: number;
   student_name: string;
+  admission_no?: string | null;
+  student_code?: string | null;
   roll_no?: string | null;
+  class_name?: string | null;
+  division_name?: string | null;
   is_invoice_generated: boolean;
 }
 
@@ -74,7 +78,11 @@ const invoiceApi = {
         return {
           id,
           student_name: String(row.student_name ?? row.name ?? ""),
+          admission_no: row.admission_no ? String(row.admission_no) : null,
+          student_code: row.student_code ? String(row.student_code) : null,
           roll_no: row.roll_no ? String(row.roll_no) : null,
+          class_name: row.class_name ? String(row.class_name) : null,
+          division_name: row.division_name ? String(row.division_name) : null,
           is_invoice_generated: Boolean(row.is_invoice_generated),
         } as InvoiceStudentItem;
       })
@@ -119,7 +127,7 @@ const invoiceApi = {
     const response = await axiosInstance.get(`/fees/structures/${feePlan.id}`);
     const installments = Array.isArray(response.data?.installments) ? response.data.installments : [];
 
-    const normalized = installments
+    const normalized: InstallmentOption[] = installments
       .map((item: unknown) => {
         const row = item as Record<string, unknown>;
         const numberValue = Number(row.installment_number);
@@ -133,9 +141,9 @@ const invoiceApi = {
           due_date: dueDateValue,
         };
       })
-      .filter((item): item is InstallmentOption => item !== null);
+      .filter((item: InstallmentOption | null): item is InstallmentOption => item !== null);
 
-    return Array.from(new Map(normalized.map((item) => [item.value, item])).values());
+    return Array.from(new Map<string, InstallmentOption>(normalized.map((item) => [item.value, item])).values());
   },
 
   async getStudents(params: {
