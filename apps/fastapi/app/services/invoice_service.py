@@ -60,6 +60,8 @@ def _to_invoice_response(row: dict) -> InvoiceResponse:
         due_date=row["due_date"],
         status=str(row["status"]),
         created_at=row["created_at"],
+        fee_installment_id=int(row["fee_installment_id"]) if row.get("fee_installment_id") else None,
+        installment_name=row.get("installment_name"),
     )
 
 
@@ -259,6 +261,7 @@ def create_invoice(
         due_amount=payload.due_amount,
         due_date=payload.due_date,
         status=status,
+        fee_installment_id=payload.fee_installment_id,
     )
     db.commit()
     return get_invoice(db, tenant_id=tenant_id, invoice_id=invoice_id)

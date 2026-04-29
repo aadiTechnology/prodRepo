@@ -7,16 +7,21 @@
 
 export interface CollectPaymentFormData {
   amount_to_collect: number;
-  payment_method: "CASH" | "UPI" | "CARD" | "BANK_TRANSFER";
+  payment_method: "CASH" | "UPI" | "BANK_TRANSFER";
   reference_no: string;
+  payment_date: string;
   notes: string;
   allocation_mode: "full" | "custom";
+  bank_account_holder_name?: string;
+  bank_account_no?: string;
+  ifsc_code?: string;
   [key: string]: any;
 }
 
 interface CollectPaymentFormConfigOptions {
   maxBalance: number;
   collectFullBalance: boolean;
+  paymentMethod: CollectPaymentFormData["payment_method"];
 }
 
 /**
@@ -25,12 +30,36 @@ interface CollectPaymentFormConfigOptions {
 export function createCollectPaymentFormConfig({
   maxBalance,
   collectFullBalance,
+  paymentMethod,
 }: CollectPaymentFormConfigOptions) {
+  const isCashPayment = paymentMethod === "CASH";
+  const isBankTransfer = paymentMethod === "BANK_TRANSFER";
+  const referenceFieldConfig = (() => {
+    if (paymentMethod === "UPI") {
+      return {
+        label: "UPI Transaction ID",
+        placeholder: "Enter UPI transaction ID",
+        helperText: "Required for UPI payments",
+      };
+    }
+    if (paymentMethod === "BANK_TRANSFER") {
+      return {
+        label: "Bank Transfer Reference",
+        placeholder: "Enter UTR / NEFT / IMPS reference number",
+        helperText: "Required for bank transfer payments",
+      };
+    }
+    return {
+      label: "Reference No",
+      placeholder: "Reference not needed for cash payment",
+      helperText: "Not required for cash payments",
+    };
+  })();
   return {
     fields: {
       amount_to_collect: {
         name: "amount_to_collect",
-        label: "Amount to Collect",
+        label: "Payment Amount",
         type: "text" as const,
         placeholder: "Enter amount",
         required: true,
@@ -48,14 +77,13 @@ export function createCollectPaymentFormConfig({
 
       payment_method: {
         name: "payment_method",
-        label: "Payment Method",
+        label: "Payment Mode",
         type: "select" as const,
         required: true,
         props: {
           options: [
             { label: "Cash", value: "CASH" },
             { label: "UPI", value: "UPI" },
-            { label: "Card", value: "CARD" },
             { label: "Bank Transfer", value: "BANK_TRANSFER" },
           ],
         },
@@ -63,16 +91,63 @@ export function createCollectPaymentFormConfig({
 
       reference_no: {
         name: "reference_no",
-        label: "Reference No",
+        label: paymentMethod === "UPI" ? "UPI Transaction ID" : paymentMethod === "BANK_TRANSFER" ? "Bank Transfer Reference" : "Reference No",
         type: "text" as const,
-        placeholder: "e.g., Check No, Transaction ID",
-        required: false,
-        helperText: "Optional",
+        placeholder: referenceFieldConfig.placeholder,
+        required: !isCashPayment,
+        helperText: referenceFieldConfig.helperText,
+        props: {
+          disabled: isCashPayment,
+        },
+      },
+
+      payment_date: {
+        name: "payment_date",
+        label: "Payment Date",
+        type: "date" as const,
+        required: true,
+      },
+
+      bank_account_holder_name: {
+        name: "bank_account_holder_name",
+        label: "Account Holder Name",
+        type: "text" as const,
+        placeholder: "Enter account holder name",
+        required: isBankTransfer,
+        helperText: "Required for bank transfer payments",
+        props: {
+          disabled: !isBankTransfer,
+        },
+      },
+
+      bank_account_no: {
+        name: "bank_account_no",
+        label: "Bank Account Number",
+        type: "text" as const,
+        placeholder: "Enter account number",
+        required: isBankTransfer,
+        helperText: "Required for bank transfer payments",
+        props: {
+          disabled: !isBankTransfer,
+        },
+      },
+
+      ifsc_code: {
+        name: "ifsc_code",
+        label: "IFSC Code",
+        type: "text" as const,
+        placeholder: "Enter IFSC code (e.g., SBIN0000001)",
+        required: isBankTransfer,
+        helperText: "Required for bank transfer payments",
+        props: {
+          disabled: !isBankTransfer,
+          maxLength: 11,
+        },
       },
 
       notes: {
         name: "notes",
-        label: "Notes",
+        label: "Remarks",
         type: "text" as const,
         placeholder: "Additional notes about this payment",
         required: false,
@@ -106,6 +181,26 @@ export function createCollectPaymentFormConfig({
         kind: "fields" as const,
         grid: { xs: 12, sm: 6 } as any,
         fieldNames: ["reference_no"] as any,
+      },
+      {
+        kind: "fields" as const,
+        grid: { xs: 12, sm: 6 } as any,
+        fieldNames: ["payment_date"] as any,
+      },
+      {
+        kind: "fields" as const,
+        grid: { xs: 12, sm: 6 } as any,
+        fieldNames: ["bank_account_holder_name"] as any,
+      },
+      {
+        kind: "fields" as const,
+        grid: { xs: 12, sm: 6 } as any,
+        fieldNames: ["bank_account_no"] as any,
+      },
+      {
+        kind: "fields" as const,
+        grid: { xs: 12, sm: 6 } as any,
+        fieldNames: ["ifsc_code"] as any,
       },
       {
         kind: "fields" as const,

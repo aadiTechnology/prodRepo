@@ -45,17 +45,9 @@ export function useInvoiceDetailController() {
   const onCollectPayment = useCallback(() => {
     const invoice = detail?.invoice;
     if (!invoice) return;
-    navigate("/fees/installment-status", {
+    navigate("/fees/collect-payment", {
       state: {
-        student: {
-          id: invoice.student_id,
-          student_name: invoice.student_name,
-          admission_no: invoice.admission_no,
-          class_id: invoice.class_id,
-          class_name: invoice.class_name,
-        },
-        classId: invoice.class_id,
-        academicYearId: invoice.academic_year_id,
+        invoice_id: invoice.id,
       },
     });
   }, [detail, navigate]);

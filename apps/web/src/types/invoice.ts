@@ -20,6 +20,8 @@ export interface InvoiceItem {
   due_date: string;
   status: InvoiceStatus;
   created_at: string;
+  fee_installment_id?: number | null;
+  installment_name?: string | null;
 }
 
 export interface InvoiceListResponse {

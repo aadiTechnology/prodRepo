@@ -19,7 +19,7 @@ class InvoiceBase(BaseModel):
 
 
 class InvoiceCreateRequest(InvoiceBase):
-    pass
+    fee_installment_id: Optional[int] = Field(None, ge=1)
 
 
 class InvoiceUpdateRequest(BaseModel):
@@ -51,6 +51,8 @@ class InvoiceResponse(BaseModel):
     due_date: date
     status: str
     created_at: datetime
+    fee_installment_id: Optional[int] = None
+    installment_name: Optional[str] = None
 
 
 class InvoiceFeeBreakdownItem(BaseModel):

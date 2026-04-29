@@ -78,10 +78,13 @@ def list_invoices(
             si.due_amount,
             si.due_date,
             si.status,
-            si.created_at
+            si.created_at,
+            si.fee_installment_id,
+            fi.description AS installment_name
         FROM student_invoices si
         INNER JOIN students s ON s.id = si.student_id
         INNER JOIN classes c ON c.id = si.class_id
+        LEFT JOIN fee_installments fi ON fi.id = si.fee_installment_id
         WHERE {where_clause}
         ORDER BY si.created_at DESC, si.id DESC
         OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY
@@ -123,10 +126,13 @@ def get_invoice_by_id(db: Session, *, tenant_id: int, invoice_id: int) -> dict |
             si.due_amount,
             si.due_date,
             si.status,
-            si.created_at
+            si.created_at,
+            si.fee_installment_id,
+            fi.description AS installment_name
         FROM student_invoices si
         INNER JOIN students s ON s.id = si.student_id
         INNER JOIN classes c ON c.id = si.class_id
+        LEFT JOIN fee_installments fi ON fi.id = si.fee_installment_id
         WHERE si.tenant_id = :tenant_id AND si.id = :invoice_id
         """
     )
@@ -160,6 +166,7 @@ def insert_invoice(
     due_amount: float,
     due_date: date,
     status: str,
+    fee_installment_id: int | None = None,
 ) -> int:
     entity = StudentInvoice(
         tenant_id=tenant_id,
@@ -173,6 +180,7 @@ def insert_invoice(
         due_amount=due_amount,
         due_date=due_date,
         status=status,
+        fee_installment_id=fee_installment_id,
     )
     db.add(entity)
     db.flush()
