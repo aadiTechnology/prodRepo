@@ -472,6 +472,7 @@ export default function CollectPaymentPage() {
           type: "custom" as const,
           validate: (data: CollectPaymentFormData) => {
             const val = Number(data.amount_to_collect);
+            if (selectedInvoice && selectedInvoice.due_amount <= 0) return "";
             if (val <= 0) return "Amount must be greater than 0";
             if (selectedInvoice && val > selectedInvoice.due_amount) {
               return `Amount cannot exceed due balance (${formatCurrency(selectedInvoice.due_amount)})`;
@@ -755,6 +756,7 @@ export default function CollectPaymentPage() {
       isEditMode={false}
       submitLabelCreate="Save Payment"
       confirmMessage="Confirm payment collection?"
+      canSubmit={!!selectedInvoice && selectedInvoice.due_amount > 0}
       formTopSlot={topSlot}
       headerConfig={{
         links: [
@@ -767,7 +769,7 @@ export default function CollectPaymentPage() {
         cancelTooltip: "Discard",
       }}
       extraHeaderActions={
-        selectedInvoice && (
+        selectedInvoice && selectedInvoice.due_amount > 0 && (
           <Tooltip title={loading ? "Processing..." : "Save & Print"} placement="left">
             <span style={{ display: "inline-flex" }}>
               <IconButton
@@ -806,7 +808,6 @@ export default function CollectPaymentPage() {
           ? navigate(`/fees/invoices/${selectedInvoice.id}/detail`)
           : navigate("/fees/invoices")
       }
-      canSubmit={!!selectedInvoice}
     />
   );
 }
