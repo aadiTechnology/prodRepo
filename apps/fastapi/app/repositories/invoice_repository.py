@@ -231,6 +231,7 @@ def get_invoice_student_info(db: Session, *, tenant_id: int, invoice_id: int) ->
             si.student_id,
             s.student_name,
             s.admission_no,
+            s.roll_no,
             si.class_id,
             c.name AS class_name,
             s.class_division_id AS division_id,
@@ -255,12 +256,70 @@ def get_invoice_fee_breakdown(db: Session, *, invoice_id: int) -> list[dict]:
             fc.name AS fee_category_name,
             sii.amount
         FROM student_invoice_items sii
-        LEFT JOIN fee_categories fc ON fc.id = TRY_CONVERT(varchar(36), sii.fee_category_id)
+        LEFT JOIN fee_categories fc ON fc.id = sii.fee_category_id
         WHERE sii.invoice_id = :invoice_id
         ORDER BY sii.id ASC
         """
     )
     rows = db.execute(sql, {"invoice_id": invoice_id}).mappings().all()
+    return [dict(r) for r in rows]
+
+
+def get_fee_structure_breakdown_for_invoice(
+    db: Session,
+    *,
+    tenant_id: int,
+    invoice_id: int,
+) -> list[dict]:
+    sql = text(
+        """
+        ;WITH invoice_ctx AS (
+            SELECT
+                si.id AS invoice_id,
+                si.tenant_id,
+                si.fee_structure_id,
+                CONVERT(decimal(10,2), ISNULL(si.total_amount, 0)) AS invoice_total,
+                CONVERT(decimal(10,2), ISNULL(si.paid_amount, 0)) AS invoice_paid
+            FROM student_invoices si
+            WHERE si.tenant_id = :tenant_id AND si.id = :invoice_id
+        ),
+        category_ids AS (
+            SELECT DISTINCT
+                NULLIF(LTRIM(RTRIM(value)), '') AS fee_category_id
+            FROM fee_structures fs
+            INNER JOIN invoice_ctx ic ON ic.fee_structure_id = fs.id
+            CROSS APPLY STRING_SPLIT(ISNULL(fs.multi_category_ids, ''), ',')
+            UNION
+            SELECT DISTINCT
+                fs.fee_category_id
+            FROM fee_structures fs
+            INNER JOIN invoice_ctx ic ON ic.fee_structure_id = fs.id
+            WHERE fs.fee_category_id IS NOT NULL
+        ),
+        category_rows AS (
+            SELECT
+                ROW_NUMBER() OVER (ORDER BY fc.name ASC, fc.id ASC) AS id,
+                fc.id AS fee_category_id,
+                fc.name AS fee_category_name,
+                CONVERT(decimal(10,2), ISNULL(fc.amount, 0)) AS amount,
+                fs.installment_type AS payable_for
+            FROM invoice_ctx ic
+            INNER JOIN fee_structures fs ON fs.id = ic.fee_structure_id
+            INNER JOIN category_ids cids ON cids.fee_category_id IS NOT NULL
+            LEFT JOIN fee_categories fc
+                ON fc.id = cids.fee_category_id
+               AND fc.tenant_id = ic.tenant_id
+        )
+        SELECT
+            cr.id,
+            cr.fee_category_id,
+            cr.fee_category_name,
+            cr.amount,
+            cr.payable_for
+        FROM category_rows cr
+        """
+    )
+    rows = db.execute(sql, {"tenant_id": tenant_id, "invoice_id": invoice_id}).mappings().all()
     return [dict(r) for r in rows]
 
 

@@ -57,9 +57,12 @@ class InvoiceResponse(BaseModel):
 
 class InvoiceFeeBreakdownItem(BaseModel):
     id: int
-    fee_category_id: Optional[int] = None
+    fee_category_id: Optional[str] = None
     fee_category_name: Optional[str] = None
     amount: float
+    paid_amount: float = 0
+    pending_amount: float = 0
+    payable_for: Optional[str] = None
 
 
 class InvoicePaymentHistoryItem(BaseModel):
@@ -74,6 +77,7 @@ class InvoiceStudentInfo(BaseModel):
     student_id: int
     student_name: str
     admission_no: Optional[str] = None
+    roll_no: Optional[str] = None
     class_id: int
     class_name: Optional[str] = None
     division_id: Optional[int] = None

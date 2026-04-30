@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   Box,
   Button,
@@ -7,24 +8,17 @@ import {
   DialogTitle,
   Link,
   Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Typography,
 } from "@mui/material";
-import { useMemo } from "react";
-import BaseForm from "../../components/reusable/BaseForm";
-import { useFormManager } from "../../hooks/useFormManager";
-import { useInvoiceDetailController } from "../../hooks/useInvoiceDetailController";
+import { PageHeader } from "../../components/layout";
 import {
-  invoiceDetailFormConfig,
-  type InvoiceDetailFormData,
-} from "../../formConfig/invoiceDetailFormConfig";
-import type { FormValidationConfig } from "../../utils/formValidation";
+  DataTable,
+  ListPageLayout,
+} from "../../components/reusable";
+import FeeInstallmentStatusChip from "../../components/fees/FeeInstallmentStatusChip";
+import { useInvoiceDetailController } from "../../hooks/useInvoiceDetailController";
+import type { InvoiceFeeBreakdownItem, InvoicePaymentHistoryItem } from "../../types/invoice";
+import { colorTokens } from "../../tokens/colors";
 
 function money(v: number): string {
   return `₹${Number(v || 0).toLocaleString()}`;
@@ -33,210 +27,199 @@ function money(v: number): string {
 export default function InvoiceDetail() {
   const controller = useInvoiceDetailController();
   const detail = controller.detail;
-  const validationConfig = useMemo<FormValidationConfig<InvoiceDetailFormData>>(() => ({}), []);
-  const {
-    formData,
-    setFormData,
-    fieldErrors,
-    handleChange,
-    handleFieldValueChange,
-    handleSubmit,
-  } = useFormManager<InvoiceDetailFormData>({
-    initialValues: {},
-    validationConfig,
-    onClearError: () => controller.setError(null),
-  });
 
-  const summarySlot = useMemo(
-    () =>
-      !detail ? null : (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            {detail.student_info.student_name} | Roll No: {detail.student_info.roll_no || "-"} | Class:{" "}
-            {detail.student_info.class_name || "-"} | Invoice: {detail.invoice.invoice_no}
-          </Typography>
-          <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
-            Installment: {detail.invoice.installment || "-"} | Due Date:{" "}
-            {new Date(detail.invoice.due_date).toLocaleDateString()} | Status: {detail.invoice.status}
-          </Typography>
-        </Paper>
-      ),
-    [detail]
+  const feeBreakdownColumns = useMemo(
+    () => [
+      {
+        id: "component",
+        label: "Fee Component",
+        render: (row: InvoiceFeeBreakdownItem) => row.fee_category_name || "-",
+      },
+      {
+        id: "payable_for",
+        label: "Payable For",
+        render: (row: InvoiceFeeBreakdownItem) =>
+          row.payable_for || row.installment_type || detail?.invoice.installment || "As applicable",
+      },
+      {
+        id: "amount",
+        label: "Amount",
+        align: "right" as const,
+        render: (row: InvoiceFeeBreakdownItem) => money(row.amount),
+      },
+      {
+        id: "paid_amount",
+        label: "Paid",
+        align: "right" as const,
+        render: (row: InvoiceFeeBreakdownItem) => money(row.paid_amount || 0),
+      },
+      {
+        id: "pending_amount",
+        label: "Pending",
+        align: "right" as const,
+        render: (row: InvoiceFeeBreakdownItem) => money(row.pending_amount || 0),
+      },
+    ],
+    [detail?.invoice.installment]
   );
 
-  const breakupSlot = useMemo(
-    () =>
-      !detail ? null : (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Component</TableCell>
-                  <TableCell align="right">Amount</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {detail.fee_breakdown.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>{item.fee_category_name || "-"}</TableCell>
-                    <TableCell align="right">{money(item.amount)}</TableCell>
-                  </TableRow>
-                ))}
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>
-                    {money(detail.payment_summary.total_amount)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      ),
-    [detail]
-  );
-
-  const paymentSummarySlot = useMemo(
-    () =>
-      !detail ? null : (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="body2">
-            Paid: {money(detail.payment_summary.paid_amount)} | Due: {money(detail.payment_summary.due_amount)}
-          </Typography>
-        </Paper>
-      ),
-    [detail]
-  );
-
-  const paymentHistorySlot = useMemo(
-    () =>
-      !detail ? null : (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          {detail.payment_history.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              No payment records found
-            </Typography>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Date</TableCell>
-                    <TableCell align="right">Amount</TableCell>
-                    <TableCell>Mode</TableCell>
-                    <TableCell>Ref No</TableCell>
-                    <TableCell align="center">Receipt</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {detail.payment_history.map((row) => (
-                    <TableRow key={row.payment_id}>
-                      <TableCell>{new Date(row.payment_date).toLocaleDateString()}</TableCell>
-                      <TableCell align="right">{money(row.amount)}</TableCell>
-                      <TableCell>{row.payment_method}</TableCell>
-                      <TableCell>{row.reference_no || "-"}</TableCell>
-                      <TableCell align="center">
-                        <Link
-                          component="button"
-                          variant="body2"
-                          onClick={() => controller.onOpenReceipt(row)}
-                          sx={{ textDecoration: "none", fontWeight: 700, "&:hover": { textDecoration: "underline" } }}
-                        >
-                          Receipt
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Paper>
-      ),
-    [controller, detail]
-  );
-
-  const actionSlot = useMemo(
-    () =>
-      !detail ? null : (
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <Button variant="outlined" onClick={controller.onBack} sx={{ textTransform: "none" }}>
-            Back
-          </Button>
-          <Button variant="outlined" onClick={controller.onPrint} sx={{ textTransform: "none" }}>
-            Print
-          </Button>
-          <Button variant="outlined" onClick={controller.onDownload} sx={{ textTransform: "none" }}>
-            Download
-          </Button>
-          <Button
-            variant="contained"
-            sx={{ textTransform: "none" }}
-            onClick={controller.onPayNow}
-            disabled={!detail.available_actions.includes("pay_now")}
+  const paymentHistoryColumns = useMemo(
+    () => [
+      {
+        id: "payment_date",
+        label: "Date",
+        render: (row: InvoicePaymentHistoryItem) =>
+          new Date(row.payment_date).toLocaleDateString(),
+      },
+      {
+        id: "amount",
+        label: "Amount",
+        align: "right" as const,
+        render: (row: InvoicePaymentHistoryItem) => money(row.amount),
+      },
+      { id: "payment_method", label: "Mode", render: (row: InvoicePaymentHistoryItem) => row.payment_method },
+      { id: "reference_no", label: "Ref No", render: (row: InvoicePaymentHistoryItem) => row.reference_no || "-" },
+      {
+        id: "receipt",
+        label: "Receipt",
+        align: "center" as const,
+        render: (row: InvoicePaymentHistoryItem) => (
+          <Link
+            component="button"
+            variant="body2"
+            onClick={() => controller.onOpenReceipt(row)}
+            sx={{ textDecoration: "none", fontWeight: 700, "&:hover": { textDecoration: "underline" } }}
           >
-            Pay Now
-          </Button>
-          <Button
-            variant="contained"
-            sx={{ textTransform: "none" }}
-            onClick={controller.onCollectPayment}
-            disabled={!detail.available_actions.includes("collect_payment")}
-          >
-            Collect Payment
-          </Button>
-        </Box>
-      ),
-    [controller, detail]
-  );
-
-  const formConfig = useMemo(
-    () =>
-      invoiceDetailFormConfig({
-        summarySlot,
-        breakupSlot,
-        paymentSummarySlot,
-        paymentHistorySlot,
-        actionSlot,
-      }),
-    [summarySlot, breakupSlot, paymentSummarySlot, paymentHistorySlot, actionSlot]
+            Receipt
+          </Link>
+        ),
+      },
+    ],
+    [controller]
   );
 
   return (
     <>
-      <BaseForm<InvoiceDetailFormData>
-        formConfig={formConfig}
-        formData={formData}
-        setFormData={setFormData}
-        fieldErrors={fieldErrors}
-        handleChange={handleChange}
-        handleFieldValueChange={handleFieldValueChange}
-        handleSubmit={handleSubmit}
-        setFormError={controller.setError}
-        onConfirmSubmit={async () => Promise.resolve()}
-        isEditMode={false}
-        loading={false}
-        fetchLoading={controller.loading}
-        error={controller.error}
-        onErrorDismiss={() => controller.setError(null)}
-        snackbar={null}
-        onSnackbarClose={() => undefined}
-        headerConfig={{
-          links: [
-            { title: "Invoice List", path: "/fees/invoices" },
-            { title: "Invoice Detail", path: "#" },
-          ],
-          homePath: "/",
-          cancelTooltip: "Back",
-          saveTooltipCreate: "View",
-        }}
-        onCancelNavigate={controller.onBack}
-        confirmMessage="Open invoice detail"
-        submitLabelCreate="View"
-        hideFooterActions
-        canSubmit={false}
-      />
+      <ListPageLayout
+        header={
+          <>
+            <PageHeader
+              links={[
+                { title: "Invoice List", path: "/fees/invoices" },
+                { title: "Invoice Detail", path: "#" },
+              ]}
+              homePath="/"
+              actions={
+                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                  <Button variant="outlined" onClick={controller.onBack} sx={{ textTransform: "none" }}>
+                    Back
+                  </Button>
+                  <Button variant="outlined" onClick={controller.onPrint} sx={{ textTransform: "none" }}>
+                    Print
+                  </Button>
+                  <Button variant="outlined" onClick={controller.onDownload} sx={{ textTransform: "none" }}>
+                    Download
+                  </Button>
+                </Box>
+              }
+            />
+            {controller.error && (
+              <Paper sx={{ p: 2, m: 2, border: `1px solid ${colorTokens.preschool.coral.main}` }}>
+                <Typography color="error">{controller.error}</Typography>
+              </Paper>
+            )}
+          </>
+        }
+      >
+        {controller.loading || !detail ? (
+          <Box sx={{ p: 3 }}>
+            <Typography color="text.secondary">Loading invoice details...</Typography>
+          </Box>
+        ) : (
+          <Box sx={{ p: 2, display: "grid", gap: 2 }}>
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                <Typography variant="body2"><strong>Student:</strong> {detail.student_info.student_name}</Typography>
+                <Typography variant="body2"><strong>Roll No:</strong> {detail.student_info.roll_no || "-"}</Typography>
+                <Typography variant="body2"><strong>Class:</strong> {detail.student_info.class_name || "-"}</Typography>
+                <Typography variant="body2"><strong>Invoice:</strong> {detail.invoice.invoice_no}</Typography>
+              </Box>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, mt: 1 }}>
+                <Typography variant="body2">
+                  <strong>Installment:</strong> {detail.invoice.installment || detail.invoice.installment_name || "-"}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Due Date:</strong> {new Date(detail.invoice.due_date).toLocaleDateString()}
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Typography variant="body2"><strong>Status:</strong></Typography>
+                  <FeeInstallmentStatusChip status={detail.invoice.status} />
+                </Box>
+              </Box>
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Fee Breakdown</Typography>
+              <DataTable<InvoiceFeeBreakdownItem>
+                columns={feeBreakdownColumns}
+                data={detail.fee_breakdown}
+                emptyMessage="No fee breakup available"
+                getRowKey={(row) => row.id}
+                size="small"
+              />
+              <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
+                <Typography sx={{ fontWeight: 700 }}>
+                  Total: {money(detail.payment_summary.total_amount)}
+                </Typography>
+              </Box>
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Payment Summary</Typography>
+              <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+                <Typography variant="body2"><strong>Paid:</strong> {money(detail.payment_summary.paid_amount)}</Typography>
+                <Typography variant="body2"><strong>Due:</strong> {money(detail.payment_summary.due_amount)}</Typography>
+              </Box>
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Payment History</Typography>
+              {detail.payment_history.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No payment records found
+                </Typography>
+              ) : (
+                <DataTable<InvoicePaymentHistoryItem>
+                  columns={paymentHistoryColumns}
+                  data={detail.payment_history}
+                  emptyMessage="No payment records found"
+                  getRowKey={(row) => row.payment_id}
+                  size="small"
+                />
+              )}
+            </Paper>
+
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+              <Button
+                variant="contained"
+                sx={{ textTransform: "none" }}
+                onClick={controller.onPayNow}
+                disabled={!detail.available_actions.includes("pay_now")}
+              >
+                Pay Now
+              </Button>
+              <Button
+                variant="contained"
+                sx={{ textTransform: "none" }}
+                onClick={controller.onCollectPayment}
+                disabled={!detail.available_actions.includes("collect_payment")}
+              >
+                Collect Payment
+              </Button>
+            </Box>
+          </Box>
+        )}
+      </ListPageLayout>
 
       <Dialog open={controller.receiptOpen} onClose={() => controller.setReceiptOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>Receipt</DialogTitle>

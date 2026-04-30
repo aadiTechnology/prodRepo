@@ -44,9 +44,13 @@ export interface InvoiceListParams {
 
 export interface InvoiceFeeBreakdownItem {
   id: number;
-  fee_category_id?: number | null;
+  fee_category_id?: string | null;
   fee_category_name?: string | null;
   amount: number;
+  paid_amount?: number;
+  pending_amount?: number;
+  payable_for?: string | null;
+  installment_type?: string | null;
 }
 
 export interface InvoicePaymentSummary {

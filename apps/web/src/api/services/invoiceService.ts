@@ -39,7 +39,16 @@ const invoiceService = {
       return {
         ...payload,
         invoice: normalizeInvoiceItem(payload.invoice ?? {}),
-        fee_breakdown: Array.isArray(payload.fee_breakdown) ? payload.fee_breakdown : [],
+        fee_breakdown: Array.isArray(payload.fee_breakdown)
+          ? payload.fee_breakdown.map((item: any) => ({
+              ...item,
+              amount: Number(item?.amount || 0),
+              paid_amount: Number(item?.paid_amount || 0),
+              pending_amount: Number(item?.pending_amount || 0),
+              payable_for: item?.payable_for ?? item?.payableFor ?? null,
+              installment_type: item?.installment_type ?? item?.installmentType ?? null,
+            }))
+          : [],
         payment_history: Array.isArray(payload.payment_history) ? payload.payment_history : [],
         available_actions: Array.isArray(payload.available_actions) ? payload.available_actions : [],
       } as InvoiceDetailResponse;

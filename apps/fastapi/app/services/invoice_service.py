@@ -163,6 +163,12 @@ def get_invoice_detail(
         db, tenant_id=tenant_id, invoice_id=invoice_id
     )
     fee_breakdown_rows = invoice_repository.get_invoice_fee_breakdown(db, invoice_id=invoice_id)
+    if not fee_breakdown_rows:
+        fee_breakdown_rows = invoice_repository.get_fee_structure_breakdown_for_invoice(
+            db,
+            tenant_id=tenant_id,
+            invoice_id=invoice_id,
+        )
     payment_history_rows = invoice_repository.get_invoice_payment_history(
         db,
         tenant_id=tenant_id,
@@ -177,26 +183,44 @@ def get_invoice_detail(
     if due_amount > 0:
         available_actions.extend(["pay_now", "collect_payment"])
 
+    breakdown_total = sum(float(item.get("amount") or 0) for item in fee_breakdown_rows)
+    paid_ratio = (paid_amount / breakdown_total) if breakdown_total > 0 else 0
+
+    breakdown_items: list[InvoiceFeeBreakdownItem] = []
+    running_paid = 0.0
+    for idx, item in enumerate(fee_breakdown_rows):
+        amount = float(item.get("amount") or 0)
+        if idx == len(fee_breakdown_rows) - 1:
+            allocated_paid = max(0.0, min(amount, paid_amount - running_paid))
+        else:
+            allocated_paid = max(0.0, min(amount, round(amount * paid_ratio, 2)))
+            running_paid += allocated_paid
+        pending = max(0.0, round(amount - allocated_paid, 2))
+        breakdown_items.append(
+            InvoiceFeeBreakdownItem(
+                id=int(item["id"]),
+                fee_category_id=item.get("fee_category_id"),
+                fee_category_name=item.get("fee_category_name"),
+                amount=amount,
+                paid_amount=allocated_paid,
+                pending_amount=pending,
+                payable_for=item.get("payable_for"),
+            )
+        )
+
     return InvoiceDetailResponse(
         invoice=invoice,
         student_info=InvoiceStudentInfo(
             student_id=int(student_info_row["student_id"]),
             student_name=str(student_info_row["student_name"]),
             admission_no=student_info_row.get("admission_no"),
+            roll_no=student_info_row.get("roll_no"),
             class_id=int(student_info_row["class_id"]),
             class_name=student_info_row.get("class_name"),
             division_id=student_info_row.get("division_id"),
             division_name=student_info_row.get("division_name"),
         ),
-        fee_breakdown=[
-            InvoiceFeeBreakdownItem(
-                id=int(item["id"]),
-                fee_category_id=item.get("fee_category_id"),
-                fee_category_name=item.get("fee_category_name"),
-                amount=float(item["amount"] or 0),
-            )
-            for item in fee_breakdown_rows
-        ],
+        fee_breakdown=breakdown_items,
         payment_summary=InvoicePaymentSummary(
             total_amount=float(invoice_row["total_amount"] or 0),
             paid_amount=paid_amount,
