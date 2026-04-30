@@ -6,9 +6,9 @@ from pydantic import BaseModel
 class StudentDetailResponse(BaseModel):
     id: str
     name: str
-    gender: str
-    date_of_birth: str
-    mobile: str
+    gender: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    mobile: Optional[str] = None
     roll_no: Optional[str] = None
     email: Optional[EmailStr] = None
     address: Optional[str] = None
