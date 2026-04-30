@@ -47,6 +47,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
   submitLabelCreate = "Save",
   submitLabelEdit = "Save",
   headerRightBelowSlot,
+  extraHeaderActions,
   formTopSlot,
   canSubmit = true,
   hideFooterActions = false,
@@ -112,7 +113,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
               links={headerConfig.links}
               homePath={headerConfig.homePath ?? "/"}
               actions={
-                <Box sx={{ display: "flex", gap: 1.5 }}>
+                <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
                   <FormHeaderIconAction
                     variant="cancel"
                     onClick={onCancelNavigate}
@@ -125,6 +126,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
                     disabled={!canSubmit}
                     tooltipTitle={saveTooltip}
                   />
+                  {extraHeaderActions}
                 </Box>
               }
             />

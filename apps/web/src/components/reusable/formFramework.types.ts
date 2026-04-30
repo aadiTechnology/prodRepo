@@ -112,6 +112,8 @@ export type BaseFormProps<T extends Record<string, unknown>> = {
   submitLabelEdit?: string;
   /** Rendered in header, below right-side icon actions. */
   headerRightBelowSlot?: ReactNode;
+  /** Rendered in header, inline with right-side icon actions. */
+  extraHeaderActions?: ReactNode;
   /** Rendered inside the form above the main field grid (e.g. contextual selectors). */
   formTopSlot?: ReactNode;
   /** Custom flag to disable the save/submit actions (e.g. permission check). Defaults to true. */
