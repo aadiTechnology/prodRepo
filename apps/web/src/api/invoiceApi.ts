@@ -79,7 +79,7 @@ const toDateInputValue = (raw: unknown): string | undefined => {
 const invoiceApi = {
   normalizeStudents(raw: unknown[]): InvoiceStudentItem[] {
     return raw
-      .map((item) => {
+      .map((item: unknown) => {
         const row = item as Record<string, unknown>;
         const id = Number(row.id);
         if (!id || Number.isNaN(id)) return null;
@@ -152,9 +152,9 @@ const invoiceApi = {
               : Number(row.class_division_id),
         } as FeeStructureOption;
       })
-      .filter((item): item is FeeStructureOption => item !== null)
+      .filter((item: FeeStructureOption | null): item is FeeStructureOption => item !== null)
       .filter(
-        (item) =>
+        (item: FeeStructureOption) =>
           item.class_division_id === params.division_id || item.class_division_id === null
       );
   },
@@ -183,6 +183,22 @@ const invoiceApi = {
       .filter((item: InstallmentOption | null): item is InstallmentOption => item !== null);
 
     return Array.from(new Map<string, InstallmentOption>(normalized.map((item) => [item.value, item])).values());
+  },
+
+  async getInstallmentOptions(params: {
+    academic_year_id: number;
+    class_id: number;
+    division_id: number;
+  }): Promise<InstallmentOption[]> {
+    const structures = await this.getFeeStructureOptions(params);
+    const requests = structures.map((s) => this.getInstallmentOptionsByFeeStructureId(s.id));
+    const responses = await Promise.all(requests);
+    const flattened = responses.flat();
+
+    // Return unique installments by value
+    return Array.from(
+      new Map(flattened.map((item: InstallmentOption) => [item.value, item])).values()
+    );
   },
 
   async getStudents(params: {

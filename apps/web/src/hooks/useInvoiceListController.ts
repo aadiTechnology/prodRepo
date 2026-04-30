@@ -134,8 +134,12 @@ export function useInvoiceListController() {
       return;
     }
     try {
+      const targetClasses = classId
+        ? classes.filter((c) => String(c.id) === classId)
+        : classes;
+
       const optionMap = new Map<string, { label: string; value: string }>();
-      const requests = classes.flatMap((schoolClass) => {
+      const requests = targetClasses.flatMap((schoolClass) => {
         const divisions = schoolClass.divisions ?? [];
         return divisions.map((division) =>
           invoiceApi.getInstallmentOptions({
@@ -153,7 +157,7 @@ export function useInvoiceListController() {
     } catch {
       setInstallmentOptions([]);
     }
-  }, [academicYearId, classes]);
+  }, [academicYearId, classId, classes]);
 
   const handleDeleteClick = useCallback((invoice: InvoiceItem) => {
     setInvoiceToDelete(invoice);
@@ -161,10 +165,20 @@ export function useInvoiceListController() {
   }, []);
 
   const handleConfirmDelete = useCallback(async () => {
-    setDeleteLoading(false);
-    setConfirmDialogOpen(false);
-    setInvoiceToDelete(null);
-  }, []);
+    if (!invoiceToDelete) return;
+    try {
+      setDeleteLoading(true);
+      await invoiceService.deleteInvoice(invoiceToDelete.id);
+      setSnackbar("Invoice deleted successfully");
+      void fetchInvoices();
+    } catch (err: any) {
+      setSnackbar(err?.message || "Failed to delete invoice");
+    } finally {
+      setDeleteLoading(false);
+      setConfirmDialogOpen(false);
+      setInvoiceToDelete(null);
+    }
+  }, [invoiceToDelete, fetchInvoices]);
 
   const onSearchChange = useCallback((value: string) => {
     setSearch(value);
@@ -173,6 +187,11 @@ export function useInvoiceListController() {
 
   const onRowsPerPageChange = useCallback((value: number) => {
     setRowsPerPage(value);
+    setPage(0);
+  }, []);
+
+  const onAcademicYearChange = useCallback((value: string) => {
+    setAcademicYearId(value);
     setPage(0);
   }, []);
 
@@ -215,7 +234,7 @@ export function useInvoiceListController() {
     sortOrder,
     setSortOrder,
     academicYearId,
-    setAcademicYearId,
+    setAcademicYearId: onAcademicYearChange,
     classId,
     setClassId: onClassChange,
     installment,

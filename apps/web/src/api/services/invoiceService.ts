@@ -77,6 +77,10 @@ const invoiceService = {
       };
     }
   },
+
+  deleteInvoice: async (invoiceId: number): Promise<void> => {
+    await apiClient.delete(`/fees/invoices/${invoiceId}`);
+  },
 };
 
 export default invoiceService;
