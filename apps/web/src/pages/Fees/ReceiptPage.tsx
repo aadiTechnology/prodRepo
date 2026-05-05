@@ -1,10 +1,9 @@
 import { alpha } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import {
   Alert,
   Box,
-  Button,
   CircularProgress,
   GlobalStyles,
   Paper,
@@ -18,10 +17,9 @@ import {
 } from "@mui/material";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
-import KeyboardBackspaceRoundedIcon from "@mui/icons-material/KeyboardBackspaceRounded";
 import PrintRoundedIcon from "@mui/icons-material/PrintRounded";
 import { PageHeader } from "../../components/layout";
-import { ListPageLayout } from "../../components/reusable";
+import { HeaderIconAction, ListPageLayout } from "../../components/reusable";
 import { useAuth } from "../../context/AuthContext";
 import { colorTokens } from "../../tokens/colors";
 import {
@@ -51,7 +49,6 @@ function tenantAddressLines(tenant: {
 export default function ReceiptPage() {
   const { paymentId, invoiceId } = useParams<{ paymentId?: string; invoiceId?: string }>();
   const location = useLocation();
-  const navigate = useNavigate();
   const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
@@ -64,10 +61,6 @@ export default function ReceiptPage() {
   const invoiceIdFromState = Number((location.state as { invoice_id?: number } | null)?.invoice_id);
   const resolvedInvoiceId =
     Number.isFinite(numericInvoiceId) && numericInvoiceId > 0 ? numericInvoiceId : invoiceIdFromState;
-  const fallbackBackPath =
-    Number.isFinite(resolvedInvoiceId) && resolvedInvoiceId > 0
-      ? `/fees/invoices/${resolvedInvoiceId}/detail`
-      : "/fees/invoices";
   const isInvoiceScope = Number.isFinite(numericInvoiceId) && numericInvoiceId > 0;
 
   useEffect(() => {
@@ -177,6 +170,28 @@ export default function ReceiptPage() {
             { title: printableTitle, path: "#" },
           ]}
           homePath="/"
+          actions={
+            <Box className="receipt-no-print" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              <HeaderIconAction
+                tooltip="Print"
+                icon={<PrintRoundedIcon fontSize="small" />}
+                onClick={onPrint}
+                aria-label="Print receipt"
+              />
+              <HeaderIconAction
+                tooltip="Download PDF"
+                icon={<DownloadRoundedIcon fontSize="small" />}
+                onClick={onDownloadPdf}
+                aria-label="Download receipt PDF"
+              />
+              <HeaderIconAction
+                tooltip="Share"
+                icon={<IosShareRoundedIcon fontSize="small" />}
+                onClick={onShare}
+                aria-label="Share receipt"
+              />
+            </Box>
+          }
         />
       }
     >
@@ -198,34 +213,6 @@ export default function ReceiptPage() {
         }}
       />
       <Box sx={{ p: 2 }}>
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          spacing={1}
-          sx={{ mb: 1.5 }}
-          className="receipt-no-print"
-        >
-          <Button
-            variant="outlined"
-            startIcon={<KeyboardBackspaceRoundedIcon />}
-            onClick={() => navigate(fallbackBackPath)}
-          >
-            Back
-          </Button>
-          <Stack direction="row" spacing={1}>
-            <Button variant="outlined" startIcon={<PrintRoundedIcon />} onClick={onPrint}>
-              Print
-            </Button>
-            <Button variant="outlined" startIcon={<DownloadRoundedIcon />} onClick={onDownloadPdf}>
-              Download PDF
-            </Button>
-            <Button variant="outlined" startIcon={<IosShareRoundedIcon />} onClick={onShare}>
-              Share
-            </Button>
-          </Stack>
-        </Stack>
-
         {notice && (
           <Alert severity="success" sx={{ mb: 1.5 }} className="receipt-no-print">
             {notice}
