@@ -672,7 +672,7 @@ export default function CollectPaymentPage() {
           .toUpperCase();
       }
 
-      await collectInvoiceFeePayment(payload);
+      const paymentResponse = await collectInvoiceFeePayment(payload);
       setSnackbar("Payment recorded successfully!");
 
       const refreshedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
@@ -687,6 +687,10 @@ export default function CollectPaymentPage() {
         bank_account_no: "",
         ifsc_code: "",
       }));
+
+      navigate(`/fees/receipt/${paymentResponse.payment_id}`, {
+        state: { invoice_id: selectedInvoice.id },
+      });
     } catch (err: any) {
       console.error("Payment failure:", err);
       const { message, fieldErrors: apiErrors } = mapApiErrorsToFields(err);
@@ -703,7 +707,7 @@ export default function CollectPaymentPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedInvoice, formData, tenantId, setFieldErrors, setFormData]);
+  }, [selectedInvoice, formData, tenantId, setFieldErrors, setFormData, navigate]);
 
   // ─── Top slot: invoice context panel ──────────────────────────────────
   const topSlot = (

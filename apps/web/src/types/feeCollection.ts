@@ -34,3 +34,42 @@ export interface InvoicePaymentCollectRequest {
   bank_account_no?: string | null;
   ifsc_code?: string | null;
 }
+
+export interface FeeReceiptPaymentLineItem {
+  sr_no: number;
+  txn_number?: string | null;
+  payment_type: string;
+  bank_name?: string | null;
+  amount: number;
+}
+
+export interface FeeReceiptFeeDetailItem {
+  sr_no: number;
+  fee_category_name?: string | null;
+  payable_for?: string | null;
+  amount: number;
+  paid_amount: number;
+}
+
+export interface FeeReceiptDetailResponse {
+  payment_id: number;
+  receipt_number?: string | null;
+  payment_date: string;
+  payment_method: string;
+  transaction_number?: string | null;
+  total_amount: number;
+  amount_in_words: string;
+  notes?: string | null;
+  student_name: string;
+  parent_name?: string | null;
+  admission_no?: string | null;
+  class_name?: string | null;
+  division_name?: string | null;
+  academic_year?: string | null;
+  invoice_no?: string | null;
+  installment?: string | null;
+  paid_for?: string | null;
+  created_by_name?: string | null;
+  payment_lines: FeeReceiptPaymentLineItem[];
+  fee_details: FeeReceiptFeeDetailItem[];
+}

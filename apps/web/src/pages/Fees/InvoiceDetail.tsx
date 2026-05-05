@@ -11,24 +11,10 @@ import {
   StudentInfoCard,
   formatInvoiceCurrency as money,
 } from "../../components/fees/InvoiceContextPanel";
-import InvoiceFeeReceiptDialog from "../../components/fees/InvoiceFeeReceiptDialog";
 import FeeInstallmentStatusChip from "../../components/fees/FeeInstallmentStatusChip";
-import { useAuth } from "../../context/AuthContext";
 import { useInvoiceDetailController } from "../../hooks/useInvoiceDetailController";
 import type { InvoiceFeeBreakdownItem } from "../../types/invoice";
 import { colorTokens } from "../../tokens/colors";
-
-function tenantAddressLines(tenant: { address_line1?: string | null; address_line2?: string | null; city?: string | null; state?: string | null; pin_code?: string | null } | null | undefined): string[] {
-  if (!tenant) return [];
-  const lines: string[] = [];
-  if (tenant.address_line1?.trim()) lines.push(tenant.address_line1.trim());
-  if (tenant.address_line2?.trim()) lines.push(tenant.address_line2.trim());
-  const cityState = [tenant.city, tenant.state].filter((x) => x?.trim()).join(", ");
-  const pin = tenant.pin_code?.trim();
-  const last = [cityState, pin].filter(Boolean).join(" ");
-  if (last) lines.push(last);
-  return lines;
-}
 
 function getFeeLineStatus(
   row: InvoiceFeeBreakdownItem,
@@ -55,33 +41,6 @@ function getFeeLineStatus(
 export default function InvoiceDetail() {
   const controller = useInvoiceDetailController();
   const detail = controller.detail;
-  const { user } = useAuth();
-
-  const organizationAddressLines = useMemo(
-    () => tenantAddressLines(user?.tenant ?? undefined),
-    [user?.tenant]
-  );
-  const invoiceStatus = useMemo(() => {
-    if (!detail) return "Pending" as const;
-
-    const totalAmount = Number(detail.payment_summary.total_amount || 0);
-    const paidAmount = Number(detail.payment_summary.paid_amount || 0);
-    const dueAmount = Number(detail.payment_summary.due_amount || 0);
-    const dueDate = detail.invoice.due_date ? new Date(detail.invoice.due_date) : null;
-    const isDueDateValid = Boolean(dueDate && !Number.isNaN(dueDate.getTime()));
-    const isDueDatePassed = isDueDateValid ? (dueDate as Date).getTime() <= Date.now() : false;
-
-    if (dueAmount <= 0 || (totalAmount > 0 && paidAmount >= totalAmount)) {
-      return "Paid" as const;
-    }
-    if (paidAmount > 0 && dueAmount > 0) {
-      return "Partial" as const;
-    }
-    if (isDueDatePassed || paidAmount <= 0) {
-      return "Pending" as const;
-    }
-    return "Pending" as const;
-  }, [detail]);
 
   const feeBreakdownColumns = useMemo(
     () => [
@@ -127,7 +86,15 @@ export default function InvoiceDetail() {
         label: "Receipt",
         align: "center" as const,
         render: (row: InvoiceFeeBreakdownItem) => {
+          const paymentId = controller.getPrimaryPaymentId();
           if (Number(row.paid_amount || 0) <= 0) {
+            return (
+              <Typography variant="body2" color="text.secondary">
+                —
+              </Typography>
+            );
+          }
+          if (!paymentId) {
             return (
               <Typography variant="body2" color="text.secondary">
                 —
@@ -139,7 +106,7 @@ export default function InvoiceDetail() {
               component="button"
               type="button"
               variant="body2"
-              onClick={() => controller.onOpenReceiptForFeeLine(row)}
+              onClick={() => controller.onOpenReceiptForFeeLine(paymentId)}
               sx={{
                 fontWeight: 700,
                 textDecoration: "none",
@@ -157,7 +124,12 @@ export default function InvoiceDetail() {
         },
       },
     ],
-    [detail?.invoice.installment, detail?.invoice.due_date, controller.onOpenReceiptForFeeLine]
+    [
+      detail?.invoice.installment,
+      detail?.invoice.due_date,
+      controller.getPrimaryPaymentId,
+      controller.onOpenReceiptForFeeLine,
+    ]
   );
 
   return (
@@ -218,6 +190,14 @@ export default function InvoiceDetail() {
 
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
               <Button
+                variant="outlined"
+                sx={{ textTransform: "none" }}
+                onClick={controller.onOpenFullReceipt}
+                disabled={Number(detail.payment_summary.paid_amount || 0) <= 0}
+              >
+                Full Receipt
+              </Button>
+              <Button
                 variant="contained"
                 sx={{ textTransform: "none" }}
                 onClick={controller.onPayNow}
@@ -237,16 +217,6 @@ export default function InvoiceDetail() {
           </Box>
         )}
       </ListPageLayout>
-
-      {detail && controller.receiptFeeLine ? (
-        <InvoiceFeeReceiptDialog
-          onClose={controller.onCloseReceipt}
-          detail={detail}
-          feeLine={controller.receiptFeeLine}
-          organizationName={user?.tenant?.name}
-          organizationAddressLines={organizationAddressLines}
-        />
-      ) : null}
     </Fragment>
   );
 }

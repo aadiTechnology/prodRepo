@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import invoiceService from "../api/services/invoiceService";
-import type { InvoiceDetailResponse, InvoiceFeeBreakdownItem } from "../types/invoice";
+import type { InvoiceDetailResponse } from "../types/invoice";
 
 export function useInvoiceDetailController() {
   const { invoiceId } = useParams<{ invoiceId: string }>();
@@ -9,7 +9,6 @@ export function useInvoiceDetailController() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<InvoiceDetailResponse | null>(null);
-  const [receiptFeeLine, setReceiptFeeLine] = useState<InvoiceFeeBreakdownItem | null>(null);
 
   const numericInvoiceId = useMemo(() => Number(invoiceId), [invoiceId]);
 
@@ -61,13 +60,36 @@ export function useInvoiceDetailController() {
     window.print();
   }, []);
 
-  const onOpenReceiptForFeeLine = useCallback((row: InvoiceFeeBreakdownItem) => {
-    setReceiptFeeLine(row);
-  }, []);
+  const onOpenReceiptForFeeLine = useCallback((paymentId?: number) => {
+    if (!paymentId || paymentId <= 0) {
+      setError("Receipt not found");
+      return;
+    }
 
-  const onCloseReceipt = useCallback(() => {
-    setReceiptFeeLine(null);
-  }, []);
+    navigate(`/fees/receipt/${paymentId}`, {
+      state: { invoice_id: numericInvoiceId },
+    });
+  }, [navigate, numericInvoiceId]);
+
+  const getPrimaryPaymentId = useCallback(() => {
+    const history = detail?.payment_history ?? [];
+    if (!history.length) {
+      return null;
+    }
+    // Use latest payment for current invoice installment context.
+    // All fee rows in this invoice belong to the same installment, so this avoids wrong row-index mapping.
+    return history[0]?.payment_id ?? null;
+  }, [detail?.payment_history]);
+
+  const onOpenFullReceipt = useCallback(() => {
+    if (!Number.isFinite(numericInvoiceId) || numericInvoiceId <= 0) {
+      setError("Receipt not found");
+      return;
+    }
+    navigate(`/fees/receipt/invoice/${numericInvoiceId}`, {
+      state: { invoice_id: numericInvoiceId, scope: "invoice" },
+    });
+  }, [navigate, numericInvoiceId]);
 
   return {
     loading,
@@ -80,8 +102,8 @@ export function useInvoiceDetailController() {
     onPayNow,
     onPrint,
     onDownload,
-    receiptFeeLine,
     onOpenReceiptForFeeLine,
-    onCloseReceipt,
+    getPrimaryPaymentId,
+    onOpenFullReceipt,
   };
 }
