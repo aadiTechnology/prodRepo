@@ -145,6 +145,36 @@ export default function ReceiptPage() {
     }
   }, []);
 
+  const waitForReceiptImages = useCallback(async (container: HTMLElement) => {
+    const images = Array.from(container.querySelectorAll("img"));
+    if (images.length === 0) return;
+
+    await Promise.all(
+      images.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            if (img.complete && img.naturalWidth > 0) {
+              resolve();
+              return;
+            }
+
+            const cleanup = () => {
+              img.removeEventListener("load", onDone);
+              img.removeEventListener("error", onDone);
+            };
+            const onDone = () => {
+              cleanup();
+              resolve();
+            };
+
+            img.addEventListener("load", onDone, { once: true });
+            img.addEventListener("error", onDone, { once: true });
+            window.setTimeout(onDone, 3000);
+          })
+      )
+    );
+  }, []);
+
   const onPrint = useCallback(() => {
     try {
       clearSelectionForPrint();
@@ -173,6 +203,7 @@ export default function ReceiptPage() {
         setError("Failed to download receipt");
         return;
       }
+      await waitForReceiptImages(printNode);
       const canvas = await html2canvas(printNode, {
         scale: 2,
         useCORS: true,
@@ -237,7 +268,7 @@ export default function ReceiptPage() {
       setError("Failed to download receipt");
       enqueueSnackbar("Failed to download receipt", { variant: "error" });
     }
-  }, [clearSelectionForPrint, receipt?.receipt_number, enqueueSnackbar]);
+  }, [clearSelectionForPrint, receipt?.receipt_number, enqueueSnackbar, waitForReceiptImages]);
 
   const onShare = useCallback(async () => {
     if (!receipt) return;
@@ -344,6 +375,7 @@ export default function ReceiptPage() {
                         component="img"
                         src={tenantLogo}
                         alt="Tenant logo"
+                        crossOrigin="anonymous"
                         sx={{ width: 64, height: 64, objectFit: "contain", mx: "auto" }}
                       />
                     </Box>
