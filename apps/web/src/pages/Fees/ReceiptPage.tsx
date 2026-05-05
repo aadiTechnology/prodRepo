@@ -18,9 +18,9 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
-import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
-import PrintRoundedIcon from "@mui/icons-material/PrintRounded";
+import DownloadIcon from "@mui/icons-material/Download";
+import ShareIcon from "@mui/icons-material/Share";
+import PrintIcon from "@mui/icons-material/Print";
 import { PageHeader } from "../../components/layout";
 import { HeaderIconAction, ListPageLayout } from "../../components/reusable";
 import { useAuth } from "../../context/AuthContext";
@@ -130,6 +130,19 @@ export default function ReceiptPage() {
   }, [receipt?.payment_date]);
   const tenantLogo = user?.tenant?.logo_url || null;
   const printableTitle = isInvoiceScope ? "Payment Receipt (Full)" : "Payment Receipt";
+  const receiptActionButtonSx = {
+    background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
+    color: colorTokens.primary.contrast,
+    borderRadius: "15px",
+    width: 44,
+    height: 44,
+    boxShadow: `0 8px 16px ${alpha(colorTokens.preschool.turquoise.main, 0.25)}`,
+    transition: "all 0.3s ease",
+    "&:hover": {
+      transform: "scale(1.08)",
+      boxShadow: `0 12px 20px ${alpha(colorTokens.preschool.turquoise.main, 0.35)}`,
+    },
+  };
 
   const clearSelectionForPrint = useCallback(() => {
     try {
@@ -301,21 +314,24 @@ export default function ReceiptPage() {
             <Box className="receipt-no-print" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
               <HeaderIconAction
                 tooltip="Print"
-                icon={<PrintRoundedIcon fontSize="small" />}
+                icon={<PrintIcon sx={{ fontSize: 20 }} />}
                 onClick={onPrint}
                 aria-label="Print receipt"
+                sx={receiptActionButtonSx}
               />
               <HeaderIconAction
                 tooltip="Download PDF"
-                icon={<DownloadRoundedIcon fontSize="small" />}
+                icon={<DownloadIcon sx={{ fontSize: 20 }} />}
                 onClick={onDownloadPdf}
                 aria-label="Download receipt PDF"
+                sx={receiptActionButtonSx}
               />
               <HeaderIconAction
                 tooltip="Share"
-                icon={<IosShareRoundedIcon fontSize="small" />}
+                icon={<ShareIcon sx={{ fontSize: 20 }} />}
                 onClick={onShare}
                 aria-label="Share receipt"
+                sx={receiptActionButtonSx}
               />
             </Box>
           }
