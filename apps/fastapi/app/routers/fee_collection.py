@@ -6,11 +6,17 @@ from app.core.dependencies import CurrentUser
 from app.core.exceptions import ValidationException
 from app.routers.installment_tracking import require_installment_tracking_access
 from app.schemas.fee_collection import (
+    FeeReceiptDetailResponse,
     FeePaymentCollectRequest, 
     FeePaymentCollectResponse,
     InvoicePaymentCollectRequest
 )
-from app.services.fee_collection_service import collect_payment, collect_invoice_payment
+from app.services.fee_collection_service import (
+    collect_payment,
+    collect_invoice_payment,
+    get_receipt_detail,
+    get_invoice_receipt_detail,
+)
 
 router = APIRouter(prefix="/fees/collection", tags=["Fees - Collection"])
 
@@ -52,5 +58,31 @@ async def collect_invoice_fee_payment(
         tenant_id=effective_tenant_id,
         user_id=current_user.id,
         req=payload,
+    )
+
+
+@router.get("/receipt/{payment_id}", response_model=FeeReceiptDetailResponse)
+async def get_fee_receipt_detail(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_installment_tracking_access),
+):
+    return get_receipt_detail(
+        db,
+        tenant_id=current_user.tenant_id,
+        payment_id=payment_id,
+    )
+
+
+@router.get("/receipt/invoice/{invoice_id}", response_model=FeeReceiptDetailResponse)
+async def get_invoice_fee_receipt_detail(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_installment_tracking_access),
+):
+    return get_invoice_receipt_detail(
+        db,
+        tenant_id=current_user.tenant_id,
+        invoice_id=invoice_id,
     )
 

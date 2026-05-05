@@ -42,3 +42,42 @@ class FeePaymentCollectResponse(BaseModel):
     payment_date: datetime
     receipt_number: Optional[str] = None
 
+
+class FeeReceiptPaymentLineItem(BaseModel):
+    sr_no: int
+    txn_number: Optional[str] = None
+    payment_type: str
+    bank_name: Optional[str] = None
+    amount: float
+
+
+class FeeReceiptFeeDetailItem(BaseModel):
+    sr_no: int
+    fee_category_name: Optional[str] = None
+    payable_for: Optional[str] = None
+    amount: float
+    paid_amount: float
+
+
+class FeeReceiptDetailResponse(BaseModel):
+    payment_id: int
+    receipt_number: Optional[str] = None
+    payment_date: datetime
+    payment_method: str
+    transaction_number: Optional[str] = None
+    total_amount: float
+    amount_in_words: str
+    notes: Optional[str] = None
+    student_name: str
+    parent_name: Optional[str] = None
+    admission_no: Optional[str] = None
+    class_name: Optional[str] = None
+    division_name: Optional[str] = None
+    academic_year: Optional[str] = None
+    invoice_no: Optional[str] = None
+    installment: Optional[str] = None
+    paid_for: Optional[str] = None
+    created_by_name: Optional[str] = None
+    payment_lines: list[FeeReceiptPaymentLineItem]
+    fee_details: list[FeeReceiptFeeDetailItem] = []
+
