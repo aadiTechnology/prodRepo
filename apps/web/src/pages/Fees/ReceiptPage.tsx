@@ -1,6 +1,9 @@
 import { alpha } from "@mui/material";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import { useSnackbar } from "notistack";
 import {
   Alert,
   Box,
@@ -50,11 +53,12 @@ export default function ReceiptPage() {
   const { paymentId, invoiceId } = useParams<{ paymentId?: string; invoiceId?: string }>();
   const location = useLocation();
   const { user } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<FeeReceiptDetailResponse | null>(null);
+  const receiptRef = useRef<HTMLDivElement | null>(null);
 
   const numericPaymentId = Number(paymentId);
   const numericInvoiceId = Number(invoiceId);
@@ -127,23 +131,113 @@ export default function ReceiptPage() {
   const tenantLogo = user?.tenant?.logo_url || null;
   const printableTitle = isInvoiceScope ? "Payment Receipt (Full)" : "Payment Receipt";
 
+  const clearSelectionForPrint = useCallback(() => {
+    try {
+      const selection = window.getSelection?.();
+      if (selection && selection.rangeCount > 0) {
+        selection.removeAllRanges();
+      }
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    } catch {
+      // Ignore selection-clear errors and continue with print.
+    }
+  }, []);
+
   const onPrint = useCallback(() => {
     try {
+      clearSelectionForPrint();
+      const originalTitle = document.title;
+      const printableName = receipt?.receipt_number
+        ? `Receipt-${receipt.receipt_number}`
+        : "Receipt";
+      document.title = printableName;
+      const restoreTitle = () => {
+        document.title = originalTitle;
+        window.removeEventListener("afterprint", restoreTitle);
+      };
+      window.addEventListener("afterprint", restoreTitle);
       window.print();
     } catch {
       setError("Unable to generate print view");
     }
-  }, []);
+  }, [clearSelectionForPrint, receipt?.receipt_number]);
 
-  const onDownloadPdf = useCallback(() => {
+  const onDownloadPdf = useCallback(async () => {
     try {
-      setNotice("Use your browser destination as Save to PDF");
-      window.print();
-      setNotice("Receipt downloaded successfully");
+      clearSelectionForPrint();
+      setError(null);
+      const printNode = receiptRef.current;
+      if (!printNode) {
+        setError("Failed to download receipt");
+        return;
+      }
+      const canvas = await html2canvas(printNode, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+      const imageData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const usableWidth = pageWidth - margin * 2;
+      const scaledHeight = (canvas.height * usableWidth) / canvas.width;
+
+      if (scaledHeight <= pageHeight - margin * 2) {
+        pdf.addImage(imageData, "PNG", margin, margin, usableWidth, scaledHeight, undefined, "FAST");
+      } else {
+        const usableHeight = pageHeight - margin * 2;
+        const pageCanvas = document.createElement("canvas");
+        const ctx = pageCanvas.getContext("2d");
+        if (!ctx) {
+          setError("Failed to download receipt");
+          return;
+        }
+        const pagePixelHeight = Math.floor((usableHeight * canvas.width) / usableWidth);
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = pagePixelHeight;
+
+        let renderedHeight = 0;
+        let pageIndex = 0;
+        while (renderedHeight < canvas.height) {
+          ctx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
+          ctx.drawImage(
+            canvas,
+            0,
+            renderedHeight,
+            canvas.width,
+            Math.min(pagePixelHeight, canvas.height - renderedHeight),
+            0,
+            0,
+            canvas.width,
+            Math.min(pagePixelHeight, canvas.height - renderedHeight)
+          );
+          const pageData = pageCanvas.toDataURL("image/png");
+          if (pageIndex > 0) pdf.addPage();
+          const currentSliceHeight = Math.min(pagePixelHeight, canvas.height - renderedHeight);
+          const renderedMm = (currentSliceHeight * usableWidth) / canvas.width;
+          pdf.addImage(pageData, "PNG", margin, margin, usableWidth, renderedMm, undefined, "FAST");
+          renderedHeight += pagePixelHeight;
+          pageIndex += 1;
+        }
+      }
+
+      const fileName = `${receipt?.receipt_number || "receipt"}.pdf`;
+      pdf.save(fileName);
+      enqueueSnackbar("Receipt downloaded successfully", { variant: "success" });
     } catch {
       setError("Failed to download receipt");
+      enqueueSnackbar("Failed to download receipt", { variant: "error" });
     }
-  }, []);
+  }, [clearSelectionForPrint, receipt?.receipt_number, enqueueSnackbar]);
 
   const onShare = useCallback(async () => {
     if (!receipt) return;
@@ -152,14 +246,16 @@ export default function ReceiptPage() {
     try {
       if (navigator.share) {
         await navigator.share({ title, text });
+        enqueueSnackbar("Receipt shared successfully", { variant: "success" });
         return;
       }
       await navigator.clipboard.writeText(`${title}\n${text}`);
-      setNotice("Receipt details copied for sharing");
+      enqueueSnackbar("Receipt details copied for sharing", { variant: "success" });
     } catch {
       setError("Unable to share receipt");
+      enqueueSnackbar("Unable to share receipt", { variant: "error" });
     }
-  }, [receipt]);
+  }, [receipt, enqueueSnackbar]);
 
   return (
     <ListPageLayout
@@ -213,13 +309,9 @@ export default function ReceiptPage() {
         }}
       />
       <Box sx={{ p: 2 }}>
-        {notice && (
-          <Alert severity="success" sx={{ mb: 1.5 }} className="receipt-no-print">
-            {notice}
-          </Alert>
-        )}
-
         <Paper
+          ref={receiptRef}
+          component="div"
           className="receipt-print-area"
           sx={{
             bgcolor: colorTokens.surface.card,
