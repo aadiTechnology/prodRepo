@@ -12,6 +12,7 @@ import {
   formatInvoiceCurrency as money,
 } from "../../components/fees/InvoiceContextPanel";
 import InvoiceFeeReceiptDialog from "../../components/fees/InvoiceFeeReceiptDialog";
+import FeeInstallmentStatusChip from "../../components/fees/FeeInstallmentStatusChip";
 import { useAuth } from "../../context/AuthContext";
 import { useInvoiceDetailController } from "../../hooks/useInvoiceDetailController";
 import type { InvoiceFeeBreakdownItem } from "../../types/invoice";
@@ -29,6 +30,28 @@ function tenantAddressLines(tenant: { address_line1?: string | null; address_lin
   return lines;
 }
 
+function getFeeLineStatus(
+  row: InvoiceFeeBreakdownItem,
+  invoiceDueDate?: string | null
+): "Paid" | "Pending" | "Partial" {
+  const amount = Number(row.amount || 0);
+  const paid = Number(row.paid_amount || 0);
+  const pending = Number(row.pending_amount || Math.max(amount - paid, 0));
+
+  if (pending <= 0 && (paid > 0 || amount <= 0)) return "Paid";
+  if (paid > 0 && pending > 0) return "Partial";
+
+  // Pending remains the status before/after due date for unpaid lines.
+  if (invoiceDueDate) {
+    const due = new Date(invoiceDueDate);
+    if (!Number.isNaN(due.getTime())) {
+      return "Pending";
+    }
+  }
+
+  return "Pending";
+}
+
 export default function InvoiceDetail() {
   const controller = useInvoiceDetailController();
   const detail = controller.detail;
@@ -38,6 +61,27 @@ export default function InvoiceDetail() {
     () => tenantAddressLines(user?.tenant ?? undefined),
     [user?.tenant]
   );
+  const invoiceStatus = useMemo(() => {
+    if (!detail) return "Pending" as const;
+
+    const totalAmount = Number(detail.payment_summary.total_amount || 0);
+    const paidAmount = Number(detail.payment_summary.paid_amount || 0);
+    const dueAmount = Number(detail.payment_summary.due_amount || 0);
+    const dueDate = detail.invoice.due_date ? new Date(detail.invoice.due_date) : null;
+    const isDueDateValid = Boolean(dueDate && !Number.isNaN(dueDate.getTime()));
+    const isDueDatePassed = isDueDateValid ? (dueDate as Date).getTime() <= Date.now() : false;
+
+    if (dueAmount <= 0 || (totalAmount > 0 && paidAmount >= totalAmount)) {
+      return "Paid" as const;
+    }
+    if (paidAmount > 0 && dueAmount > 0) {
+      return "Partial" as const;
+    }
+    if (isDueDatePassed || paidAmount <= 0) {
+      return "Pending" as const;
+    }
+    return "Pending" as const;
+  }, [detail]);
 
   const feeBreakdownColumns = useMemo(
     () => [
@@ -69,6 +113,14 @@ export default function InvoiceDetail() {
         label: "Amt. Payable",
         align: "right" as const,
         render: (row: InvoiceFeeBreakdownItem) => money(row.pending_amount || 0),
+      },
+      {
+        id: "status",
+        label: "Status",
+        align: "center" as const,
+        render: (row: InvoiceFeeBreakdownItem) => (
+          <FeeInstallmentStatusChip status={getFeeLineStatus(row, detail?.invoice.due_date)} />
+        ),
       },
       {
         id: "receipt",
@@ -105,7 +157,7 @@ export default function InvoiceDetail() {
         },
       },
     ],
-    [detail?.invoice.installment, controller.onOpenReceiptForFeeLine]
+    [detail?.invoice.installment, detail?.invoice.due_date, controller.onOpenReceiptForFeeLine]
   );
 
   return (
