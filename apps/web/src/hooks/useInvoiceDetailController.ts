@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import invoiceService from "../api/services/invoiceService";
-import type { InvoiceDetailResponse, InvoicePaymentHistoryItem } from "../types/invoice";
+import type { InvoiceDetailResponse, InvoiceFeeBreakdownItem } from "../types/invoice";
 
 export function useInvoiceDetailController() {
   const { invoiceId } = useParams<{ invoiceId: string }>();
@@ -9,8 +9,7 @@ export function useInvoiceDetailController() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<InvoiceDetailResponse | null>(null);
-  const [receiptOpen, setReceiptOpen] = useState(false);
-  const [receiptRow, setReceiptRow] = useState<InvoicePaymentHistoryItem | null>(null);
+  const [receiptFeeLine, setReceiptFeeLine] = useState<InvoiceFeeBreakdownItem | null>(null);
 
   const numericInvoiceId = useMemo(() => Number(invoiceId), [invoiceId]);
 
@@ -62,9 +61,12 @@ export function useInvoiceDetailController() {
     window.print();
   }, []);
 
-  const onOpenReceipt = useCallback((row: InvoicePaymentHistoryItem) => {
-    setReceiptRow(row);
-    setReceiptOpen(true);
+  const onOpenReceiptForFeeLine = useCallback((row: InvoiceFeeBreakdownItem) => {
+    setReceiptFeeLine(row);
+  }, []);
+
+  const onCloseReceipt = useCallback(() => {
+    setReceiptFeeLine(null);
   }, []);
 
   return {
@@ -78,9 +80,8 @@ export function useInvoiceDetailController() {
     onPayNow,
     onPrint,
     onDownload,
-    receiptOpen,
-    setReceiptOpen,
-    receiptRow,
-    onOpenReceipt,
+    receiptFeeLine,
+    onOpenReceiptForFeeLine,
+    onCloseReceipt,
   };
 }
