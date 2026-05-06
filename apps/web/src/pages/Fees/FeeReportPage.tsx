@@ -122,6 +122,20 @@ export default function FeeReportPage() {
     installments: c.filterOptions.installments.map(inst => ({ label: inst, value: inst })),
   }), [c.filterOptions]);
 
+  const normalizedSearch = c.search.trim().toLowerCase();
+  const visibleRows = useMemo(() => {
+    if (!normalizedSearch) return c.rows;
+    return c.rows.filter((row) => {
+      const fields = [
+        row.student_name,
+        row.admission_no ?? "",
+        row.invoice_no,
+        row.student_code ?? "",
+      ];
+      return fields.some((value) => value.toLowerCase().includes(normalizedSearch));
+    });
+  }, [c.rows, normalizedSearch]);
+
   // ── Header Actions (Row 1) ──
   const headerActions = (
     <Stack
@@ -216,7 +230,7 @@ export default function FeeReportPage() {
         {/* ── Filters (Row 2) ── */}
         <FeeReportFilters
           search={c.search}
-          setSearch={c.setSearch}
+          setSearch={(value) => { c.setSearch(value); c.setPage(0); }}
           academicYearId={c.academicYearId ? String(c.academicYearId) : ""}
           setAcademicYearId={(id) => { c.setAcademicYearId(id ? Number(id) : null); c.setPage(0); }}
           classId={c.classId ? String(c.classId) : ""}
@@ -270,13 +284,13 @@ export default function FeeReportPage() {
         >
           <EntityTableSection<FeeReportRow>
             label="Institutional Fee Ledger"
-            totalRows={c.totalRows}
+            totalRows={normalizedSearch ? visibleRows.length : c.totalRows}
             page={c.page}
             rowsPerPage={c.rowsPerPage}
             onPageChange={c.setPage}
             onRowsPerPageChange={c.setRowsPerPage}
             columns={feeReportListConfig.columns}
-            data={c.rows}
+            data={visibleRows}
             loading={c.loading}
             emptyMessage={
               hasFilters

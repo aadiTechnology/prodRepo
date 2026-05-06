@@ -72,6 +72,7 @@ def get_fee_report(
     academic_year_id: Optional[int] = None,
     class_id: Optional[int] = None,
     installment: Optional[str] = None,
+    search: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
 ) -> FeeReportResponse:
@@ -91,6 +92,17 @@ def get_fee_report(
     if installment:
         filters.append("si.Installment = :installment")
         params["installment"] = installment
+
+    if search and search.strip():
+        filters.append(
+            "("
+            "LOWER(s.student_name) LIKE :search "
+            "OR LOWER(ISNULL(s.admission_no, '')) LIKE :search "
+            "OR LOWER(ISNULL(s.student_code, '')) LIKE :search "
+            "OR LOWER(si.invoice_no) LIKE :search"
+            ")"
+        )
+        params["search"] = f"%{search.strip().lower()}%"
 
     if start_date:
         filters.append("CAST(si.created_at AS DATE) >= :start_date")

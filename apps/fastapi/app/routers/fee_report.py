@@ -31,6 +31,7 @@ def get_fee_report(
     academic_year_id: Optional[int] = Query(None, ge=1),
     class_id: Optional[int] = Query(None, ge=1),
     installment: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
@@ -49,6 +50,7 @@ def get_fee_report(
         academic_year_id=academic_year_id,
         class_id=class_id,
         installment=installment,
+        search=search,
         start_date=start_date,
         end_date=end_date,
     )
