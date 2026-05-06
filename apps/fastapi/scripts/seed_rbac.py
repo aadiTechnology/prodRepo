@@ -83,6 +83,7 @@ def seed_rbac_data():
                     {"name": "Fee Discount", "path": "/fees/discounts", "feature": "FEE_MGMT"},
                     {"name": "Fee Installment Status", "path": "/fees/installment-status", "feature": "FEE_MGMT"},
                     {"name": "Assign Student Fee", "path": "/fees/assign-student-fee", "feature": "FEE_MGMT"},
+                    {"name": "Fee Report", "path": "/fees/reports", "feature": "FEE_MGMT"},
                 ]
             },
             {
