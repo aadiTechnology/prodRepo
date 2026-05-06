@@ -66,6 +66,7 @@ const InvoiceList = lazy(() => import("../pages/Fees/InvoiceList"));
 const InvoiceDetail = lazy(() => import("../pages/Fees/InvoiceDetail"));
 const ReceiptPage = lazy(() => import("../pages/Fees/ReceiptPage"));
 const GenerateInvoice = lazy(() => import("../pages/Fees/GenerateInvoice"));
+const FeeReportPage = lazy(() => import("../pages/Fees/FeeReportPage"));
 // Loading fallback component
 const PageLoader = () => (
   <Box
@@ -250,6 +251,10 @@ export default function AppRoutes() {
           <Route
             path="/fees/generate-invoice"
             element={<ProtectedRoute requiredPermissions="FEE_MGMT:create"><GenerateInvoice /></ProtectedRoute>}
+          />
+          <Route
+            path="/fees/reports"
+            element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeReportPage /></ProtectedRoute>}
           />
           
           {/* FEES MODULE (from user request) */}

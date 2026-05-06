@@ -77,8 +77,8 @@ export type { PaperProps } from "./Surface";
 export { Table, TableHead, TableBody, TableRow, TableCell } from "./Table";
 export type { TableProps, TableHeadProps, TableBodyProps, TableRowProps, TableCellProps } from "./Table";
 
-export { Chip, Switch } from "./Controls";
-export type { ChipProps, SwitchProps } from "./Controls";
+export { Chip, Switch, Divider, Tooltip } from "./Controls";
+export type { ChipProps, SwitchProps, DividerProps, TooltipProps } from "./Controls";
 
 export { Menu } from "./Menu";
 export type { MenuProps } from "./Menu";
