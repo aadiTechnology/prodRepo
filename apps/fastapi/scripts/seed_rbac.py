@@ -41,6 +41,10 @@ def seed_rbac_data():
                 db.add(feature)
                 db.flush()
                 print(f"[SEED] Created feature: {f['code']}")
+            else:
+                feature.name = f["name"]
+                feature.category = f["category"]
+                print(f"[SEED] Updated feature: {f['code']}")
             feature_map[f["code"]] = feature.id
 
         # 2. Hierarchy Data
@@ -75,10 +79,10 @@ def seed_rbac_data():
                 ]
             },
             {
-                "name": "Fees", "level": 1, "icon": "feesIcon", "sort_order": 4,
+                "name": "Fees", "level": 1, "icon": "feesIcon", "sort_order": 5,
                 "children": [
                     {"name": "Invoice List", "path": "/fees/invoices", "feature": "FEE_MGMT"},
-                    {"name": "Fee Collection", "path": "/fees/collection", "feature": "FEE_MGMT"},
+                    {"name": "Fee Collection", "path": "/fees/collect-payment", "feature": "FEE_MGMT"},
                     {"name": "Fee Category", "path": "/fees/categories", "feature": "FEE_MGMT"},
                     {"name": "Fee Structure", "path": "/fees/setup", "feature": "FEE_MGMT"},
                     {"name": "Fee Discount", "path": "/fees/discounts", "feature": "FEE_MGMT"},

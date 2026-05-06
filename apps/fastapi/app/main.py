@@ -49,6 +49,7 @@ from app.routers import invoice
 from app.routers import lead as lead_router
 from app.routers import enrollment as enrollment_router
 from app.routers import attendance_router
+from app.routers import fee_report as fee_report_router
 
 from app.routers import enrollment as enrollment_router
 
@@ -124,6 +125,7 @@ app.include_router(task_effort.router)
 app.include_router(lead_router.router)
 app.include_router(enrollment_router.router)
 app.include_router(attendance_router.router)
+app.include_router(fee_report_router.router)
 
 
 
