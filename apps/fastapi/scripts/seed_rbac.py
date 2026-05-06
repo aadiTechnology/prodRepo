@@ -30,6 +30,7 @@ def seed_rbac_data():
             {"code": "SYSTEM_CONFIG", "name": "System Configuration", "category": "System"},
             {"code": "SPRINT_MGMT", "name": "Sprint Management", "category": "System"},
             {"code": "TEACHER_MGMT", "name": "Teacher Management", "category": "HR"},
+            {"code": "COMMUNICATION_MGMT", "name": "Communication Management", "category": "Communication"},
         ]
         
         feature_map = {}
@@ -108,6 +109,12 @@ def seed_rbac_data():
                     {"name": "Theme Studio", "path": "/admin/theme-studio", "feature": "SYSTEM_CONFIG"},
                     {"name": "Permission Mapping", "path": "/admin/permission-management", "feature": "SYSTEM_CONFIG"},
                     {"name": "Sprints", "path": "/sprints", "feature": "SPRINT_MGMT"},
+                ]
+            },
+            {
+                "name": "Communication", "level": 1, "icon": "chatIcon", "sort_order": 9,
+                "children": [
+                    {"name": "Create Notices", "path": "/communication/notices", "feature": "COMMUNICATION_MGMT"},
                 ]
             }
         ]
