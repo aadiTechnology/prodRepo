@@ -29,6 +29,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const TOKEN_STORAGE_KEY = "auth_token";
 const USER_STORAGE_KEY = "auth_user";
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 /**
  * Get token from localStorage
@@ -275,7 +276,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         timeoutId = setTimeout(() => {
           console.log("Session timed out due to inactivity");
           logout(true);
-        }, 300000); // 5 minute inactivity
+        }, INACTIVITY_TIMEOUT_MS);
       }
     };
 
