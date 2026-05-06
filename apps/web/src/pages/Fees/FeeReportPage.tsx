@@ -226,7 +226,16 @@ export default function FeeReportPage() {
         />
       }
     >
-      <Box sx={{ px: { xs: 1.5, sm: 3 }, py: 1, display: "flex", flexDirection: "column", gap: 1.5 }}>
+      <Box
+        sx={{
+          px: { xs: 1.5, sm: 3 },
+          py: { xs: 0.6, sm: 0.9 },
+          mt: { xs: -0.2, sm: -1.15 },
+          display: "flex",
+          flexDirection: "column",
+          gap: { xs: 1.8, sm: 1.8 },
+        }}
+      >
         {/* ── Filters (Row 2) ── */}
         <FeeReportFilters
           search={c.search}

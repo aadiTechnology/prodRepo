@@ -20,7 +20,7 @@ export function SummaryCard({ label, value, subtext, color, icon, trend }: Summa
       sx={{
         height: "100%",
         background: `linear-gradient(135deg, ${alpha(color, 0.08)} 0%, ${alpha(color, 0.02)} 100%)`,
-        border: `1px solid ${alpha(color, 0.1)}`,
+        border: `1px solid ${alpha(color, 0.18)}`,
         position: "relative",
         overflow: "hidden",
         transition: "all 0.25s ease",
@@ -72,11 +72,10 @@ export function SummaryCard({ label, value, subtext, color, icon, trend }: Summa
           <Typography
             variant="h5"
             fontWeight={700}
-            color="text.primary"
+            color={alpha("#1f2937", 0.92)}
             sx={{
               lineHeight: 1.1,
-              fontSize: { xs: "1.52rem", sm: "1.7rem" },
-              opacity: 0.92,
+              fontSize: { xs: "1.48rem", sm: "1.65rem" },
               letterSpacing: "-0.01em",
             }}
           >
@@ -160,8 +159,7 @@ export function SummaryAnalytics({
           sm: "repeat(2, 1fr)",
           lg: "repeat(4, 1fr)",
         },
-        gap: { xs: 1.5, sm: 2.25, lg: 3 },
-        mb: { xs: 1.5, sm: 3, lg: 4 },
+        gap: { xs: 1.5, sm: 2, lg: 2.25 },
       }}
     >
       <SummaryCard
