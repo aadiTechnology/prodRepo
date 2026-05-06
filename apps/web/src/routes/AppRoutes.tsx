@@ -67,6 +67,7 @@ const InvoiceDetail = lazy(() => import("../pages/Fees/InvoiceDetail"));
 const ReceiptPage = lazy(() => import("../pages/Fees/ReceiptPage"));
 const GenerateInvoice = lazy(() => import("../pages/Fees/GenerateInvoice"));
 const FeeReportPage = lazy(() => import("../pages/Fees/FeeReportPage"));
+const CreateNotice = lazy(() => import("../pages/Communication/CreateNotice"));
 // Loading fallback component
 const PageLoader = () => (
   <Box
@@ -283,10 +284,11 @@ export default function AppRoutes() {
             }
           />
           <Route path="/fees/assign-student-fee" element={<ProtectedRoute requiredPermissions="FEE_MGMT:create"><AssignStudentFee /></ProtectedRoute>} />
-
-          
           <Route path="/admin/permission-management" element={<ProtectedRoute requiredPermissions={["ADMIN_MGMT:view", "SYSTEM_CONFIG:view"]}><PermissionManagementPage /></ProtectedRoute>} />
           <Route path="/admin/theme-studio" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><ThemeStudioPage /></ProtectedRoute>} />
+
+          {/* Communication Management */}
+          <Route path="/communication/notices" element={<ProtectedRoute requiredPermissions="COMMUNICATION_MGMT:view"><CreateNotice /></ProtectedRoute>} />
           
           {/* Academic Year Management */}
           <Route path="/academic-years" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><AcademicYearList /></ProtectedRoute>} />
@@ -332,6 +334,7 @@ export default function AppRoutes() {
           />
           <Route path="/admissions/enrollment/print" element={<ProtectedRoute requiredPermissions="ADMISSIONS_MGMT:view"><EnrollmentPrintPage /></ProtectedRoute>} />
         </Route>
+
       </Routes>
     </Suspense>
   );

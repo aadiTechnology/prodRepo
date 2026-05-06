@@ -71,3 +71,10 @@ export type { EntityTableSectionProps } from "./EntityTableSection";
 
 export { default as HeaderIconAction } from "./HeaderIconAction";
 export type { HeaderIconActionProps } from "./HeaderIconAction";
+
+export { default as ApplicableToClassSelector } from "./ApplicableToClassSelector";
+export type {
+  ApplicableRole,
+  ApplicableRoleState,
+  ClassDivisionColumn,
+} from "./ApplicableToClassSelector";
