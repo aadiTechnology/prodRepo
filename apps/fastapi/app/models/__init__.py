@@ -33,6 +33,7 @@ from app.models.permission import Permission, role_permissions
 from app.models.lead import Lead, LeadSource, LeadStatus, LeadFollowup, LeadParent
 from app.models.student_attendance import StudentAttendance
 from app.models.student_invoice import StudentInvoice
+from app.models.notice import Notice, NoticeTarget, NoticeAttachment
 
 # Export all models for convenience
 __all__ = [
@@ -78,5 +79,8 @@ __all__ = [
     "LeadParent",
     "StudentAttendance",
     "StudentInvoice",
+    "Notice",
+    "NoticeTarget",
+    "NoticeAttachment",
 ]
 

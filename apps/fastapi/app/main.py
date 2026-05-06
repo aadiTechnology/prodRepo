@@ -27,6 +27,9 @@ from app.models import (  # noqa: F401
     SchoolClass,
     AcademicYear,
     FeeStructure,
+    Notice,
+    NoticeTarget,
+    NoticeAttachment,
 )
 # Import FeePayment + FeePaymentAllocation so create_all creates fee_payment_allocations
 from app.models.fee_payment import FeePayment, FeePaymentAllocation  # noqa: F401
@@ -39,7 +42,7 @@ from app.models.pt_timesheet import (  # noqa: F401
     pt_timesheets,
 )
 
-from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, academic_year, class_fee_structure_assignment, class_router,student_fee_assignment, fee_structure, reports, sprint, task_effort, teacher_router,teacher_assignment
+from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, academic_year, class_fee_structure_assignment, class_router,student_fee_assignment, fee_structure, reports, sprint, task_effort, teacher_router,teacher_assignment,notice
 
 
 
@@ -126,6 +129,7 @@ app.include_router(lead_router.router)
 app.include_router(enrollment_router.router)
 app.include_router(attendance_router.router)
 app.include_router(fee_report_router.router)
+app.include_router(notice.router)
 
 
 
