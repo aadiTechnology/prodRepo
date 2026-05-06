@@ -125,16 +125,16 @@ export default function FeeReportPage() {
   // ── Header Actions (Row 1) ──
   const headerActions = (
     <Stack
-      direction="column"
-      alignItems="stretch"
+      direction={{ xs: "column", sm: "row" }}
+      alignItems={{ xs: "stretch", sm: "center" }}
       gap={1}
       sx={{
         width: { xs: "100%", sm: "auto" },
-        maxWidth: { xs: "100%", sm: 420 },
+        maxWidth: "100%",
         minWidth: 0,
       }}
     >
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%" }}>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ width: { xs: "100%", sm: "auto" } }}>
         <TextField
           label="From"
           type="date"
