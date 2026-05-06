@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  CalendarMonth as CalendarIcon,
-  Groups as ClassIcon,
-  ListAlt as InstallmentIcon,
   Search as SearchIcon,
 } from "@mui/icons-material";
 import { 
@@ -94,7 +91,61 @@ export const FeeReportFilters: React.FC<FeeReportFiltersProps> = ({
           bgcolor: alpha(colorTokens.primary.main, 0.01),
         }}
       >
-        {/* Full-width Search on Left */}
+        {/* Filter Group First */}
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          sx={{ width: { xs: "100%", md: "auto" } }}
+        >
+          <Select
+            value={academicYearId}
+            onChange={(e) => setAcademicYearId(e.target.value as string)}
+            displayEmpty
+            size="small"
+            sx={filterSelectSx}
+          >
+            <MenuItem value="">
+              <Typography variant="body2" color="text.secondary">Academic Year</Typography>
+            </MenuItem>
+            {options.academicYears.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+            ))}
+          </Select>
+
+          <Select
+            value={classId}
+            onChange={(e) => setClassId(e.target.value as string)}
+            displayEmpty
+            size="small"
+            sx={filterSelectSx}
+          >
+            <MenuItem value="">
+              <Typography variant="body2" color="text.secondary">Class</Typography>
+            </MenuItem>
+            {options.classes.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+            ))}
+          </Select>
+
+          <Select
+            value={installment}
+            onChange={(e) => setInstallment(e.target.value as string)}
+            displayEmpty
+            size="small"
+            sx={filterSelectSx}
+          >
+            <MenuItem value="">
+              <Typography variant="body2" color="text.secondary">Installment</Typography>
+            </MenuItem>
+            {options.installments.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+            ))}
+          </Select>
+
+        </Stack>
+
+        {/* Search Field After Filters */}
         <TextField
           placeholder="Search student or invoice..."
           value={localSearch}
@@ -116,81 +167,12 @@ export const FeeReportFilters: React.FC<FeeReportFiltersProps> = ({
               borderRadius: "15px",
               fontSize: "0.85rem",
               fontWeight: 600,
-              "& fieldset": { borderColor: colorTokens.border.subtle },
+              "& fieldset": { borderColor: alpha(colorTokens.text.secondary, 0.25) },
               "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
               "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
             },
           }}
         />
-
-        {/* Filter Group on Right */}
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1.5}
-          alignItems={{ xs: "stretch", sm: "center" }}
-          sx={{ width: { xs: "100%", md: "auto" } }}
-        >
-          <Select
-            value={academicYearId}
-            onChange={(e) => setAcademicYearId(e.target.value as string)}
-            displayEmpty
-            size="small"
-            startAdornment={
-              <InputAdornment position="start" sx={{ opacity: 0.5, mr: 0 }}>
-                <CalendarIcon sx={{ fontSize: 18 }} />
-              </InputAdornment>
-            }
-            sx={filterSelectSx}
-          >
-            <MenuItem value="">
-              <Typography variant="body2" color="text.secondary">Academic Year</Typography>
-            </MenuItem>
-            {options.academicYears.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-            ))}
-          </Select>
-
-          <Select
-            value={classId}
-            onChange={(e) => setClassId(e.target.value as string)}
-            displayEmpty
-            size="small"
-            startAdornment={
-              <InputAdornment position="start" sx={{ opacity: 0.5, mr: 0 }}>
-                <ClassIcon sx={{ fontSize: 18 }} />
-              </InputAdornment>
-            }
-            sx={filterSelectSx}
-          >
-            <MenuItem value="">
-              <Typography variant="body2" color="text.secondary">Class</Typography>
-            </MenuItem>
-            {options.classes.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-            ))}
-          </Select>
-
-          <Select
-            value={installment}
-            onChange={(e) => setInstallment(e.target.value as string)}
-            displayEmpty
-            size="small"
-            startAdornment={
-              <InputAdornment position="start" sx={{ opacity: 0.5, mr: 0 }}>
-                <InstallmentIcon sx={{ fontSize: 18 }} />
-              </InputAdornment>
-            }
-            sx={filterSelectSx}
-          >
-            <MenuItem value="">
-              <Typography variant="body2" color="text.secondary">Installment</Typography>
-            </MenuItem>
-            {options.installments.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-            ))}
-          </Select>
-
-        </Stack>
       </Stack>
     </AppCard>
   );
