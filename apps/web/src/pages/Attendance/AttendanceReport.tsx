@@ -15,11 +15,9 @@ import {
   IconButton,
   Grid,
   Card,
-  Button,
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
-  Search as SearchIcon,
   FileDownload as ExportIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
@@ -28,6 +26,7 @@ import {
 } from "@mui/icons-material";
 import { PageHeader, PageLayout } from "../../components/layout";
 import { EntityTableSection } from "../../components/reusable";
+import { AppCard } from "../../components/primitives";
 import { colorTokens } from "../../tokens/colors";
 import schoolClassService, { SchoolClass, ClassDivision } from "../../api/services/schoolClassService";
 import academicYearService, { AcademicYear } from "../../api/services/academicYearService";
@@ -50,6 +49,45 @@ const filterSelectSx = {
     "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
   },
 };
+
+const HeaderGradientIconButton = ({
+  onClick,
+  icon,
+  label,
+  disabled = false,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  disabled?: boolean;
+}) => (
+  <Tooltip title={label}>
+    <span style={{ display: "inline-flex" }}>
+      <IconButton
+        onClick={onClick}
+        aria-label={label}
+        disabled={disabled}
+        sx={{
+          background: disabled
+            ? alpha(colorTokens.text.secondary, 0.12)
+            : `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
+          color: disabled ? colorTokens.text.secondary : colorTokens.primary.contrast,
+          borderRadius: "15px",
+          width: 44,
+          height: 44,
+          boxShadow: disabled ? "none" : `0 8px 16px ${alpha(colorTokens.preschool.turquoise.main, 0.25)}`,
+          transition: "all 0.3s ease",
+          "&:hover": {
+            transform: disabled ? "none" : "scale(1.08)",
+            boxShadow: disabled ? "none" : `0 12px 20px ${alpha(colorTokens.preschool.turquoise.main, 0.35)}`,
+          },
+        }}
+      >
+        {icon}
+      </IconButton>
+    </span>
+  </Tooltip>
+);
 
 const AttendanceReport = () => {
   const { user } = useAuth();
@@ -347,13 +385,30 @@ const AttendanceReport = () => {
     }
   ], []);
 
-  const filtersSection = (
+  const handleResetFilters = () => {
+    const myTeacher = teachers.find(
+      (t) =>
+        String(t.user_id) === String(user?.id) ||
+        (user?.email && t.email?.toLowerCase() === user.email.toLowerCase())
+    );
+    setFilters({
+      academic_year_id: academicYears.find((y) => y.is_active)?.id || 0,
+      class_id: isTeacher ? (myTeacher?.class_id || 0) : 0,
+      division_id: isTeacher ? (myTeacher?.class_division_id || 0) : 0,
+      student_id: 0,
+      from_date: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split("T")[0],
+      to_date: new Date().toISOString().split("T")[0],
+    });
+    setReportData(null);
+    setPage(0);
+  };
+
+  const headerActions = (
     <Stack
       direction={{ xs: "column", sm: "row" }}
       alignItems={{ xs: "stretch", sm: "center" }}
-      gap={1.5}
-      flexWrap="wrap"
-      sx={{ width: "100%" }}
+      gap={1}
+      sx={{ width: { xs: "100%", sm: "auto" } }}
     >
       <TextField
         label="From Date"
@@ -375,7 +430,6 @@ const AttendanceReport = () => {
           },
         }}
       />
-      
       <TextField
         label="To Date"
         type="date"
@@ -396,7 +450,46 @@ const AttendanceReport = () => {
           },
         }}
       />
+      <Stack direction="row" spacing={1} alignItems="center">
+        <HeaderGradientIconButton
+          onClick={handleResetFilters}
+          icon={<RefreshIcon sx={{ fontSize: 22 }} />}
+          label="Reset Filters"
+        />
+        <HeaderGradientIconButton
+          onClick={handleExport}
+          icon={<ExportIcon sx={{ fontSize: 22 }} />}
+          label="Export CSV"
+          disabled={!reportData || reportData.records.length === 0}
+        />
+      </Stack>
+    </Stack>
+  );
 
+  const filterCard = (
+    <Card
+      elevation={0}
+      sx={{
+        borderRadius: "14px",
+        border: `1px solid ${colorTokens.border.default}`,
+        boxShadow: "0 4px 14px rgba(0, 0, 0, 0.03)",
+      }}
+    >
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        alignItems={{ xs: "stretch", sm: "center" }}
+        gap={1.5}
+        flexWrap="wrap"
+        sx={{
+          px: { xs: 2, sm: 2.5 },
+          py: 1.5,
+          bgcolor: alpha(colorTokens.primary.main, 0.01),
+          width: "100%",
+          "& > .MuiInputBase-root": {
+            flex: { sm: 1 },
+          },
+        }}
+      >
       <Select
         value={filters.class_id || ""}
         displayEmpty
@@ -406,7 +499,7 @@ const AttendanceReport = () => {
           setPage(0);
           setFilters(prev => ({ ...prev, class_id: Number(e.target.value) }));
         }}
-        sx={filterSelectSx}
+        sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
       >
         <MenuItem value="">
           <Typography variant="body2" color="text.secondary">All Classes</Typography>
@@ -425,7 +518,7 @@ const AttendanceReport = () => {
           setPage(0);
           setFilters(prev => ({ ...prev, division_id: Number(e.target.value) }));
         }}
-        sx={filterSelectSx}
+        sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
       >
         <MenuItem value="">
           <Typography variant="body2" color="text.secondary">All Divisions</Typography>
@@ -444,7 +537,7 @@ const AttendanceReport = () => {
           setPage(0);
           setFilters(prev => ({ ...prev, student_id: Number(e.target.value) }));
         }}
-        sx={filterSelectSx}
+        sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
       >
         <MenuItem value="">
           <Typography variant="body2" color="text.secondary">All Students</Typography>
@@ -453,43 +546,8 @@ const AttendanceReport = () => {
           <MenuItem key={s.id} value={s.id}>{s.student_name || s.name}</MenuItem>
         ))}
       </Select>
-
-      {/* Action Buttons */}
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ ml: { xs: 0, sm: "auto" } }}>
-        <Tooltip title="Reset Filters">
-          <IconButton
-            onClick={() => {
-              const myTeacher = teachers.find(
-                (t) =>
-                  String(t.user_id) === String(user?.id) ||
-                  (user?.email && t.email?.toLowerCase() === user.email.toLowerCase())
-              );
-              setFilters({
-                academic_year_id: academicYears.find(y => y.is_active)?.id || 0,
-                class_id: isTeacher ? (myTeacher?.class_id || 0) : 0,
-                division_id: isTeacher ? (myTeacher?.class_division_id || 0) : 0,
-                student_id: 0,
-                from_date: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
-                to_date: new Date().toISOString().split('T')[0]
-              });
-              setReportData(null);
-              setPage(0);
-            }}
-            sx={{
-              color: colorTokens.text.secondary,
-              backgroundColor: alpha(colorTokens.text.secondary, 0.08),
-              borderRadius: "12px",
-              width: 44,
-              height: 44,
-              border: `1.5px solid ${alpha(colorTokens.text.secondary, 0.2)}`,
-              "&:hover": { backgroundColor: alpha(colorTokens.text.secondary, 0.15) },
-            }}
-          >
-            <RefreshIcon sx={{ fontSize: 22 }} />
-          </IconButton>
-        </Tooltip>
       </Stack>
-    </Stack>
+    </Card>
   );
 
   return (
@@ -499,10 +557,11 @@ const AttendanceReport = () => {
         <PageHeader
           links={[{ title: "Attendance", path: "/attendance/mark" }, { title: "Attendance Report", path: "/attendance/report" }]}
           homePath="/"
-          actions={filtersSection}
+          actions={headerActions}
         />
       }
     >
+      {filterCard}
       {reportData && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%', flex: 1, minHeight: 0 }}>
           {/* Summary Cards */}
@@ -616,67 +675,21 @@ const AttendanceReport = () => {
             </Grid>
           </Grid>
 
-          {/* Elegant Table Wrapper */}
-          <Card 
-            elevation={0}
-            sx={{ 
-              borderRadius: "20px", 
-              bgcolor: "#ffffff",
-              border: `1px solid ${colorTokens.border.subtle}`,
-              boxShadow: "0px 8px 24px rgba(0, 0, 0, 0.02)",
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              flex: 1, 
-              minHeight: 0
+          <AppCard
+            paddingSize="none"
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              borderRadius: "14px",
+              border: `1px solid ${colorTokens.border.default}`,
+              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.03)",
             }}
           >
-            <Box sx={{ 
-              px: { xs: 2.5, sm: 3.5 }, py: { xs: 2.5, sm: 3 }, 
-              borderBottom: `1px solid ${colorTokens.border.subtle}`,
-              display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, 
-              justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2,
-              bgcolor: alpha(colorTokens.primary.main, 0.015)
-            }}>
-               <Box>
-                 <Typography variant="h6" sx={{ fontWeight: 800, color: colorTokens.text.primary, fontSize: '1.15rem' }}>
-                    Attendance Analytics Ledger
-                 </Typography>
-                 <Typography variant="body2" sx={{ color: colorTokens.text.secondary, mt: 0.5, fontWeight: 500 }}>
-                    Detailed breakdown of student attendance logs
-                 </Typography>
-               </Box>
-               <Stack direction="row" spacing={3} alignItems="center">
-                  <Box sx={{ textAlign: 'right' }}>
-                    <Typography variant="h4" sx={{ fontWeight: 900, color: colorTokens.preschool.turquoise.main, lineHeight: 1 }}>
-                      {Math.round((reportData.summary.total_present / Math.max(1, (reportData.summary.total_present + reportData.summary.total_absent + reportData.summary.total_half_day + reportData.summary.total_leave))) * 100)}%
-                    </Typography>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      Overall Rate
-                    </Typography>
-                  </Box>
-                  <Button 
-                    variant="contained" 
-                    onClick={handleExport}
-                    disabled={!reportData || reportData.records.length === 0}
-                    sx={{ 
-                      borderRadius: '14px', 
-                      px: 3, py: 1.25,
-                      textTransform: 'none',
-                      fontWeight: 700,
-                      boxShadow: '0 8px 20px rgba(6, 185, 114, 0.25)',
-                      background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, #049d5f 100%)`,
-                      "&:hover": {
-                         boxShadow: '0 8px 20px rgba(6, 185, 114, 0.4)',
-                      }
-                    }}
-                  >
-                    Export CSV
-                  </Button>
-               </Stack>
-            </Box>
             <EntityTableSection<any>
-              label=""
+              label="Attendance Analytics Ledger"
               loading={loading}
               totalRows={reportData.total_count}
               page={page}
@@ -688,11 +701,11 @@ const AttendanceReport = () => {
               }}
               columns={columns}
               data={reportData.records}
-              showPagination={true}
-              showInfoBar={false}
+              emptyMessage="No attendance records found for selected filters."
+              stickyHeader
               getRowKey={(row, index) => String(index)}
             />
-          </Card>
+          </AppCard>
         </Box>
       )}
 
