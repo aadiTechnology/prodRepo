@@ -13,8 +13,6 @@ import {
   Stack,
   alpha,
   IconButton,
-  Grid,
-  Card,
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
@@ -467,8 +465,7 @@ const AttendanceReport = () => {
   );
 
   const filterCard = (
-    <Card
-      elevation={0}
+    <AppCard
       sx={{
         borderRadius: "14px",
         border: `1px solid ${colorTokens.border.default}`,
@@ -481,73 +478,70 @@ const AttendanceReport = () => {
         gap={1.5}
         flexWrap="wrap"
         sx={{
-          px: { xs: 2, sm: 2.5 },
-          py: 1.5,
-          bgcolor: alpha(colorTokens.primary.main, 0.01),
           width: "100%",
           "& > .MuiInputBase-root": {
             flex: { sm: 1 },
           },
         }}
       >
-      <Select
-        value={filters.class_id || ""}
-        displayEmpty
-        size="small"
-        disabled={isTeacher}
-        onChange={(e) => {
-          setPage(0);
-          setFilters(prev => ({ ...prev, class_id: Number(e.target.value) }));
-        }}
-        sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
-      >
-        <MenuItem value="">
-          <Typography variant="body2" color="text.secondary">All Classes</Typography>
-        </MenuItem>
-        {filteredClasses.map(cls => (
-          <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
-        ))}
-      </Select>
+        <Select
+          value={filters.class_id || ""}
+          displayEmpty
+          size="small"
+          disabled={isTeacher}
+          onChange={(e) => {
+            setPage(0);
+            setFilters(prev => ({ ...prev, class_id: Number(e.target.value) }));
+          }}
+          sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
+        >
+          <MenuItem value="">
+            <Typography variant="body2" color="text.secondary">All Classes</Typography>
+          </MenuItem>
+          {filteredClasses.map(cls => (
+            <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
+          ))}
+        </Select>
 
-      <Select
-        value={filters.division_id || ""}
-        displayEmpty
-        size="small"
-        disabled={!filters.class_id || isTeacher}
-        onChange={(e) => {
-          setPage(0);
-          setFilters(prev => ({ ...prev, division_id: Number(e.target.value) }));
-        }}
-        sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
-      >
-        <MenuItem value="">
-          <Typography variant="body2" color="text.secondary">All Divisions</Typography>
-        </MenuItem>
-        {divisions.map(div => (
-          <MenuItem key={div.id} value={div.id}>{div.division_name}</MenuItem>
-        ))}
-      </Select>
+        <Select
+          value={filters.division_id || ""}
+          displayEmpty
+          size="small"
+          disabled={!filters.class_id || isTeacher}
+          onChange={(e) => {
+            setPage(0);
+            setFilters(prev => ({ ...prev, division_id: Number(e.target.value) }));
+          }}
+          sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
+        >
+          <MenuItem value="">
+            <Typography variant="body2" color="text.secondary">All Divisions</Typography>
+          </MenuItem>
+          {divisions.map(div => (
+            <MenuItem key={div.id} value={div.id}>{div.division_name}</MenuItem>
+          ))}
+        </Select>
 
-      <Select
-        value={filters.student_id || ""}
-        displayEmpty
-        size="small"
-        disabled={!filters.division_id}
-        onChange={(e) => {
-          setPage(0);
-          setFilters(prev => ({ ...prev, student_id: Number(e.target.value) }));
-        }}
-        sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
-      >
-        <MenuItem value="">
-          <Typography variant="body2" color="text.secondary">All Students</Typography>
-        </MenuItem>
-        {students.map(s => (
-          <MenuItem key={s.id} value={s.id}>{s.student_name || s.name}</MenuItem>
-        ))}
-      </Select>
+        <Select
+          value={filters.student_id || ""}
+          displayEmpty
+          size="small"
+          disabled={!filters.division_id}
+          onChange={(e) => {
+            setPage(0);
+            setFilters(prev => ({ ...prev, student_id: Number(e.target.value) }));
+          }}
+          sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
+        >
+          <MenuItem value="">
+            <Typography variant="body2" color="text.secondary">All Students</Typography>
+          </MenuItem>
+          {students.map(s => (
+            <MenuItem key={s.id} value={s.id}>{s.student_name || s.name}</MenuItem>
+          ))}
+        </Select>
       </Stack>
-    </Card>
+    </AppCard>
   );
 
   return (
@@ -561,202 +555,346 @@ const AttendanceReport = () => {
         />
       }
     >
-      {filterCard}
-      {reportData && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%', flex: 1, minHeight: 0 }}>
-          {/* Summary Cards */}
-          <Grid container spacing={3}>
-            {/* Present Card */}
-            <Grid item xs={12} sm={6} md={3}>
-              <Card elevation={0} sx={{ borderRadius: "16px", bgcolor: alpha(colorTokens.preschool.mint.main, 0.12) }}>
-                <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.secondary }}>
+      <Box
+        sx={{
+          px: { xs: 1.5, sm: 3 },
+          py: { xs: 0.6, sm: 0.9 },
+          mt: { xs: -0.2, sm: -1.15 },
+          display: "flex",
+          flexDirection: "column",
+          gap: { xs: 1.8, sm: 1.8 },
+        }}
+      >
+        {/* ── Filters (Row 1) ── */}
+        {filterCard}
+
+        {reportData && (
+          <>
+            {/* ── Summary Analytics (Row 2) ── */}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(auto-fit, minmax(200px, 1fr))" },
+                gap: { xs: 1.5, sm: 2 },
+              }}
+            >
+              {/* Present Card */}
+              <AppCard
+                sx={{
+                  height: "100%",
+                  background: `linear-gradient(135deg, ${alpha(colorTokens.preschool.mint.main, 0.14)} 0%, ${alpha(colorTokens.preschool.mint.main, 0.06)} 100%)`,
+                  border: `1.5px solid ${alpha(colorTokens.preschool.mint.main, 0.35)}`,
+                  position: "relative",
+                  overflow: "hidden",
+                  transition: "all 0.25s ease",
+                  "&:hover": {
+                    transform: "translateY(-4px)",
+                    boxShadow: `0 12px 24px ${alpha(colorTokens.preschool.mint.main, 0.2)}`,
+                    borderColor: alpha(colorTokens.preschool.mint.main, 0.45),
+                  },
+                  "&::before": {
+                    content: '""',
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    width: "100px",
+                    height: "100px",
+                    background: `radial-gradient(circle at top right, ${alpha(colorTokens.preschool.mint.main, 0.15)}, transparent 70%)`,
+                    pointerEvents: "none",
+                  }
+                }}
+                paddingSize="dense"
+              >
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: "16px",
+                      bgcolor: alpha(colorTokens.preschool.mint.main, 0.22),
+                      color: colorTokens.preschool.mint.main,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: `inset 0 0 0 1.5px ${alpha(colorTokens.preschool.mint.main, 0.3)}`,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <CheckCircleIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
+                  </Box>
+                  <Box flex={1} minWidth={0}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', fontSize: '0.65rem' }}>
                       Total Present
                     </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 1 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 0.5, fontSize: '1.65rem', lineHeight: 1.1 }}>
                       {reportData.summary.total_present}
                     </Typography>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.mint.dark, display: 'block', mt: 2 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.mint.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
                       Logged attendances
                     </Typography>
                   </Box>
-                  <Box sx={{ 
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                    width: 56, height: 56, borderRadius: '16px', 
-                    bgcolor: colorTokens.preschool.mint.main, color: "#ffffff",
-                    boxShadow: `0 8px 16px ${alpha(colorTokens.preschool.mint.main, 0.3)}`
-                  }}>
-                    <CheckCircleIcon />
-                  </Box>
-                </Box>
-              </Card>
-            </Grid>
+                </Stack>
+              </AppCard>
 
-            {/* Absent Card */}
-            <Grid item xs={12} sm={6} md={3}>
-              <Card elevation={0} sx={{ borderRadius: "16px", bgcolor: alpha(colorTokens.preschool.coral.main, 0.1) }}>
-                <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.secondary }}>
+              {/* Absent Card */}
+              <AppCard
+                sx={{
+                  height: "100%",
+                  background: `linear-gradient(135deg, ${alpha(colorTokens.preschool.coral.main, 0.14)} 0%, ${alpha(colorTokens.preschool.coral.main, 0.06)} 100%)`,
+                  border: `1.5px solid ${alpha(colorTokens.preschool.coral.main, 0.35)}`,
+                  position: "relative",
+                  overflow: "hidden",
+                  transition: "all 0.25s ease",
+                  "&:hover": {
+                    transform: "translateY(-4px)",
+                    boxShadow: `0 12px 24px ${alpha(colorTokens.preschool.coral.main, 0.2)}`,
+                    borderColor: alpha(colorTokens.preschool.coral.main, 0.45),
+                  },
+                  "&::before": {
+                    content: '""',
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    width: "100px",
+                    height: "100px",
+                    background: `radial-gradient(circle at top right, ${alpha(colorTokens.preschool.coral.main, 0.15)}, transparent 70%)`,
+                    pointerEvents: "none",
+                  }
+                }}
+                paddingSize="dense"
+              >
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: "16px",
+                      bgcolor: alpha(colorTokens.preschool.coral.main, 0.22),
+                      color: colorTokens.preschool.coral.main,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: `inset 0 0 0 1.5px ${alpha(colorTokens.preschool.coral.main, 0.3)}`,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <CancelIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
+                  </Box>
+                  <Box flex={1} minWidth={0}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', fontSize: '0.65rem' }}>
                       Total Absent
                     </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 1 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 0.5, fontSize: '1.65rem', lineHeight: 1.1 }}>
                       {reportData.summary.total_absent}
                     </Typography>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.coral.dark, display: 'block', mt: 2 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.coral.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
                       Missed sessions
                     </Typography>
                   </Box>
-                  <Box sx={{ 
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                    width: 56, height: 56, borderRadius: '16px', 
-                    bgcolor: colorTokens.preschool.coral.main, color: "#ffffff",
-                    boxShadow: `0 8px 16px ${alpha(colorTokens.preschool.coral.main, 0.3)}`
-                  }}>
-                    <CancelIcon />
-                  </Box>
-                </Box>
-              </Card>
-            </Grid>
+                </Stack>
+              </AppCard>
 
-            {/* Half Day Card */}
-            <Grid item xs={12} sm={6} md={3}>
-              <Card elevation={0} sx={{ borderRadius: "16px", bgcolor: alpha(colorTokens.preschool.peach.main, 0.15) }}>
-                <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.secondary }}>
+              {/* Half Day Card */}
+              <AppCard
+                sx={{
+                  height: "100%",
+                  background: `linear-gradient(135deg, ${alpha(colorTokens.preschool.peach.main, 0.14)} 0%, ${alpha(colorTokens.preschool.peach.main, 0.06)} 100%)`,
+                  border: `1.5px solid ${alpha(colorTokens.preschool.peach.main, 0.35)}`,
+                  position: "relative",
+                  overflow: "hidden",
+                  transition: "all 0.25s ease",
+                  "&:hover": {
+                    transform: "translateY(-4px)",
+                    boxShadow: `0 12px 24px ${alpha(colorTokens.preschool.peach.main, 0.2)}`,
+                    borderColor: alpha(colorTokens.preschool.peach.main, 0.45),
+                  },
+                  "&::before": {
+                    content: '""',
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    width: "100px",
+                    height: "100px",
+                    background: `radial-gradient(circle at top right, ${alpha(colorTokens.preschool.peach.main, 0.15)}, transparent 70%)`,
+                    pointerEvents: "none",
+                  }
+                }}
+                paddingSize="dense"
+              >
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: "16px",
+                      bgcolor: alpha(colorTokens.preschool.peach.main, 0.22),
+                      color: colorTokens.preschool.peach.main,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: `inset 0 0 0 1.5px ${alpha(colorTokens.preschool.peach.main, 0.3)}`,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <WarningIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
+                  </Box>
+                  <Box flex={1} minWidth={0}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', fontSize: '0.65rem' }}>
                       Half Days
                     </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 1 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 0.5, fontSize: '1.65rem', lineHeight: 1.1 }}>
                       {reportData.summary.total_half_day}
                     </Typography>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.peach.dark, display: 'block', mt: 2 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.peach.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
                       Partial attendance
                     </Typography>
                   </Box>
-                  <Box sx={{ 
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                    width: 56, height: 56, borderRadius: '16px', 
-                    bgcolor: colorTokens.preschool.peach.main, color: "#ffffff",
-                    boxShadow: `0 8px 16px ${alpha(colorTokens.preschool.peach.main, 0.3)}`
-                  }}>
-                    <WarningIcon />
-                  </Box>
-                </Box>
-              </Card>
-            </Grid>
+                </Stack>
+              </AppCard>
 
-            {/* Leave Card */}
-            <Grid item xs={12} sm={6} md={3}>
-              <Card elevation={0} sx={{ borderRadius: "16px", bgcolor: alpha(colorTokens.preschool.lavender.main, 0.15) }}>
-                <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.secondary }}>
+              {/* Leave Card */}
+              <AppCard
+                sx={{
+                  height: "100%",
+                  background: `linear-gradient(135deg, ${alpha(colorTokens.preschool.lavender.main, 0.14)} 0%, ${alpha(colorTokens.preschool.lavender.main, 0.06)} 100%)`,
+                  border: `1.5px solid ${alpha(colorTokens.preschool.lavender.main, 0.35)}`,
+                  position: "relative",
+                  overflow: "hidden",
+                  transition: "all 0.25s ease",
+                  "&:hover": {
+                    transform: "translateY(-4px)",
+                    boxShadow: `0 12px 24px ${alpha(colorTokens.preschool.lavender.main, 0.2)}`,
+                    borderColor: alpha(colorTokens.preschool.lavender.main, 0.45),
+                  },
+                  "&::before": {
+                    content: '""',
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    width: "100px",
+                    height: "100px",
+                    background: `radial-gradient(circle at top right, ${alpha(colorTokens.preschool.lavender.main, 0.15)}, transparent 70%)`,
+                    pointerEvents: "none",
+                  }
+                }}
+                paddingSize="dense"
+              >
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: "16px",
+                      bgcolor: alpha(colorTokens.preschool.lavender.main, 0.22),
+                      color: colorTokens.preschool.lavender.main,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: `inset 0 0 0 1.5px ${alpha(colorTokens.preschool.lavender.main, 0.3)}`,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <EventNoteIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
+                  </Box>
+                  <Box flex={1} minWidth={0}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', fontSize: '0.65rem' }}>
                       On Leave
                     </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 1 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 0.5, fontSize: '1.65rem', lineHeight: 1.1 }}>
                       {reportData.summary.total_leave}
                     </Typography>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.lavender.dark, display: 'block', mt: 2 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.lavender.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
                       Approved time off
                     </Typography>
                   </Box>
-                  <Box sx={{ 
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                    width: 56, height: 56, borderRadius: '16px', 
-                    bgcolor: colorTokens.preschool.lavender.main, color: "#ffffff",
-                    boxShadow: `0 8px 16px ${alpha(colorTokens.preschool.lavender.main, 0.3)}`
-                  }}>
-                    <EventNoteIcon />
-                  </Box>
-                </Box>
-              </Card>
-            </Grid>
-          </Grid>
+                </Stack>
+              </AppCard>
+            </Box>
 
-          <AppCard
-            paddingSize="none"
+            {/* ── Table Ledger (Row 3) ── */}
+            <AppCard
+              paddingSize="none"
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+                borderRadius: "14px",
+                border: `1px solid ${colorTokens.border.default}`,
+                boxShadow: "0 4px 14px rgba(0, 0, 0, 0.03)",
+              }}
+            >
+              <EntityTableSection<any>
+                label="Attendance Analytics Ledger"
+                loading={loading}
+                totalRows={reportData.total_count}
+                page={page}
+                rowsPerPage={rowsPerPage}
+                onPageChange={setPage}
+                onRowsPerPageChange={(v) => {
+                  setRowsPerPage(v);
+                  setPage(0);
+                }}
+                columns={columns}
+                data={reportData.records}
+                emptyMessage="No attendance records found for selected filters."
+                stickyHeader
+                getRowKey={(row, index) => String(index)}
+              />
+            </AppCard>
+          </>
+        )}
+
+        {!reportData && !loading && (
+          <Box
             sx={{
               flex: 1,
-              minHeight: 0,
               display: "flex",
               flexDirection: "column",
-              overflow: "hidden",
-              borderRadius: "14px",
-              border: `1px solid ${colorTokens.border.default}`,
-              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.03)",
+              alignItems: "center",
+              justifyContent: "center",
+              py: 10,
+              gap: 2,
+              textAlign: "center",
+              opacity: 0.55,
             }}
           >
-            <EntityTableSection<any>
-              label="Attendance Analytics Ledger"
-              loading={loading}
-              totalRows={reportData.total_count}
-              page={page}
-              rowsPerPage={rowsPerPage}
-              onPageChange={setPage}
-              onRowsPerPageChange={(v) => {
-                setRowsPerPage(v);
-                setPage(0);
-              }}
-              columns={columns}
-              data={reportData.records}
-              emptyMessage="No attendance records found for selected filters."
-              stickyHeader
-              getRowKey={(row, index) => String(index)}
+            <Box
+              component="img"
+              src="/icons/3d-folder.png"
+              onError={(e) => (e.currentTarget.src = "/icons/3d-calendar.png")}
+              alt="Report"
+              sx={{ width: 84, height: 84, objectFit: "contain", opacity: 0.8 }}
             />
-          </AppCard>
-        </Box>
-      )}
+            <Typography variant="h6" fontWeight={700} color={colorTokens.text.primary} sx={{ fontSize: "1.1rem", mt: 1 }}>
+              No Data Available
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 350, lineHeight: 1.6 }}>
+              Select your filters from the toolbar above to generate the Attendance Analytics Dashboard.
+            </Typography>
+          </Box>
+        )}
 
-      {!reportData && !loading && (
-        <Box
-          sx={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            py: 10,
-            gap: 2,
-            textAlign: "center",
-            opacity: 0.55,
-          }}
-        >
+        {loading && !reportData && (
           <Box
-            component="img"
-            src="/icons/3d-folder.png"
-            onError={(e) => (e.currentTarget.src = "/icons/3d-calendar.png")}
-            alt="Report"
-            sx={{ width: 84, height: 84, objectFit: "contain", opacity: 0.8 }}
-          />
-          <Typography variant="h6" fontWeight={700} color={colorTokens.text.primary} sx={{ fontSize: "1.1rem", mt: 1 }}>
-            No Data Available
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 350, lineHeight: 1.6 }}>
-            Select your filters from the toolbar above to generate the Attendance Analytics Dashboard.
-          </Typography>
-        </Box>
-      )}
-
-      {loading && !reportData && (
-        <Box
-          sx={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            py: 10,
-            gap: 2,
-          }}
-        >
-          <CircularProgress size={44} sx={{ color: colorTokens.preschool.turquoise.main }} />
-          <Typography variant="body2" color="text.secondary">
-            Generating report...
-          </Typography>
-        </Box>
-      )}
+            sx={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              py: 10,
+              gap: 2,
+            }}
+          >
+            <CircularProgress size={44} sx={{ color: colorTokens.preschool.turquoise.main }} />
+            <Typography variant="body2" color="text.secondary">
+              Generating report...
+            </Typography>
+          </Box>
+        )}
+      </Box>
 
       <Snackbar
         open={snackbar.open}
