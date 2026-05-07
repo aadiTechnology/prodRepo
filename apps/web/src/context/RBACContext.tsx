@@ -140,6 +140,8 @@ export function RBACProvider({ children }: RBACProviderProps) {
 
   // Latest version seen by polling; ref so the interval closure always sees it.
   const rbacVersionRef = useRef<string | null>(rbacVersion);
+  // Deduplicate overlapping refresh calls from poll/visibility/mount triggers.
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
   useEffect(() => {
     rbacVersionRef.current = rbacVersion;
   }, [rbacVersion]);
@@ -199,36 +201,52 @@ export function RBACProvider({ children }: RBACProviderProps) {
    * identity stable for memoized consumers (e.g. the Sidebar).
    */
   const refreshRBAC = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await authService.getRBACContext();
-      const nextVersion = data.rbac_version ?? null;
+    if (refreshInFlightRef.current) {
+      await refreshInFlightRef.current;
+      return;
+    }
 
-      if (nextVersion && rbacVersionRef.current && nextVersion === rbacVersionRef.current) {
-        return;
-      }
-
-      const normalized = normalizeRoles(data.roles);
-      const effectivePermissions = data.permissions?.length
-        ? data.permissions
-        : extractPermissions(data.menus);
-      setRoles(normalized);
-      setMenus(data.menus);
-      setPermissions(effectivePermissions);
-      saveRBACData({ roles: normalized, menus: data.menus, permissions: effectivePermissions });
-      setRbacVersion(nextVersion);
+    const run = (async () => {
+      setIsLoading(true);
+      setError(null);
       try {
-        if (nextVersion) localStorage.setItem(RBAC_VERSION_STORAGE_KEY, nextVersion);
-        else localStorage.removeItem(RBAC_VERSION_STORAGE_KEY);
-      } catch {
-        // non-fatal
+        const data = await authService.getRBACContext();
+        const nextVersion = data.rbac_version ?? null;
+
+        if (nextVersion && rbacVersionRef.current && nextVersion === rbacVersionRef.current) {
+          return;
+        }
+
+        const normalized = normalizeRoles(data.roles);
+        const effectivePermissions = data.permissions?.length
+          ? data.permissions
+          : extractPermissions(data.menus);
+        setRoles(normalized);
+        setMenus(data.menus);
+        setPermissions(effectivePermissions);
+        saveRBACData({ roles: normalized, menus: data.menus, permissions: effectivePermissions });
+        setRbacVersion(nextVersion);
+        try {
+          if (nextVersion) localStorage.setItem(RBAC_VERSION_STORAGE_KEY, nextVersion);
+          else localStorage.removeItem(RBAC_VERSION_STORAGE_KEY);
+        } catch {
+          // non-fatal
+        }
+      } catch (err: any) {
+        console.error("Failed to refresh RBAC data:", err);
+        setError(err.message || "Failed to refresh permissions");
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err: any) {
-      console.error("Failed to refresh RBAC data:", err);
-      setError(err.message || "Failed to refresh permissions");
+    })();
+
+    refreshInFlightRef.current = run;
+    try {
+      await run;
     } finally {
-      setIsLoading(false);
+      if (refreshInFlightRef.current === run) {
+        refreshInFlightRef.current = null;
+      }
     }
   }, []);
 

@@ -2,20 +2,35 @@ import { Chip, alpha } from "@mui/material";
 import { colorTokens } from "../../tokens/colors";
 
 interface StatusChipProps {
-  status: "ACTIVE" | "INACTIVE" | "COMPLETED";
+  status: "ACTIVE" | "INACTIVE" | "COMPLETED" | "DUE" | "OVERDUE";
+  label?: string;
 }
 
-export default function StatusChip({ status }: StatusChipProps) {
+export default function StatusChip({ status, label }: StatusChipProps) {
   const color =
     status === "ACTIVE"
       ? colorTokens.preschool.mint.main
       : status === "COMPLETED"
         ? colorTokens.preschool.lavender.main
-        : colorTokens.preschool.coral.main;
+        : status === "DUE"
+          ? colorTokens.preschool.peach.dark
+          : colorTokens.preschool.coral.main;
+
+  const resolvedLabel =
+    label ??
+    (status === "ACTIVE"
+      ? "Active"
+      : status === "COMPLETED"
+        ? "Completed"
+        : status === "DUE"
+          ? "Due"
+          : status === "OVERDUE"
+            ? "Overdue"
+            : "Inactive");
 
   return (
     <Chip
-      label={status === "ACTIVE" ? "Active" : status === "COMPLETED" ? "Completed" : "Inactive"}
+      label={resolvedLabel}
       size="small"
       sx={{ 
         fontWeight: 800,

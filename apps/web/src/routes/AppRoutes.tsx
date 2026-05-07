@@ -67,6 +67,7 @@ const InvoiceDetail = lazy(() => import("../pages/Fees/InvoiceDetail"));
 const ReceiptPage = lazy(() => import("../pages/Fees/ReceiptPage"));
 const GenerateInvoice = lazy(() => import("../pages/Fees/GenerateInvoice"));
 const FeeReportPage = lazy(() => import("../pages/Fees/FeeReportPage"));
+const FeeDueListV2 = lazy(() => import("../pages/Fees/FeeDueListV2"));
 const CreateNotice = lazy(() => import("../pages/Communication/CreateNotice"));
 // Loading fallback component
 const PageLoader = () => (
@@ -256,6 +257,10 @@ export default function AppRoutes() {
           <Route
             path="/fees/reports"
             element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeReportPage /></ProtectedRoute>}
+          />
+          <Route
+            path="/fees/due-list-v2"
+            element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeDueListV2 /></ProtectedRoute>}
           />
           
           {/* FEES MODULE (from user request) */}
