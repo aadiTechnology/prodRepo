@@ -74,7 +74,11 @@ export function createFeeDueListV2Columns({
             component="button"
             underline="hover"
             onClick={() => navigate(`/fees/invoices?search=${encodeURIComponent(row.invoice_id || "")}`)}
-            sx={{ fontWeight: 700 }}
+            sx={{
+              color: colorTokens.text.primary,
+              "&:hover": { color: colorTokens.text.primary },
+              "&:visited": { color: colorTokens.text.primary },
+            }}
           >
             {row.invoice_id}
           </Link>
