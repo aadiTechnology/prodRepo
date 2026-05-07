@@ -82,6 +82,7 @@ def seed_rbac_data():
                 "name": "Fees", "level": 1, "icon": "feesIcon", "sort_order": 5,
                 "children": [
                     {"name": "Invoice List", "path": "/fees/invoices", "feature": "FEE_MGMT"},
+                    {"name": "Fee Due List", "path": "/fees/due-list-v2", "feature": "FEE_MGMT"},
                     {"name": "Fee Collection", "path": "/fees/collect-payment", "feature": "FEE_MGMT"},
                     {"name": "Fee Category", "path": "/fees/categories", "feature": "FEE_MGMT"},
                     {"name": "Fee Structure", "path": "/fees/setup", "feature": "FEE_MGMT"},
