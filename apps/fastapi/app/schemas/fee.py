@@ -112,3 +112,29 @@ class FeeStructurePaginatedResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+class FeeDueListSummary(BaseModel):
+    total_due: float
+    overdue_students: int
+
+
+class FeeDueListItem(BaseModel):
+    student_id: int
+    student_name: str
+    class_name: Optional[str] = None
+    installment: str
+    invoice_row_id: Optional[int] = None
+    invoice_id: Optional[str] = None
+    due_amount: float
+    due_date: date
+    days_overdue: int
+    status: str
+
+
+class FeeDueListResponse(BaseModel):
+    summary: FeeDueListSummary
+    data: List[FeeDueListItem]
+    total: int
+    page: int
+    page_size: int

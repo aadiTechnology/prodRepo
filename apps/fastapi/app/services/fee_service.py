@@ -1,10 +1,15 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import uuid4
+from sqlalchemy import String, and_, case, cast, func, or_
 from sqlalchemy.orm import Session
 from app.models.fee import FeeCategory, FeeStructure, FeeInstallment
 from app.models.academic import SchoolClass, AcademicYear
+from app.models.fee_payment import FeePayment
+from app.models.student import Student
+from app.models.student_fee_assignment import StudentFeeAssignment, StudentFeeInstallment
+from app.models.student_invoice import StudentInvoice
 from app.schemas.fee import FeeStructureCreate, FeeStructureUpdate, FeeCategoryCreate, FeeCategoryUpdate
-from app.core.exceptions import NotFoundException, ConflictException
+from app.core.exceptions import AppException, NotFoundException, ConflictException
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -388,3 +393,240 @@ def delete_fee_structure(db: Session, structure_id: int, tenant_id: int, user_id
     })
 
     db.commit()
+
+
+def get_fee_due_list_v2(
+    db: Session,
+    *,
+    tenant_id: int,
+    academic_year_id: int,
+    class_id: int | None = None,
+    installment: str | None = None,
+    search: str | None = None,
+    status_filter: str = "ALL",
+    page: int = 1,
+    page_size: int = 10,
+) -> dict:
+    """
+    Return due-fee list (installment + invoice) with summary and pagination.
+    """
+    try:
+        normalized_status = (status_filter or "ALL").strip().upper()
+        if normalized_status not in {"ALL", "DUE", "OVERDUE"}:
+            raise AppException("Invalid status. Allowed values: ALL, DUE, OVERDUE", status_code=422)
+
+        today = date.today()
+
+        payment_agg_sq = (
+            db.query(
+                FeePayment.tenant_id.label("tenant_id"),
+                FeePayment.fee_installment_id.label("installment_id"),
+                func.sum(func.coalesce(FeePayment.paid_amount, FeePayment.total_amount, 0)).label("paid_amount"),
+            )
+            .filter(
+                FeePayment.tenant_id == tenant_id,
+                FeePayment.fee_installment_id.isnot(None),
+            )
+            .group_by(FeePayment.tenant_id, FeePayment.fee_installment_id)
+            .subquery()
+        )
+
+        due_amount_expr = (
+            func.coalesce(StudentFeeInstallment.amount, 0) - func.coalesce(payment_agg_sq.c.paid_amount, 0)
+        )
+        base_query = (
+            db.query(
+                Student.id.label("student_id"),
+                Student.student_name.label("student_name"),
+                SchoolClass.name.label("class_name"),
+                func.coalesce(StudentInvoice.installment, cast(StudentFeeInstallment.installment_no, String)).label(
+                    "installment"
+                ),
+                StudentInvoice.id.label("invoice_row_id"),
+                StudentInvoice.invoice_no.label("invoice_id"),
+                due_amount_expr.label("due_amount"),
+                StudentFeeInstallment.due_date.label("due_date"),
+            )
+            .join(
+                StudentFeeAssignment,
+                StudentFeeAssignment.student_id == Student.id,
+            )
+            .join(
+                StudentFeeInstallment,
+                StudentFeeInstallment.assignment_id == StudentFeeAssignment.id,
+            )
+            .outerjoin(
+                FeeInstallment,
+                and_(
+                    FeeInstallment.fee_structure_id == StudentFeeAssignment.fee_structure_id,
+                    FeeInstallment.installment_number == StudentFeeInstallment.installment_no,
+                    FeeInstallment.is_deleted == False,  # noqa: E712
+                ),
+            )
+            .join(
+                SchoolClass,
+                SchoolClass.id == Student.class_id,
+            )
+            .outerjoin(
+                StudentInvoice,
+                and_(
+                    StudentInvoice.tenant_id == tenant_id,
+                    StudentInvoice.student_id == Student.id,
+                    StudentInvoice.academic_year_id == academic_year_id,
+                    or_(
+                        StudentInvoice.fee_installment_id == FeeInstallment.id,
+                        and_(
+                            StudentInvoice.fee_installment_id.is_(None),
+                            StudentInvoice.due_date == StudentFeeInstallment.due_date,
+                        ),
+                    ),
+                ),
+            )
+            .outerjoin(
+                payment_agg_sq,
+                and_(
+                    payment_agg_sq.c.tenant_id == tenant_id,
+                    payment_agg_sq.c.installment_id == StudentFeeInstallment.id,
+                ),
+            )
+            .filter(
+                Student.tenant_id == tenant_id,
+                SchoolClass.tenant_id == tenant_id,
+                Student.academic_year_id == academic_year_id,
+                StudentFeeAssignment.academic_year_id == academic_year_id,
+                StudentInvoice.id.isnot(None),
+                func.upper(StudentInvoice.status).in_(["PARTIAL", "PENDING"]),
+                due_amount_expr > 0,
+            )
+        )
+
+        if class_id is not None:
+            base_query = base_query.filter(Student.class_id == class_id)
+
+        if search:
+            term = f"%{search.strip()}%"
+            base_query = base_query.filter(
+                or_(
+                    Student.student_name.ilike(term),
+                    StudentInvoice.invoice_no.ilike(term),
+                )
+            )
+
+        if installment:
+            base_query = base_query.filter(StudentInvoice.installment == installment.strip())
+
+        if normalized_status == "DUE":
+            base_query = base_query.filter(StudentFeeInstallment.due_date >= today)
+        elif normalized_status == "OVERDUE":
+            base_query = base_query.filter(StudentFeeInstallment.due_date < today)
+
+        summary_query = (
+            db.query(
+                func.coalesce(func.sum(due_amount_expr), 0).label("total_due"),
+                func.count(func.distinct(case((StudentFeeInstallment.due_date < today, Student.id)))).label(
+                    "overdue_students"
+                ),
+            )
+            .select_from(Student)
+            .join(StudentFeeAssignment, StudentFeeAssignment.student_id == Student.id)
+            .join(StudentFeeInstallment, StudentFeeInstallment.assignment_id == StudentFeeAssignment.id)
+            .outerjoin(
+                FeeInstallment,
+                and_(
+                    FeeInstallment.fee_structure_id == StudentFeeAssignment.fee_structure_id,
+                    FeeInstallment.installment_number == StudentFeeInstallment.installment_no,
+                    FeeInstallment.is_deleted == False,  # noqa: E712
+                ),
+            )
+            .join(SchoolClass, SchoolClass.id == Student.class_id)
+            .outerjoin(
+                StudentInvoice,
+                and_(
+                    StudentInvoice.tenant_id == tenant_id,
+                    StudentInvoice.student_id == Student.id,
+                    StudentInvoice.academic_year_id == academic_year_id,
+                    or_(
+                        StudentInvoice.fee_installment_id == FeeInstallment.id,
+                        and_(
+                            StudentInvoice.fee_installment_id.is_(None),
+                            StudentInvoice.due_date == StudentFeeInstallment.due_date,
+                        ),
+                    ),
+                ),
+            )
+            .outerjoin(
+                payment_agg_sq,
+                and_(
+                    payment_agg_sq.c.tenant_id == tenant_id,
+                    payment_agg_sq.c.installment_id == StudentFeeInstallment.id,
+                ),
+            )
+            .filter(
+                Student.tenant_id == tenant_id,
+                SchoolClass.tenant_id == tenant_id,
+                Student.academic_year_id == academic_year_id,
+                StudentFeeAssignment.academic_year_id == academic_year_id,
+                StudentInvoice.id.isnot(None),
+                func.upper(StudentInvoice.status).in_(["PARTIAL", "PENDING"]),
+                due_amount_expr > 0,
+            )
+        )
+
+        if class_id is not None:
+            summary_query = summary_query.filter(Student.class_id == class_id)
+        if search:
+            term = f"%{search.strip()}%"
+            summary_query = summary_query.filter(
+                or_(
+                    Student.student_name.ilike(term),
+                    StudentInvoice.invoice_no.ilike(term),
+                )
+            )
+        if installment:
+            summary_query = summary_query.filter(StudentInvoice.installment == installment.strip())
+        if normalized_status == "DUE":
+            summary_query = summary_query.filter(StudentFeeInstallment.due_date >= today)
+        elif normalized_status == "OVERDUE":
+            summary_query = summary_query.filter(StudentFeeInstallment.due_date < today)
+
+        total = base_query.count()
+        offset = (page - 1) * page_size
+        rows = (
+            base_query.order_by(StudentFeeInstallment.due_date.asc(), Student.student_name.asc(), Student.id.asc())
+            .offset(offset)
+            .limit(page_size)
+            .all()
+        )
+
+        summary_row = summary_query.one()
+        data = [
+            {
+                "student_id": int(row.student_id),
+                "student_name": str(row.student_name),
+                "class_name": row.class_name,
+                "installment": str(row.installment or ""),
+                "invoice_row_id": int(row.invoice_row_id) if row.invoice_row_id is not None else None,
+                "invoice_id": row.invoice_id,
+                "due_amount": float(row.due_amount or 0),
+                "due_date": row.due_date,
+                "days_overdue": (today - row.due_date).days if row.due_date and row.due_date < today else 0,
+                "status": "OVERDUE" if row.due_date and row.due_date < today else "DUE",
+            }
+            for row in rows
+        ]
+
+        return {
+            "summary": {
+                "total_due": float(summary_row.total_due or 0),
+                "overdue_students": int(summary_row.overdue_students or 0),
+            },
+            "data": data,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
+    except AppException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to fetch fee due list v2: %s", exc)
+        raise AppException("Unable to fetch fee due list at the moment", status_code=400)

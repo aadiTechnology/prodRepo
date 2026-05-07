@@ -10,6 +10,7 @@ from app.schemas.fee import (
     FeeStructureUpdate,
     FeeStructureResponse,
     FeeStructurePaginatedResponse,
+    FeeDueListResponse,
 )
 from app.services import fee_service
 from app.core.logging_config import get_logger
@@ -157,4 +158,30 @@ async def read_fee_structure(
                 inst.description = ""
                 
     return structure
+
+
+@router.get("/due-list-v2", response_model=FeeDueListResponse)
+async def read_fee_due_list_v2(
+    academic_year_id: int = Query(..., ge=1),
+    class_id: int | None = Query(None, ge=1),
+    installment: str | None = Query(None),
+    search: str | None = Query(None),
+    status: str = Query("ALL"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_permission("Fees", "view")),
+):
+    """Get due fee list with installment and invoice details."""
+    return fee_service.get_fee_due_list_v2(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        academic_year_id=academic_year_id,
+        class_id=class_id,
+        installment=installment,
+        search=search,
+        status_filter=status,
+        page=page,
+        page_size=page_size,
+    )
 

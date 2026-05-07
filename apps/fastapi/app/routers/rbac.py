@@ -48,27 +48,9 @@ def get_role_permission_matrix(
     role = role_service.get_role(db, role_id)
     _assert_role_scope_access(role, current_user, db)
     
-    # 1. Get all menus accessible to THIS tenant, further filtered by what the CURRENT USER can see
-    # This prevents a Tenant Admin from delegating a menu they themselves don't have access to.
-    
-    # Get user's effective menus (flat IDs)
-    _, user_menu_nodes = rbac_service.resolve_user_permissions_and_menus(db, current_user)
-    
-    def get_all_ids(nodes):
-        ids = []
-        for n in nodes:
-            ids.append(n.id)
-            if n.children:
-                ids.extend(get_all_ids(n.children))
-        return ids
-    
-    accessible_menu_ids = set(get_all_ids(user_menu_nodes))
-    
-    # If the user is PLATFORM ADMIN (is_super_admin), they should see all menus for the tenant
-    is_super_admin = (
-        current_user.role == "SUPER_ADMIN" or 
-        (current_user.role == "ADMIN" and current_user.tenant_id is None)
-    )
+    # 1. Get all menus in scope of the role being edited.
+    # Do not hide menus based on current user's menu visibility in matrix view;
+    # update endpoint already enforces grant constraints for non-super-admin users.
 
     # Scope menus strictly to the role being edited:
     # - Platform role (role.tenant_id is None): only global menus (Menu.tenant_id IS NULL).
@@ -84,13 +66,7 @@ def get_role_permission_matrix(
             (Menu.tenant_id.is_(None)) | (Menu.tenant_id == role.tenant_id)
         )
     
-    all_menus_raw = query.all()
-    
-    if is_super_admin:
-        all_menus = all_menus_raw
-    else:
-        # Filter by what the user is allowed to see
-        all_menus = [m for m in all_menus_raw if m.id in accessible_menu_ids]
+    all_menus = query.all()
     
     # 2. Get current permissions for this role
     current_perms = db.query(RoleMenuPermission).filter(
