@@ -60,6 +60,7 @@ class InvoiceFeeBreakdownItem(BaseModel):
     fee_category_id: Optional[str] = None
     fee_category_name: Optional[str] = None
     amount: float
+    discount_amount: float = 0
     paid_amount: float = 0
     pending_amount: float = 0
     payable_for: Optional[str] = None

@@ -10,6 +10,7 @@ from app.core.exceptions import ConflictException, NotFoundException, Validation
 from app.models.academic import AcademicYear, ClassDivision, SchoolClass
 from app.models.fee import FeeStructure
 from app.models.student import Student
+from app.models.student_fee_assignment import StudentFeeAssignment, StudentFeeDetail
 from app.repositories import invoice_repository
 from app.schemas.invoice import (
     FeePlanResponse,
@@ -163,6 +164,35 @@ def get_invoice_detail(
         db, tenant_id=tenant_id, invoice_id=invoice_id
     )
     fee_breakdown_rows = invoice_repository.get_invoice_fee_breakdown(db, invoice_id=invoice_id)
+    
+    # Try to get student-specific assignment details to show discounts
+    assignment = (
+        db.query(StudentFeeAssignment)
+        .filter(
+            StudentFeeAssignment.student_id == int(invoice_row["student_id"]),
+            StudentFeeAssignment.academic_year_id == int(invoice_row["academic_year_id"]),
+            StudentFeeAssignment.fee_structure_id == int(invoice_row["fee_structure_id"])
+        )
+        .first()
+    )
+
+    if not fee_breakdown_rows and assignment and assignment.details:
+        invoice_total = float(invoice_row["total_amount"] or 0)
+        assignment_final_total = float(assignment.final_amount or 0)
+        
+        # Calculate ratio of this invoice to total assigned fee
+        ratio = (invoice_total / assignment_final_total) if assignment_final_total > 0 else 1.0
+        
+        fee_breakdown_rows = []
+        for det in assignment.details:
+            fee_breakdown_rows.append({
+                "id": det.id,
+                "fee_category_name": det.category,
+                "amount": float(det.amount) * ratio,
+                "discount_amount": float(det.discount_applied or 0) * ratio,
+                "payable_for": invoice_row.get("installment_name") or invoice_row.get("installment")
+            })
+
     if not fee_breakdown_rows:
         fee_breakdown_rows = invoice_repository.get_fee_structure_breakdown_for_invoice(
             db,
@@ -183,25 +213,34 @@ def get_invoice_detail(
     if due_amount > 0:
         available_actions.extend(["pay_now", "collect_payment"])
 
-    breakdown_total = sum(float(item.get("amount") or 0) for item in fee_breakdown_rows)
-    paid_ratio = (paid_amount / breakdown_total) if breakdown_total > 0 else 0
+    # Calculate paid ratio based on NET amount (amount - discount)
+    net_breakdown_total = sum(
+        float(item.get("amount") or 0) - float(item.get("discount_amount") or 0) 
+        for item in fee_breakdown_rows
+    )
+    paid_ratio = (paid_amount / net_breakdown_total) if net_breakdown_total > 0 else 0
 
     breakdown_items: list[InvoiceFeeBreakdownItem] = []
     running_paid = 0.0
     for idx, item in enumerate(fee_breakdown_rows):
         amount = float(item.get("amount") or 0)
+        discount = float(item.get("discount_amount") or 0)
+        net_item_amount = amount - discount
+        
         if idx == len(fee_breakdown_rows) - 1:
-            allocated_paid = max(0.0, min(amount, paid_amount - running_paid))
+            allocated_paid = max(0.0, min(net_item_amount, paid_amount - running_paid))
         else:
-            allocated_paid = max(0.0, min(amount, round(amount * paid_ratio, 2)))
+            allocated_paid = max(0.0, min(net_item_amount, round(net_item_amount * paid_ratio, 2)))
             running_paid += allocated_paid
-        pending = max(0.0, round(amount - allocated_paid, 2))
+        
+        pending = max(0.0, round(net_item_amount - allocated_paid, 2))
         breakdown_items.append(
             InvoiceFeeBreakdownItem(
                 id=int(item["id"]),
                 fee_category_id=item.get("fee_category_id"),
                 fee_category_name=item.get("fee_category_name"),
                 amount=amount,
+                discount_amount=discount,
                 paid_amount=allocated_paid,
                 pending_amount=pending,
                 payable_for=item.get("payable_for"),
@@ -511,7 +550,7 @@ def _resolve_installment_for_generation(
     if not selected:
         raise ValidationException("Selected installment is invalid for the fee structure")
 
-    return int(selected.id), float(selected.amount or 0)
+    return int(selected.id), float(selected.amount or 0), int(selected.installment_number)
 
 
 def generate_invoices(
@@ -594,30 +633,54 @@ def generate_invoices(
             skipped_student_ids=sorted(skipped_set),
         )
 
-    selected_installment_id, selected_installment_amount = _resolve_installment_for_generation(
+    selected_installment_id, template_installment_amount, target_installment_no = _resolve_installment_for_generation(
         fee_structure=fee_structure,
         installment_name=payload.installment_name,
     )
 
+    # Fetch student-specific installment amounts (which include discounts)
+    from app.models.student_fee_assignment import StudentFeeAssignment, StudentFeeInstallment
+    
+    student_installments = (
+        db.query(
+            StudentFeeAssignment.student_id,
+            StudentFeeInstallment.amount
+        )
+        .join(StudentFeeInstallment, StudentFeeInstallment.assignment_id == StudentFeeAssignment.id)
+        .filter(
+            StudentFeeAssignment.student_id.in_(to_create_ids),
+            StudentFeeAssignment.academic_year_id == payload.academic_year_id,
+            StudentFeeAssignment.fee_structure_id == payload.fee_structure_id,
+            StudentFeeInstallment.installment_no == target_installment_no
+        )
+        .all()
+    )
+    
+    # Map student_id -> discounted_amount
+    discounted_amounts_map = {int(row.student_id): float(row.amount) for row in student_installments}
+
     next_invoice_seq = _next_invoice_sequence(db)
-    rows = [
-        invoice_repository.StudentInvoice(
+    rows = []
+    for index, student_id in enumerate(to_create_ids):
+        # Use student-specific discounted amount if available, otherwise fallback to template amount
+        final_amount = discounted_amounts_map.get(student_id, template_installment_amount)
+        
+        rows.append(invoice_repository.StudentInvoice(
             tenant_id=tenant_id,
             student_id=student_id,
             academic_year_id=payload.academic_year_id,
             class_id=payload.class_id,
             fee_structure_id=int(fee_structure.id),
             invoice_no=_format_invoice_no(next_invoice_seq + index),
-            total_amount=selected_installment_amount,
+            total_amount=final_amount,
             paid_amount=0,
-            due_amount=selected_installment_amount,
+            due_amount=final_amount,
             due_date=payload.due_date,
             status="Pending",
             installment=payload.installment_name,
             fee_installment_id=selected_installment_id,
-        )
-        for index, student_id in enumerate(to_create_ids)
-    ]
+        ))
+
     db.bulk_save_objects(rows)
     db.commit()
 

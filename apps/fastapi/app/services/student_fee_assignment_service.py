@@ -156,12 +156,19 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
                 final_amount=d["final_amount"],
             ))
         # Installments
+        total_template_installment_sum = float(sum(float(inst.amount or 0) for inst in installments))
+        discount_ratio = (discount_applied / total_template_installment_sum) if total_template_installment_sum > 0 else 0.0
+
         for inst in installments:
+            raw_amount = float(inst.amount or 0)
+            # Apply discount ratio to each installment
+            discounted_amount = max(0.0, round(raw_amount * (1.0 - discount_ratio), 2))
+            
             db.add(StudentFeeInstallment(
                 assignment_id=assignment.id,
                 installment_no=inst.installment_number,
                 due_date=inst.due_date,
-                amount=inst.amount,
+                amount=discounted_amount,
                 status="Pending",
             ))
         # Create FeeLedger if not exists

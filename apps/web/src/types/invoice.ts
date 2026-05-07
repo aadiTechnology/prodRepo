@@ -47,6 +47,7 @@ export interface InvoiceFeeBreakdownItem {
   fee_category_id?: string | null;
   fee_category_name?: string | null;
   amount: number;
+  discount_amount?: number;
   paid_amount?: number;
   pending_amount?: number;
   payable_for?: string | null;

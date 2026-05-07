@@ -117,9 +117,10 @@ export function generateInvoiceFormConfig({
       },
       payable_amount: {
         name: "payable_amount",
-        label: "Payable Amount (₹)",
+        label: "Base Amount (₹)",
         type: "text",
         required: false,
+        helperText: "Individual student discounts will be applied automatically during generation.",
         props: {
           disabled: disablePayableAmount,
           readOnly: true,

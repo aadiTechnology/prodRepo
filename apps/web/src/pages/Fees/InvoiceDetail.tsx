@@ -62,6 +62,12 @@ export default function InvoiceDetail() {
         render: (row: InvoiceFeeBreakdownItem) => money(row.amount),
       },
       {
+        id: "discount_amount",
+        label: "Discount",
+        align: "right" as const,
+        render: (row: InvoiceFeeBreakdownItem) => money(row.discount_amount || 0),
+      },
+      {
         id: "paid_amount",
         label: "Amt. Paid",
         align: "right" as const,
