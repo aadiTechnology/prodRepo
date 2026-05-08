@@ -34,6 +34,7 @@ from app.models.lead import Lead, LeadSource, LeadStatus, LeadFollowup, LeadPare
 from app.models.student_attendance import StudentAttendance
 from app.models.student_invoice import StudentInvoice
 from app.models.notice import Notice, NoticeTarget, NoticeAttachment
+from app.models.subject import Subject, SubjectClass
 
 # Export all models for convenience
 __all__ = [
@@ -82,5 +83,7 @@ __all__ = [
     "Notice",
     "NoticeTarget",
     "NoticeAttachment",
+    "Subject",
+    "SubjectClass",
 ]
 

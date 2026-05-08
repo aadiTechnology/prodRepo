@@ -130,6 +130,8 @@ app.include_router(enrollment_router.router)
 app.include_router(attendance_router.router)
 app.include_router(fee_report_router.router)
 app.include_router(notice.router)
+from app.routers import subject_router
+app.include_router(subject_router.router)
 
 
 
