@@ -48,6 +48,8 @@ const AcademicYearList = lazy(() => import("../pages/academics/AcademicYearList"
 const AddAcademicYear = lazy(() => import("../pages/academics/AddAcademicYear"));
 const ClassList = lazy(() => import("../pages/academics/ClassList"));
 const AddClass = lazy(() => import("../pages/academics/AddClass"));
+const SubjectList = lazy(() => import("../pages/academics/SubjectList"));
+const AddSubject = lazy(() => import("../pages/academics/AddSubject"));
 const AssignStudentFee = lazy(() => import("../pages/Fees/AssignStudentFee"));
 const PermissionManagementPage = lazy(() => import("../pages/admin/PermissionManagementPage"));
 const FeeInstallmentStatus = lazy(() => import("../pages/Fees/FeeInstallmentStatus"));
@@ -308,6 +310,12 @@ export default function AppRoutes() {
           <Route path="/academics/classes" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><ClassList /></ProtectedRoute>} />
           <Route path="/academics/classes/new" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:create"><AddClass /></ProtectedRoute>} />
           <Route path="/academics/classes/:id/edit" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><AddClass /></ProtectedRoute>} />
+          <Route path="/subjects" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><SubjectList /></ProtectedRoute>} />
+          <Route path="/subjects/new" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:create"><AddSubject /></ProtectedRoute>} />
+          <Route path="/subjects/:id/edit" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><AddSubject /></ProtectedRoute>} />
+          <Route path="/academics/subjects" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><SubjectList /></ProtectedRoute>} />
+          <Route path="/academics/subjects/new" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:create"><AddSubject /></ProtectedRoute>} />
+          <Route path="/academics/subjects/:id/edit" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><AddSubject /></ProtectedRoute>} />
 
           {/* Attendance Management */}
           {/* Attendance Management */}
