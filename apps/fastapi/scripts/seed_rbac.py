@@ -76,6 +76,7 @@ def seed_rbac_data():
                     {"name": "Attendance Report", "path": "/attendance/report", "feature": "ACADEMIC_MGMT"},
                     {"name": "Academic Years", "path": "/academic-years", "feature": "ACADEMIC_MGMT"},
                     {"name": "Classes", "path": "/classes", "feature": "ACADEMIC_MGMT"},
+                    {"name": "Subjects", "path": "/subjects", "feature": "ACADEMIC_MGMT"},
                 ]
             },
             {
