@@ -1,101 +1,68 @@
 import { type FormConfig } from "../../components/reusable/formFramework.types";
-import { FormControl, InputLabel, Select, MenuItem, OutlinedInput, Checkbox, ListItemText } from "@mui/material";
 
-export type AddSubjectFormData = {
+export type AddSubjectItem = {
+  id?: number; // Optional ID - only present for existing subjects
   name: string;
   code: string;
-  description: string;
   subject_type: string;
+  is_mandatory: boolean;
   is_active: boolean;
-  class_ids: number[];
+};
+
+export type AddSubjectFormData = {
+  academic_year_id: string;
+  class_id: string;
+  description: string;
+  subjects: AddSubjectItem[];
 };
 
 export const createAddSubjectFormConfig = (options: {
   isEditMode: boolean;
-  classOptions: { id: number; label: string }[];
+  classOptions: { label: string; value: string }[];
+  academicYearOptions: { label: string; value: string }[];
 }): FormConfig<AddSubjectFormData> => ({
+
   fields: {
-    name: {
-      name: "name",
-      label: "Subject Name",
-      type: "text",
-      placeholder: "e.g. Mathematics",
-      required: true,
-      props: { htmlInput: { minLength: 1 } },
-    },
-    code: {
-      name: "code",
-      label: "Subject Code",
-      type: "text",
-      placeholder: "e.g. MAT101",
-      required: true,
-    },
-    subject_type: {
-      name: "subject_type",
-      label: "Subject Type",
+    academic_year_id: {
+      name: "academic_year_id",
+      label: "Academic Year",
       type: "select",
       required: true,
       props: {
-        options: [
-          { id: "Theory", label: "Theory", value: "Theory" },
-          { id: "Practical", label: "Practical", value: "Practical" },
-          { id: "Activity", label: "Activity", value: "Activity" },
-        ],
-        disableWhenEmpty: false,
+        options: options.academicYearOptions,
+        placeholder: "Select Year",
+      },
+    },
+    class_id: {
+      name: "class_id",
+      label: "Class",
+      type: "select",
+      required: true,
+      props: {
+        options: options.classOptions,
+        placeholder: "Select Class",
       },
     },
     description: {
       name: "description",
-      label: "Description",
+      label: "General Description",
       type: "text",
-      placeholder: "Optional description",
+      placeholder: "Optional notes for this batch",
       required: false,
-    },
-    class_ids: {
-      name: "class_ids",
-      label: "Applicable Classes",
-      type: "select",
-      required: false,
-      props: {
-        multiple: true,
-        coerceToNumberArray: true,
-        options: options.classOptions.map((c) => ({
-          id: String(c.id),
-          value: String(c.id),
-          label: c.label,
-        })),
-        disableWhenEmpty: false,
-        emptyListLabel: "No classes available",
-      },
-    },
-    is_active: {
-      name: "is_active",
-      label: "Subject Status",
-      type: "switch",
-      helperText: "Control system access for this subject",
     },
   },
   layoutRows: [
     {
       kind: "fields",
       grid: { xs: 12, md: 6 },
-      fieldNames: ["name", "code"],
-    },
-    {
-      kind: "fields",
-      grid: { xs: 12, md: 6 },
-      fieldNames: ["subject_type", "class_ids"],
+      fieldNames: ["academic_year_id", "class_id"],
     },
     {
       kind: "fields",
       grid: { xs: 12 },
       fieldNames: ["description"],
     },
-    {
-      kind: "fields",
-      grid: { xs: 12 },
-      fieldNames: ["is_active"],
-      show: (ctx) => ctx.isEditMode,
-    },
   ],
 });
+
+

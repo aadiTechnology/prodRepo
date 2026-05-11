@@ -4,6 +4,12 @@ import { BaseResponse } from './api';
 export interface SubjectClassResponse {
   class_id: number;
   class_name: string;
+  academic_year_id?: number;
+  academic_year_name?: string;
+  class_division_id?: number;
+  division_name?: string;
+  is_mandatory: boolean;
+  is_active: boolean;
 }
 
 export interface SubjectResponse {
@@ -27,13 +33,22 @@ export interface SubjectListResponse {
   pages: number;
 }
 
+
+export interface SubjectClassMappingPayload {
+  class_id: number;
+  academic_year_id?: number;
+  class_division_id?: number;
+  is_mandatory: boolean;
+  is_active: boolean;
+}
+
 export interface CreateSubjectPayload {
   name: string;
   code: string;
   description?: string;
   subject_type: string;
   is_active: boolean;
-  class_ids: number[];
+  class_mappings: SubjectClassMappingPayload[];
 }
 
 export interface UpdateSubjectPayload {
@@ -42,8 +57,9 @@ export interface UpdateSubjectPayload {
   description?: string;
   subject_type?: string;
   is_active?: boolean;
-  class_ids?: number[];
+  class_mappings?: SubjectClassMappingPayload[];
 }
+
 
 export const subjectService = {
   async getSubjects(params?: {
@@ -51,6 +67,7 @@ export const subjectService = {
     limit?: number;
     search?: string;
     class_id?: number;
+    academic_year_id?: number;
     is_active?: boolean;
   }): Promise<SubjectListResponse> {
     const response = await apiClient.get('/api/subjects', { params });

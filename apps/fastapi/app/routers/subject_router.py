@@ -19,6 +19,7 @@ def get_subjects(
     limit: int = Query(100, ge=1, le=1000, description="Limit the number of items returned"),
     search: Optional[str] = Query(None, description="Search by subject name or code"),
     class_id: Optional[int] = Query(None, description="Filter by class ID"),
+    academic_year_id: Optional[int] = Query(None, description="Filter by academic year ID"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_user)
@@ -33,6 +34,7 @@ def get_subjects(
         limit=limit,
         search=search,
         class_id=class_id,
+        academic_year_id=academic_year_id,
         is_active=is_active
     )
     

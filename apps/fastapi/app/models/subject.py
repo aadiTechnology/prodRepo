@@ -35,7 +35,7 @@ class Subject(Base):
 class SubjectClass(Base):
     __tablename__ = "subject_classes"
     __table_args__ = (
-        UniqueConstraint('tenant_id', 'subject_id', 'class_id', name='uq_subject_classes_mapping'),
+        UniqueConstraint('tenant_id', 'academic_year_id', 'class_id', 'class_division_id', 'subject_id', name='uq_subject_classes_mapping_v2'),
         {'extend_existing': True}
     )
 
@@ -43,6 +43,10 @@ class SubjectClass(Base):
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="NO ACTION"), nullable=False)
     subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="NO ACTION"), nullable=False)
     class_id = Column(Integer, ForeignKey("classes.id", ondelete="NO ACTION"), nullable=False)
+    academic_year_id = Column(Integer, ForeignKey("academic_years.id", ondelete="SET NULL"), nullable=True)
+    class_division_id = Column(Integer, ForeignKey("class_divisions.id", ondelete="SET NULL"), nullable=True)
+    is_mandatory = Column(Boolean, default=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     created_by = Column(Integer, nullable=True)
@@ -50,3 +54,6 @@ class SubjectClass(Base):
     # Relationships
     subject = relationship("Subject", back_populates="subject_classes")
     class_model = relationship("SchoolClass", foreign_keys=[class_id], viewonly=True)
+    division_model = relationship("ClassDivision", foreign_keys=[class_division_id], viewonly=True)
+    academic_year = relationship("AcademicYear", foreign_keys=[academic_year_id], viewonly=True)
+

@@ -6,7 +6,7 @@ import { ListPageLayout, ListPageToolbar, EntityTableSection } from "../../compo
 import { type SubjectResponse } from "../../api/services/subjectService";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { useSubjectListController } from "../../hooks/useSubjectListController";
-import { createSubjectListConfig } from "./SubjectList.listConfig";
+import { createSubjectListConfig, type SubjectClassRow } from "./SubjectList.listConfig";
 
 export default function SubjectList() {
     const navigate = useNavigate();
@@ -32,17 +32,24 @@ export default function SubjectList() {
                             searchPlaceholder="Search subjects by name or code..."
                             filters={[
                                 {
-                                    label: "Class",
+                                    label: "Academic Year",
+                                    value: controller.academicYearFilter,
+                                    onChange: controller.setAcademicYearFilter,
+                                    options: controller.academicYearOptions,
+                                },
+                                {
+                                    label: "Select Class",
                                     value: controller.classFilter,
                                     onChange: controller.setClassFilter,
                                     options: controller.classOptions,
                                 },
                                 {
-                                    label: "Status",
+                                    label: "Select Status",
                                     value: controller.statusFilter,
                                     onChange: controller.setStatusFilter,
                                     options: controller.statusOptions,
                                 },
+
                             ]}
                             onAddClick={() => navigate("/subjects/new")}
                             addLabel="Add Subject"
@@ -58,7 +65,7 @@ export default function SubjectList() {
                 </Alert>
             )}
 
-            <EntityTableSection<SubjectResponse>
+            <EntityTableSection<SubjectClassRow>
                 label="Subjects"
                 totalRows={controller.totalSubjects}
                 page={controller.page}
@@ -66,7 +73,7 @@ export default function SubjectList() {
                 onPageChange={controller.setPage}
                 onRowsPerPageChange={controller.setRowsPerPage}
                 columns={listConfig.columns}
-                data={controller.subjects}
+                data={controller.subjectRows}
                 loading={controller.loading}
                 emptyMessage={listConfig.uiPolicy.emptyMessage}
                 rowActions={listConfig.actions.rowActions}
@@ -77,7 +84,7 @@ export default function SubjectList() {
             <ConfirmDialog
                 open={controller.deleteDialogOpen}
                 title="Delete Subject?"
-                message={`Are you sure you want to delete ${controller.selectedSubject?.name}?`}
+                message={`Are you sure you want to delete ${controller.selectedSubject?.name}? This will remove it from all assigned classes.`}
                 confirmText={controller.deleteLoading ? "Deleting..." : "Delete"}
                 onConfirm={controller.handleConfirmDelete}
                 onCancel={() => controller.setDeleteDialogOpen(false)}
