@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     DB_NAME: str = ""
     DB_USER: str = ""
     DB_PASSWORD: str = ""
-    DB_DRIVER: str = "ODBC Driver 18 for SQL Server"
+    DB_DRIVER: str = "ODBC Driver 17 for SQL Server"
     DB_ECHO: bool = False
     
     # CORS - comma-separated string in .env (parsed to list via CORS_ORIGINS property)

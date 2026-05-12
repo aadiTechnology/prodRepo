@@ -9,14 +9,19 @@ from app.repositories import notice_repository
 from app.schemas.notice import (
     NoticeAttachmentResponse,
     NoticeCreateRequest,
+    NoticeDropdownOptionsResponse,
     NoticeListResponse,
     NoticeResponse,
+    NoticeStatusUpdateResponse,
     NoticeTargetResponse,
     NoticeUpdateRequest,
 )
 
 
 ALLOWED_ATTACHMENT_TYPES = {"application/pdf", "image/jpeg", "image/jpg", "image/png"}
+ALLOWED_AUDIENCE_TYPES = {"ALL", "STUDENT", "TEACHER", "ADMIN"}
+ALLOWED_NOTICE_TYPES = {"GENERAL", "FEE", "EVENT", "HOLIDAY", "EXAM"}
+AUDIENCE_WITH_CLASS_TARGETS = frozenset({"STUDENT", "ALL"})
 
 
 def _validate_notice_input(
@@ -24,6 +29,7 @@ def _validate_notice_input(
     title: str | None,
     description: str | None,
     audience_type: str | None,
+    notice_type: str | None,
     publish_date: datetime | None,
     expiry_date: datetime | None,
     targets: list[dict] | None,
@@ -33,22 +39,39 @@ def _validate_notice_input(
         raise ValidationException("Please enter notice title")
     if description is not None and not description.strip():
         raise ValidationException("Please enter description")
-    if audience_type is not None and audience_type not in {"ALL", "CLASS", "DIVISION"}:
+    if audience_type is not None and audience_type not in ALLOWED_AUDIENCE_TYPES:
         raise ValidationException("Please select audience")
+    if notice_type is not None and notice_type not in ALLOWED_NOTICE_TYPES:
+        raise ValidationException("Invalid notice type")
     if publish_date and expiry_date and expiry_date < publish_date:
         raise ValidationException("Expiry date cannot be before publish date")
 
-    if audience_type in {"CLASS", "DIVISION"}:
+    if audience_type in AUDIENCE_WITH_CLASS_TARGETS:
         if not targets:
             raise ValidationException("Please select audience")
         if all(t.get("class_id") is None and t.get("division_id") is None for t in targets):
             raise ValidationException("Please select audience")
+    elif audience_type in {"TEACHER", "ADMIN"} and targets:
+        for t in targets:
+            if t.get("class_id") is not None or t.get("division_id") is not None:
+                raise ValidationException("Class and division targets apply only to All or Students audience")
 
     if attachments:
         for item in attachments:
             file_type = (item.get("file_type") or "").lower()
             if file_type and file_type not in ALLOWED_ATTACHMENT_TYPES:
                 raise ValidationException("Invalid file format or size exceeded")
+
+
+def _derive_status(*, is_draft: bool, publish_date: datetime, expiry_date: datetime | None) -> str:
+    now = datetime.utcnow()
+    if expiry_date and expiry_date < now:
+        return "EXPIRED"
+    if is_draft:
+        return "DRAFT"
+    if publish_date > now:
+        return "UNPUBLISHED"
+    return "PUBLISHED"
 
 
 def _to_notice_response(db: Session, row: dict) -> NoticeResponse:
@@ -61,10 +84,13 @@ def _to_notice_response(db: Session, row: dict) -> NoticeResponse:
         description=str(row["description"]),
         notice_type=str(row["notice_type"]),
         audience_type=str(row["audience_type"]),
+        status=str(row["status"]),
         publish_date=row["publish_date"],
         expiry_date=row.get("expiry_date"),
         is_draft=bool(row["is_draft"]),
         is_published=bool(row["is_published"]),
+        published_at=row.get("published_at"),
+        unpublished_at=row.get("unpublished_at"),
         send_notification=bool(row["send_notification"]),
         created_by=int(row["created_by"]),
         created_at=row["created_at"],
@@ -83,6 +109,7 @@ def list_notices(
     page: int,
     size: int,
     search: str | None = None,
+    status: str | None = None,
     audience_type: str | None = None,
     notice_type: str | None = None,
     is_published: bool | None = None,
@@ -91,6 +118,7 @@ def list_notices(
         db,
         tenant_id=tenant_id,
         search=search,
+        status=status,
         audience_type=audience_type,
         notice_type=notice_type,
         is_published=is_published,
@@ -122,31 +150,40 @@ def create_notice(
     publish_date = payload.publish_date or datetime.utcnow()
     targets = [t.model_dump() for t in payload.targets]
     attachments = [a.model_dump() for a in payload.attachments]
+    notice_type = payload.notice_type.upper()
+    audience_type = payload.audience_type.upper()
+    is_draft = bool(payload.is_draft)
+    status = _derive_status(is_draft=is_draft, publish_date=publish_date, expiry_date=payload.expiry_date)
+    is_published = status == "PUBLISHED"
+    published_at = datetime.utcnow() if is_published else None
+    unpublished_at = datetime.utcnow() if status == "UNPUBLISHED" else None
 
     _validate_notice_input(
         title=payload.title,
         description=payload.description,
-        audience_type=payload.audience_type,
+        audience_type=audience_type,
+        notice_type=notice_type,
         publish_date=publish_date,
         expiry_date=payload.expiry_date,
         targets=targets,
         attachments=attachments,
     )
 
-    is_draft = bool(payload.is_draft)
-    is_published = not is_draft
     notice_id = notice_repository.insert_notice(
         db,
         payload={
             "tenant_id": tenant_id,
             "title": payload.title.strip(),
             "description": payload.description.strip(),
-            "notice_type": payload.notice_type,
-            "audience_type": payload.audience_type,
+            "notice_type": notice_type,
+            "audience_type": audience_type,
+            "status": status,
             "publish_date": publish_date,
             "expiry_date": payload.expiry_date,
             "is_draft": is_draft,
             "is_published": is_published,
+            "published_at": published_at,
+            "unpublished_at": unpublished_at,
             "send_notification": payload.send_notification,
             "created_by": user_id,
             "is_deleted": False,
@@ -154,10 +191,18 @@ def create_notice(
     )
     notice_repository.replace_notice_targets(
         db,
+        tenant_id=tenant_id,
         notice_id=notice_id,
-        targets=[] if payload.audience_type == "ALL" else targets,
+        user_id=user_id,
+        targets=targets if audience_type in AUDIENCE_WITH_CLASS_TARGETS else [],
     )
-    notice_repository.replace_notice_attachments(db, notice_id=notice_id, attachments=attachments)
+    notice_repository.replace_notice_attachments(
+        db,
+        tenant_id=tenant_id,
+        notice_id=notice_id,
+        user_id=user_id,
+        attachments=attachments,
+    )
     db.commit()
     return get_notice(db, tenant_id=tenant_id, notice_id=notice_id)
 
@@ -181,8 +226,13 @@ def update_notice(
         update_data["title"] = update_data["title"].strip()
     if "description" in update_data and update_data["description"] is not None:
         update_data["description"] = update_data["description"].strip()
+    if "notice_type" in update_data and update_data["notice_type"] is not None:
+        update_data["notice_type"] = str(update_data["notice_type"]).upper()
+    if "audience_type" in update_data and update_data["audience_type"] is not None:
+        update_data["audience_type"] = str(update_data["audience_type"]).upper()
 
     next_audience_type = update_data.get("audience_type", existing["audience_type"])
+    next_notice_type = update_data.get("notice_type", existing["notice_type"])
     next_publish_date = update_data.get("publish_date", existing["publish_date"])
     next_expiry_date = update_data.get("expiry_date", existing.get("expiry_date"))
     normalized_targets = [item.model_dump() for item in targets] if targets is not None else None
@@ -194,6 +244,7 @@ def update_notice(
         title=update_data.get("title", existing["title"]),
         description=update_data.get("description", existing["description"]),
         audience_type=next_audience_type,
+        notice_type=next_notice_type,
         publish_date=next_publish_date,
         expiry_date=next_expiry_date,
         targets=normalized_targets
@@ -202,8 +253,19 @@ def update_notice(
         attachments=normalized_attachments,
     )
 
-    if "is_draft" in update_data and update_data["is_draft"] is not None:
-        update_data["is_published"] = not bool(update_data["is_draft"])
+    next_is_draft = bool(update_data.get("is_draft", existing["is_draft"]))
+    next_status = _derive_status(
+        is_draft=next_is_draft,
+        publish_date=next_publish_date,
+        expiry_date=next_expiry_date,
+    )
+    update_data["status"] = next_status
+    update_data["is_draft"] = next_is_draft
+    update_data["is_published"] = next_status == "PUBLISHED"
+    update_data["published_at"] = datetime.utcnow() if next_status == "PUBLISHED" else existing.get("published_at")
+    update_data["unpublished_at"] = (
+        datetime.utcnow() if next_status == "UNPUBLISHED" else existing.get("unpublished_at")
+    )
     update_data["updated_by"] = user_id
     update_data["updated_at"] = datetime.utcnow()
 
@@ -216,23 +278,38 @@ def update_notice(
     if normalized_targets is not None:
         notice_repository.replace_notice_targets(
             db,
+            tenant_id=tenant_id,
             notice_id=notice_id,
-            targets=[] if next_audience_type == "ALL" else normalized_targets,
+            user_id=user_id,
+            targets=normalized_targets if next_audience_type in AUDIENCE_WITH_CLASS_TARGETS else [],
         )
     if normalized_attachments is not None:
         notice_repository.replace_notice_attachments(
             db,
+            tenant_id=tenant_id,
             notice_id=notice_id,
+            user_id=user_id,
             attachments=normalized_attachments,
         )
     db.commit()
     return get_notice(db, tenant_id=tenant_id, notice_id=notice_id)
 
 
-def publish_notice(db: Session, *, tenant_id: int, notice_id: int, user_id: int) -> NoticeResponse:
+def publish_notice(
+    db: Session,
+    *,
+    tenant_id: int,
+    notice_id: int,
+    user_id: int,
+) -> NoticeStatusUpdateResponse:
     existing = notice_repository.get_notice_by_id(db, tenant_id=tenant_id, notice_id=notice_id)
     if not existing:
         raise NotFoundException("Notice", notice_id)
+    if bool(existing.get("is_deleted")):
+        raise ValidationException("Action not allowed in current state")
+    if existing.get("expiry_date") and existing["expiry_date"] < datetime.utcnow():
+        raise ValidationException("Action not allowed in current state")
+
     notice_repository.update_notice(
         db,
         tenant_id=tenant_id,
@@ -240,12 +317,51 @@ def publish_notice(db: Session, *, tenant_id: int, notice_id: int, user_id: int)
         update_fields={
             "is_draft": False,
             "is_published": True,
+            "status": "PUBLISHED",
+            "published_at": datetime.utcnow(),
+            "unpublished_at": None,
             "updated_by": user_id,
             "updated_at": datetime.utcnow(),
         },
     )
     db.commit()
-    return get_notice(db, tenant_id=tenant_id, notice_id=notice_id)
+    return NoticeStatusUpdateResponse(
+        message="Notice published successfully",
+        notice=get_notice(db, tenant_id=tenant_id, notice_id=notice_id),
+    )
+
+
+def unpublish_notice(
+    db: Session,
+    *,
+    tenant_id: int,
+    notice_id: int,
+    user_id: int,
+) -> NoticeStatusUpdateResponse:
+    existing = notice_repository.get_notice_by_id(db, tenant_id=tenant_id, notice_id=notice_id)
+    if not existing:
+        raise NotFoundException("Notice", notice_id)
+    if not bool(existing.get("is_published")):
+        raise ValidationException("Action not allowed in current state")
+
+    notice_repository.update_notice(
+        db,
+        tenant_id=tenant_id,
+        notice_id=notice_id,
+        update_fields={
+            "is_draft": False,
+            "is_published": False,
+            "status": "UNPUBLISHED",
+            "unpublished_at": datetime.utcnow(),
+            "updated_by": user_id,
+            "updated_at": datetime.utcnow(),
+        },
+    )
+    db.commit()
+    return NoticeStatusUpdateResponse(
+        message="Notice unpublished successfully",
+        notice=get_notice(db, tenant_id=tenant_id, notice_id=notice_id),
+    )
 
 
 def delete_notice(db: Session, *, tenant_id: int, notice_id: int, user_id: int) -> None:
@@ -258,8 +374,18 @@ def delete_notice(db: Session, *, tenant_id: int, notice_id: int, user_id: int) 
         notice_id=notice_id,
         update_fields={
             "is_deleted": True,
+            "deleted_at": datetime.utcnow(),
+            "deleted_by": user_id,
             "updated_by": user_id,
             "updated_at": datetime.utcnow(),
         },
     )
     db.commit()
+
+
+def get_dropdown_options() -> NoticeDropdownOptionsResponse:
+    return NoticeDropdownOptionsResponse(
+        notice_types=["GENERAL", "FEE", "EVENT", "HOLIDAY", "EXAM"],
+        audience_types=["ALL", "STUDENT", "TEACHER", "ADMIN"],
+        status_types=["DRAFT", "PUBLISHED", "UNPUBLISHED", "EXPIRED"],
+    )

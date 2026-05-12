@@ -14,5 +14,6 @@ export { useTenantListController } from "./useTenantListController";
 export type { TenantListSortBy } from "./useTenantListController";
 export { useSprintListController } from "./useSprintListController";
 export type { SprintListSortBy } from "./useSprintListController";
+export { useNoticeListController } from "./useNoticeListController";
 export { useFormManager } from "./useFormManager";
 export type { DependentFieldPair, UseFormManagerOptions, UseFormManagerResult } from "./useFormManager";

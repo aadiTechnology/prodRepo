@@ -71,6 +71,8 @@ const GenerateInvoice = lazy(() => import("../pages/Fees/GenerateInvoice"));
 const FeeReportPage = lazy(() => import("../pages/Fees/FeeReportPage"));
 const FeeDueListV2 = lazy(() => import("../pages/Fees/FeeDueListV2"));
 const CreateNotice = lazy(() => import("../pages/Communication/CreateNotice"));
+const NoticeList = lazy(() => import("../pages/Communication/NoticeList"));
+const NoticeDetails = lazy(() => import("../pages/Communication/NoticeDetails"));
 // Loading fallback component
 const PageLoader = () => (
   <Box
@@ -294,8 +296,39 @@ export default function AppRoutes() {
           <Route path="/admin/permission-management" element={<ProtectedRoute requiredPermissions={["ADMIN_MGMT:view", "SYSTEM_CONFIG:view"]}><PermissionManagementPage /></ProtectedRoute>} />
           <Route path="/admin/theme-studio" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><ThemeStudioPage /></ProtectedRoute>} />
 
-          {/* Communication Management */}
-          <Route path="/communication/notices" element={<ProtectedRoute requiredPermissions="COMMUNICATION_MGMT:view"><CreateNotice /></ProtectedRoute>} />
+          {/* Communication — Notices */}
+          <Route
+            path="/communication/notices/new"
+            element={
+              <ProtectedRoute requiredPermissions="COMMUNICATION_MGMT:create">
+                <CreateNotice />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/communication/notices/:id/edit"
+            element={
+              <ProtectedRoute requiredPermissions="COMMUNICATION_MGMT:edit">
+                <CreateNotice />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/communication/notices/:id"
+            element={
+              <ProtectedRoute requiredPermissions="COMMUNICATION_MGMT:view">
+                <NoticeDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/communication/notices"
+            element={
+              <ProtectedRoute requiredPermissions="COMMUNICATION_MGMT:view">
+                <NoticeList />
+              </ProtectedRoute>
+            }
+          />
           
           {/* Academic Year Management */}
           <Route path="/academic-years" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><AcademicYearList /></ProtectedRoute>} />

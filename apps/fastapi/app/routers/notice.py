@@ -3,7 +3,14 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, require_permission
-from app.schemas.notice import NoticeCreateRequest, NoticeListResponse, NoticeResponse, NoticeUpdateRequest
+from app.schemas.notice import (
+    NoticeCreateRequest,
+    NoticeDropdownOptionsResponse,
+    NoticeListResponse,
+    NoticeResponse,
+    NoticeStatusUpdateResponse,
+    NoticeUpdateRequest,
+)
 from app.services import notice_service
 
 router = APIRouter(prefix="/communications/notices", tags=["Communication - Notices"])
@@ -14,6 +21,7 @@ async def list_notices(
     page: int = Query(0, ge=0),
     size: int = Query(10, ge=1, le=100),
     search: str | None = Query(None),
+    status_filter: str | None = Query(None, alias="status"),
     audience_type: str | None = Query(None),
     notice_type: str | None = Query(None),
     is_published: bool | None = Query(None),
@@ -26,10 +34,19 @@ async def list_notices(
         page=page,
         size=size,
         search=search,
-        audience_type=audience_type,
-        notice_type=notice_type,
+        status=status_filter.upper() if status_filter else None,
+        audience_type=audience_type.upper() if audience_type else None,
+        notice_type=notice_type.upper() if notice_type else None,
         is_published=is_published,
     )
+
+
+@router.get("/dropdown/options", response_model=NoticeDropdownOptionsResponse)
+async def get_notice_dropdown_options(
+    current_user: CurrentUser = Depends(require_permission("Create Notices", "view")),
+):
+    _ = current_user
+    return notice_service.get_dropdown_options()
 
 
 @router.get("/{notice_id}", response_model=NoticeResponse)
@@ -71,13 +88,27 @@ async def update_notice(
     )
 
 
-@router.post("/{notice_id}/publish", response_model=NoticeResponse)
+@router.post("/{notice_id}/publish", response_model=NoticeStatusUpdateResponse)
 async def publish_notice(
     notice_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_permission("Create Notices", "edit")),
 ):
     return notice_service.publish_notice(
+        db,
+        tenant_id=current_user.tenant_id,
+        notice_id=notice_id,
+        user_id=current_user.id,
+    )
+
+
+@router.post("/{notice_id}/unpublish", response_model=NoticeStatusUpdateResponse)
+async def unpublish_notice(
+    notice_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_permission("Create Notices", "edit")),
+):
+    return notice_service.unpublish_notice(
         db,
         tenant_id=current_user.tenant_id,
         notice_id=notice_id,

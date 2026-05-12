@@ -1,5 +1,12 @@
 import { apiClient } from "../client";
-import type { Notice, NoticeCreateRequest, NoticeListResponse } from "../../types/notice";
+import type {
+  Notice,
+  NoticeCreateRequest,
+  NoticeDropdownOptionsResponse,
+  NoticeListResponse,
+  NoticeStatusUpdateResponse,
+  NoticeUpdateRequest,
+} from "../../types/notice";
 
 const BASE = "/communications/notices";
 
@@ -8,11 +15,17 @@ const noticeService = {
     page?: number;
     size?: number;
     search?: string;
+    status?: string;
     audience_type?: string;
     notice_type?: string;
     is_published?: boolean;
   }): Promise<NoticeListResponse> => {
     const res = await apiClient.get(BASE, { params });
+    return res.data;
+  },
+
+  getDropdownOptions: async (): Promise<NoticeDropdownOptionsResponse> => {
+    const res = await apiClient.get(`${BASE}/dropdown/options`);
     return res.data;
   },
 
@@ -26,13 +39,18 @@ const noticeService = {
     return res.data;
   },
 
-  update: async (id: number, payload: Partial<NoticeCreateRequest>): Promise<Notice> => {
+  update: async (id: number, payload: NoticeUpdateRequest): Promise<Notice> => {
     const res = await apiClient.put(`${BASE}/${id}`, payload);
     return res.data;
   },
 
-  publish: async (id: number): Promise<Notice> => {
+  publish: async (id: number): Promise<NoticeStatusUpdateResponse> => {
     const res = await apiClient.post(`${BASE}/${id}/publish`);
+    return res.data;
+  },
+
+  unpublish: async (id: number): Promise<NoticeStatusUpdateResponse> => {
+    const res = await apiClient.post(`${BASE}/${id}/unpublish`);
     return res.data;
   },
 

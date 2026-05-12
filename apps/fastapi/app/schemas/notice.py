@@ -6,8 +6,9 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-AudienceType = Literal["ALL", "CLASS", "DIVISION"]
-NoticeType = Literal["General", "Fee", "Event", "Holiday"]
+AudienceType = Literal["ALL", "STUDENT", "TEACHER", "ADMIN"]
+NoticeType = Literal["GENERAL", "FEE", "EVENT", "HOLIDAY", "EXAM"]
+NoticeStatus = Literal["DRAFT", "PUBLISHED", "UNPUBLISHED", "EXPIRED"]
 
 
 class NoticeTargetItem(BaseModel):
@@ -19,6 +20,7 @@ class NoticeAttachmentItem(BaseModel):
     file_name: str | None = Field(None, max_length=255)
     file_path: str | None = Field(None, max_length=500)
     file_type: str | None = Field(None, max_length=50)
+    file_size_kb: int | None = Field(None, ge=0)
 
 
 class NoticeCreateRequest(BaseModel):
@@ -49,16 +51,24 @@ class NoticeUpdateRequest(BaseModel):
 
 class NoticeTargetResponse(BaseModel):
     id: int
+    tenant_id: int
+    notice_id: int
     class_id: int | None = None
     division_id: int | None = None
+    created_at: datetime | None = None
+    created_by: int | None = None
 
 
 class NoticeAttachmentResponse(BaseModel):
     id: int
+    tenant_id: int
+    notice_id: int
     file_name: str | None = None
     file_path: str | None = None
     file_type: str | None = None
+    file_size_kb: int | None = None
     uploaded_at: datetime | None = None
+    uploaded_by: int | None = None
 
 
 class NoticeResponse(BaseModel):
@@ -66,12 +76,15 @@ class NoticeResponse(BaseModel):
     tenant_id: int
     title: str
     description: str
-    notice_type: str
-    audience_type: str
+    notice_type: NoticeType
+    audience_type: AudienceType
+    status: NoticeStatus
     publish_date: datetime
     expiry_date: datetime | None = None
     is_draft: bool
     is_published: bool
+    published_at: datetime | None = None
+    unpublished_at: datetime | None = None
     send_notification: bool
     created_by: int
     created_at: datetime
@@ -87,3 +100,14 @@ class NoticeListResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+class NoticeStatusUpdateResponse(BaseModel):
+    message: str
+    notice: NoticeResponse
+
+
+class NoticeDropdownOptionsResponse(BaseModel):
+    notice_types: list[NoticeType]
+    audience_types: list[AudienceType]
+    status_types: list[NoticeStatus]

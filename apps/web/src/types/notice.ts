@@ -1,18 +1,27 @@
-export type NoticeAudienceType = "ALL" | "CLASS" | "DIVISION";
-export type NoticeType = "General" | "Fee" | "Event" | "Holiday";
+export type NoticeAudienceType = "ALL" | "STUDENT" | "TEACHER" | "ADMIN";
+export type NoticeType = "GENERAL" | "FEE" | "EVENT" | "HOLIDAY" | "EXAM";
+export type NoticeStatus = "DRAFT" | "PUBLISHED" | "UNPUBLISHED" | "EXPIRED";
 
 export interface NoticeTarget {
   id: number;
+  tenant_id: number;
+  notice_id: number;
   class_id: number | null;
   division_id: number | null;
+  created_at?: string | null;
+  created_by?: number | null;
 }
 
 export interface NoticeAttachment {
   id: number;
+  tenant_id: number;
+  notice_id: number;
   file_name: string | null;
   file_path: string | null;
   file_type: string | null;
+  file_size_kb?: number | null;
   uploaded_at: string | null;
+  uploaded_by?: number | null;
 }
 
 export interface Notice {
@@ -22,10 +31,13 @@ export interface Notice {
   description: string;
   notice_type: NoticeType;
   audience_type: NoticeAudienceType;
+  status: NoticeStatus;
   publish_date: string;
   expiry_date: string | null;
   is_draft: boolean;
   is_published: boolean;
+  published_at: string | null;
+  unpublished_at: string | null;
   send_notification: boolean;
   created_by: number;
   created_at: string;
@@ -45,6 +57,7 @@ export interface NoticeCreateAttachment {
   file_name?: string;
   file_path?: string;
   file_type?: string;
+  file_size_kb?: number;
 }
 
 export interface NoticeCreateRequest {
@@ -60,9 +73,36 @@ export interface NoticeCreateRequest {
   attachments: NoticeCreateAttachment[];
 }
 
+export type NoticeUpdateRequest = Partial<
+  Pick<
+    NoticeCreateRequest,
+    | "title"
+    | "description"
+    | "audience_type"
+    | "notice_type"
+    | "publish_date"
+    | "expiry_date"
+    | "send_notification"
+    | "is_draft"
+    | "targets"
+    | "attachments"
+  >
+>;
+
 export interface NoticeListResponse {
   items: Notice[];
   total: number;
   page: number;
   size: number;
+}
+
+export interface NoticeStatusUpdateResponse {
+  message: string;
+  notice: Notice;
+}
+
+export interface NoticeDropdownOptionsResponse {
+  notice_types: NoticeType[];
+  audience_types: NoticeAudienceType[];
+  status_types: NoticeStatus[];
 }

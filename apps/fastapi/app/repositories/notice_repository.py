@@ -13,24 +13,28 @@ def list_notices(
     search: str | None,
     audience_type: str | None,
     notice_type: str | None,
+    status: str | None,
     is_published: bool | None,
     page: int,
     size: int,
 ) -> tuple[list[dict], int]:
-    where_sql = ["tenant_id = :tenant_id", "is_deleted = 0"]
+    where_sql = ["n.tenant_id = :tenant_id", "n.is_deleted = 0"]
     params: dict = {"tenant_id": tenant_id}
 
     if search:
-        where_sql.append("(title LIKE :search OR description LIKE :search)")
+        where_sql.append("(n.title LIKE :search OR n.description LIKE :search)")
         params["search"] = f"%{search.strip()}%"
     if audience_type:
-        where_sql.append("audience_type = :audience_type")
+        where_sql.append("n.audience_type = :audience_type")
         params["audience_type"] = audience_type
     if notice_type:
-        where_sql.append("notice_type = :notice_type")
+        where_sql.append("n.notice_type = :notice_type")
         params["notice_type"] = notice_type
+    if status:
+        where_sql.append("n.status = :status")
+        params["status"] = status
     if is_published is not None:
-        where_sql.append("is_published = :is_published")
+        where_sql.append("n.is_published = :is_published")
         params["is_published"] = 1 if is_published else 0
 
     where_clause = " AND ".join(where_sql)
@@ -39,14 +43,14 @@ def list_notices(
 
     list_sql = text(
         f"""
-        SELECT *
-        FROM notices
+        SELECT n.*
+        FROM communication_notices n
         WHERE {where_clause}
-        ORDER BY created_at DESC, id DESC
+        ORDER BY n.created_at DESC, n.id DESC
         OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY
         """
     )
-    count_sql = text(f"SELECT COUNT(1) FROM notices WHERE {where_clause}")
+    count_sql = text(f"SELECT COUNT(1) FROM communication_notices n WHERE {where_clause}")
 
     rows = db.execute(list_sql, params).mappings().all()
     total = db.execute(count_sql, params).scalar() or 0
@@ -57,7 +61,7 @@ def get_notice_by_id(db: Session, *, tenant_id: int, notice_id: int) -> dict | N
     sql = text(
         """
         SELECT *
-        FROM notices
+        FROM communication_notices
         WHERE id = :notice_id AND tenant_id = :tenant_id AND is_deleted = 0
         """
     )
@@ -68,9 +72,9 @@ def get_notice_by_id(db: Session, *, tenant_id: int, notice_id: int) -> dict | N
 def get_notice_targets(db: Session, *, notice_id: int) -> list[dict]:
     sql = text(
         """
-        SELECT id, class_id, division_id
-        FROM notice_targets
-        WHERE notice_id = :notice_id
+        SELECT id, tenant_id, notice_id, class_id, division_id, created_at, created_by
+        FROM communication_notice_targets
+        WHERE notice_id = :notice_id AND is_deleted = 0
         ORDER BY id ASC
         """
     )
@@ -81,9 +85,9 @@ def get_notice_targets(db: Session, *, notice_id: int) -> list[dict]:
 def get_notice_attachments(db: Session, *, notice_id: int) -> list[dict]:
     sql = text(
         """
-        SELECT id, file_name, file_path, file_type, uploaded_at
-        FROM notice_attachments
-        WHERE notice_id = :notice_id
+        SELECT id, tenant_id, notice_id, file_name, file_path, file_type, file_size_kb, uploaded_at, uploaded_by
+        FROM communication_notice_attachments
+        WHERE notice_id = :notice_id AND is_deleted = 0
         ORDER BY id ASC
         """
     )
@@ -98,18 +102,57 @@ def insert_notice(db: Session, *, payload: dict) -> int:
     return int(entity.id)
 
 
-def replace_notice_targets(db: Session, *, notice_id: int, targets: list[dict]) -> None:
+def replace_notice_targets(
+    db: Session,
+    *,
+    tenant_id: int,
+    notice_id: int,
+    user_id: int,
+    targets: list[dict],
+) -> None:
     db.query(NoticeTarget).filter(NoticeTarget.notice_id == notice_id).delete()
     if targets:
-        db.bulk_insert_mappings(NoticeTarget, [{"notice_id": notice_id, **t} for t in targets])
+        db.bulk_insert_mappings(
+            NoticeTarget,
+            [
+                {
+                    "tenant_id": tenant_id,
+                    "notice_id": notice_id,
+                    "class_id": t.get("class_id"),
+                    "division_id": t.get("division_id"),
+                    "created_by": user_id,
+                    "is_deleted": False,
+                }
+                for t in targets
+            ],
+        )
 
 
-def replace_notice_attachments(db: Session, *, notice_id: int, attachments: list[dict]) -> None:
+def replace_notice_attachments(
+    db: Session,
+    *,
+    tenant_id: int,
+    notice_id: int,
+    user_id: int,
+    attachments: list[dict],
+) -> None:
     db.query(NoticeAttachment).filter(NoticeAttachment.notice_id == notice_id).delete()
     if attachments:
         db.bulk_insert_mappings(
             NoticeAttachment,
-            [{"notice_id": notice_id, **a} for a in attachments],
+            [
+                {
+                    "tenant_id": tenant_id,
+                    "notice_id": notice_id,
+                    "file_name": a.get("file_name") or "",
+                    "file_path": a.get("file_path") or "",
+                    "file_type": a.get("file_type") or "",
+                    "file_size_kb": a.get("file_size_kb"),
+                    "uploaded_by": user_id,
+                    "is_deleted": False,
+                }
+                for a in attachments
+            ],
         )
 
 
@@ -123,7 +166,7 @@ def update_notice(db: Session, *, tenant_id: int, notice_id: int, update_fields:
         params[key] = value
     sql = text(
         f"""
-        UPDATE notices
+        UPDATE communication_notices
         SET {", ".join(set_parts)}
         WHERE id = :notice_id AND tenant_id = :tenant_id AND is_deleted = 0
         """

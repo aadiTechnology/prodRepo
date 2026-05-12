@@ -24,6 +24,8 @@ type Props = {
   onClassSelectAll: (checked: boolean) => void;
   onClassToggle: (classId: number, checked: boolean) => void;
   onDivisionToggle: (classId: number, divisionId: number, checked: boolean) => void;
+  /** When true, hides Admin/Teacher/Student role checkboxes (audience is chosen elsewhere). */
+  hideApplicableRoleControls?: boolean;
 };
 
 export default function ApplicableToClassSelector({
@@ -39,63 +41,70 @@ export default function ApplicableToClassSelector({
   onClassSelectAll,
   onClassToggle,
   onDivisionToggle,
+  hideApplicableRoleControls = false,
 }: Props) {
+  const showClassTargetSection = hideApplicableRoleControls || applicableTo.student;
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.2 }}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-        Applicable to: 
-      </Typography>
-      <Box sx={{ bgcolor: "#f0f0f0", px: 1, py: 0.4, width: "fit-content" }}>
-        <FormControlLabel
-          control={
-            <Checkbox
-              size="small"
-              checked={isApplicableSelectAll}
-              onChange={(e) => onApplicableSelectAll(e.target.checked)}
+      {!hideApplicableRoleControls ? (
+        <>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            Applicable to:
+          </Typography>
+          <Box sx={{ bgcolor: "#f0f0f0", px: 1, py: 0.4, width: "fit-content" }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={isApplicableSelectAll}
+                  onChange={(e) => onApplicableSelectAll(e.target.checked)}
+                />
+              }
+              label="Select All"
             />
-          }
-          label="Select All"
-        />
-      </Box>
-      <Box sx={{ display: "flex", gap: 2.5, flexWrap: "wrap" }}>
-        <FormControlLabel
-          control={
-            <Checkbox
-              size="small"
-              checked={applicableTo.admin}
-              onChange={() => onApplicableRoleToggle("admin")}
+          </Box>
+          <Box sx={{ display: "flex", gap: 2.5, flexWrap: "wrap" }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={applicableTo.admin}
+                  onChange={() => onApplicableRoleToggle("admin")}
+                />
+              }
+              label="Admin"
             />
-          }
-          label="Admin"
-        />
-        <FormControlLabel
-          control={
-            <Checkbox
-              size="small"
-              checked={applicableTo.teacher}
-              onChange={() => onApplicableRoleToggle("teacher")}
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={applicableTo.teacher}
+                  onChange={() => onApplicableRoleToggle("teacher")}
+                />
+              }
+              label="Teacher"
             />
-          }
-          label="Teacher"
-        />
-        <FormControlLabel
-          control={
-            <Checkbox
-              size="small"
-              checked={applicableTo.student}
-              onChange={() => onApplicableRoleToggle("student")}
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={applicableTo.student}
+                  onChange={() => onApplicableRoleToggle("student")}
+                />
+              }
+              label="Student"
             />
-          }
-          label="Student"
-        />
-      </Box>
+          </Box>
+        </>
+      ) : null}
       {error ? (
         <Typography variant="caption" color="error" sx={{ mt: -0.5 }}>
           {error}
         </Typography>
       ) : null}
 
-      {applicableTo.student ? (
+      {showClassTargetSection ? (
         <Box
           sx={{
             mt: 0.5,
