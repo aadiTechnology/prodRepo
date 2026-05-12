@@ -4,6 +4,7 @@ from datetime import datetime
 from fastapi import HTTPException, status
 from sqlalchemy import or_, and_, desc, asc
 from app.models.subject import Subject, SubjectClass
+from app.models.academic import SchoolClass
 from app.schemas.subject_schema import SubjectCreate, SubjectUpdate
 
 class SubjectService:
@@ -117,7 +118,30 @@ class SubjectService:
         db.add(db_subject)
         db.flush()
 
-        if subject.class_mappings:
+        # Handle all_classes flag
+        if subject.all_classes and subject.academic_year_id:
+            classes = db.query(SchoolClass).filter(
+                SchoolClass.tenant_id == tenant_id,
+                SchoolClass.academic_year_id == subject.academic_year_id,
+                SchoolClass.is_active == True,
+                SchoolClass.is_deleted == False
+            ).all()
+            for cls in classes:
+                # Check if mapping already exists from class_mappings to avoid duplicates
+                if subject.class_mappings and any(m.class_id == cls.id for m in subject.class_mappings):
+                    continue
+                
+                db.add(SubjectClass(
+                    tenant_id=tenant_id,
+                    subject_id=db_subject.id,
+                    class_id=cls.id,
+                    academic_year_id=subject.academic_year_id,
+                    is_mandatory=subject.is_mandatory,
+                    is_active=subject.is_active,
+                    created_by=user_id,
+                    created_at=datetime.utcnow()
+                ))
+        elif subject.class_mappings:
             for mapping in subject.class_mappings:
                 db_mapping = SubjectClass(
                     tenant_id=tenant_id,
@@ -188,7 +212,33 @@ class SubjectService:
         db_subject.updated_by = user_id
         db_subject.updated_at = datetime.utcnow()
 
-        if class_mappings is not None:
+        if update_data.all_classes and update_data.academic_year_id:
+            classes = db.query(SchoolClass).filter(
+                SchoolClass.tenant_id == tenant_id,
+                SchoolClass.academic_year_id == update_data.academic_year_id,
+                SchoolClass.is_active == True,
+                SchoolClass.is_deleted == False
+            ).all()
+            for cls in classes:
+                # Delete existing mapping for this specific class and year
+                db.query(SubjectClass).filter(
+                    SubjectClass.subject_id == subject_id,
+                    SubjectClass.class_id == cls.id,
+                    SubjectClass.academic_year_id == update_data.academic_year_id
+                ).delete()
+
+                # Add the new mapping
+                db.add(SubjectClass(
+                    tenant_id=tenant_id,
+                    subject_id=db_subject.id,
+                    class_id=cls.id,
+                    academic_year_id=update_data.academic_year_id,
+                    is_mandatory=update_data.is_mandatory if update_data.is_mandatory is not None else True,
+                    is_active=update_data.is_active if update_data.is_active is not None else True,
+                    created_by=user_id,
+                    created_at=datetime.utcnow()
+                ))
+        elif class_mappings is not None:
             # We want to update mappings for the specific classes/years provided.
             # For each mapping in the input, we replace the existing mapping for that class/year combination.
             for mapping in class_mappings:

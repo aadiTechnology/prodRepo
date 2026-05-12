@@ -269,11 +269,18 @@ export default function AddSubject() {
                 })));
 
                 const classData = classes || [];
-                setClassOptions(classData.map((c: any) => ({
+                const options = classData.map((c: any) => ({
                     id: String(c.id),
                     label: c.name,
                     value: String(c.id)
-                })));
+                }));
+                
+                // Add "All Classes" option
+                if (options.length > 0) {
+                    options.unshift({ id: "all", label: "All Classes", value: "all" });
+                }
+                
+                setClassOptions(options);
             } catch (err) {
                 console.error("Failed to load options", err);
             }
@@ -360,6 +367,8 @@ export default function AddSubject() {
                 const existingSubjects = formData.subjects.filter(s => s.id);
                 const newSubjects = formData.subjects.filter(s => !s.id);
                 
+                const isAllClasses = formData.class_id === "all";
+                
                 // Update existing subjects
                 for (const sub of existingSubjects) {
                     const payload = {
@@ -368,7 +377,10 @@ export default function AddSubject() {
                         description: formData.description.trim(),
                         subject_type: sub.subject_type,
                         is_active: sub.is_active,
-                        class_mappings: [{
+                        is_mandatory: sub.is_mandatory,
+                        all_classes: isAllClasses,
+                        academic_year_id: Number(formData.academic_year_id),
+                        class_mappings: isAllClasses ? [] : [{
                             class_id: Number(formData.class_id),
                             academic_year_id: Number(formData.academic_year_id),
                             is_mandatory: sub.is_mandatory,
@@ -386,7 +398,10 @@ export default function AddSubject() {
                         description: formData.description.trim(),
                         subject_type: sub.subject_type,
                         is_active: sub.is_active,
-                        class_mappings: [{
+                        is_mandatory: sub.is_mandatory,
+                        all_classes: isAllClasses,
+                        academic_year_id: Number(formData.academic_year_id),
+                        class_mappings: isAllClasses ? [] : [{
                             class_id: Number(formData.class_id),
                             academic_year_id: Number(formData.academic_year_id),
                             is_mandatory: sub.is_mandatory,
@@ -398,6 +413,8 @@ export default function AddSubject() {
                 
                 setSnackbar("Subjects updated successfully.");
             } else {
+                const isAllClasses = formData.class_id === "all";
+                
                 // Bulk creation
                 const promises = formData.subjects.map(sub => {
                     const payload = {
@@ -406,7 +423,10 @@ export default function AddSubject() {
                         description: formData.description.trim(),
                         subject_type: sub.subject_type,
                         is_active: sub.is_active,
-                        class_mappings: [{
+                        is_mandatory: sub.is_mandatory,
+                        all_classes: isAllClasses,
+                        academic_year_id: Number(formData.academic_year_id),
+                        class_mappings: isAllClasses ? [] : [{
                             class_id: Number(formData.class_id),
                             academic_year_id: Number(formData.academic_year_id),
                             is_mandatory: sub.is_mandatory,
