@@ -55,7 +55,12 @@ export const createAddSubjectFormConfig = (options: {
     {
       kind: "fields",
       grid: { xs: 12, md: 6 },
-      fieldNames: ["academic_year_id", "class_id"],
+      fieldNames: ["academic_year_id"],
+    },
+    {
+      kind: "fields",
+      grid: { xs: 12, md: 6 },
+      fieldNames: ["class_id"],
     },
     {
       kind: "fields",

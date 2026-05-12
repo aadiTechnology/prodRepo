@@ -6,7 +6,7 @@ import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import SchoolIcon from "@mui/icons-material/School";
 import ClassIcon from "@mui/icons-material/Class";
 import { subjectService } from "../../api/services/subjectService";
-import schoolClassService, { type SchoolClass } from "../../api/services/schoolClassService";
+import schoolClassService from "../../api/services/schoolClassService";
 import academicYearService from "../../api/services/academicYearService";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
 import { useFormManager } from "../../hooks/useFormManager";
@@ -23,7 +23,9 @@ export default function AddSubject() {
     const isEditMode = Boolean(id && id !== "new");
     
     // Get academic_year_id, class_id, and subject_type from navigation state
-    const navigationState = (location.state as { academic_year_id?: number; class_id?: number; subject_type?: string }) || {};
+    const navigationState = useMemo(() => 
+        (location.state as { academic_year_id?: number; class_id?: number; subject_type?: string }) || {},
+    [location.state]);
 
     const [loading, setLoading] = useState(false);
     const [fetchLoading, setFetchLoading] = useState(isEditMode);
@@ -259,14 +261,14 @@ export default function AddSubject() {
                     schoolClassService.getAll()
                 ]);
                 
-                const yearsData = years?.data || years || [];
+                const yearsData = years || [];
                 setAcademicYearOptions(yearsData.map((y: any) => ({
                     id: String(y.id),
                     label: y.name || y.code,
                     value: String(y.id)
                 })));
 
-                const classData = classes?.data || classes || [];
+                const classData = classes || [];
                 setClassOptions(classData.map((c: any) => ({
                     id: String(c.id),
                     label: c.name,
@@ -394,10 +396,7 @@ export default function AddSubject() {
                     await subjectService.createSubject(payload);
                 }
                 
-                const updateMsg = existingSubjects.length > 0 ? `${existingSubjects.length} updated` : "";
-                const createMsg = newSubjects.length > 0 ? `${newSubjects.length} created` : "";
-                const messages = [updateMsg, createMsg].filter(Boolean);
-                setSnackbar(`Subject(s) ${messages.join(" and ")} successfully.`);
+                setSnackbar("Subjects updated successfully.");
             } else {
                 // Bulk creation
                 const promises = formData.subjects.map(sub => {
@@ -417,7 +416,7 @@ export default function AddSubject() {
                     return subjectService.createSubject(payload);
                 });
                 await Promise.all(promises);
-                setSnackbar(`${formData.subjects.length} subjects created and assigned to class successfully.`);
+                setSnackbar("Subjects created and assigned to class successfully.");
             }
             setTimeout(() => navigate("/subjects"), 1000);
         } catch (err: any) {
@@ -444,6 +443,7 @@ export default function AddSubject() {
             loading={loading}
             fetchLoading={fetchLoading}
             error={error}
+            useErrorSnackbar={true}
             onErrorDismiss={() => setError(null)}
             snackbar={snackbar}
             onSnackbarClose={() => setSnackbar(null)}

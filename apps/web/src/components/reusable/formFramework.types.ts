@@ -122,4 +122,6 @@ export type BaseFormProps<T extends Record<string, unknown>> = {
   hideFooterActions?: boolean;
   /** Controls footer action order; defaults to save then cancel. */
   footerActionOrder?: "save-first" | "cancel-first";
+  /** If true, error message will be shown in a snackbar instead of an inline alert. */
+  useErrorSnackbar?: boolean;
 };

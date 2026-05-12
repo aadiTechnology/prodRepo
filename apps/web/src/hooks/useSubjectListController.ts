@@ -16,9 +16,9 @@ export function useSubjectListController() {
 
     // Filters
     const [search, setSearch] = useState("");
-    const [statusFilter, setStatusFilter] = useState("all");
-    const [classFilter, setClassFilter] = useState("all");
-    const [academicYearFilter, setAcademicYearFilter] = useState("all");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [classFilter, setClassFilter] = useState("");
+    const [academicYearFilter, setAcademicYearFilter] = useState("");
 
     const [classOptions, setClassOptions] = useState<{ label: string; value: string }[]>([]);
     const [academicYearOptions, setAcademicYearOptions] = useState<{ label: string; value: string }[]>([]);
@@ -33,23 +33,21 @@ export function useSubjectListController() {
         // Load class options
         classService.list()
             .then((classes: any[]) => {
-                setClassOptions([
-                    { label: "Select Class", value: "all" },
-                    ...classes
+                setClassOptions(
+                    classes
                         .filter((c: any) => c.is_active && !c.is_deleted)
                         .map((c: any) => ({ label: c.name, value: String(c.id) })),
-                ]);
+                );
             })
             .catch(() => { });
 
         // Load academic year options
         academicYearService.list()
             .then((years: any[]) => {
-                setAcademicYearOptions([
-                    { label: "Academic Year", value: "all" },
-                    ...years
+                setAcademicYearOptions(
+                    years
                         .map((y: any) => ({ label: y.name || y.code, value: String(y.id) })),
-                ]);
+                );
             })
             .catch(() => { });
     }, []);
@@ -63,9 +61,9 @@ export function useSubjectListController() {
                 skip: page * rowsPerPage,
                 limit: rowsPerPage,
                 search: search || undefined,
-                is_active: statusFilter === "all" ? undefined : statusFilter === "active",
-                class_id: classFilter === "all" ? undefined : Number(classFilter),
-                academic_year_id: academicYearFilter === "all" ? undefined : Number(academicYearFilter),
+                is_active: statusFilter === "" ? undefined : statusFilter === "active",
+                class_id: classFilter === "" ? undefined : Number(classFilter),
+                academic_year_id: academicYearFilter === "" ? undefined : Number(academicYearFilter),
             });
 
             setSubjects(response.data);
@@ -218,7 +216,6 @@ export function useSubjectListController() {
         handleConfirmDelete,
         deleteLoading,
         statusOptions: [
-            { label: "Select Status", value: "all" },
             { label: "Active", value: "active" },
             { label: "Inactive", value: "inactive" },
         ],

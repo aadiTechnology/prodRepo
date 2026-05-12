@@ -52,6 +52,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
   canSubmit = true,
   hideFooterActions = false,
   footerActionOrder = "save-first",
+  useErrorSnackbar = false,
 }: BaseFormProps<T>) {
   const formId = useId();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -135,7 +136,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
                 {headerRightBelowSlot}
               </Box>
             ) : null}
-            {error && (
+            {error && !useErrorSnackbar && (
               <Alert
                 severity="error"
                 variant="filled"
@@ -222,13 +223,18 @@ export default function BaseForm<T extends Record<string, unknown>>({
       </ListPageLayout>
 
       <Snackbar
-        open={!!snackbar}
+        open={!!snackbar || (!!error && useErrorSnackbar)}
         autoHideDuration={3000}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        onClose={onSnackbarClose}
+        onClose={snackbar ? onSnackbarClose : onErrorDismiss}
       >
-        <Alert onClose={onSnackbarClose} severity="success" sx={{ width: "100%" }}>
-          {snackbar}
+        <Alert
+          onClose={snackbar ? onSnackbarClose : onErrorDismiss}
+          severity={snackbar ? "success" : "error"}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: "12px" }}
+        >
+          {snackbar || error}
         </Alert>
       </Snackbar>
 
