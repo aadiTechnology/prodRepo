@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
-import { subjectService, type SubjectResponse } from "../api/services/subjectService";
+import { subjectService } from "../api/services/subjectService";
 import { classService, academicYearService } from "../api/services/dropdownServices";
 import { type SubjectClassRow } from "../pages/academics/SubjectList.listConfig";
 
 export function useSubjectListController() {
-    const [subjects, setSubjects] = useState<SubjectResponse[]>([]);
+    const [subjects, setSubjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function useSubjectListController() {
 
     // Delete Modal
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [selectedSubject, setSelectedSubject] = useState<SubjectResponse | null>(null);
+    const [selectedRow, setSelectedRow] = useState<SubjectClassRow | null>(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
 
     // Load filter options
@@ -108,7 +108,7 @@ export function useSubjectListController() {
                 });
             } else {
                 // Group by academic year, class, AND subject_type
-                subject.classes.forEach((classMapping) => {
+                subject.classes.forEach((classMapping: any) => {
                     // Use IDs for the key to ensure consistent grouping even if names vary
                     const key = `${classMapping.academic_year_id || 'no-year'}-${classMapping.class_id || 'no-class'}-${subject.subject_type}`;
                     const existing = groupedMap.get(key);
@@ -139,7 +139,8 @@ export function useSubjectListController() {
 
         const rows: SubjectClassRow[] = Array.from(groupedMap.entries()).map(([key, group]) => ({
             id: key,
-            subject_id: group.subject_ids[0], // Use first subject ID as a reference for edit/delete
+            subject_id: group.subject_ids[0], // first subject ID used for edit navigation
+            subject_ids: group.subject_ids,   // ALL subject IDs used for delete
             academic_year_id: group.academic_year_id,
             class_id: group.class_id,
             subject_name: group.subject_names.join(", "),
@@ -165,17 +166,20 @@ export function useSubjectListController() {
         setPage(0);
     }, [search, statusFilter, classFilter, academicYearFilter]);
 
-    const handleDeleteClick = (subject: SubjectResponse) => {
-        setSelectedSubject(subject);
+    const handleDeleteClick = (row: SubjectClassRow) => {
+        setSelectedRow(row);
         setDeleteDialogOpen(true);
     };
 
     const handleConfirmDelete = async () => {
-        if (!selectedSubject) return;
+        if (!selectedRow) return;
         try {
             setDeleteLoading(true);
-            await subjectService.deleteSubject(selectedSubject.id);
-            setSuccess("Subject deleted successfully");
+            // Delete ALL subjects in this grouped row
+            for (const id of selectedRow.subject_ids) {
+                await subjectService.deleteSubject(id);
+            }
+            setSuccess(`${selectedRow.subject_ids.length} subject(s) deleted successfully`);
             setDeleteDialogOpen(false);
             fetchSubjects();
         } catch (err: any) {
@@ -211,7 +215,7 @@ export function useSubjectListController() {
         academicYearOptions,
         deleteDialogOpen,
         setDeleteDialogOpen,
-        selectedSubject,
+        selectedRow,
         handleDeleteClick,
         handleConfirmDelete,
         deleteLoading,

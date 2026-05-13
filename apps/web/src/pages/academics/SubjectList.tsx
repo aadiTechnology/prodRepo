@@ -83,8 +83,8 @@ export default function SubjectList() {
 
             <ConfirmDialog
                 open={controller.deleteDialogOpen}
-                title="Delete Subject?"
-                message={`Are you sure you want to delete ${controller.selectedSubject?.name}? This will remove it from all assigned classes.`}
+                title="Delete Subject(s)?"
+                message={`Are you sure you want to delete "${controller.selectedRow?.subject_name}"? This will permanently remove ${controller.selectedRow?.subject_ids?.length ?? 1} subject(s) from all assigned classes.`}
                 confirmText={controller.deleteLoading ? "Deleting..." : "Delete"}
                 onConfirm={controller.handleConfirmDelete}
                 onCancel={() => controller.setDeleteDialogOpen(false)}

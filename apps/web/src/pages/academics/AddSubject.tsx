@@ -31,6 +31,8 @@ export default function AddSubject() {
     const [fetchLoading, setFetchLoading] = useState(isEditMode);
     const [error, setError] = useState<string | null>(null);
     const [snackbar, setSnackbar] = useState<string | null>(null);
+    // Track originally-loaded subject IDs so we can delete removed ones on save
+    const [originalSubjectIds, setOriginalSubjectIds] = useState<number[]>([]);
     
     const [academicYearOptions, setAcademicYearOptions] = useState<{ id: string; label: string; value: string }[]>([]);
     const [classOptions, setClassOptions] = useState<{ id: string; label: string; value: string }[]>([]);
@@ -309,22 +311,25 @@ export default function AddSubject() {
                 // Filter by subject_type to get only subjects of the same type
                 const subjects = (response.data || []).filter(s => s.subject_type === subjectType);
                 
+                const mappedSubjects = subjects.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    code: s.code,
+                    subject_type: s.subject_type,
+                    is_mandatory: (s.classes || [])[0]?.is_mandatory ?? true,
+                    is_active: s.is_active
+                }));
+                setOriginalSubjectIds(mappedSubjects.map(s => s.id!));
                 setFormData({
                     academic_year_id: String(academicYearId),
                     class_id: String(classId),
                     description: "",
-                    subjects: subjects.map(s => ({
-                        id: s.id,
-                        name: s.name,
-                        code: s.code,
-                        subject_type: s.subject_type,
-                        is_mandatory: (s.classes || [])[0]?.is_mandatory ?? true,
-                        is_active: s.is_active
-                    }))
+                    subjects: mappedSubjects
                 });
             } else {
                 // Fallback: load single subject by ID
                 const data = await subjectService.getSubject(Number(id));
+                setOriginalSubjectIds([data.id]);
                 setFormData({
                     academic_year_id: (data.classes || [])[0]?.academic_year_id ? String((data.classes || [])[0].academic_year_id) : "",
                     class_id: (data.classes || [])[0]?.class_id ? String((data.classes || [])[0].class_id) : "",
@@ -368,6 +373,13 @@ export default function AddSubject() {
                 const newSubjects = formData.subjects.filter(s => !s.id);
                 
                 const isAllClasses = formData.class_id === "all";
+
+                // Delete subjects that were removed from the form
+                const currentSubjectIds = new Set(existingSubjects.map(s => s.id!));
+                const deletedSubjectIds = originalSubjectIds.filter(id => !currentSubjectIds.has(id));
+                for (const deletedId of deletedSubjectIds) {
+                    await subjectService.deleteSubject(deletedId);
+                }
                 
                 // Update existing subjects
                 for (const sub of existingSubjects) {
@@ -411,7 +423,9 @@ export default function AddSubject() {
                     await subjectService.createSubject(payload);
                 }
                 
-                setSnackbar("Subjects updated successfully.");
+                const deletedCount = deletedSubjectIds.length;
+                setSnackbar(`Subjects updated successfully.${deletedCount > 0 ? ` ${deletedCount} subject(s) deleted.` : ""}`);
+
             } else {
                 const isAllClasses = formData.class_id === "all";
                 

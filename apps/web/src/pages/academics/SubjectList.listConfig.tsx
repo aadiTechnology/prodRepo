@@ -1,5 +1,4 @@
 import { Chip, alpha } from "@mui/material";
-import { type SubjectResponse } from "../../api/services/subjectService";
 import { type ListConfig } from "../../components/reusable/listFramework.types";
 import StatusChip from "../../components/roles/StatusChip";
 import { colorTokens } from "../../tokens/colors";
@@ -7,7 +6,8 @@ import { colorTokens } from "../../tokens/colors";
 // Flattened row type for display (one row per academic year - class - subject_type combination)
 export interface SubjectClassRow {
   id: string; // unique identifier for this row
-  subject_id: number;
+  subject_id: number;  // first subject ID (used for edit navigation)
+  subject_ids: number[]; // ALL subject IDs in this grouped row (used for delete)
   academic_year_id?: number; // For loading all subjects in edit mode
   class_id?: number; // For loading all subjects in edit mode
   subject_name: string;
@@ -22,7 +22,7 @@ export interface SubjectClassRow {
 
 type SubjectListConfigArgs = {
   navigate: (path: string, options?: any) => void;
-  onDeleteClick?: (subject: SubjectResponse) => void;
+  onDeleteClick?: (row: SubjectClassRow) => void;
 };
 
 export const createSubjectListConfig = ({
@@ -102,11 +102,7 @@ export const createSubjectListConfig = ({
           subject_type: row.subject_type
         } 
       }),
-      onDelete: onDeleteClick ? () => {
-        // Need to reconstruct the original subject for delete
-        const dummySubject = { id: row.subject_id } as SubjectResponse;
-        onDeleteClick(dummySubject);
-      } : undefined,
+      onDelete: onDeleteClick ? () => onDeleteClick(row) : undefined,
     }),
   },
 });

@@ -150,14 +150,15 @@ export default function FeeReportPage() {
     >
       <Stack direction="row" spacing={1} alignItems="center" sx={{ width: { xs: "100%", sm: "auto" } }}>
         <TextField
-          label="From Date"
+          label="From"
           type="date"
           size="small"
           InputLabelProps={{ shrink: true }}
           value={c.startDate}
           onChange={(e) => { c.setStartDate(e.target.value); c.setPage(0); }}
           sx={{
-            minWidth: { xs: "100%", sm: 140 },
+            flex: 1,
+            minWidth: 0,
             "& .MuiOutlinedInput-root": {
               borderRadius: "15px",
               fontSize: "0.85rem",
