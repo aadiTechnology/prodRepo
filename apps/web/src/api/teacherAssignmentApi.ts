@@ -22,6 +22,11 @@ export interface TeacherOption {
   full_name: string;
 }
 
+export interface SubjectOption {
+  id: number;
+  name: string;
+}
+
 export interface TeacherAssignmentAssignedMap {
   class_ids: number[];
   class_division_ids: number[];
@@ -37,6 +42,8 @@ export interface TeacherAssignmentApiItem {
   division_name: string | null;
   teacher_id: number | null;
   teacher_name: string | null;
+  subject_id?: number | null;
+  subject_name?: string | null;
   status: TeacherAssignmentStatus;
 }
 
@@ -61,6 +68,7 @@ export interface AssignTeacherPayload {
   class_division_id?: number | null;
   class_division_ids?: number[];
   teacher_id: number;
+  subject_id?: number | null;
 }
 
 export interface AssignTeacherResponse {
@@ -90,6 +98,7 @@ export interface TeacherAssignmentDetailResponse {
   class_division_id: number | null;
   class_division_ids?: number[] | null;
   teacher_id: number | null;
+  subject_id?: number | null;
 }
 
 const teacherAssignmentApi = {
@@ -138,6 +147,23 @@ const teacherAssignmentApi = {
       }));
     }
     return [];
+  },
+
+  getSubjects: async (academicYearId: number, classId: number): Promise<SubjectOption[]> => {
+    const response = await axiosInstance.get("/api/subjects", {
+      params: {
+        skip: 0,
+        limit: 1000,
+        academic_year_id: academicYearId,
+        class_id: classId,
+        is_active: true,
+      },
+    });
+    const payload = response.data as
+      | { data?: Array<{ id: number; name?: string | null }> }
+      | Array<{ id: number; name?: string | null }>;
+    const rows = Array.isArray(payload) ? payload : payload?.data || [];
+    return rows.map((item) => ({ id: item.id, name: item.name || "" }));
   },
 
   getTeacherAssignments: async (

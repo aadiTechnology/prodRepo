@@ -20,6 +20,7 @@ def _ensure_teacher_assignments_table(db: Session) -> None:
                 class_id INT NOT NULL,
                 class_division_id INT NOT NULL,
                 teacher_id INT NOT NULL,
+                subject_id INT NULL,
                 is_active BIT NOT NULL DEFAULT(1),
                 created_at DATETIME NOT NULL DEFAULT(GETDATE()),
                 updated_at DATETIME NOT NULL DEFAULT(GETDATE())
@@ -37,6 +38,17 @@ def _ensure_teacher_assignments_table(db: Session) -> None:
         """
     )
     db.execute(create_table_query)
+    db.execute(
+        text(
+            """
+            IF COL_LENGTH('dbo.teacher_assignments', 'subject_id') IS NULL
+            BEGIN
+                ALTER TABLE dbo.teacher_assignments
+                ADD subject_id INT NULL;
+            END
+            """
+        )
+    )
 
 
 def get_academic_years(db: Session, tenant_id: Optional[int]) -> list[dict]:
@@ -226,6 +238,7 @@ def assign_teacher(
     class_id: int,
     class_division_id: Optional[int],
     teacher_id: int,
+    subject_id: Optional[int] = None,
     class_division_ids: Optional[list[int]] = None,
 ) -> dict:
     teacher_exists_query = text(
@@ -245,6 +258,10 @@ def assign_teacher(
           AND academic_year_id = :academic_year_id
           AND class_id = :class_id
           AND class_division_id = :class_division_id
+          AND (
+              (:subject_id IS NULL AND subject_id IS NULL)
+              OR subject_id = :subject_id
+          )
           AND is_active = 1
         ORDER BY id DESC
         """
@@ -254,6 +271,7 @@ def assign_teacher(
         """
         UPDATE teacher_assignments
         SET teacher_id = :teacher_id,
+            subject_id = :subject_id,
             updated_at = GETDATE()
         WHERE id = :id
         """
@@ -267,6 +285,7 @@ def assign_teacher(
             class_id,
             class_division_id,
             teacher_id,
+            subject_id,
             is_active,
             created_at,
             updated_at
@@ -278,6 +297,7 @@ def assign_teacher(
             :class_id,
             :class_division_id,
             :teacher_id,
+            :subject_id,
             1,
             GETDATE(),
             GETDATE()
@@ -313,12 +333,20 @@ def assign_teacher(
                 "class_id": class_id,
                 "class_division_id": division_id,
                 "teacher_id": teacher_id,
+                "subject_id": subject_id,
             }
 
             existing = db.execute(find_query, params).mappings().first()
             if existing:
                 changed_existing = True
-                db.execute(update_query, {"id": existing["id"], "teacher_id": teacher_id})
+                db.execute(
+                    update_query,
+                    {
+                        "id": existing["id"],
+                        "teacher_id": teacher_id,
+                        "subject_id": subject_id,
+                    },
+                )
                 if first_assignment_id is None:
                     first_assignment_id = existing["id"]
             else:
@@ -438,9 +466,9 @@ def get_teacher_assignments(
         except SQLAlchemyError:
             legacy_rows = []
 
-        merged_by_key: dict[tuple[int | None, int | None, int | None], dict] = {}
+        merged_by_key: dict[tuple[int | None, int | None, int | None, int | None], dict] = {}
         for row in assignment_rows:
-            key = (row["teacher_id"], row["class_id"], row["academic_year_id"])
+            key = (row["teacher_id"], row["class_id"], row["academic_year_id"], row.get("subject_id"))
             if key not in merged_by_key:
                 merged_by_key[key] = {
                     "id": row["id"],
@@ -452,6 +480,8 @@ def get_teacher_assignments(
                     "division_name": row["division_name"] or "",
                     "teacher_id": row["teacher_id"],
                     "teacher_name": row["teacher_name"],
+                    "subject_id": row.get("subject_id"),
+                    "subject_name": row.get("subject_name"),
                     "status": row["status"],
                 }
             else:
@@ -464,7 +494,7 @@ def get_teacher_assignments(
                     merged_by_key[key]["division_name"] = ", ".join(existing_names)
 
         for row in legacy_rows:
-            key = (row["teacher_id"], row["class_id"], row["academic_year_id"])
+            key = (row["teacher_id"], row["class_id"], row["academic_year_id"], row.get("subject_id"))
             if key not in merged_by_key:
                 merged_by_key[key] = {
                     "id": row["id"],
@@ -476,6 +506,8 @@ def get_teacher_assignments(
                     "division_name": row["division_name"],
                     "teacher_id": row["teacher_id"],
                     "teacher_name": row["teacher_name"],
+                    "subject_id": row.get("subject_id"),
+                    "subject_name": row.get("subject_name"),
                     "status": row["status"],
                 }
             else:
@@ -515,6 +547,8 @@ def get_teacher_assignments(
             cd.division_name AS division_name,
             t.id AS teacher_id,
             NULLIF(LTRIM(RTRIM(t.full_name)), '') AS teacher_name,
+            ta.subject_id AS subject_id,
+            s.name AS subject_name,
             'ASSIGNED' AS status
         FROM teacher_assignments ta
         INNER JOIN teachers t ON t.id = ta.teacher_id
@@ -522,11 +556,14 @@ def get_teacher_assignments(
                              AND t.is_deleted = 0
         LEFT JOIN classes c ON c.id = ta.class_id
         LEFT JOIN class_divisions cd ON cd.id = ta.class_division_id
+        LEFT JOIN subjects s ON s.id = ta.subject_id
+                            AND s.is_deleted = 0
         WHERE ta.is_active = 1
           AND (:tenant_id IS NULL OR ta.tenant_id = :tenant_id)
           AND (:search_like IS NULL
                OR c.name LIKE :search_like
                OR cd.division_name LIKE :search_like
+               OR s.name LIKE :search_like
                OR NULLIF(LTRIM(RTRIM(t.full_name)), '') LIKE :search_like)
         ORDER BY c.name ASC, cd.division_name ASC, ta.id ASC
         """
@@ -543,6 +580,8 @@ def get_teacher_assignments(
             cd.division_name AS division_name,
             t.id AS teacher_id,
             NULLIF(LTRIM(RTRIM(t.full_name)), '') AS teacher_name,
+            NULL AS subject_id,
+            NULL AS subject_name,
             'ASSIGNED' AS status
         FROM teachers t
         LEFT JOIN classes c ON c.id = t.class_id
@@ -580,7 +619,8 @@ def get_teacher_assignment_by_id(
             ta.academic_year_id,
             ta.class_id,
             ta.class_division_id,
-            ta.teacher_id
+            ta.teacher_id,
+            ta.subject_id
         FROM teacher_assignments ta
         INNER JOIN teachers t ON t.id = ta.teacher_id
                              AND t.is_deleted = 0
@@ -596,6 +636,10 @@ def get_teacher_assignment_by_id(
         WHERE ta.teacher_id = :teacher_id
           AND ta.class_id = :class_id
           AND ta.academic_year_id = :academic_year_id
+          AND (
+              (:subject_id IS NULL AND ta.subject_id IS NULL)
+              OR ta.subject_id = :subject_id
+          )
           AND ta.is_active = 1
           AND (:tenant_id IS NULL OR ta.tenant_id = :tenant_id)
         ORDER BY ta.class_division_id ASC
@@ -646,6 +690,7 @@ def get_teacher_assignment_by_id(
                     "teacher_id": row["teacher_id"],
                     "class_id": row["class_id"],
                     "academic_year_id": row["academic_year_id"],
+                    "subject_id": row.get("subject_id"),
                     "tenant_id": tenant_id,
                 },
             ).mappings().all()
@@ -660,6 +705,7 @@ def get_teacher_assignment_by_id(
             "class_division_id": row["class_division_id"],
             "class_division_ids": class_division_ids,
             "teacher_id": row["teacher_id"],
+            "subject_id": row.get("subject_id"),
         }
     except SQLAlchemyError:
         return None
@@ -673,6 +719,7 @@ def update_teacher_assignment(
     class_id: int,
     class_division_id: Optional[int],
     teacher_id: int,
+    subject_id: Optional[int] = None,
     class_division_ids: Optional[list[int]] = None,
 ) -> dict:
     teacher_exists_query = text(
@@ -685,7 +732,7 @@ def update_teacher_assignment(
     )
     find_assignment_query = text(
         """
-        SELECT TOP 1 ta.id, ta.teacher_id, ta.class_id, ta.academic_year_id
+        SELECT TOP 1 ta.id, ta.teacher_id, ta.class_id, ta.academic_year_id, ta.subject_id
         FROM teacher_assignments ta
         WHERE ta.id = :assignment_id
           AND ta.is_active = 1
@@ -699,6 +746,7 @@ def update_teacher_assignment(
             class_id = :class_id,
             class_division_id = :class_division_id,
             teacher_id = :teacher_id,
+            subject_id = :subject_id,
             updated_at = GETDATE()
         WHERE id = :assignment_id
         """
@@ -711,6 +759,10 @@ def update_teacher_assignment(
         WHERE teacher_id = :teacher_id
           AND class_id = :class_id
           AND academic_year_id = :academic_year_id
+          AND (
+              (:subject_id IS NULL AND subject_id IS NULL)
+              OR subject_id = :subject_id
+          )
           AND (:tenant_id IS NULL OR tenant_id = :tenant_id)
           AND is_active = 1
         """
@@ -764,6 +816,7 @@ def update_teacher_assignment(
                     "teacher_id": assignment_row["teacher_id"],
                     "class_id": assignment_row["class_id"],
                     "academic_year_id": assignment_row["academic_year_id"],
+                    "subject_id": assignment_row.get("subject_id"),
                     "tenant_id": tenant_id,
                 },
             )
@@ -774,6 +827,7 @@ def update_teacher_assignment(
                 class_id=class_id,
                 class_division_id=division_ids[0],
                 teacher_id=teacher_id,
+                subject_id=subject_id,
                 class_division_ids=division_ids,
             )
             if new_result["assignment_id"] is None:
@@ -799,6 +853,7 @@ def update_teacher_assignment(
             class_id=class_id,
             class_division_id=division_ids[0],
             teacher_id=teacher_id,
+            subject_id=subject_id,
             class_division_ids=division_ids,
         )
         if result["assignment_id"] is None:

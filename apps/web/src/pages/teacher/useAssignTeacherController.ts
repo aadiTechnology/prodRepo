@@ -17,6 +17,7 @@ const emptyFormValues = (): AssignTeacherFormData => ({
   class_id: null,
   class_division_ids: [],
   teacher_id: null,
+  subject_id: null,
 });
 
 export function useAssignTeacherController() {
@@ -33,6 +34,7 @@ export function useAssignTeacherController() {
       class_id: [{ type: "required", message: "Class is required" }],
       class_division_ids: [{ type: "required", message: "At least one division is required" }],
       teacher_id: [{ type: "required", message: "Teacher is required" }],
+      subject_id: [{ type: "required", message: "Subject is required" }],
     }),
     []
   );
@@ -61,7 +63,9 @@ export function useAssignTeacherController() {
       !!searchParams.get("divisionId") ||
       !!searchParams.get("class_division_id") ||
       !!searchParams.get("class_division_ids") ||
-      !!searchParams.get("teacherId")
+      !!searchParams.get("teacherId") ||
+      !!searchParams.get("subjectId") ||
+      !!searchParams.get("subject_id")
     );
   }, [searchParams]);
 
@@ -92,8 +96,9 @@ export function useAssignTeacherController() {
       searchParams.get("class_division_id");
     const divisionsRaw = searchParams.get("class_division_ids");
     const teacherRaw = searchParams.get("teacherId");
+    const subjectRaw = searchParams.get("subjectId") ?? searchParams.get("subject_id");
 
-    if (!academicYearRaw && !classRaw && !divisionRaw && !teacherRaw) {
+    if (!academicYearRaw && !classRaw && !divisionRaw && !teacherRaw && !subjectRaw) {
       return;
     }
 
@@ -108,8 +113,9 @@ export function useAssignTeacherController() {
         ? [Number(divisionRaw)]
         : [];
     const teacherId = teacherRaw ? Number(teacherRaw) : null;
+    const subjectId = subjectRaw ? Number(subjectRaw) : null;
 
-    const hasAnyInvalidNumber = [academicYearId, classId, teacherId]
+    const hasAnyInvalidNumber = [academicYearId, classId, teacherId, subjectId]
       .filter((value) => value !== null)
       .some((value) => Number.isNaN(value as number));
     if (hasAnyInvalidNumber) {
@@ -124,6 +130,7 @@ export function useAssignTeacherController() {
       class_id: classId,
       class_division_ids: divisionIds,
       teacher_id: teacherId,
+      subject_id: subjectId,
     }));
     setError(null);
   }, [searchParams, setFormData]);
@@ -132,7 +139,8 @@ export function useAssignTeacherController() {
     !!formData.academic_year_id &&
     !!formData.class_id &&
     (formData.class_division_ids?.length || 0) > 0 &&
-    !!formData.teacher_id;
+    !!formData.teacher_id &&
+    !!formData.subject_id;
 
   const { data: assignmentDetail } = useQuery({
     queryKey: ["assign-teacher", "assignment-detail", assignmentId],
@@ -155,6 +163,7 @@ export function useAssignTeacherController() {
             ? [assignmentDetail.class_division_id]
             : [],
       teacher_id: assignmentDetail.teacher_id,
+      subject_id: assignmentDetail.subject_id ?? null,
     }));
     setError(null);
   }, [assignmentDetail, setFormData]);
@@ -274,6 +283,13 @@ export function useAssignTeacherController() {
     queryFn: teacherAssignmentApi.getTeachers,
   });
 
+  const { data: subjects = [], isLoading: subjectsLoading } = useQuery({
+    queryKey: ["assign-teacher", "subjects", formData.academic_year_id, formData.class_id],
+    queryFn: () =>
+      teacherAssignmentApi.getSubjects(formData.academic_year_id as number, formData.class_id as number),
+    enabled: !!formData.academic_year_id && !!formData.class_id,
+  });
+
   const { data: assignmentCheck, isFetching: assignmentChecking } = useQuery({
     queryKey: [
       "assign-teacher",
@@ -312,6 +328,7 @@ export function useAssignTeacherController() {
         class_id: null,
         class_division_ids: [],
         teacher_id: null,
+        subject_id: null,
       };
     });
   }, [formData.academic_year_id, setFormData]);
@@ -322,13 +339,18 @@ export function useAssignTeacherController() {
       return;
     }
     setFormData((prev) => {
-      if ((prev.class_division_ids?.length || 0) === 0 && prev.teacher_id === null) {
+      if (
+        (prev.class_division_ids?.length || 0) === 0 &&
+        prev.teacher_id === null &&
+        prev.subject_id === null
+      ) {
         return prev;
       }
       return {
         ...prev,
         class_division_ids: [],
         teacher_id: null,
+        subject_id: null,
       };
     });
   }, [formData.class_id, setFormData]);
@@ -389,6 +411,16 @@ export function useAssignTeacherController() {
     [teachers]
   );
 
+  const subjectOptions = useMemo<SelectItemOption[]>(
+    () =>
+      subjects.map((item) => ({
+        id: String(item.id),
+        value: String(item.id),
+        label: item.name,
+      })),
+    [subjects]
+  );
+
   const formConfig = useMemo(
     () =>
       assignTeacherFormConfig({
@@ -396,23 +428,28 @@ export function useAssignTeacherController() {
         classOptions,
         divisionOptions,
         teacherOptions,
+        subjectOptions,
         academicYearsLoading,
         classesLoading,
         divisionsLoading,
         teachersLoading,
+        subjectsLoading,
         disableClass: !formData.academic_year_id,
         disableDivision: !formData.class_id,
         disableTeacher: !formData.academic_year_id,
+        disableSubject: !formData.academic_year_id || !formData.class_id,
       }),
     [
       academicYearOptions,
       classOptions,
       divisionOptions,
       teacherOptions,
+      subjectOptions,
       academicYearsLoading,
       classesLoading,
       divisionsLoading,
       teachersLoading,
+      subjectsLoading,
       formData.academic_year_id,
       formData.class_id,
       formData.class_division_ids,
@@ -424,7 +461,8 @@ export function useAssignTeacherController() {
       !formData.academic_year_id ||
       !formData.class_id ||
       (formData.class_division_ids?.length || 0) === 0 ||
-      !formData.teacher_id
+      !formData.teacher_id ||
+      !formData.subject_id
     ) {
       return;
     }
@@ -436,6 +474,7 @@ export function useAssignTeacherController() {
         class_id: formData.class_id,
         class_division_ids: formData.class_division_ids,
         teacher_id: formData.teacher_id,
+        subject_id: formData.subject_id,
       };
       if (isEditMode && assignmentId) {
         await teacherAssignmentApi.updateTeacherAssignment(assignmentId, payload);

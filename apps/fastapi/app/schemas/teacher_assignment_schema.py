@@ -29,6 +29,7 @@ class TeacherAssignmentUpsertRequest(BaseModel):
     class_division_id: Optional[int] = None
     class_division_ids: Optional[list[int]] = None
     teacher_id: int
+    subject_id: Optional[int] = None
 
     @model_validator(mode="after")
     def validate_divisions(self):
@@ -61,6 +62,7 @@ class TeacherAssignmentDetailResponse(BaseModel):
     class_division_id: Optional[int] = None
     class_division_ids: Optional[list[int]] = None
     teacher_id: Optional[int] = None
+    subject_id: Optional[int] = None
 
 
 class TeacherAssignmentItem(BaseModel):
@@ -73,6 +75,8 @@ class TeacherAssignmentItem(BaseModel):
     division_name: Optional[str] = None
     teacher_id: Optional[int] = None
     teacher_name: Optional[str] = None
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
     status: str
 
 

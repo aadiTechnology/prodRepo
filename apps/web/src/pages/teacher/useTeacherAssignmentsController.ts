@@ -16,6 +16,8 @@ export type TeacherAssignmentRow = {
   division: string;
   teacherId: number | null;
   teacherName: string | null;
+  subjectId: number | null;
+  subjectName: string | null;
   status: "ASSIGNED" | "NOT_ASSIGNED";
 };
 
@@ -71,6 +73,8 @@ export function useTeacherAssignmentsController() {
         division: item.division_name || "-",
         teacherId: item.teacher_id,
         teacherName: item.teacher_name,
+        subjectId: item.subject_id ?? null,
+        subjectName: item.subject_name ?? "-",
         status: item.status,
       })),
     [data]

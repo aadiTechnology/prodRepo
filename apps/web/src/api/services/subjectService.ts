@@ -1,5 +1,4 @@
 import { apiClient } from '../client';
-import { BaseResponse } from './api';
 
 export interface SubjectClassResponse {
   class_id: number;

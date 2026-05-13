@@ -63,6 +63,7 @@ export default function TeacherAssignmentsPage() {
         },
         { id: "class", label: "Class", field: "class" },
         { id: "division", label: "Division", field: "division" },
+        { id: "subjectName", label: "Subject", field: "subjectName" },
         {
           id: "status",
           label: "Status",
@@ -123,6 +124,7 @@ export default function TeacherAssignmentsPage() {
             if (row.classDivisionId != null) params.set("divisionId", String(row.classDivisionId));
             if (row.classDivisionIds.length > 0) params.set("class_division_ids", row.classDivisionIds.join(","));
             if (row.teacherId != null) params.set("teacherId", String(row.teacherId));
+            if (row.subjectId != null) params.set("subjectId", String(row.subjectId));
             if (row.class && row.class !== "-") params.set("className", row.class);
             if (row.division && row.division !== "-") params.set("divisionName", row.division);
             navigate(`/teacher-assignments/assign?${params.toString()}`);

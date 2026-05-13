@@ -6,6 +6,7 @@ export type AssignTeacherFormData = {
   class_id: number | null;
   class_division_ids: number[];
   teacher_id: number | null;
+  subject_id: number | null;
 };
 
 type AssignTeacherFormConfigArgs = {
@@ -13,13 +14,16 @@ type AssignTeacherFormConfigArgs = {
   classOptions: SelectItemOption[];
   divisionOptions: SelectItemOption[];
   teacherOptions: SelectItemOption[];
+  subjectOptions: SelectItemOption[];
   academicYearsLoading: boolean;
   classesLoading: boolean;
   divisionsLoading: boolean;
   teachersLoading: boolean;
+  subjectsLoading: boolean;
   disableClass: boolean;
   disableDivision: boolean;
   disableTeacher: boolean;
+  disableSubject: boolean;
 };
 
 export function assignTeacherFormConfig({
@@ -27,13 +31,16 @@ export function assignTeacherFormConfig({
   classOptions,
   divisionOptions,
   teacherOptions,
+  subjectOptions,
   academicYearsLoading,
   classesLoading,
   divisionsLoading,
   teachersLoading,
+  subjectsLoading,
   disableClass,
   disableDivision,
   disableTeacher,
+  disableSubject,
 }: AssignTeacherFormConfigArgs): FormConfig<AssignTeacherFormData> {
   return {
     fields: {
@@ -89,6 +96,19 @@ export function assignTeacherFormConfig({
           coerceToNumber: true,
         },
       },
+      subject_id: {
+        name: "subject_id",
+        label: "Subject",
+        type: "select",
+        required: true,
+        props: {
+          options: subjectOptions,
+          loading: subjectsLoading,
+          emptyOptionLabel: "Select Subject",
+          disabled: disableSubject,
+          coerceToNumber: true,
+        },
+      },
     },
     layoutRows: [
       {
@@ -110,6 +130,11 @@ export function assignTeacherFormConfig({
         kind: "fields",
         grid: { xs: 12, md: 6 },
         fieldNames: ["class_division_ids"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, md: 6 },
+        fieldNames: ["subject_id"],
       },
     ],
   };

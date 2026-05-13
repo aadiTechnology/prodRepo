@@ -124,6 +124,7 @@ def assign_teacher(
         class_id=payload.class_id,
         class_division_id=(payload.class_division_id or (payload.class_division_ids or [None])[0]),
         teacher_id=payload.teacher_id,
+        subject_id=payload.subject_id,
         class_division_ids=payload.class_division_ids,
     )
     if result["assignment_id"] is None:
@@ -146,6 +147,7 @@ def update_teacher_assignment(
         class_id=payload.class_id,
         class_division_id=(payload.class_division_id or (payload.class_division_ids or [None])[0]),
         teacher_id=payload.teacher_id,
+        subject_id=payload.subject_id,
         class_division_ids=payload.class_division_ids,
     )
     if result["assignment_id"] is None:
