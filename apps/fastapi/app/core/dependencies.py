@@ -139,6 +139,50 @@ def get_rbac_role_codes(db: Session, user_id: int) -> list[str]:
     return [r.code.lower() for r in rbac_roles]
 
 
+def is_platform_system_admin(db: Session, current_user: CurrentUser) -> bool:
+    """True if the user is an org-level system admin (no tenant) with admin privileges."""
+    if current_user.tenant_id is not None:
+        return False
+    if current_user.role in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+        return True
+    rbac_role_codes = get_rbac_role_codes(db, current_user.id)
+    return SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_role_codes
+
+
+def resolve_tenant_id_for_academic_year_list(
+    db: Session,
+    current_user: CurrentUser,
+    tenant_id_query: Optional[int],
+) -> int:
+    """
+    Resolve which tenant's academic years to list.
+
+    School users always use their own tenant_id. Optional query tenant_id must match.
+    Platform system admins must pass tenant_id (e.g. ?tenant_id=1) or use impersonation.
+    """
+    if current_user.tenant_id is not None:
+        if tenant_id_query is not None and tenant_id_query != current_user.tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot load another tenant's academic years.",
+            )
+        return current_user.tenant_id
+    if not is_platform_system_admin(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to list academic years.",
+        )
+    if tenant_id_query is None or tenant_id_query < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Query parameter tenant_id is required for system administrator accounts "
+                "(e.g. ?tenant_id=1), or sign in as a school user or use impersonation."
+            ),
+        )
+    return tenant_id_query
+
+
 def require_role(allowed_roles: list[UserRole]):
     """
     Dependency factory to require specific roles.
