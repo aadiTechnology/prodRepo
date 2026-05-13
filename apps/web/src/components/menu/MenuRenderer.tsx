@@ -4,7 +4,7 @@
  */
 
 import { List } from "@mui/material";
-import { useMemo } from "react";
+import { useMemo, memo } from "react";
 import { MenuNode } from "../../types/menu";
 import MenuGroup from "./MenuGroup";
 
@@ -14,7 +14,7 @@ interface MenuRendererProps {
   searchTerm?: string;
 }
 
-export default function MenuRenderer({ menus, collapsed = false, searchTerm = "" }: MenuRendererProps) {
+function MenuRendererComponent({ menus, collapsed = false, searchTerm = "" }: MenuRendererProps) {
   // SECURITY: Sort menus by sort_order with null checks
   const sortedMenus = useMemo(() => {
     return [...menus].sort((a, b) => {
@@ -55,3 +55,7 @@ export default function MenuRenderer({ menus, collapsed = false, searchTerm = ""
     </List>
   );
 }
+
+// OPTIMIZATION: Memoize entire renderer to prevent re-renders of entire menu tree
+// when unrelated parts of the app update
+export default memo(MenuRendererComponent);

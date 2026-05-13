@@ -12,7 +12,7 @@ import {
   List,
 } from "@mui/material";
 import { ExpandLess, ExpandMore } from "@mui/icons-material";
-import { useState } from "react";
+import { useState, memo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MenuNode } from "../../types/menu";
 import MenuIcon from "./MenuIcon";
@@ -38,7 +38,7 @@ interface MenuGroupProps {
   searchTerm?: string;
 }
 
-export default function MenuGroup({ menu, defaultExpanded = false, collapsed = false, searchTerm = "" }: MenuGroupProps) {
+function MenuGroupComponent({ menu, defaultExpanded = false, collapsed = false, searchTerm = "" }: MenuGroupProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -131,3 +131,7 @@ export default function MenuGroup({ menu, defaultExpanded = false, collapsed = f
     </>
   );
 }
+
+// OPTIMIZATION: Memoize to prevent re-renders when parent updates
+// This prevents unnecessary re-renders of all siblings when one menu item changes
+export default memo(MenuGroupComponent);

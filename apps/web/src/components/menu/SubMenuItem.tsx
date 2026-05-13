@@ -4,6 +4,7 @@
  */
 
 import { ListItemButton, ListItemIcon, ListItemText, Tooltip } from "@mui/material";
+import { memo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MenuNode } from "../../types/menu";
 import MenuIcon from "./MenuIcon";
@@ -24,7 +25,7 @@ interface SubMenuItemProps {
   onClick?: () => void;
 }
 
-export default function SubMenuItem({ menu, onClick }: SubMenuItemProps) {
+function SubMenuItemComponent({ menu, onClick }: SubMenuItemProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -81,3 +82,7 @@ export default function SubMenuItem({ menu, onClick }: SubMenuItemProps) {
     </Tooltip>
   );
 }
+
+// OPTIMIZATION: Memoize to prevent re-renders when parent menu updates
+// This ensures individual sub-menu items don't re-render unless their specific menu object changes
+export default memo(SubMenuItemComponent);

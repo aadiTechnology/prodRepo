@@ -403,7 +403,48 @@ export function RBACProvider({ children }: RBACProviderProps) {
     [menus]
   );
 
-  const value: RBACContextType = useMemo(
+  // OPTIMIZATION: Memoize permission checking methods separately to prevent thrashing
+  // When roles change, permission checkers don't need to update
+  const permissionMethods = useMemo(
+    () => ({
+      hasPermission,
+      hasAnyPermission,
+      hasAllPermissions,
+    }),
+    [hasPermission, hasAnyPermission, hasAllPermissions]
+  );
+
+  // OPTIMIZATION: Memoize role checking methods separately
+  const roleMethods = useMemo(
+    () => ({
+      hasRole,
+      hasAnyRole,
+      hasAllRoles,
+    }),
+    [hasRole, hasAnyRole, hasAllRoles]
+  );
+
+  // OPTIMIZATION: Memoize menu utilities separately
+  const menuMethods = useMemo(
+    () => ({
+      getMenuByPath,
+      getMenuFeatures,
+    }),
+    [getMenuByPath, getMenuFeatures]
+  );
+
+  // OPTIMIZATION: Memoize action methods separately
+  const actionMethods = useMemo(
+    () => ({
+      setRBACData,
+      refreshRBAC,
+      clearRBACData,
+    }),
+    [setRBACData, refreshRBAC, clearRBACData]
+  );
+
+  // OPTIMIZATION: Memoize state separately to prevent unnecessary re-renders
+  const state = useMemo(
     () => ({
       roles,
       permissions,
@@ -411,37 +452,19 @@ export function RBACProvider({ children }: RBACProviderProps) {
       isLoading,
       error,
       rbacVersion,
-      hasPermission,
-      hasAnyPermission,
-      hasAllPermissions,
-      hasRole,
-      hasAnyRole,
-      hasAllRoles,
-      getMenuByPath,
-      getMenuFeatures,
-      setRBACData,
-      refreshRBAC,
-      clearRBACData,
     }),
-    [
-      roles,
-      permissions,
-      menus,
-      isLoading,
-      error,
-      rbacVersion,
-      hasPermission,
-      hasAnyPermission,
-      hasAllPermissions,
-      hasRole,
-      hasAnyRole,
-      hasAllRoles,
-      getMenuByPath,
-      getMenuFeatures,
-      setRBACData,
-      refreshRBAC,
-      clearRBACData,
-    ]
+    [roles, permissions, menus, isLoading, error, rbacVersion]
+  );
+
+  const value: RBACContextType = useMemo(
+    () => ({
+      ...state,
+      ...permissionMethods,
+      ...roleMethods,
+      ...menuMethods,
+      ...actionMethods,
+    }),
+    [state, permissionMethods, roleMethods, menuMethods, actionMethods]
   );
 
   return <RBACContext.Provider value={value}>{children}</RBACContext.Provider>;
