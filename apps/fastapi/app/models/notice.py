@@ -17,7 +17,6 @@ class Notice(Base):
     status = Column(String(20), nullable=False, default="DRAFT")
     publish_date = Column(DateTime, nullable=False)
     expiry_date = Column(DateTime, nullable=True)
-    is_draft = Column(Boolean, nullable=False, default=True)
     is_published = Column(Boolean, nullable=False, default=False)
     published_at = Column(DateTime, nullable=True)
     unpublished_at = Column(DateTime, nullable=True)

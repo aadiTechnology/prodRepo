@@ -31,7 +31,8 @@ class NoticeCreateRequest(BaseModel):
     publish_date: datetime | None = None
     expiry_date: datetime | None = None
     send_notification: bool = False
-    is_draft: bool = True
+    status: NoticeStatus | None = None
+    is_draft: bool | None = None
     targets: list[NoticeTargetItem] = Field(default_factory=list)
     attachments: list[NoticeAttachmentItem] = Field(default_factory=list)
 
@@ -44,6 +45,7 @@ class NoticeUpdateRequest(BaseModel):
     publish_date: datetime | None = None
     expiry_date: datetime | None = None
     send_notification: bool | None = None
+    status: NoticeStatus | None = None
     is_draft: bool | None = None
     targets: list[NoticeTargetItem] | None = None
     attachments: list[NoticeAttachmentItem] | None = None

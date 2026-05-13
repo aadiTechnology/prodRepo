@@ -63,12 +63,10 @@ def _validate_notice_input(
                 raise ValidationException("Invalid file format or size exceeded")
 
 
-def _derive_status(*, is_draft: bool, publish_date: datetime, expiry_date: datetime | None) -> str:
+def _derive_status_from_timeline(*, publish_date: datetime, expiry_date: datetime | None) -> str:
     now = datetime.utcnow()
     if expiry_date and expiry_date < now:
         return "EXPIRED"
-    if is_draft:
-        return "DRAFT"
     if publish_date > now:
         return "UNPUBLISHED"
     return "PUBLISHED"
@@ -87,7 +85,7 @@ def _to_notice_response(db: Session, row: dict) -> NoticeResponse:
         status=str(row["status"]),
         publish_date=row["publish_date"],
         expiry_date=row.get("expiry_date"),
-        is_draft=bool(row["is_draft"]),
+        is_draft=str(row["status"]) == "DRAFT",
         is_published=bool(row["is_published"]),
         published_at=row.get("published_at"),
         unpublished_at=row.get("unpublished_at"),
@@ -152,8 +150,13 @@ def create_notice(
     attachments = [a.model_dump() for a in payload.attachments]
     notice_type = payload.notice_type.upper()
     audience_type = payload.audience_type.upper()
-    is_draft = bool(payload.is_draft)
-    status = _derive_status(is_draft=is_draft, publish_date=publish_date, expiry_date=payload.expiry_date)
+    requested_status = payload.status.upper() if payload.status else None
+    if requested_status:
+        status = requested_status
+    elif payload.is_draft is True:
+        status = "DRAFT"
+    else:
+        status = _derive_status_from_timeline(publish_date=publish_date, expiry_date=payload.expiry_date)
     is_published = status == "PUBLISHED"
     published_at = datetime.utcnow() if is_published else None
     unpublished_at = datetime.utcnow() if status == "UNPUBLISHED" else None
@@ -180,7 +183,6 @@ def create_notice(
             "status": status,
             "publish_date": publish_date,
             "expiry_date": payload.expiry_date,
-            "is_draft": is_draft,
             "is_published": is_published,
             "published_at": published_at,
             "unpublished_at": unpublished_at,
@@ -230,6 +232,8 @@ def update_notice(
         update_data["notice_type"] = str(update_data["notice_type"]).upper()
     if "audience_type" in update_data and update_data["audience_type"] is not None:
         update_data["audience_type"] = str(update_data["audience_type"]).upper()
+    if "status" in update_data and update_data["status"] is not None:
+        update_data["status"] = str(update_data["status"]).upper()
 
     next_audience_type = update_data.get("audience_type", existing["audience_type"])
     next_notice_type = update_data.get("notice_type", existing["notice_type"])
@@ -253,14 +257,17 @@ def update_notice(
         attachments=normalized_attachments,
     )
 
-    next_is_draft = bool(update_data.get("is_draft", existing["is_draft"]))
-    next_status = _derive_status(
-        is_draft=next_is_draft,
-        publish_date=next_publish_date,
-        expiry_date=next_expiry_date,
-    )
+    if "status" in update_data and update_data["status"] is not None:
+        next_status = str(update_data["status"]).upper()
+    elif update_data.get("is_draft") is True:
+        next_status = "DRAFT"
+    else:
+        next_status = _derive_status_from_timeline(
+            publish_date=next_publish_date,
+            expiry_date=next_expiry_date,
+        )
     update_data["status"] = next_status
-    update_data["is_draft"] = next_is_draft
+    update_data.pop("is_draft", None)
     update_data["is_published"] = next_status == "PUBLISHED"
     update_data["published_at"] = datetime.utcnow() if next_status == "PUBLISHED" else existing.get("published_at")
     update_data["unpublished_at"] = (
@@ -315,7 +322,6 @@ def publish_notice(
         tenant_id=tenant_id,
         notice_id=notice_id,
         update_fields={
-            "is_draft": False,
             "is_published": True,
             "status": "PUBLISHED",
             "published_at": datetime.utcnow(),
@@ -349,7 +355,6 @@ def unpublish_notice(
         tenant_id=tenant_id,
         notice_id=notice_id,
         update_fields={
-            "is_draft": False,
             "is_published": False,
             "status": "UNPUBLISHED",
             "unpublished_at": datetime.utcnow(),
