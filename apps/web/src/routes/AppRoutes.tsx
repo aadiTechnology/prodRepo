@@ -73,6 +73,8 @@ const FeeDueListV2 = lazy(() => import("../pages/Fees/FeeDueListV2"));
 const CreateNotice = lazy(() => import("../pages/Communication/CreateNotice"));
 const NoticeList = lazy(() => import("../pages/Communication/NoticeList"));
 const NoticeDetails = lazy(() => import("../pages/Communication/NoticeDetails"));
+const HolidayConfiguration = lazy(() => import("../pages/configuration/HolidayConfiguration"));
+const HolidayForm = lazy(() => import("../pages/configuration/HolidayForm"));
 // Loading fallback component
 const PageLoader = () => (
   <Box
@@ -349,7 +351,18 @@ export default function AppRoutes() {
           <Route path="/academics/subjects" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><SubjectList /></ProtectedRoute>} />
           <Route path="/academics/subjects/new" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:create"><AddSubject /></ProtectedRoute>} />
           <Route path="/academics/subjects/:id/edit" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><AddSubject /></ProtectedRoute>} />
-
+          <Route
+            path="/academics/configuration/holidays"
+            element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><HolidayConfiguration /></ProtectedRoute>}
+          />
+          <Route
+            path="/academics/configuration/holidays/new"
+            element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:create"><HolidayForm /></ProtectedRoute>}
+          />
+          <Route
+            path="/academics/configuration/holidays/:id/edit"
+            element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><HolidayForm /></ProtectedRoute>}
+          />
           {/* Attendance Management */}
           {/* Attendance Management */}
           <Route path="/attendance/mark" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><MarkAttendance /></ProtectedRoute>} />
