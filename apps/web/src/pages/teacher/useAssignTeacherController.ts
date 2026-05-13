@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useFormManager } from "../../hooks/useFormManager";
 import type { FormValidationConfig } from "../../utils/formValidation";
 import type { SelectItemOption } from "../../components/semantic";
+import { useAuth } from "../../context/AuthContext";
 import teacherAssignmentApi from "../../api/teacherAssignmentApi";
 import type { ApiError } from "../../api/client";
 import {
@@ -22,7 +23,9 @@ const emptyFormValues = (): AssignTeacherFormData => ({
 
 export function useAssignTeacherController() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
+  const effectiveTenantId = user?.tenant_id ?? user?.tenant?.id ?? null;
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const skipNextAcademicCascadeResetRef = useRef(false);
@@ -34,7 +37,6 @@ export function useAssignTeacherController() {
       class_id: [{ type: "required", message: "Class is required" }],
       class_division_ids: [{ type: "required", message: "At least one division is required" }],
       teacher_id: [{ type: "required", message: "Teacher is required" }],
-      subject_id: [{ type: "required", message: "Subject is required" }],
     }),
     []
   );
@@ -139,8 +141,7 @@ export function useAssignTeacherController() {
     !!formData.academic_year_id &&
     !!formData.class_id &&
     (formData.class_division_ids?.length || 0) > 0 &&
-    !!formData.teacher_id &&
-    !!formData.subject_id;
+    !!formData.teacher_id;
 
   const { data: assignmentDetail } = useQuery({
     queryKey: ["assign-teacher", "assignment-detail", assignmentId],
@@ -279,8 +280,9 @@ export function useAssignTeacherController() {
   });
 
   const { data: teachers = [], isLoading: teachersLoading } = useQuery({
-    queryKey: ["assign-teacher", "teachers"],
+    queryKey: ["assign-teacher", "teachers", effectiveTenantId],
     queryFn: teacherAssignmentApi.getTeachers,
+    enabled: effectiveTenantId != null,
   });
 
   const { data: subjects = [], isLoading: subjectsLoading } = useQuery({
@@ -436,7 +438,7 @@ export function useAssignTeacherController() {
         subjectsLoading,
         disableClass: !formData.academic_year_id,
         disableDivision: !formData.class_id,
-        disableTeacher: !formData.academic_year_id,
+        disableTeacher: !formData.academic_year_id || effectiveTenantId == null,
         disableSubject: !formData.academic_year_id || !formData.class_id,
       }),
     [
@@ -453,6 +455,7 @@ export function useAssignTeacherController() {
       formData.academic_year_id,
       formData.class_id,
       formData.class_division_ids,
+      effectiveTenantId,
     ]
   );
 
@@ -461,8 +464,7 @@ export function useAssignTeacherController() {
       !formData.academic_year_id ||
       !formData.class_id ||
       (formData.class_division_ids?.length || 0) === 0 ||
-      !formData.teacher_id ||
-      !formData.subject_id
+      !formData.teacher_id
     ) {
       return;
     }
@@ -474,7 +476,7 @@ export function useAssignTeacherController() {
         class_id: formData.class_id,
         class_division_ids: formData.class_division_ids,
         teacher_id: formData.teacher_id,
-        subject_id: formData.subject_id,
+        ...(formData.subject_id != null ? { subject_id: formData.subject_id } : {}),
       };
       if (isEditMode && assignmentId) {
         await teacherAssignmentApi.updateTeacherAssignment(assignmentId, payload);

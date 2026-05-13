@@ -119,6 +119,8 @@ def get_divisions(db: Session, tenant_id: Optional[int], class_id: int) -> list[
 
 
 def get_teachers(db: Session, tenant_id: Optional[int]) -> list[dict]:
+    if tenant_id is None:
+        return []
     query = text(
         """
         SELECT
@@ -127,6 +129,7 @@ def get_teachers(db: Session, tenant_id: Optional[int]) -> list[dict]:
         FROM teachers t
         WHERE t.is_active = 1
           AND t.is_deleted = 0
+          AND t.tenant_id = :tenant_id
         ORDER BY NULLIF(LTRIM(RTRIM(t.full_name)), '') ASC
         """
     )

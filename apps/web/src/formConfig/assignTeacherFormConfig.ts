@@ -100,11 +100,11 @@ export function assignTeacherFormConfig({
         name: "subject_id",
         label: "Subject",
         type: "select",
-        required: true,
+        required: false,
         props: {
           options: subjectOptions,
           loading: subjectsLoading,
-          emptyOptionLabel: "Select Subject",
+          emptyOptionLabel: "Subject (optional)",
           disabled: disableSubject,
           coerceToNumber: true,
         },
