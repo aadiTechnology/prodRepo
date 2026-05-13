@@ -21,7 +21,7 @@ export interface SubjectClassRow {
 }
 
 type SubjectListConfigArgs = {
-  navigate: (path: string) => void;
+  navigate: (path: string, options?: any) => void;
   onDeleteClick?: (subject: SubjectResponse) => void;
 };
 
