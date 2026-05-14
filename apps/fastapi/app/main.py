@@ -31,6 +31,8 @@ from app.models import (  # noqa: F401
     NoticeTarget,
     NoticeAttachment,
     Holiday,
+    Homework,
+    HomeworkAttachment,
 )
 # Import FeePayment + FeePaymentAllocation so create_all creates fee_payment_allocations
 from app.models.fee_payment import FeePayment, FeePaymentAllocation  # noqa: F401
@@ -134,6 +136,8 @@ app.include_router(notice.router)
 from app.routers import subject_router
 app.include_router(subject_router.router)
 app.include_router(holiday.router)
+from app.routers import homework_router
+app.include_router(homework_router.router)
 app.include_router(holiday.configuration_router)
 
 
@@ -145,6 +149,8 @@ os.makedirs("static/profile-images", exist_ok=True)
 app.mount("/profile-images", StaticFiles(directory="static/profile-images"), name="profile-images")
 os.makedirs("static/enrollment-documents", exist_ok=True)
 app.mount("/enrollment-documents", StaticFiles(directory="static/enrollment-documents"), name="enrollment-documents")
+os.makedirs("static/homework-attachments", exist_ok=True)
+app.mount("/homework-attachments", StaticFiles(directory="static/homework-attachments"), name="homework-attachments")
 
 @app.on_event("startup")
 async def startup_event():

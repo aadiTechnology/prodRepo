@@ -36,6 +36,7 @@ from app.models.student_invoice import StudentInvoice
 from app.models.notice import Notice, NoticeTarget, NoticeAttachment
 from app.models.subject import Subject, SubjectClass
 from app.models.holiday import Holiday
+from app.models.homework import Homework, HomeworkAttachment
 
 # Export all models for convenience
 __all__ = [
@@ -87,5 +88,7 @@ __all__ = [
     "Subject",
     "SubjectClass",
     "Holiday",
+    "Homework",
+    "HomeworkAttachment",
 ]
 
