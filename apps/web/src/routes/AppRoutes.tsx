@@ -75,6 +75,8 @@ const NoticeList = lazy(() => import("../pages/Communication/NoticeList"));
 const NoticeDetails = lazy(() => import("../pages/Communication/NoticeDetails"));
 const HolidayConfiguration = lazy(() => import("../pages/configuration/HolidayConfiguration"));
 const HolidayForm = lazy(() => import("../pages/configuration/HolidayForm"));
+const HomeworkList = lazy(() => import("../pages/academics/HomeworkList"));
+const AddHomework = lazy(() => import("../pages/academics/AddHomework"));
 // Loading fallback component
 const PageLoader = () => (
   <Box
@@ -363,6 +365,11 @@ export default function AppRoutes() {
             path="/academics/configuration/holidays/:id/edit"
             element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><HolidayForm /></ProtectedRoute>}
           />
+          {/* Homework Management */}
+          <Route path="/homework" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><HomeworkList /></ProtectedRoute>} />
+          <Route path="/homework/new" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:create"><AddHomework /></ProtectedRoute>} />
+          <Route path="/homework/:id/edit" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><AddHomework /></ProtectedRoute>} />
+
           {/* Attendance Management */}
           {/* Attendance Management */}
           <Route path="/attendance/mark" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><MarkAttendance /></ProtectedRoute>} />
