@@ -1,8 +1,13 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text, event
 
 from app.core.database import Base
+from app.utils.holiday_storage import (
+    coerce_holiday_type_for_db,
+    pack_holiday_description,
+    unpack_holiday_description,
+)
 
 
 class Holiday(Base):
@@ -20,3 +25,23 @@ class Holiday(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+
+
+@event.listens_for(Holiday, "before_insert", propagate=True)
+@event.listens_for(Holiday, "before_update", propagate=True)
+def _enforce_legacy_holiday_type_check(mapper, connection, target: Holiday) -> None:
+    """Many DBs still CHECK holiday_type to legacy enums. Coerce the column and keep free text in HOLIDAY_META_V1."""
+    raw = (getattr(target, "holiday_type", None) or "").strip()
+    db_val, label = coerce_holiday_type_for_db(raw)
+    target.holiday_type = db_val
+    if not label:
+        return
+    aud, c_ids, d_ids, user_notes, _ = unpack_holiday_description(getattr(target, "description", None))
+    aud_resolved = (aud or "STUDENT").strip().upper()
+    target.description = pack_holiday_description(
+        aud_resolved,
+        c_ids,
+        d_ids,
+        user_notes if user_notes else None,
+        holiday_type_label=label,
+    )

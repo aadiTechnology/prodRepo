@@ -1,79 +1,55 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   AlertTitle,
+  alpha,
   Box,
   Button as MuiButton,
-  Card,
-  CardContent,
-  Chip,
   FormControl,
-  Grid,
+  InputAdornment,
   InputLabel,
   MenuItem,
   Select,
-  Skeleton,
   Stack,
-  Typography,
+  TextField,
 } from "@mui/material";
-import { Add as AddIcon } from "@mui/icons-material";
+import { Add as AddIcon, Search as SearchIcon } from "@mui/icons-material";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useSnackbar } from "notistack";
 
 import { PageHeader } from "../../components/layout";
-import { EntityTableSection, ListPageLayout, ListPageToolbar, TableRowActions } from "../../components/reusable";
+import { EntityTableSection, ListPageLayout, PrimaryActionButton, TableRowActions } from "../../components/reusable";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { colorTokens } from "../../tokens/colors";
 import { academicYearService } from "../../api/services/academicYearService";
-import holidayApi, { HolidayListItem, HolidayType } from "../../services/holidayApi";
+import holidayApi, { HolidayListItem, holidayInclusiveDayCount, parseHolidayDateRange } from "../../services/holidayApi";
 import { useAuth } from "../../context/AuthContext";
-
-const HOLIDAY_TYPE_OPTIONS: { label: string; value: HolidayType }[] = [
-  { label: "Public Holiday", value: "PUBLIC_HOLIDAY" },
-  { label: "Academic Break", value: "ACADEMIC_BREAK" },
-  { label: "Non-Teaching Day", value: "NON_TEACHING_DAY" },
-];
-
-function renderHolidayTypeFilterValue(selected: HolidayType | ""): ReactNode {
-  if (selected === "") {
-    return null;
-  }
-  return HOLIDAY_TYPE_OPTIONS.find((o) => o.value === selected)?.label ?? selected;
-}
-
-function mapHolidayTypeColor(type: HolidayType) {
-  if (type === "PUBLIC_HOLIDAY") {
-    return { bg: colorTokens.info.light, text: colorTokens.info.dark };
-  }
-  if (type === "ACADEMIC_BREAK") {
-    return { bg: colorTokens.success.light, text: colorTokens.success.dark };
-  }
-  return { bg: colorTokens.primary.light, text: colorTokens.primary.dark };
-}
 
 function createHolidayTableColumns() {
   return [
     { id: "holiday_name", label: "Holiday Name", field: "holiday_name" },
-    { id: "holiday_date", label: "Holiday Date", field: "holiday_date" },
     {
-      id: "holiday_type",
-      label: "Holiday Type",
+      id: "start_date",
+      label: "Start Date",
       render: (row: HolidayListItem) => {
-        const colors = mapHolidayTypeColor(row.holiday_type);
-        return (
-          <Chip
-            size="small"
-            label={row.holiday_type}
-            sx={{
-              backgroundColor: colors.bg,
-              color: colors.text,
-              fontWeight: 700,
-              borderRadius: 1,
-            }}
-          />
-        );
+        const { start } = parseHolidayDateRange(row.holiday_date);
+        return start || "—";
       },
+    },
+    {
+      id: "end_date",
+      label: "End Date",
+      render: (row: HolidayListItem) => {
+        const { start, end } = parseHolidayDateRange(row.holiday_date);
+        return end && end !== start ? end : start || "—";
+      },
+    },
+    {
+      id: "total_days",
+      label: "Total Days",
+      render: (row: HolidayListItem) =>
+        row.total_days != null ? String(row.total_days) : String(holidayInclusiveDayCount(row.holiday_date)),
     },
     { id: "applicable_for", label: "Applicable For", field: "applicable_for" },
   ];
@@ -89,7 +65,6 @@ function useHolidayListController() {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [holidayTypeFilter, setHolidayTypeFilter] = useState<HolidayType | "">("");
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<number | "">("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -104,7 +79,7 @@ function useHolidayListController() {
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, holidayTypeFilter, selectedAcademicYearId]);
+  }, [debouncedSearch, selectedAcademicYearId]);
 
   const academicYearsQuery = useQuery({
     queryKey: ["holidays", "academic-years", effectiveTenantId],
@@ -131,7 +106,6 @@ function useHolidayListController() {
       "holidays",
       {
         academic_year_id: selectedAcademicYearId,
-        holiday_type: holidayTypeFilter,
         search: debouncedSearch,
         page,
         page_size: rowsPerPage,
@@ -140,7 +114,6 @@ function useHolidayListController() {
     queryFn: () =>
       holidayApi.list({
         academic_year_id: Number(selectedAcademicYearId),
-        holiday_type: holidayTypeFilter || undefined,
         search: debouncedSearch || undefined,
         page: page + 1,
         page_size: rowsPerPage,
@@ -218,12 +191,6 @@ function useHolidayListController() {
   const loading = holidaysQuery.isLoading || holidaysQuery.isFetching;
   const rows: HolidayListItem[] = holidaysQuery.data?.data ?? [];
   const total = holidaysQuery.data?.total ?? 0;
-  const summary = holidaysQuery.data?.summary ?? {
-    total_holidays: 0,
-    public_holidays: 0,
-    academic_breaks: 0,
-    non_teaching: 0,
-  };
 
   const columns = useMemo(() => createHolidayTableColumns(), []);
 
@@ -241,7 +208,6 @@ function useHolidayListController() {
         "holidays",
         {
           academic_year_id: selectedAcademicYearId,
-          holiday_type: holidayTypeFilter,
           search: debouncedSearch,
           page,
           page_size: rowsPerPage,
@@ -269,8 +235,6 @@ function useHolidayListController() {
     hasTenantContext,
     search,
     setSearch,
-    holidayTypeFilter,
-    setHolidayTypeFilter,
     selectedAcademicYearId,
     setSelectedAcademicYearId,
     page,
@@ -283,7 +247,6 @@ function useHolidayListController() {
     loading,
     rows,
     total,
-    summary,
     columns,
     deleteMutation,
     deleteTarget,
@@ -308,154 +271,82 @@ export default function HolidayConfiguration() {
             links={[{ title: "Academic Management", path: "#" }]}
             homePath="/"
             actions={
-              <ListPageToolbar
-                searchValue={controller.search}
-                onSearchChange={controller.setSearch}
-                searchPlaceholder="Search holidays..."
-                onAddClick={() => controller.navigate("/academics/configuration/holidays/new")}
-                addLabel="Add Holiday"
-                addIcon={<AddIcon sx={{ fontSize: 24 }} />}
-                renderActions={
-                  <>
-                    <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 220 } }}>
-                      <InputLabel id="holiday-academic-year-label">Academic Year</InputLabel>
-                      <Select
-                        labelId="holiday-academic-year-label"
-                        id="holiday-academic-year-select"
-                        label="Academic Year"
-                        value={controller.selectedAcademicYearId}
-                        displayEmpty
-                        disabled={controller.academicYearsQuery.isLoading || controller.academicYears.length === 0}
-                        renderValue={() => {
-                          if (controller.academicYearsQuery.isLoading) return null;
-                          if (controller.academicYears.length === 0) return null;
-                          const sel = controller.selectedAcademicYearId;
-                          if (sel === "" || sel === undefined) return null;
-                          const year = controller.academicYears.find((y) => y.id === sel);
-                          return year?.name ?? "";
-                        }}
-                        onChange={(e) => controller.setSelectedAcademicYearId(Number(e.target.value))}
-                      >
-                        <MenuItem value="" sx={{ display: "none" }} aria-hidden>
-                          &nbsp;
-                        </MenuItem>
-                        {controller.academicYears.map((year) => (
-                          <MenuItem key={year.id} value={year.id}>
-                            {year.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 200 } }}>
-                      <InputLabel id="holiday-type-filter-label">Holiday Type</InputLabel>
-                      <Select
-                        labelId="holiday-type-filter-label"
-                        id="holiday-type-filter-select"
-                        label="Holiday Type"
-                        value={controller.holidayTypeFilter}
-                        displayEmpty
-                        renderValue={(selected) => renderHolidayTypeFilterValue(selected as HolidayType | "")}
-                        onChange={(e) =>
-                          controller.setHolidayTypeFilter(e.target.value as HolidayType | "")
-                        }
-                      >
-                        {/* Keeps value="" valid for MUI; not shown as a normal list choice */}
-                        <MenuItem value="" sx={{ display: "none" }} aria-hidden>
-                          &nbsp;
-                        </MenuItem>
-                        {HOLIDAY_TYPE_OPTIONS.map((option) => (
-                          <MenuItem key={option.value} value={option.value}>
-                            {option.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </>
-                }
-                actionsAfterSearch
-              />
+              <Box
+                sx={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: 2,
+                  width: "100%",
+                  justifyContent: "space-between",
+                }}
+              >
+                <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 220 } }}>
+                  <InputLabel id="holiday-academic-year-label">Academic Year</InputLabel>
+                  <Select
+                    labelId="holiday-academic-year-label"
+                    id="holiday-academic-year-select"
+                    label="Academic Year"
+                    value={controller.selectedAcademicYearId}
+                    displayEmpty
+                    disabled={controller.academicYearsQuery.isLoading || controller.academicYears.length === 0}
+                    renderValue={() => {
+                      if (controller.academicYearsQuery.isLoading) return null;
+                      if (controller.academicYears.length === 0) return null;
+                      const sel = controller.selectedAcademicYearId;
+                      if (sel === "" || sel === undefined) return null;
+                      const year = controller.academicYears.find((y) => y.id === sel);
+                      return year?.name ?? "";
+                    }}
+                    onChange={(e) => controller.setSelectedAcademicYearId(Number(e.target.value))}
+                  >
+                    <MenuItem value="" sx={{ display: "none" }} aria-hidden>
+                      &nbsp;
+                    </MenuItem>
+                    {controller.academicYears.map((year) => (
+                      <MenuItem key={year.id} value={year.id}>
+                        {year.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1, justifyContent: "flex-end", minWidth: 0 }}>
+                  <TextField
+                    placeholder="Search holidays..."
+                    value={controller.search}
+                    onChange={(e) => controller.setSearch(e.target.value)}
+                    variant="outlined"
+                    size="small"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon sx={(theme) => ({ color: theme.palette.grey[500], fontSize: 20 })} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={(theme) => ({
+                      width: { xs: "100%", sm: 280 },
+                      maxWidth: "100%",
+                      "& .MuiOutlinedInput-root": {
+                        bgcolor: "#ffffff",
+                        borderRadius: "15px",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        "& fieldset": { borderColor: colorTokens.border.subtle },
+                        "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
+                        "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
+                      },
+                    })}
+                  />
+                  <PrimaryActionButton
+                    onClick={() => controller.navigate("/academics/configuration/holidays/new")}
+                    icon={<AddIcon sx={{ fontSize: 24 }} />}
+                    label="Add Holiday"
+                  />
+                </Stack>
+              </Box>
             }
           />
-          <Box sx={{ px: 2, pb: 2 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} lg={3}>
-                <Card
-                  sx={{
-                    borderRadius: 3,
-                    boxShadow: "none",
-                    border: `1px solid ${colorTokens.border.default}`,
-                    backgroundColor: colorTokens.background.paper,
-                  }}
-                >
-                  <CardContent>
-                    <Typography variant="subtitle2" sx={{ color: colorTokens.text.secondary, fontWeight: 600 }}>
-                      Total Holidays
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                      {controller.loading ? <Skeleton width={70} /> : controller.summary.total_holidays}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6} lg={3}>
-                <Card
-                  sx={{
-                    borderRadius: 3,
-                    boxShadow: "none",
-                    border: `1px solid ${colorTokens.border.default}`,
-                    backgroundColor: colorTokens.background.paper,
-                  }}
-                >
-                  <CardContent>
-                    <Typography variant="subtitle2" sx={{ color: colorTokens.text.secondary, fontWeight: 600 }}>
-                      Public Holidays
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                      {controller.loading ? <Skeleton width={70} /> : controller.summary.public_holidays}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6} lg={3}>
-                <Card
-                  sx={{
-                    borderRadius: 3,
-                    boxShadow: "none",
-                    border: `1px solid ${colorTokens.border.default}`,
-                    backgroundColor: colorTokens.background.paper,
-                  }}
-                >
-                  <CardContent>
-                    <Typography variant="subtitle2" sx={{ color: colorTokens.text.secondary, fontWeight: 600 }}>
-                      Academic Breaks
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                      {controller.loading ? <Skeleton width={70} /> : controller.summary.academic_breaks}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6} lg={3}>
-                <Card
-                  sx={{
-                    borderRadius: 3,
-                    boxShadow: "none",
-                    border: `1px solid ${colorTokens.border.default}`,
-                    backgroundColor: colorTokens.background.paper,
-                  }}
-                >
-                  <CardContent>
-                    <Typography variant="subtitle2" sx={{ color: colorTokens.text.secondary, fontWeight: 600 }}>
-                      Non-Teaching
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                      {controller.loading ? <Skeleton width={70} /> : controller.summary.non_teaching}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-          </Box>
         </>
       }
     >

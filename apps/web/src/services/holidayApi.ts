@@ -1,13 +1,13 @@
 import { apiClient } from "../api/client";
-
-export type HolidayType = "PUBLIC_HOLIDAY" | "ACADEMIC_BREAK" | "NON_TEACHING_DAY";
+import type { NoticeAudienceType } from "../types/notice";
 
 export interface HolidayListItem {
   id: number;
   holiday_name: string;
   holiday_date: string;
-  holiday_type: HolidayType;
+  holiday_type: string;
   applicable_for: string;
+  total_days?: number;
 }
 
 export interface HolidaySummary {
@@ -15,6 +15,7 @@ export interface HolidaySummary {
   public_holidays: number;
   academic_breaks: number;
   non_teaching: number;
+  other_holidays: number;
 }
 
 export interface HolidayListResponse {
@@ -26,31 +27,36 @@ export interface HolidayListResponse {
 export interface HolidayCreatePayload {
   academic_year_id: number;
   holiday_name: string;
-  holiday_type: HolidayType;
+  holiday_type: string;
   start_date: string;
   end_date?: string;
-  applicable_for: string;
+  audience_type: NoticeAudienceType;
+  class_ids: number[];
+  division_ids: number[];
   description?: string;
 }
 
-export interface HolidayUpdatePayload extends Partial<HolidayCreatePayload> {}
+export type HolidayUpdatePayload = Partial<HolidayCreatePayload>;
 
 export interface HolidayResponse {
   id: number;
   tenant_id: number;
   academic_year_id: number;
   holiday_name: string;
-  holiday_type: HolidayType;
+  holiday_type: string;
   start_date: string;
   end_date: string | null;
   applicable_for: string;
+  audience_type: string | null;
+  class_ids: number[];
+  division_ids: number[];
   description: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string | null;
 }
 
-function parseHolidayDateRange(holiday_date: string): { start: string; end: string } {
+export function parseHolidayDateRange(holiday_date: string): { start: string; end: string } {
   const sep = " to ";
   if (holiday_date.includes(sep)) {
     const parts = holiday_date.split(sep).map((s) => s.trim());
@@ -60,6 +66,14 @@ function parseHolidayDateRange(holiday_date: string): { start: string; end: stri
   }
   const d = holiday_date.trim().slice(0, 10);
   return { start: d, end: d };
+}
+
+export function holidayInclusiveDayCount(holiday_date: string): number {
+  const { start, end } = parseHolidayDateRange(holiday_date);
+  const a = Date.parse(`${start}T00:00:00`);
+  const b = Date.parse(`${end}T00:00:00`);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return 1;
+  return Math.floor((b - a) / 86400000) + 1;
 }
 
 function listItemToHolidayResponse(row: HolidayListItem, academic_year_id: number): HolidayResponse {
@@ -73,6 +87,9 @@ function listItemToHolidayResponse(row: HolidayListItem, academic_year_id: numbe
     start_date: start,
     end_date: start === end ? null : end,
     applicable_for: row.applicable_for,
+    audience_type: null,
+    class_ids: [],
+    division_ids: [],
     description: null,
     is_active: true,
     created_at: "1970-01-01T00:00:00Z",
@@ -83,7 +100,7 @@ function listItemToHolidayResponse(row: HolidayListItem, academic_year_id: numbe
 const holidayApi = {
   list: async (params: {
     academic_year_id: number;
-    holiday_type?: HolidayType;
+    holiday_type?: string;
     search?: string;
     page: number;
     page_size: number;

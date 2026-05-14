@@ -1,28 +1,25 @@
+import type { ReactNode } from "react";
 import { Box } from "../../components/primitives";
 import FormFieldRenderer from "../../components/reusable/FormFieldRenderer";
 import type { FormConfig } from "../../components/reusable/formFramework.types";
 import type { SelectItemOption } from "../../components/semantic";
-import { HOLIDAY_TYPE_OPTIONS, type HolidayFormData } from "./holidayForm.config";
+import type { HolidayFormData } from "./holidayForm.config";
 
 export type HolidayFormConfigFactoryArgs = {
   academicYears: { id: number; name: string }[];
   yearsLoading: boolean;
+  associatedClassesSlot: ReactNode;
 };
 
 export function createHolidayFormConfig({
   academicYears,
   yearsLoading,
+  associatedClassesSlot,
 }: HolidayFormConfigFactoryArgs): FormConfig<HolidayFormData> {
   const yearOptions: SelectItemOption[] = academicYears.map((y) => ({
     id: `year-${y.id}`,
     value: String(y.id),
     label: y.name,
-  }));
-
-  const typeOptions: SelectItemOption[] = HOLIDAY_TYPE_OPTIONS.map((o) => ({
-    id: o.value,
-    value: o.value,
-    label: o.label,
   }));
 
   const fields: FormConfig<HolidayFormData>["fields"] = {
@@ -58,26 +55,12 @@ export function createHolidayFormConfig({
     holiday_type: {
       name: "holiday_type",
       label: "Holiday Type",
-      type: "select",
-      required: true,
-      props: {
-        options: typeOptions,
-        disableWhenEmpty: false,
-        size: "small",
-        slotProps: {
-          htmlInput: { "aria-label": "Holiday type" },
-        },
-      },
-    },
-    applicable_for: {
-      name: "applicable_for",
-      label: "Applicable For",
       type: "text",
-      required: false,
-      placeholder: "Defaults to All Staff & Students if empty",
+      required: true,
+      placeholder: "e.g. Public holiday, festival closure",
       props: {
         size: "small",
-        slotProps: { htmlInput: { "aria-label": "Applicable for", minLength: 0 } },
+        slotProps: { htmlInput: { "aria-label": "Holiday type", maxLength: 50 } },
       },
     },
     start_date: {
@@ -115,7 +98,7 @@ export function createHolidayFormConfig({
   };
 
   const academicYearField = fields.academic_year_id!;
-  const holidayTypeField = fields.holiday_type!;
+  const holidayNameField = fields.holiday_name!;
 
   return {
     fields,
@@ -137,20 +120,20 @@ export function createHolidayFormConfig({
               <FormFieldRenderer<HolidayFormData> field={academicYearField} ctx={ctx} />
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <FormFieldRenderer<HolidayFormData> field={holidayTypeField} ctx={ctx} />
+              <FormFieldRenderer<HolidayFormData> field={holidayNameField} ctx={ctx} />
             </Box>
           </Box>
         ),
       },
       {
         kind: "fields",
-        grid: { xs: 12, sm: 6 },
-        fieldNames: ["holiday_name"],
+        grid: { xs: 12 },
+        fieldNames: ["holiday_type"],
       },
       {
-        kind: "fields",
-        grid: { xs: 12, sm: 6 },
-        fieldNames: ["applicable_for"],
+        kind: "custom",
+        grid: { xs: 12 },
+        render: () => <Box sx={{ mt: 0.5 }}>{associatedClassesSlot}</Box>,
       },
       {
         kind: "fields",

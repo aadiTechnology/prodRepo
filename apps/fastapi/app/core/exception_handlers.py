@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from app.core.exceptions import AppException
+from app.core.config import settings
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -30,9 +31,12 @@ async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError) -
     logger.error(f"Database error: {str(exc)}", exc_info=True)
     
     if isinstance(exc, IntegrityError):
+        content: dict = {"detail": "Database integrity error. Resource may already exist."}
+        if settings.DEBUG:
+            content["driver_detail"] = (str(getattr(exc, "orig", exc) or exc))[:800]
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
-            content={"detail": "Database integrity error. Resource may already exist."},
+            content=content,
         )
     
     return JSONResponse(
