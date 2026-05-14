@@ -30,11 +30,13 @@ function computeDisplayStatus(row: HomeworkRow): { label: string; color: string 
 type HomeworkListConfigArgs = {
   navigate: (path: string) => void;
   onDeleteClick?: (row: HomeworkRow) => void;
+  onViewClick?: (row: HomeworkRow) => void;
 };
 
 export const createHomeworkListConfig = ({
   navigate,
   onDeleteClick,
+  onViewClick,
 }: HomeworkListConfigArgs): ListConfig<HomeworkRow> => ({
   columns: [
     {
@@ -121,6 +123,9 @@ export const createHomeworkListConfig = ({
 
   actions: {
     rowActions: (row: HomeworkRow) => ({
+      onView: onViewClick
+        ? () => onViewClick(row)
+        : () => navigate(`/homework/${row.id}`),
       onEdit: () => navigate(`/homework/${row.id}/edit`),
       onDelete: onDeleteClick ? () => onDeleteClick(row) : undefined,
     }),
