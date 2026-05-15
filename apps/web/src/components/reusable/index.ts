@@ -63,6 +63,9 @@ export type { FormActionsBarProps } from "./FormActionsBar";
 export { default as PrimaryActionButton } from "./PrimaryActionButton";
 export type { PrimaryActionButtonProps } from "./PrimaryActionButton";
 
+export { default as DeleteActionButton } from "./DeleteActionButton";
+export type { DeleteActionButtonProps } from "./DeleteActionButton";
+
 export { default as TableRowActions } from "./TableRowActions";
 export type { TableRowActionsProps } from "./TableRowActions";
 

@@ -26,7 +26,7 @@ import {
   Person as PersonIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
-import { ListPageLayout } from "../../components/reusable";
+import { ListPageLayout, PrimaryActionButton, DeleteActionButton } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import { homeworkService, type HomeworkResponse } from "../../api/services/homeworkService";
@@ -194,23 +194,16 @@ export default function HomeworkDetails() {
           homePath="/"
           actions={
             <Stack direction="row" gap={1} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: "wrap" }}>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<EditIcon sx={{ fontSize: 18 }} />}
+              <PrimaryActionButton
                 onClick={() => navigate(`/homework/${hw.id}/edit`)}
-              >
-                Edit
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                size="small"
-                startIcon={<DeleteIcon sx={{ fontSize: 18 }} />}
+                icon={<EditIcon sx={{ fontSize: 20 }} />}
+                label="Edit homework"
+              />
+              <DeleteActionButton
                 onClick={() => setDeleteOpen(true)}
-              >
-                Delete
-              </Button>
+                icon={<DeleteIcon sx={{ fontSize: 20 }} />}
+                label="Delete homework"
+              />
             </Stack>
           }
         />
@@ -292,67 +285,30 @@ export default function HomeworkDetails() {
                 </Stack>
               </Box>
               <Grid container spacing={0} sx={{ p: 0 }}>
-                <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ p: 2.5, borderRight: { md: `1px solid ${colorTokens.border.default}` }, borderBottom: `1px solid ${colorTokens.border.default}` }}>
+                <Grid size={{ xs: 12, sm: 6, md: 2 }} sx={{ p: 2.5, borderRight: { md: `1px solid ${colorTokens.border.default}` }, borderBottom: `1px solid ${colorTokens.border.default}` }}>
+                  <InfoBlock icon={<CalendarIcon sx={{ fontSize: 18 }} />} label="Assigned Date" value={formatDate(hw.assigned_date)} />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6, md: 2 }} sx={{ p: 2.5, borderRight: { md: `1px solid ${colorTokens.border.default}` }, borderBottom: { xs: `1px solid ${colorTokens.border.default}`, md: "none" } }}>
+                  <InfoBlock icon={<CalendarIcon sx={{ fontSize: 18 }} />} label="Submission Date" value={formatDate(hw.submission_date)} />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6, md: 2 }} sx={{ p: 2.5, borderRight: { md: `1px solid ${colorTokens.border.default}` }, borderBottom: `1px solid ${colorTokens.border.default}` }}>
                   <InfoBlock icon={<BookIcon sx={{ fontSize: 18 }} />} label="Subject" value={hw.subject_name ?? "—"} />
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ p: 2.5, borderRight: { md: `1px solid ${colorTokens.border.default}` }, borderBottom: { xs: `1px solid ${colorTokens.border.default}`, md: "none" } }}>
+                <Grid size={{ xs: 12, sm: 6, md: 2 }} sx={{ p: 2.5, borderRight: { md: `1px solid ${colorTokens.border.default}` }, borderBottom: { xs: `1px solid ${colorTokens.border.default}`, md: "none" } }}>
                   <InfoBlock icon={<PersonIcon sx={{ fontSize: 18 }} />} label="Teacher" value={hw.teacher_name ?? "—"} />
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ p: 2.5, borderRight: { md: `1px solid ${colorTokens.border.default}` }, borderBottom: `1px solid ${colorTokens.border.default}` }}>
+                <Grid size={{ xs: 12, sm: 6, md: 2 }} sx={{ p: 2.5, borderRight: { md: `1px solid ${colorTokens.border.default}` }, borderBottom: `1px solid ${colorTokens.border.default}` }}>
                   <InfoBlock icon={<ClassIcon sx={{ fontSize: 18 }} />} label="Class" value={classLabel || "—"} />
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ p: 2.5 }}>
+                <Grid size={{ xs: 12, sm: 6, md: 2 }} sx={{ p: 2.5 }}>
                   <InfoBlock icon={<CalendarIcon sx={{ fontSize: 18 }} />} label="Academic Year" value={hw.academic_year_name ?? "—"} />
                 </Grid>
               </Grid>
             </Paper>
           </Grid>
 
-          {/* Dates Card */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Paper
-              elevation={0}
-              sx={{
-                borderRadius: 2,
-                border: `1px solid ${colorTokens.border.default}`,
-                overflow: "hidden",
-                bgcolor: colorTokens.surface.card,
-              }}
-            >
-              <Box sx={{ px: 3, py: 2.5, bgcolor: alpha(colorTokens.primary.main, 0.04), borderBottom: `1px solid ${colorTokens.border.default}` }}>
-                <Stack direction="row" alignItems="center" gap={1}>
-                  <CalendarIcon sx={{ fontSize: 20, color: colorTokens.text.primary }} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", fontSize: "0.75rem", color: colorTokens.text.secondary }}>
-                    Dates
-                  </Typography>
-                </Stack>
-              </Box>
-              <Box sx={{ p: 2.5 }}>
-                <Stack spacing={2}>
-                  <Box>
-                    <Typography variant="caption" sx={{ color: colorTokens.text.secondary, fontWeight: 600 }}>
-                      Assigned Date
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: colorTokens.text.primary, fontWeight: 600, mt: 0.5 }}>
-                      {formatDate(hw.assigned_date)}
-                    </Typography>
-                  </Box>
-                  <Divider />
-                  <Box>
-                    <Typography variant="caption" sx={{ color: colorTokens.text.secondary, fontWeight: 600 }}>
-                      Submission Date
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: colorTokens.text.primary, fontWeight: 600, mt: 0.5 }}>
-                      {formatDate(hw.submission_date)}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Box>
-            </Paper>
-          </Grid>
-
           {/* Description Card */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12 }}>
             <Paper
               elevation={0}
               sx={{
