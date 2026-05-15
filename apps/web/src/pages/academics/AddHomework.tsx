@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useRBAC } from "../../context/RBACContext";
 import {
   Box,
   Button,
@@ -54,6 +55,13 @@ export default function AddHomework() {
   const { id } = useParams<{ id?: string }>();
   const isEditMode = Boolean(id && id !== "new");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { hasPermission } = useRBAC();
+
+  const canCreate = hasPermission("HOMEWORK_MGMT:create");
+  const canEdit = hasPermission("HOMEWORK_MGMT:edit");
+  const canDelete = hasPermission("HOMEWORK_MGMT:delete");
+
+  const isAuthorized = isEditMode ? canEdit : canCreate;
 
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
@@ -248,7 +256,7 @@ export default function AddHomework() {
   };
 
   const handleDeleteSavedAttachment = async (attId: number) => {
-    if (!id) return;
+    if (!id || !canEdit) return;
     try {
       setDeletingAttId(attId);
       await homeworkService.deleteAttachment(Number(id), attId);
@@ -448,7 +456,7 @@ export default function AddHomework() {
                   edge="end"
                   size="small"
                   color="error"
-                  disabled={deletingAttId === att.id}
+                  disabled={deletingAttId === att.id || !canEdit}
                   onClick={() => handleDeleteSavedAttachment(att.id)}
                 >
                   <DeleteOutlineIcon fontSize="small" />
@@ -536,6 +544,22 @@ export default function AddHomework() {
       )}
     </Box>
   );
+
+  if (!isAuthorized) {
+    return (
+      <Box sx={{ p: 4, textAlign: "center" }}>
+        <Typography variant="h6" color="error" gutterBottom>
+          Access Denied
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          You do not have permission to {isEditMode ? "edit" : "create"} homework.
+        </Typography>
+        <Button variant="contained" onClick={() => navigate("/homework")}>
+          Back to Homework List
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <BaseForm

@@ -9,6 +9,7 @@ import {
 } from "../../components/reusable";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { useHomeworkListController } from "../../hooks/useHomeworkListController";
+import { useRBAC } from "../../context/RBACContext";
 import {
   createHomeworkListConfig,
   type HomeworkRow,
@@ -17,11 +18,32 @@ import {
 export default function HomeworkList() {
   const navigate = useNavigate();
   const controller = useHomeworkListController();
+  const { hasPermission } = useRBAC();
+  const canView = hasPermission("HOMEWORK_MGMT:view");
 
   const listConfig = createHomeworkListConfig({
     navigate,
     onDeleteClick: controller.handleDeleteClick,
+    canEdit: hasPermission("HOMEWORK_MGMT:edit"),
+    canDelete: hasPermission("HOMEWORK_MGMT:delete"),
   });
+
+  if (!canView) {
+    return (
+      <ListPageLayout
+        header={
+          <PageHeader
+            links={[{ title: "Homework", path: "#" }]}
+            homePath="/"
+          />
+        }
+      >
+        <Alert severity="error" sx={{ m: 2 }}>
+          Access Denied: You do not have permission to view this page.
+        </Alert>
+      </ListPageLayout>
+    );
+  }
 
   return (
     <ListPageLayout
@@ -56,9 +78,13 @@ export default function HomeworkList() {
                   options: controller.statusOptions,
                 },
               ]}
-              onAddClick={() => navigate("/homework/new")}
-              addLabel="Assign Homework"
-              addIcon={<AddIcon sx={{ fontSize: 24 }} />}
+              {...(hasPermission("HOMEWORK_MGMT:create")
+                ? {
+                    onAddClick: () => navigate("/homework/new"),
+                    addLabel: "Assign Homework",
+                    addIcon: <AddIcon sx={{ fontSize: 24 }} />,
+                  }
+                : {})}
             />
           }
         />

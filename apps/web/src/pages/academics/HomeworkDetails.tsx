@@ -24,6 +24,7 @@ import {
 import { useParams } from "react-router-dom";
 import { ListPageLayout } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
+import { useRBAC } from "../../context/RBACContext";
 import { homeworkService, type HomeworkResponse } from "../../api/services/homeworkService";
 import { apiBaseUrl } from "../../config/env";
 import { colorTokens } from "../../tokens/colors";
@@ -96,6 +97,9 @@ function InfoBlock({
 export default function HomeworkDetails() {
   const { id } = useParams<{ id: string }>();
   const homeworkId = id ? Number(id) : NaN;
+  const { hasPermission } = useRBAC();
+
+  const canView = hasPermission("HOMEWORK_MGMT:view");
 
   const [hw, setHw] = useState<HomeworkResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,6 +138,32 @@ export default function HomeworkDetails() {
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
         <CircularProgress />
       </Box>
+    );
+  }
+
+  // ── Authorization check ──────────────────────────────────────────────────
+  if (!canView) {
+    return (
+      <ListPageLayout
+        header={
+          <PageHeader
+            links={[
+              { title: "Homework", path: "/homework" },
+              { title: "Access Denied", path: "#" },
+            ]}
+            homePath="/"
+          />
+        }
+      >
+        <Box sx={{ p: 4, textAlign: "center" }}>
+          <Typography variant="h6" color="error" gutterBottom>
+            Access Denied
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            You do not have permission to view homework details.
+          </Typography>
+        </Box>
+      </ListPageLayout>
     );
   }
 

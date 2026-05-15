@@ -31,12 +31,16 @@ type HomeworkListConfigArgs = {
   navigate: (path: string) => void;
   onDeleteClick?: (row: HomeworkRow) => void;
   onViewClick?: (row: HomeworkRow) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 };
 
 export const createHomeworkListConfig = ({
   navigate,
   onDeleteClick,
   onViewClick,
+  canEdit = true,
+  canDelete = true,
 }: HomeworkListConfigArgs): ListConfig<HomeworkRow> => ({
   columns: [
     {
@@ -126,8 +130,8 @@ export const createHomeworkListConfig = ({
       onView: onViewClick
         ? () => onViewClick(row)
         : () => navigate(`/homework/${row.id}`),
-      onEdit: () => navigate(`/homework/${row.id}/edit`),
-      onDelete: onDeleteClick ? () => onDeleteClick(row) : undefined,
+      onEdit: canEdit ? () => navigate(`/homework/${row.id}/edit`) : undefined,
+      onDelete: canDelete && onDeleteClick ? () => onDeleteClick(row) : undefined,
     }),
   },
 });
