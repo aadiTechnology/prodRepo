@@ -31,6 +31,16 @@ export function normalizeIsoDatePart(value: string): string {
   return value.trim().slice(0, 10);
 }
 
+/** True when `iso` (YYYY-MM-DD) falls within the academic year inclusive bounds. */
+export function isDateWithinAcademicYear(iso: string, ayStart: string, ayEnd: string): boolean {
+  const d = normalizeIsoDatePart(iso);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  const cmpStart = compareIsoDateStrings(d, normalizeIsoDatePart(ayStart));
+  const cmpEnd = compareIsoDateStrings(d, normalizeIsoDatePart(ayEnd));
+  if (Number.isNaN(cmpStart) || Number.isNaN(cmpEnd)) return false;
+  return cmpStart >= 0 && cmpEnd <= 0;
+}
+
 /** Compares calendar dates at local midnight; returns NaN if either value is invalid. */
 export function compareIsoDateStrings(a: string, b: string): number {
   const pa = normalizeIsoDatePart(a);

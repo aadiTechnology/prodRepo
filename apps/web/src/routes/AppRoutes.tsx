@@ -78,6 +78,7 @@ const HolidayForm = lazy(() => import("../pages/configuration/HolidayForm"));
 const HomeworkList = lazy(() => import("../pages/academics/HomeworkList"));
 const AddHomework = lazy(() => import("../pages/academics/AddHomework"));
 const HomeworkDetails = lazy(() => import("../pages/academics/HomeworkDetails"));
+const AcademicCalendar = lazy(() => import("../pages/calendar/AcademicCalendar"));
 // Loading fallback component
 const PageLoader = () => (
   <Box
@@ -365,6 +366,14 @@ export default function AppRoutes() {
           <Route
             path="/academics/configuration/holidays/:id/edit"
             element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><HolidayForm /></ProtectedRoute>}
+          />
+            <Route
+            path="/calendar/academic"
+            element={
+              <ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view">
+                <AcademicCalendar />
+              </ProtectedRoute>
+            }
           />
           {/* Homework Management */}
           <Route path="/homework" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:view"><HomeworkList /></ProtectedRoute>} />

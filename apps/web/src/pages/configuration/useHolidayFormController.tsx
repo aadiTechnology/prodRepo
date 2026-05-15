@@ -17,6 +17,7 @@ import {
   buildHolidayCreatePayload,
   compareIsoDateStrings,
   EMPTY_FORM,
+  isDateWithinAcademicYear,
   normalizeIsoDatePart,
   serializeHolidayFormSnapshot,
   type HolidayFormData,
@@ -37,6 +38,20 @@ export function useHolidayFormController() {
     if (!raw) return null;
     const n = Number(raw);
     return Number.isFinite(n) && n > 0 ? n : null;
+  }, [searchParams]);
+
+  const startDateFromUrl = useMemo(() => {
+    const raw = searchParams.get("start_date");
+    if (!raw) return null;
+    const d = normalizeIsoDatePart(raw);
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
+  }, [searchParams]);
+
+  const endDateFromUrl = useMemo(() => {
+    const raw = searchParams.get("end_date");
+    if (!raw) return null;
+    const d = normalizeIsoDatePart(raw);
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
   }, [searchParams]);
 
   const navigate = useNavigate();
@@ -152,6 +167,20 @@ export function useHolidayFormController() {
           regex: /^\d{4}-\d{2}-\d{2}$/,
           message: "Use a valid calendar date (YYYY-MM-DD).",
         },
+        {
+          type: "custom",
+          validate: (fd) => {
+            const start = normalizeIsoDatePart(String(fd.start_date ?? ""));
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return "";
+            const yid = fd.academic_year_id;
+            const ay = academicYears.find((y) => y.id === yid);
+            if (!ay) return "";
+            if (!isDateWithinAcademicYear(start, ay.start_date, ay.end_date)) {
+              return "Start date must fall within the selected academic year.";
+            }
+            return "";
+          },
+        },
       ],
       end_date: [
         {
@@ -167,6 +196,11 @@ export function useHolidayFormController() {
             const cmp = compareIsoDateStrings(end, start);
             if (Number.isNaN(cmp)) return "Enter a valid start date first.";
             if (cmp < 0) return "End date cannot be before start date.";
+            const yid = fd.academic_year_id;
+            const ay = academicYears.find((y) => y.id === yid);
+            if (ay && !isDateWithinAcademicYear(end, ay.start_date, ay.end_date)) {
+              return "End date must fall within the selected academic year.";
+            }
             return "";
           },
         },
@@ -203,14 +237,31 @@ export function useHolidayFormController() {
     if (isEditMode) return;
     if (academicYears.length === 0) return;
     setFormData((prev) => {
-      if (prev.academic_year_id != null) return prev;
-      const next = { ...prev, academic_year_id: academicYears[0].id };
+      const yearId =
+        academicYearFromUrl != null && academicYears.some((y) => y.id === academicYearFromUrl)
+          ? academicYearFromUrl
+          : prev.academic_year_id ?? academicYears[0].id;
+      const ay = academicYears.find((y) => y.id === yearId);
+      let start = prev.start_date;
+      let end = prev.end_date;
+      if (startDateFromUrl && ay && isDateWithinAcademicYear(startDateFromUrl, ay.start_date, ay.end_date)) {
+        start = startDateFromUrl;
+        const endCandidate = endDateFromUrl ?? startDateFromUrl;
+        end =
+          endCandidate && isDateWithinAcademicYear(endCandidate, ay.start_date, ay.end_date)
+            ? endCandidate
+            : startDateFromUrl;
+      }
+      if (prev.academic_year_id === yearId && prev.start_date === start && prev.end_date === end) {
+        return prev;
+      }
+      const next = { ...prev, academic_year_id: yearId, start_date: start, end_date: end };
       if (baselineSerialized.current === null) {
         baselineSerialized.current = serializeHolidayFormSnapshot(next);
       }
       return next;
     });
-  }, [isEditMode, academicYears, setFormData]);
+  }, [isEditMode, academicYears, academicYearFromUrl, startDateFromUrl, endDateFromUrl, setFormData]);
 
   useEffect(() => {
     if (academicYears.length === 0) return;
