@@ -31,6 +31,7 @@ def seed_rbac_data():
             {"code": "SPRINT_MGMT", "name": "Sprint Management", "category": "System"},
             {"code": "TEACHER_MGMT", "name": "Teacher Management", "category": "HR"},
             {"code": "COMMUNICATION_MGMT", "name": "Communication Management", "category": "Communication"},
+            {"code": "HOMEWORK_MGMT", "name": "Homework Management", "category": "Academics"},
         ]
         
         feature_map = {}
@@ -78,6 +79,8 @@ def seed_rbac_data():
                     {"name": "Classes", "path": "/classes", "feature": "ACADEMIC_MGMT"},
                     {"name": "Subjects", "path": "/subjects", "feature": "ACADEMIC_MGMT"},
                     {"name": "Holiday Configuration", "path": "/academics/configuration/holidays", "feature": "ACADEMIC_MGMT"},
+                    {"name": "Homework", "path": "/homework", "feature": "HOMEWORK_MGMT"},
+                    {"name": "Homework Details", "path": "/homework/:id", "feature": "HOMEWORK_MGMT"},
                 ]
             },
             {

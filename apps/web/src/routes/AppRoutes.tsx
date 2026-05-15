@@ -367,10 +367,10 @@ export default function AppRoutes() {
             element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><HolidayForm /></ProtectedRoute>}
           />
           {/* Homework Management */}
-          <Route path="/homework" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><HomeworkList /></ProtectedRoute>} />
-          <Route path="/homework/new" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:create"><AddHomework /></ProtectedRoute>} />
-          <Route path="/homework/:id/edit" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><AddHomework /></ProtectedRoute>} />
-          <Route path="/homework/:id" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><HomeworkDetails /></ProtectedRoute>} />
+          <Route path="/homework" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:view"><HomeworkList /></ProtectedRoute>} />
+          <Route path="/homework/new" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:create"><AddHomework /></ProtectedRoute>} />
+          <Route path="/homework/:id/edit" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:edit"><AddHomework /></ProtectedRoute>} />
+          <Route path="/homework/:id" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:view"><HomeworkDetails /></ProtectedRoute>} />
 
           {/* Attendance Management */}
           {/* Attendance Management */}
