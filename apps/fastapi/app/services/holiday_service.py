@@ -139,9 +139,11 @@ def _validate_dates(start_date, end_date) -> None:
         raise ValidationException("End date cannot be before start date")
 
 
-def _ensure_academic_year(db: Session, tenant_id: int, academic_year_id: int) -> None:
-    exists = (
-        db.query(AcademicYear.id)
+def _get_academic_year_for_tenant(
+    db: Session, tenant_id: int, academic_year_id: int
+) -> AcademicYear:
+    row = (
+        db.query(AcademicYear)
         .filter(
             AcademicYear.id == academic_year_id,
             AcademicYear.tenant_id == tenant_id,
@@ -149,8 +151,26 @@ def _ensure_academic_year(db: Session, tenant_id: int, academic_year_id: int) ->
         )
         .first()
     )
-    if not exists:
+    if not row:
         raise ValidationException("Academic year not found for tenant")
+    return row
+
+
+def _ensure_academic_year(db: Session, tenant_id: int, academic_year_id: int) -> None:
+    _get_academic_year_for_tenant(db, tenant_id, academic_year_id)
+
+
+def _validate_holiday_dates_within_academic_year(
+    ay: AcademicYear, start_date, end_date
+) -> None:
+    if start_date < ay.start_date or start_date > ay.end_date:
+        raise ValidationException(
+            "Holiday start date must fall within the selected academic year."
+        )
+    if end_date < ay.start_date or end_date > ay.end_date:
+        raise ValidationException(
+            "Holiday end date must fall within the selected academic year."
+        )
 
 
 def _assert_no_duplicate_holiday(
@@ -385,10 +405,11 @@ def create_holiday(
     tenant_id: int,
     payload: HolidayCreateRequest,
 ) -> HolidayResponse:
-    _ensure_academic_year(db, tenant_id, payload.academic_year_id)
+    ay = _get_academic_year_for_tenant(db, tenant_id, payload.academic_year_id)
 
     end_date = payload.end_date or payload.start_date
     _validate_dates(payload.start_date, end_date)
+    _validate_holiday_dates_within_academic_year(ay, payload.start_date, end_date)
 
     aud = payload.audience_type.strip().upper()
     c_ids, d_ids = _normalize_scope(aud, payload.class_ids, payload.division_ids)
@@ -451,7 +472,8 @@ def update_holiday(
     _validate_dates(next_start_date, next_end_date)
 
     next_academic_year_id = update_data.get("academic_year_id", row.academic_year_id)
-    _ensure_academic_year(db, tenant_id, next_academic_year_id)
+    ay = _get_academic_year_for_tenant(db, tenant_id, next_academic_year_id)
+    _validate_holiday_dates_within_academic_year(ay, next_start_date, next_end_date)
 
     row.academic_year_id = next_academic_year_id
     row.holiday_name = (
