@@ -5,11 +5,15 @@ import dayjs from "dayjs";
 import { useSnackbar } from "notistack";
 
 import { academicYearService, type AcademicYear } from "../../api/services/academicYearService";
+import { useAuth } from "../../context/AuthContext";
+import { useRBAC } from "../../context/RBACContext";
 import { fetchAcademicCalendar } from "../../services/academicCalendarApi";
 import {
   buildHolidayMap,
   buildMonthCells,
   EMPTY_ACADEMIC_YEARS,
+  isAdminCalendarUser,
+  isParentCalendarUser,
   parseISODateOnly,
   type CalendarCell,
 } from "./academicCalendar.utils";
@@ -17,6 +21,14 @@ import {
 export function useAcademicCalendarController() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
+  const { user } = useAuth();
+  const { hasPermission, roles } = useRBAC();
+
+  const isParentUser = isParentCalendarUser(user?.role, roles);
+  const isAdminUser = isAdminCalendarUser(user?.role, roles);
+
+  const canManageHolidays =
+    isAdminUser && !isParentUser && hasPermission("ACADEMIC_MGMT:create");
 
   const [year, setYear] = useState(() => dayjs().year());
   const [month, setMonth] = useState(() => dayjs().month() + 1);
@@ -142,7 +154,8 @@ export function useAcademicCalendarController() {
       ? "This month is outside the selected academic year."
       : "No holidays found for this month.";
 
-  const canAddHoliday = academicYearId != null && !monthOutsideAcademicYear;
+  const canAddHoliday = canManageHolidays && academicYearId != null && !monthOutsideAcademicYear;
+  const showAddHolidayButton = canManageHolidays;
 
   const addHolidayTooltip =
     monthOutsideAcademicYear
@@ -195,7 +208,7 @@ export function useAcademicCalendarController() {
       }
       navigate(buildAddHolidayPath(iso));
     },
-    [monthOutsideAcademicYear, academicYearId, buildAddHolidayPath, navigate, enqueueSnackbar]
+    [canManageHolidays, monthOutsideAcademicYear, academicYearId, buildAddHolidayPath, navigate, enqueueSnackbar]
   );
 
   const handleAcademicYearChange = useCallback((value: number) => {
@@ -218,6 +231,7 @@ export function useAcademicCalendarController() {
     noHolidays,
     emptyMonthMessage,
     canAddHoliday,
+    showAddHolidayButton,
     addHolidayTooltip,
     handleAddHoliday,
     handleDayClick,

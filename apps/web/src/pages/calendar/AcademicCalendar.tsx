@@ -132,21 +132,23 @@ export default function AcademicCalendar() {
                       </MenuItem>
                     ))}
                   </Select>
-                  <Tooltip title={c.addHolidayTooltip}>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        pointerEvents: c.canAddHoliday ? "auto" : "none",
-                        opacity: c.canAddHoliday ? 1 : 0.45,
-                      }}
-                    >
-                      <PrimaryActionButton
-                        onClick={c.handleAddHoliday}
-                        icon={<AddIcon sx={{ fontSize: 24 }} />}
-                        label="Add Holiday"
-                      />
-                    </span>
-                  </Tooltip>
+                  {c.showAddHolidayButton && (
+                    <Tooltip title={c.addHolidayTooltip}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          pointerEvents: c.canAddHoliday ? "auto" : "none",
+                          opacity: c.canAddHoliday ? 1 : 0.45,
+                        }}
+                      >
+                        <PrimaryActionButton
+                          onClick={c.handleAddHoliday}
+                          icon={<AddIcon sx={{ fontSize: 24 }} />}
+                          label="Add Holiday"
+                        />
+                      </span>
+                    </Tooltip>
+                  )}
                 </Stack>
               }
             />

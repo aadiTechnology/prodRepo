@@ -10,6 +10,29 @@ export const WEEKEND_LABEL = "Weekend";
 
 export const EMPTY_ACADEMIC_YEARS: AcademicYear[] = [];
 
+const PARENT_ROLE_TOKENS = new Set(["parent", "parents", "guardian"]);
+const ADMIN_ROLE_TOKENS = new Set(["admin", "tenant_admin", "super_admin", "system_admin"]);
+
+export function normalizeRoleToken(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+export function isParentCalendarUser(
+  userRole: string | null | undefined,
+  rbacRoles: readonly string[]
+): boolean {
+  if (PARENT_ROLE_TOKENS.has(normalizeRoleToken(userRole))) return true;
+  return rbacRoles.some((role) => PARENT_ROLE_TOKENS.has(normalizeRoleToken(role)));
+}
+
+export function isAdminCalendarUser(
+  userRole: string | null | undefined,
+  rbacRoles: readonly string[]
+): boolean {
+  if (ADMIN_ROLE_TOKENS.has(normalizeRoleToken(userRole))) return true;
+  return rbacRoles.some((role) => ADMIN_ROLE_TOKENS.has(normalizeRoleToken(role)));
+}
+
 export function mergeHolidayDayRows(
   existing: AcademicCalendarDayItem,
   incoming: AcademicCalendarDayItem
