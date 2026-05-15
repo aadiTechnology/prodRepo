@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Box,
-  Button,
   Chip,
   CircularProgress,
   Link,
@@ -10,7 +9,6 @@ import {
   Snackbar,
   Stack,
   Typography,
-  Divider,
 } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import { alpha } from "@mui/material/styles";
@@ -19,16 +17,13 @@ import {
   Book as BookIcon,
   CalendarMonth as CalendarIcon,
   Class as ClassIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
   Info as InfoIcon,
   MenuBook as MenuBookIcon,
   Person as PersonIcon,
 } from "@mui/icons-material";
-import { useNavigate, useParams } from "react-router-dom";
-import { ListPageLayout, PrimaryActionButton, DeleteActionButton } from "../../components/reusable";
+import { useParams } from "react-router-dom";
+import { ListPageLayout } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
-import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import { homeworkService, type HomeworkResponse } from "../../api/services/homeworkService";
 import { apiBaseUrl } from "../../config/env";
 import { colorTokens } from "../../tokens/colors";
@@ -100,14 +95,11 @@ function InfoBlock({
 
 export default function HomeworkDetails() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const homeworkId = id ? Number(id) : NaN;
 
   const [hw, setHw] = useState<HomeworkResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     message: string;
     severity: "success" | "error";
@@ -135,20 +127,6 @@ export default function HomeworkDetails() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  const handleDelete = async () => {
-    if (!hw) return;
-    try {
-      setDeleteLoading(true);
-      await homeworkService.delete(hw.id);
-      setDeleteOpen(false);
-      navigate("/homework");
-    } catch {
-      setSnackbar({ message: "Unable to delete homework", severity: "error" });
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
@@ -192,20 +170,6 @@ export default function HomeworkDetails() {
             { title: hw.title, path: "#" },
           ]}
           homePath="/"
-          actions={
-            <Stack direction="row" gap={1} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: "wrap" }}>
-              <PrimaryActionButton
-                onClick={() => navigate(`/homework/${hw.id}/edit`)}
-                icon={<EditIcon sx={{ fontSize: 20 }} />}
-                label="Edit homework"
-              />
-              <DeleteActionButton
-                onClick={() => setDeleteOpen(true)}
-                icon={<DeleteIcon sx={{ fontSize: 20 }} />}
-                label="Delete homework"
-              />
-            </Stack>
-          }
         />
       }
     >
@@ -415,17 +379,6 @@ export default function HomeworkDetails() {
           </Paper>
         )}
       </Box>
-
-      {/* Delete confirmation */}
-      <ConfirmDialog
-        open={deleteOpen}
-        title="Delete Homework?"
-        message={`Are you sure you want to delete "${hw.title}"? This action cannot be undone.`}
-        confirmLabel={deleteLoading ? "Deleting…" : "Delete"}
-        onConfirm={() => void handleDelete()}
-        onClose={() => setDeleteOpen(false)}
-        loading={deleteLoading}
-      />
 
       {/* Toast */}
       <Snackbar
