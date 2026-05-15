@@ -66,6 +66,12 @@ export const authService = {
     const response = await apiClient.get<LoginContextResponse>("/auth/rbac/context");
     return response.data;
   },
+
+  /** Extend session with a new access token (requires current token still valid). */
+  refreshAccessToken: async (): Promise<TokenResponse> => {
+    const response = await apiClient.post<TokenResponse>("/auth/refresh");
+    return response.data;
+  },
 };
 
 export default authService;

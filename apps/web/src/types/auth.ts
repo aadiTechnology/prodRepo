@@ -38,6 +38,8 @@ export interface User {
 export interface LoginRequest {
   email: string;
   password: string;
+  /** When using the school login flow; backend enforces tenant users match this tenant. */
+  tenant_id?: number | null;
 }
 
 export interface TokenResponse {

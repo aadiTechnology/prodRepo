@@ -66,3 +66,18 @@ export interface TenantProvisionResponse {
     admin_role_id: number;
     message: string;
 }
+
+/** Public school row from GET /tenants/tenants/ (pre-login picker). */
+export interface TenantSchoolPickerItem {
+    id: number;
+    code: string;
+    name: string;
+    logo_url?: string | null;
+    theme_template_id?: number | null;
+    theme_config?: Record<string, unknown> | null;
+}
+
+export interface TenantSchoolPickerListResponse {
+    items: TenantSchoolPickerItem[];
+    total: number;
+}

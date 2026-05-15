@@ -125,9 +125,8 @@ function MainLayout() {
   const handleLogout = useCallback(() => {
     handleUserMenuClose();
     clearRBACData();
-    logout();
-    navigate("/login");
-  }, [handleUserMenuClose, clearRBACData, logout, navigate]);
+    void logout();
+  }, [handleUserMenuClose, clearRBACData, logout]);
 
   const handleMobileMenuToggle = useCallback(() => {
     setMobileMenuOpen(!mobileMenuOpen);

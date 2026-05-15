@@ -3,8 +3,9 @@
  * Handles email/password login with RBAC context integration
  */
 
-import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate, useLocation, Link, useSearchParams } from "react-router-dom";
+import SelectSchoolModal from "../components/semantic/SelectSchoolModal";
 import {
   Box,
   Typography,
@@ -19,6 +20,11 @@ import { Info as InfoIcon } from "@mui/icons-material";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 import { LoginRequest } from "../types/auth";
+import type { ApiError } from "../api/client";
+import type { TenantSchoolPickerItem } from "../types/tenant";
+import publicSchoolService from "../api/services/publicSchoolService";
+import AppThemeProvider from "../theme/AppThemeProvider";
+import { deriveThemePropsFromTenant } from "../theme/ThemeFromTenantProvider";
 
 // ── Design tokens ─────────────────────────────────────────────────────────
 const T = {
@@ -102,6 +108,7 @@ const MarketingSvg = () => (
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { loginWithContext, isAuthenticated } = useAuth();
   const { setRBACData } = useRBAC();
 
@@ -109,6 +116,52 @@ export default function Login() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [schoolPreview, setSchoolPreview] = useState<TenantSchoolPickerItem | null>(null);
+  const [schoolModalOpen, setSchoolModalOpen] = useState(false);
+
+  const tenantIdFromQuery = useMemo(() => {
+    const raw = searchParams.get("tenant");
+    if (!raw || !/^\d+$/.test(raw)) return undefined;
+    return Number(raw);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (tenantIdFromQuery === undefined) {
+      setSchoolPreview(null);
+      return;
+    }
+    const id = tenantIdFromQuery;
+    try {
+      const cached = sessionStorage.getItem(`schoolLoginPreview:${id}`);
+      if (cached) {
+        const parsed = JSON.parse(cached) as TenantSchoolPickerItem;
+        if (parsed && parsed.id === id) {
+          setSchoolPreview(parsed);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await publicSchoolService.get(id);
+        if (!cancelled) {
+          setSchoolPreview(data);
+          try {
+            sessionStorage.setItem(`schoolLoginPreview:${id}`, JSON.stringify(data));
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch {
+        if (!cancelled) setSchoolPreview(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantIdFromQuery]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -132,6 +185,17 @@ export default function Login() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleSchoolSelected = (school: TenantSchoolPickerItem) => {
+    try {
+      sessionStorage.setItem(`schoolLoginPreview:${school.id}`, JSON.stringify(school));
+    } catch {
+      /* ignore */
+    }
+    setSearchParams({ tenant: String(school.id) }, { replace: true });
+    setSchoolModalOpen(false);
+    setError(null);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -145,10 +209,26 @@ export default function Login() {
     if (!validate()) return;
     setIsSubmitting(true);
     try {
-      const response = await loginWithContext(formData);
+      const response = await loginWithContext({
+        ...formData,
+        ...(tenantIdFromQuery !== undefined ? { tenant_id: tenantIdFromQuery } : {}),
+      });
       setRBACData({ roles: response.roles, menus: response.menus, permissions: response.permissions });
-    } catch {
-      setError("Invalid credentials.");
+    } catch (err) {
+      const apiErr = err as ApiError;
+      const status = apiErr.response?.status;
+      const rawDetail = apiErr.response?.data?.detail;
+      const msg = typeof rawDetail === "string" ? rawDetail : apiErr.message;
+      if (status === 403 && tenantIdFromQuery !== undefined) {
+        setError(
+          msg ||
+            `This account is not registered with ${schoolPreview?.name ?? "the selected school"}. Please select the correct school.`,
+        );
+      } else if (status === 403) {
+        setError(msg || "You do not have permission to sign in.");
+      } else {
+        setError("Invalid credentials.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -157,7 +237,9 @@ export default function Login() {
   const isButtonDisabled = !formData.email.trim() || !formData.password || isSubmitting;
   if (isAuthenticated) return null;
 
-  return (
+  const tenantTheme = schoolPreview ? deriveThemePropsFromTenant(schoolPreview) : null;
+
+  const page = (
     <Box sx={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", backgroundColor: T.bgPage }}>
       <style>{globalAnimations}</style>
       <Grid container sx={{ flex: 1, height: "100%" }}>
@@ -194,12 +276,21 @@ export default function Login() {
             
             {/* Brand */}
             <Box sx={{ mb: 4, textAlign: "left" }}>
-              <Box
-                component="img"
-                src="/aadi-logo.png"
-                alt="Aadi Technology"
-                sx={{ height: 76, width: "auto", mb: 3.5, display: "block",  }}
-              />
+              {schoolPreview?.logo_url ? (
+                <Box
+                  component="img"
+                  src={schoolPreview.logo_url}
+                  alt={schoolPreview.name}
+                  sx={{ maxHeight: 88, width: "auto", mb: 2.5, display: "block", objectFit: "contain" }}
+                />
+              ) : (
+                <Box
+                  component="img"
+                  src="/aadi-logo.png"
+                  alt="Aadi Technology"
+                  sx={{ height: 76, width: "auto", mb: 3.5, display: "block" }}
+                />
+              )}
               <Typography
                 variant="h5"
                 sx={{
@@ -208,7 +299,7 @@ export default function Login() {
                   mb: 1,
                   letterSpacing: "-0.02em",
                   lineHeight: 1.3,
-                  fontFamily: "'Sora', sans-serif"
+                  fontFamily: "'Sora', sans-serif",
                 }}
               >
                 Sign in to your account
@@ -355,6 +446,28 @@ export default function Login() {
                     Register
                   </MuiLink>
                 </Typography>
+              </Box>
+
+              <Box sx={{ textAlign: "center", mt: 1.5, animation: "fadeUp 0.5s 0.38s ease both" }}>
+                <MuiLink
+                  component="button"
+                  type="button"
+                  onClick={() => setSchoolModalOpen(true)}
+                  sx={{
+                    color: T.primary,
+                    textDecoration: "none",
+                    fontWeight: 600,
+                    fontSize: "0.82rem",
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    p: 0,
+                    "&:hover": { textDecoration: "underline", color: T.primaryDark },
+                  }}
+                >
+                  Change School for Login
+                </MuiLink>
               </Box>
             </Box>
           </Box>
@@ -523,6 +636,27 @@ export default function Login() {
           </Box>
         </Grid>
       </Grid>
+
+      <SelectSchoolModal
+        open={schoolModalOpen}
+        onClose={() => setSchoolModalOpen(false)}
+        onSchoolSelected={handleSchoolSelected}
+        selectedSchoolId={tenantIdFromQuery ?? null}
+      />
     </Box>
   );
+
+  if (tenantTheme) {
+    return (
+      <AppThemeProvider
+        tenantConfig={tenantTheme.tenantConfig}
+        tokenOverrides={tenantTheme.tokenOverrides}
+        logoUrl={tenantTheme.logoUrl}
+      >
+        {page}
+      </AppThemeProvider>
+    );
+  }
+
+  return page;
 }

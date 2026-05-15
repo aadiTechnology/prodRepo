@@ -13,9 +13,11 @@ import AppThemeProvider from "./AppThemeProvider";
 import type { TenantThemeConfig } from "./tenant";
 import type { ThemeConfigTokenOverrides } from "../types/auth";
 
-function deriveThemeProps(tenant: { theme_config?: ThemeConfigTokenOverrides | null; logo_url?: string | null } | null | undefined) {
+export function deriveThemePropsFromTenant(
+  tenant: { theme_config?: ThemeConfigTokenOverrides | null; logo_url?: string | null } | null | undefined,
+) {
   if (!tenant) {
-    return { tenantConfig: null, tokenOverrides: null, logoUrl: null };
+    return { tenantConfig: null, tokenOverrides: null, logoUrl: null as string | null };
   }
   const logoUrl = tenant.logo_url ?? null;
   if (tenant.theme_config != null && Object.keys(tenant.theme_config).length > 0) {
@@ -38,8 +40,8 @@ export default function ThemeFromTenantProvider({ children }: ThemeFromTenantPro
   const tenant = user?.tenant;
 
   const { tenantConfig, tokenOverrides, logoUrl } = useMemo(
-    () => deriveThemeProps(tenant),
-    [tenant]
+    () => deriveThemePropsFromTenant(tenant),
+    [tenant],
   );
 
   return (

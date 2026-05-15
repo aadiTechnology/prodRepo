@@ -12,10 +12,60 @@ from app.models.user import User, UserRole
 from app.models.role import Role, user_roles, role_menus
 from app.models.menu import Menu
 from app.models.role_menu_permission import RoleMenuPermission
-from app.schemas.tenant import TenantCreate, TenantUpdate, TenantProvision
+from app.schemas.tenant import TenantCreate, TenantUpdate, TenantProvision, TenantSchoolPickerItem
+from app.services import theme_template_service
 from app.utils.security import hash_password
 
 logger = get_logger(__name__)
+
+def _to_school_picker_item(db: Session, tenant: Tenant) -> TenantSchoolPickerItem:
+    tid = getattr(tenant, "theme_template_id", None)
+    theme_config = theme_template_service.get_template_config(db, tid) if tid else None
+    return TenantSchoolPickerItem(
+        id=tenant.id,
+        name=tenant.name,
+        code=tenant.code,
+        logo_url=tenant.logo_url,
+        theme_template_id=tid,
+        theme_config=theme_config,
+    )
+
+
+def list_public_schools_for_login(
+    db: Session,
+    page: int = 1,
+    page_size: int = 100,
+) -> tuple[list[TenantSchoolPickerItem], int]:
+    """Active, non-deleted tenants for the public school picker (pre-login)."""
+    query = db.query(Tenant).filter(
+        Tenant.is_deleted == False,  # noqa: E712
+        Tenant.is_active == True,  # noqa: E712
+    )
+    total_count = query.count()
+    rows = (
+        query.order_by(Tenant.name.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return [_to_school_picker_item(db, t) for t in rows], total_count
+
+
+def get_public_school_for_login(db: Session, tenant_id: int) -> TenantSchoolPickerItem:
+    """Single active tenant for login branding refresh (public)."""
+    tenant = (
+        db.query(Tenant)
+        .filter(
+            Tenant.id == tenant_id,
+            Tenant.is_deleted == False,  # noqa: E712
+            Tenant.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
+    if not tenant:
+        raise NotFoundException("Tenant", tenant_id)
+    return _to_school_picker_item(db, tenant)
+
 
 def get_tenants(
     db: Session,

@@ -1,13 +1,18 @@
 """Authentication schemas."""
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Any
 from app.models.user import UserRole
 from app.schemas.menu import MenuNode
 
 class LoginRequest(BaseModel):
     """Login request schema."""
+
     email: EmailStr
     password: str
+    tenant_id: Optional[int] = Field(
+        default=None,
+        description="When set (school login flow), tenant-scoped users must belong to this tenant.",
+    )
 
 class TokenResponse(BaseModel):
     """Token response schema."""

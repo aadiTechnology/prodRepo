@@ -7,7 +7,7 @@ from app.services.rbac_service import get_user_roles
 from app.schemas.auth import LoginRequest, TokenResponse, UserWithRole, LoginContextResponse, TenantInfo
 from app.schemas.user import UserCreate, UserResponse
 from app.services import user_service, rbac_service, auth_service, theme_template_service
-from app.models.user import UserRole
+from app.models.user import User, UserRole
 from app.utils.security import verify_password, create_access_token
 from app.core.exceptions import UnauthorizedException, ForbiddenException
 from app.core.logging_config import get_logger
@@ -15,9 +15,47 @@ from app.core.dependencies import get_current_user, CurrentUser, get_rbac_role_c
 from app.services.auth_service import revoke_token
 from app.models.tenant import Tenant
 
+from typing import Optional
+
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+def _assert_login_tenant_matches(db: Session, user: User, requested_tenant_id: Optional[int]) -> None:
+    """
+    School portal login: only users assigned to the selected tenant may sign in.
+    System administrators (no tenant) must use /login without a school selection.
+    """
+    if requested_tenant_id is None:
+        return
+
+    school = (
+        db.query(Tenant)
+        .filter(
+            Tenant.id == requested_tenant_id,
+            Tenant.is_deleted == False,  # noqa: E712
+            Tenant.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
+    if not school:
+        raise ForbiddenException("The selected school is not available. Please choose another school.")
+
+    user_tenant_id = user.tenant_id
+    school_name = school.name
+
+    if user_tenant_id is None:
+        raise ForbiddenException(
+            f"This account is not registered with {school_name}. "
+            "System administrators should sign in from the administrator login page."
+        )
+
+    if user_tenant_id != requested_tenant_id:
+        raise ForbiddenException(
+            f"This account does not belong to {school_name}. "
+            "Please select the correct school or contact your school administrator."
+        )
 
 
 def _has_full_user_management_access(db: Session, user) -> bool:
@@ -33,11 +71,10 @@ def _has_full_user_management_access(db: Session, user) -> bool:
 @router.post("/register", response_model=UserResponse, status_code=201)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)) -> UserResponse:
     """Register a new user."""
-    from app.models.user import User
-    
+
     existing_users = db.query(User).count()
     is_first_user = existing_users == 0
-    
+
     role = UserRole.ADMIN if is_first_user else UserRole.USER
     
     logger.info(f"Registering new user: {user_data.email} with role: {role.value}")
@@ -65,7 +102,9 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> Toke
     if user is None or not verify_password(login_data.password, user.hashed_password):
         logger.warning(f"Invalid credentials for email: {login_data.email}")
         raise UnauthorizedException("Invalid email or password")
-    
+
+    _assert_login_tenant_matches(db, user, login_data.tenant_id)
+
     if not user.is_active:
         raise UnauthorizedException("Your account is deactivated. Contact system administrator.")
     
@@ -102,7 +141,38 @@ async def login_with_context(
         logger.warning(f"[RBAC] Invalid credentials for email: {login_data.email}")
         raise UnauthorizedException("Invalid email or password")
 
+    _assert_login_tenant_matches(db, user, login_data.tenant_id)
+
     return auth_service.get_login_context(db, user)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_access_token(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> TokenResponse:
+    """Issue a new access token for the current session (extends JWT lifetime)."""
+    user = user_service.get_user_by_id(db, current_user.id)
+    if not user or not user.is_active or user.is_deleted:
+        raise UnauthorizedException("Your account is deactivated. Contact system administrator.")
+
+    roles = rbac_service.get_user_roles(db, user.id)
+    resolved_role = roles[0].code if roles else (user.role.value if user.role else "USER")
+
+    token_data: dict = {
+        "sub": str(user.id),
+        "email": user.email,
+        "role": resolved_role,
+        "tenant_id": user.tenant_id,
+        "is_impersonation": current_user.is_impersonation,
+    }
+    if current_user.is_impersonation and current_user.original_user_id:
+        token_data["original_user_id"] = current_user.original_user_id
+
+    access_token = create_access_token(data=token_data)
+    logger.info(f"Access token refreshed for user: {user.email}")
+    return TokenResponse(access_token=access_token)
+
 
 @router.get("/me", response_model=UserWithRole)
 async def get_current_user_info(

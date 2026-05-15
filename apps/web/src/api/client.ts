@@ -3,8 +3,44 @@
  * Centralized HTTP client with interceptors and error handling
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
+import axios, { AxiosInstance, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from "axios";
 import { apiBaseUrl, isDevelopment } from "../config";
+import { refreshAccessToken } from "./tokenRefresh";
+
+type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+
+const AUTH_NO_REFRESH_PATHS = [
+  "/auth/login",
+  "/auth/login/context",
+  "/auth/register",
+  "/auth/refresh",
+  "/auth/logout",
+];
+
+function shouldAttemptTokenRefresh(config: InternalAxiosRequestConfig | undefined): boolean {
+  const url = config?.url ?? "";
+  return !AUTH_NO_REFRESH_PATHS.some((path) => url.includes(path));
+}
+
+let refreshInFlight: Promise<string | null> | null = null;
+
+function tryRefreshToken(): Promise<string | null> {
+  if (!refreshInFlight) {
+    refreshInFlight = refreshAccessToken().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
+function forceSessionExpiredLogout(): void {
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("auth_user");
+  const currentPath = window.location.pathname;
+  if (currentPath !== "/login" && currentPath !== "/session-expired") {
+    window.location.href = "/session-expired";
+  }
+}
 
 /**
  * Custom error interface for API errors
@@ -75,7 +111,7 @@ const createAxiosInstance = (): AxiosInstance => {
       }
       return response;
     },
-    (error: AxiosError<ApiErrorResponse>) => {
+    async (error: AxiosError<ApiErrorResponse>) => {
       // Log error in development
       if (isDevelopment) {
         console.error("[API Response Error]", {
@@ -89,17 +125,24 @@ const createAxiosInstance = (): AxiosInstance => {
 
       // Handle different error scenarios
       if (error.response) {
-        // Handle 401 Unauthorized - clear auth and redirect to session expired page
-        if (error.response.status === 401) {
-          // Clear authentication data
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("auth_user");
+        const originalConfig = error.config as RetriableConfig | undefined;
 
-          // Only redirect if not already on login or session-expired page
-          const currentPath = window.location.pathname;
-          if (currentPath !== "/login" && currentPath !== "/session-expired") {
-            window.location.href = "/session-expired";
+        if (
+          error.response.status === 401 &&
+          originalConfig &&
+          !originalConfig._retry &&
+          shouldAttemptTokenRefresh(originalConfig)
+        ) {
+          originalConfig._retry = true;
+          const newToken = await tryRefreshToken();
+          if (newToken) {
+            originalConfig.headers = originalConfig.headers ?? {};
+            originalConfig.headers.Authorization = `Bearer ${newToken}`;
+            return instance(originalConfig);
           }
+          forceSessionExpiredLogout();
+        } else if (error.response.status === 401 && shouldAttemptTokenRefresh(originalConfig)) {
+          forceSessionExpiredLogout();
         }
 
         // Server responded with error status

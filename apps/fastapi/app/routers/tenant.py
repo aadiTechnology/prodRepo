@@ -4,13 +4,44 @@ from typing import List, Optional
 
 from app.core.database import get_db
 from app.core.dependencies import require_system_admin, CurrentUser
-from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantProvision, TenantListResponse
+from app.schemas.tenant import (
+    TenantCreate,
+    TenantUpdate,
+    TenantResponse,
+    TenantProvision,
+    TenantListResponse,
+    TenantSchoolPickerItem,
+    TenantSchoolPickerListResponse,
+)
 from app.schemas.user import UserResponse
 from app.services import tenant_service
 from app.models.tenant import Tenant
 from app.models.user import User, UserRole
 
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
+
+
+@router.get("/tenants/", response_model=TenantSchoolPickerListResponse)
+async def list_public_schools_for_login(
+    db: Session = Depends(get_db),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(100, ge=1, le=500, description="Items per page"),
+) -> TenantSchoolPickerListResponse:
+    """
+    Public list of active schools for the pre-login school picker.
+    No authentication required.
+    """
+    items, total = tenant_service.list_public_schools_for_login(db, page=page, page_size=page_size)
+    return {"items": items, "total": total}
+
+
+@router.get("/tenants/{tenant_id}", response_model=TenantSchoolPickerItem)
+async def get_public_school_for_login(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+) -> TenantSchoolPickerItem:
+    """Public single-school profile for login branding (active tenants only)."""
+    return tenant_service.get_public_school_for_login(db, tenant_id)
 
 
 @router.get("/", response_model=TenantListResponse)

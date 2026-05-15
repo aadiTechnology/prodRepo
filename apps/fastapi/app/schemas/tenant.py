@@ -1,7 +1,7 @@
 """Pydantic schemas for Tenant (multi-tenancy)."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, EmailStr
 
@@ -70,4 +70,23 @@ class TenantResponse(TenantBase):
 
 class TenantListResponse(BaseModel):
     items: list[TenantResponse]
+    total: int
+
+
+class TenantSchoolPickerItem(BaseModel):
+    """Public school row for pre-login selection (active tenants only)."""
+
+    id: int
+    name: str
+    code: str
+    logo_url: Optional[str] = None
+    theme_template_id: Optional[int] = None
+    theme_config: Optional[dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TenantSchoolPickerListResponse(BaseModel):
+    items: list[TenantSchoolPickerItem]
     total: int

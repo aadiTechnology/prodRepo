@@ -8,10 +8,12 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { User, LoginRequest, AuthState } from "../types/auth";
 import authService from "../api/services/authService";
 import { ApiError } from "../api/client";
+import { AUTH_TOKEN_REFRESHED_EVENT } from "../api/tokenRefresh";
 import { LoginContextResponse } from "../types/rbac";
 import { useNavigate } from "react-router-dom";
 import { useRBAC } from "./RBACContext";
 import { enqueueSnackbar } from "notistack";
+import { getJwtExpiryMs } from "../utils/jwt";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Type Definitions
@@ -30,6 +32,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const TOKEN_STORAGE_KEY = "auth_token";
 const USER_STORAGE_KEY = "auth_user";
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+/** Refresh JWT this many ms before `exp` so the session does not hit 401 mid-work. */
+const TOKEN_REFRESH_BEFORE_EXPIRY_MS = 2 * 60 * 1000;
 
 /**
  * Get token from localStorage
@@ -261,6 +265,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(false);
     }
   }, [applyLoginContextResponse, navigate]);
+
+  /** Keep access token fresh while the user is active (JWT has no refresh until expiry otherwise). */
+  useEffect(() => {
+    if (!token) return;
+
+    const scheduleRefresh = () => {
+      const expMs = getJwtExpiryMs(token);
+      if (!expMs) return undefined;
+      const delay = Math.max(expMs - Date.now() - TOKEN_REFRESH_BEFORE_EXPIRY_MS, 30_000);
+      return window.setTimeout(async () => {
+        try {
+          const { access_token } = await authService.refreshAccessToken();
+          setToken(access_token);
+          saveToken(access_token);
+        } catch {
+          /* 401 handled by api client; ignore transient errors */
+        }
+      }, delay);
+    };
+
+    let timeoutId = scheduleRefresh();
+
+    const onTokenRefreshed = (event: Event) => {
+      const detail = (event as CustomEvent<{ access_token?: string }>).detail;
+      if (detail?.access_token) {
+        setToken(detail.access_token);
+        saveToken(detail.access_token);
+      }
+    };
+
+    window.addEventListener(AUTH_TOKEN_REFRESHED_EVENT, onTokenRefreshed);
+
+    return () => {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      window.removeEventListener(AUTH_TOKEN_REFRESHED_EVENT, onTokenRefreshed);
+    };
+  }, [token]);
 
   /**
    * Handle session timeout after inactivity
