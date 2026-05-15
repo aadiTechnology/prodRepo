@@ -213,6 +213,31 @@ class StudentService:
             self.db.add(student)
             self.db.commit()
             self.db.refresh(student)
+
+            # Create User for Student
+            try:
+                from app.services import user_service
+                from app.schemas.user import UserCreate
+                
+                user_email = req.email or f"{student.student_code}@student.local"
+                user_create = UserCreate(
+                    email=user_email,
+                    full_name=student.student_name,
+                    password=student.mobile_number, # default password
+                    role="STUDENT",
+                    tenant_id=tenant_id
+                )
+                user_service.create_user(
+                    self.db,
+                    user=user_create,
+                    role="STUDENT",
+                    created_by=getattr(user, "id", None) if user else None,
+                    tenant_id=tenant_id
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Failed to create user for student {student.id}: {e}")
+
             return StudentCreateResponse(message="Student created successfully", student_id=student.id)
         except Exception as e:
             self.db.rollback()

@@ -209,6 +209,30 @@ class EnrollmentService:
             self.db.commit()
             self.db.refresh(student)
 
+            # Create User for Student
+            try:
+                from app.services import user_service
+                from app.schemas.user import UserCreate
+                
+                user_email = payload.email or f"{student.admission_no}@student.local"
+                user_create = UserCreate(
+                    email=user_email,
+                    full_name=student.student_name,
+                    password=student.mobile_number or "student@123", # default password
+                    role="STUDENT",
+                    tenant_id=tenant_id
+                )
+                user_service.create_user(
+                    self.db,
+                    user=user_create,
+                    role="STUDENT",
+                    created_by=user_id,
+                    tenant_id=tenant_id
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Failed to create user for enrolled student {student.id}: {e}")
+
             printable = {
                 "student": {
                     "id": student.id,

@@ -33,8 +33,8 @@ def create_user(
         ).first()
 
         if not role_obj:
-            # Auto-healing: Create the role if it's a critical role (TEACHER/ADMIN) and missing for this tenant
-            if user.role.upper() in ["TEACHER", "ADMIN"]:
+            # Auto-healing: Create the role if it's a critical role (TEACHER/ADMIN/STUDENT) and missing for this tenant
+            if user.role.upper() in ["TEACHER", "ADMIN", "STUDENT", "PARENT"]:
                 role_obj = Role(
                     code=user.role.upper(),
                     name=user.role.title(),
