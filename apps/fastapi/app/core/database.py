@@ -69,8 +69,7 @@ engine = create_engine(
     pool_timeout=30,           # Seconds to wait before giving up on getting a connection (default: 30)
     # Connection arguments
     connect_args={
-        "timeout": 10,         # pyodbc login/connection timeout in seconds
-        "loginTimeout": 10,    # ODBC login timeout (some drivers use this key)
+        "timeout": 10,         # pyodbc connection timeout in seconds
     },
     # Execution options for better performance
     execution_options={

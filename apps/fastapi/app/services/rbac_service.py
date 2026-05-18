@@ -291,14 +291,18 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
         menu_rows = [m for m in menu_rows if m.tenant_id is None or m.tenant_id == user.tenant_id]  # type: ignore
         
     elif role_ids:
-        # Query 2: Get all role-menu permissions with EAGER LOADING (no N+1!)
-        # This is the critical optimization: joinedload() prevents lazy loading of Menu.feature
-        from sqlalchemy.orm import joinedload
-        
+        # Single query: JOIN RoleMenuPermission → Menu → Feature + LEFT JOIN all menus for
+        # parent resolution.  contains_eager() tells SQLAlchemy to populate the ORM
+        # relationships from the rows already fetched by our explicit JOINs, so we
+        # avoid the extra SELECT that joinedload() would issue.
+        from sqlalchemy.orm import contains_eager
+
         perms = (
             db.query(RoleMenuPermission)
+            .join(RoleMenuPermission.menu)
+            .outerjoin(Menu.feature)
             .options(
-                joinedload(RoleMenuPermission.menu).joinedload(Menu.feature)  # Eager load Menu.feature
+                contains_eager(RoleMenuPermission.menu).contains_eager(Menu.feature)
             )
             .filter(
                 RoleMenuPermission.role_id.in_(role_ids),
@@ -308,10 +312,10 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
             .all()
         )
 
-        # Build permission codes (no lazy loading now!)
+        # Build permission codes (all related data already in memory — no lazy loads)
         seen_menu_ids: set[int] = set()
         menus_to_include = []
-        
+
         for p in perms:
             m = p.menu
             if m.feature_id and m.feature:
@@ -327,22 +331,16 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
 
             if p.can_view and (m.tenant_id is None or m.tenant_id == user.tenant_id):  # type: ignore
                 menus_to_include.append(m)
-        
-        # Query 3: Pre-load ALL menus to avoid N+1 on parent lookup
-        # Collect all menu IDs that need parent resolution
-        all_menu_ids = set(int(m.id) if m.id else 0 for m in menus_to_include)  # type: ignore
-        parent_ids = set(int(m.parent_id) if m.parent_id else 0 for m in menus_to_include if m.parent_id)  # type: ignore
-        
-        # Build a local cache of all menus to avoid recursive DB queries
+
+        # One extra query to fetch the full menu catalog for parent-chain resolution
         menu_cache: Dict[int, Menu] = {}
-        if menus_to_include or parent_ids:
+        if menus_to_include:
             all_menus_query = db.query(Menu).filter(
                 Menu.is_active == True,  # noqa: E712
                 Menu.is_deleted == False,  # noqa: E712
             ).all()
             menu_cache = {int(m.id): m for m in all_menus_query}  # type: ignore
-        
-        # Now include menus with their parents using the cache (no DB queries!)
+
         for m in menus_to_include:
             _include_menu_with_parents_from_cache(m, menu_rows, seen_menu_ids, menu_cache)
 
