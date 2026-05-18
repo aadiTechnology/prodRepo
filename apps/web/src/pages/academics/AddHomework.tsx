@@ -10,10 +10,11 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  Tooltip,
   Typography,
   alpha,
 } from "@mui/material";
-import PublishIcon from "@mui/icons-material/Publish";
+import SaveAsIcon from "@mui/icons-material/SaveAs";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
@@ -66,7 +67,7 @@ export default function AddHomework() {
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
   // Prevents the class_id watcher from resetting subject/division when edit data loads.
-  const skipDependentResetRef = useRef(false);
+  const isDataLoadedRef = useRef(!isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
 
@@ -143,6 +144,15 @@ export default function AddHomework() {
       .catch(() => {});
   }, []);
 
+  // When academic year changes — reset class, division, and subject dropdowns
+  useEffect(() => {
+    if (!isDataLoadedRef.current) return;
+    handleFieldValueChange("class_id", "");
+    handleFieldValueChange("class_division_id", "");
+    handleFieldValueChange("subject_id", "");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.academic_year_id]);
+
   // When class changes — reload divisions and subjects
   useEffect(() => {
     const classId = formData.class_id;
@@ -171,32 +181,13 @@ export default function AddHomework() {
       )
       .catch(() => setSubjectOptions([]));
 
-    // When edit data loads it sets class_id along with subject/division — skip the reset.
-    if (skipDependentResetRef.current) {
-      skipDependentResetRef.current = false;
-      return;
-    }
+    if (!isDataLoadedRef.current) return;
 
     // Reset dependent dropdowns only when the user manually picks a different class.
     handleFieldValueChange("class_division_id", "");
     handleFieldValueChange("subject_id", "");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.class_id]);
-
-  // Reload subjects when academic year changes (if class already selected)
-  useEffect(() => {
-    if (!formData.class_id) return;
-    const yearId = formData.academic_year_id ? Number(formData.academic_year_id) : undefined;
-    homeworkService
-      .getSubjectsForClass(Number(formData.class_id), yearId)
-      .then((subjects) =>
-        setSubjectOptions(
-          subjects.map((s) => ({ label: `${s.name} (${s.code})`, value: String(s.id) })),
-        ),
-      )
-      .catch(() => setSubjectOptions([]));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.academic_year_id]);
 
   // Load existing homework data in edit mode
   useEffect(() => {
@@ -205,8 +196,6 @@ export default function AddHomework() {
     homeworkService
       .getById(Number(id))
       .then((hw) => {
-        // Flag so the class_id watcher doesn't reset subject/division during this load.
-        skipDependentResetRef.current = true;
         setFormData({
           academic_year_id: String(hw.academic_year_id),
           class_id: String(hw.class_id),
@@ -220,6 +209,10 @@ export default function AddHomework() {
           status: hw.status,
         });
         setSavedAttachments(hw.attachments ?? []);
+        // Settle renders before enabling manual reset behavior
+        setTimeout(() => {
+          isDataLoadedRef.current = true;
+        }, 100);
       })
       .catch(() => setError("Unable to load homework details"))
       .finally(() => setFetchLoading(false));
@@ -378,6 +371,36 @@ export default function AddHomework() {
     [baseHandleSubmit, submitHomework],
   );
 
+  // Draft handler — bypasses submission_date required check.
+  const handleSaveDraft = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      // Minimal validation: only require class and title at minimum
+      const draftErrors: Partial<Record<keyof AddHomeworkFormData, string>> = {};
+      if (!formData.academic_year_id) draftErrors.academic_year_id = "Please select academic year";
+      if (!formData.class_id) draftErrors.class_id = "Please select class";
+      if (!formData.subject_id) draftErrors.subject_id = "Please select subject";
+      if (!formData.title.trim()) draftErrors.title = "Please enter homework title";
+      if (!formData.assigned_date) draftErrors.assigned_date = "Please select assigned date";
+      if (Object.keys(draftErrors).length > 0) {
+        setFieldErrors((prev) => ({ ...prev, ...draftErrors }));
+        return;
+      }
+      // For draft, if submission_date is empty, use assigned_date as a placeholder
+      const originalSubmissionDate = formData.submission_date;
+      if (!formData.submission_date) {
+        setFormData((prev) => ({ ...prev, submission_date: formData.assigned_date }));
+      }
+      await submitHomework("Draft");
+      // Restore if it was empty (the form may have navigated away, but just in case)
+      if (!originalSubmissionDate) {
+        setFormData((prev) => ({ ...prev, submission_date: "" }));
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [formData, submitHomework],
+  );
+
   // ---------------------------------------------------------------------------
   // Form config
   // ---------------------------------------------------------------------------
@@ -388,8 +411,17 @@ export default function AddHomework() {
         classOptions,
         divisionOptions,
         subjectOptions,
+        academicYearSelected: Boolean(formData.academic_year_id),
+        classSelected: Boolean(formData.class_id),
       }),
-    [academicYearOptions, classOptions, divisionOptions, subjectOptions],
+    [
+      academicYearOptions,
+      classOptions,
+      divisionOptions,
+      subjectOptions,
+      formData.academic_year_id,
+      formData.class_id,
+    ],
   );
 
   // ---------------------------------------------------------------------------
@@ -593,17 +625,32 @@ export default function AddHomework() {
       confirmMessage=""
       onCancelNavigate={() => navigate("/homework")}
       extraHeaderActions={
-        <Button
-          variant="contained"
-          color="success"
-          size="small"
-          startIcon={<PublishIcon />}
-          onClick={handlePublish}
-          disabled={loading}
-          sx={{ ml: 1, fontWeight: 700, textTransform: "none" }}
-        >
-          {isEditMode ? "Update & Publish" : "Publish"}
-        </Button>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          {/* Save as Draft — same size as cancel/save icons */}
+          <Tooltip title="Save as Draft" arrow>
+            <span>
+              <IconButton
+                onClick={handleSaveDraft}
+                disabled={loading}
+                aria-label="Save as Draft"
+                sx={{
+                  color: "warning.dark",
+                  backgroundColor: (theme) => alpha(theme.palette.warning.main, 0.08),
+                  borderRadius: "12px",
+                  width: 44,
+                  height: 44,
+                  border: (theme) => `1.5px solid ${alpha(theme.palette.warning.main, 0.2)}`,
+                  "&:hover": {
+                    backgroundColor: (theme) => alpha(theme.palette.warning.main, 0.15),
+                  },
+                  "&.Mui-disabled": { opacity: 0.45 },
+                }}
+              >
+                <SaveAsIcon sx={{ fontSize: 20 }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
       }
       formTopSlot={attachmentSlot}
     />

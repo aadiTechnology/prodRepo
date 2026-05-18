@@ -16,7 +16,7 @@ function formatDate(dateStr: string | null | undefined): string {
 
 function computeDisplayStatus(row: HomeworkRow): { label: string; color: string } {
   if (row.status === "Draft") {
-    return { label: "Draft", color: colorTokens.text.secondary };
+    return { label: "Draft", color: "#ED6C02" }; // MUI warning.dark — amber tone
   }
   const today = new Date();
   today.setHours(0, 0, 0, 0);

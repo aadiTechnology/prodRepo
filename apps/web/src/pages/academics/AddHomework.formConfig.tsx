@@ -21,6 +21,8 @@ export const createHomeworkFormConfig = (options: {
   classOptions: Options;
   divisionOptions: Options;
   subjectOptions: Options;
+  academicYearSelected: boolean;
+  classSelected: boolean;
 }): FormConfig<AddHomeworkFormData> => ({
   fields: {
     academic_year_id: {
@@ -40,7 +42,8 @@ export const createHomeworkFormConfig = (options: {
       required: true,
       props: {
         options: options.classOptions,
-        placeholder: "Select Class",
+        placeholder: options.academicYearSelected ? "Select Class" : "Select academic year first",
+        disabled: !options.academicYearSelected,
       },
     },
     class_division_id: {
@@ -50,7 +53,12 @@ export const createHomeworkFormConfig = (options: {
       required: false,
       props: {
         options: options.divisionOptions,
-        placeholder: "Select Division",
+        placeholder: !options.academicYearSelected
+          ? "Select academic year first"
+          : !options.classSelected
+          ? "Select class first"
+          : "Select Division",
+        disabled: !options.academicYearSelected || !options.classSelected,
       },
     },
     subject_id: {
@@ -60,8 +68,12 @@ export const createHomeworkFormConfig = (options: {
       required: true,
       props: {
         options: options.subjectOptions,
-        placeholder: options.classOptions.length === 0 ? "Select a class first" : "Select Subject",
-        disabled: !options.subjectOptions.length,
+        placeholder: !options.academicYearSelected
+          ? "Select academic year first"
+          : !options.classSelected
+          ? "Select class first"
+          : "Select Subject",
+        disabled: !options.academicYearSelected || !options.classSelected || !options.subjectOptions.length,
       },
     },
     title: {
