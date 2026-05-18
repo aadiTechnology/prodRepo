@@ -185,16 +185,36 @@ export const createPermissionListConfig = ({
             </Box>
           );
         } else {
+          const allChecked =
+            row.can_view && row.can_create && row.can_edit && row.can_delete;
+          const someChecked =
+            row.can_view || row.can_create || row.can_edit || row.can_delete;
+
           return (
             <Box
               sx={{
-                pl: 4,
+                pl: 2,
                 display: "flex",
                 alignItems: "center",
-                gap: 1,
+                gap: 0.5,
                 py: 0.5,
               }}
             >
+              <Checkbox
+                size="small"
+                checked={allChecked}
+                indeterminate={someChecked && !allChecked}
+                onChange={(e) => onMasterToggle(row.id, e.target.checked)}
+                disabled={!canEdit || !selectedRole}
+                onClick={(e) => e.stopPropagation()}
+                sx={{
+                  p: 0.25,
+                  color: alpha(colorTokens.preschool.turquoise.main, 0.35),
+                  "&.Mui-checked": {
+                    color: colorTokens.preschool.turquoise.main,
+                  },
+                }}
+              />
               <Typography
                 variant="body2"
                 sx={{

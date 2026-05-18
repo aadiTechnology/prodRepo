@@ -30,7 +30,7 @@ def _resolve_teacher_id(db: Session, tenant_id: int, user_id: int) -> Optional[i
         )
         .first()
     )
-    return teacher.id if teacher else None
+    return int(teacher.id) if teacher else None  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -148,12 +148,12 @@ def update_homework(
     for key, value in update_data.items():
         setattr(hw, key, value)
 
-    hw.updated_at = datetime.utcnow()
-    hw.updated_by = user_id
+    hw.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    hw.updated_by = user_id  # type: ignore[assignment]
 
-    if update_data.get("status") == "Published" and not hw.published_at:
-        hw.published_at = datetime.utcnow()
-        hw.published_by = user_id
+    if update_data.get("status") == "Published" and hw.published_at is None:
+        hw.published_at = datetime.utcnow()  # type: ignore[assignment]
+        hw.published_by = user_id  # type: ignore[assignment]
 
     db.commit()
     db.refresh(hw)
@@ -166,9 +166,9 @@ def soft_delete_homework(
     hw: Homework,
     user_id: int,
 ) -> None:
-    hw.is_deleted = True
-    hw.deleted_at = datetime.utcnow()
-    hw.deleted_by = user_id
+    hw.is_deleted = True  # type: ignore[assignment]
+    hw.deleted_at = datetime.utcnow()  # type: ignore[assignment]
+    hw.deleted_by = user_id  # type: ignore[assignment]
     db.commit()
 
 
@@ -225,7 +225,7 @@ def get_attachment(
 
 def delete_attachment(db: Session, *, att: HomeworkAttachment) -> str:
     """Delete attachment record and return its file_path for disk cleanup."""
-    file_path = att.file_path
+    file_path = str(att.file_path)
     db.delete(att)
     db.commit()
     return file_path
@@ -257,7 +257,7 @@ def get_classes_for_teacher(
             .order_by(SchoolClass.name)
             .all()
         )
-        return [ClassOption(id=c.id, name=c.name) for c in classes]
+        return [ClassOption(id=int(c.id), name=str(c.name)) for c in classes]  # type: ignore[arg-type]
 
     sql = text(
         """
