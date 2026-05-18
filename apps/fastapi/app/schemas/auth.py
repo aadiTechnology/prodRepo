@@ -79,6 +79,11 @@ class LoginContextResponse(BaseModel):
     Frontends can poll /auth/rbac/context and compare this to decide if state
     should be replaced, enabling near real-time sidebar/permission updates."""
 
+class RBACVersionResponse(BaseModel):
+    """Lightweight response for the cheap version-check poll endpoint."""
+    version: str
+
+
 def create_user_with_role(user):
     """Create a user with role."""
     return CurrentUser(

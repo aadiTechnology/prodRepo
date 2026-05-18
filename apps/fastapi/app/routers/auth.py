@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.core.database import get_db
 from app.services.rbac_service import get_user_roles 
-from app.schemas.auth import LoginRequest, TokenResponse, UserWithRole, LoginContextResponse, TenantInfo
+from app.schemas.auth import LoginRequest, TokenResponse, UserWithRole, LoginContextResponse, TenantInfo, RBACVersionResponse
 from app.schemas.user import UserCreate, UserResponse
 from app.services import user_service, rbac_service, auth_service, theme_template_service
 from app.models.user import User, UserRole
@@ -51,7 +51,7 @@ def _assert_login_tenant_matches(db: Session, user: User, requested_tenant_id: O
             "System administrators should sign in from the administrator login page."
         )
 
-    if user_tenant_id != requested_tenant_id:
+    if user_tenant_id != requested_tenant_id:  # type: ignore[truthy-bool]
         raise ForbiddenException(
             f"This account does not belong to {school_name}. "
             "Please select the correct school or contact your school administrator."
@@ -84,13 +84,13 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)) -> User
         logger.info(f"First user created as admin: {created_user.email}")
     
     return UserResponse(
-        id=created_user.id,
-        email=created_user.email,
-        full_name=created_user.full_name,
-        tenant_id=created_user.tenant_id,
-        phone_number=created_user.phone_number,
-        is_active=created_user.is_active,
-        created_at=created_user.created_at,
+        id=created_user.id,  # type: ignore[arg-type]
+        email=created_user.email,  # type: ignore[arg-type]
+        full_name=created_user.full_name,  # type: ignore[arg-type]
+        tenant_id=created_user.tenant_id,  # type: ignore[arg-type]
+        phone_number=created_user.phone_number,  # type: ignore[arg-type]
+        is_active=created_user.is_active,  # type: ignore[arg-type]
+        created_at=created_user.created_at,  # type: ignore[arg-type]
     )
 
 @router.post("/login", response_model=TokenResponse)
@@ -99,18 +99,18 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> Toke
     logger.info(f"Login attempt for email: {login_data.email}")
     
     user = user_service.get_user_by_email(db, login_data.email)
-    if user is None or not verify_password(login_data.password, user.hashed_password):
+    if user is None or not verify_password(login_data.password, user.hashed_password):  # type: ignore[arg-type]
         logger.warning(f"Invalid credentials for email: {login_data.email}")
         raise UnauthorizedException("Invalid email or password")
 
     _assert_login_tenant_matches(db, user, login_data.tenant_id)
 
-    if not user.is_active:
+    if not user.is_active:  # type: ignore[truthy-bool]
         raise UnauthorizedException("Your account is deactivated. Contact system administrator.")
     
     if user.tenant_id is not None:
         tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
-        if not tenant or not tenant.is_active or tenant.is_deleted:
+        if not tenant or not tenant.is_active or tenant.is_deleted:  # type: ignore[truthy-bool]
             logger.warning(f"Login blocked: Tenant {user.tenant_id} is inactive or deleted (User: {user.email})")
             raise ForbiddenException("Tenant is deactivated. Contact system administrator.")
     
@@ -137,7 +137,7 @@ async def login_with_context(
     logger.info(f"[RBAC] Login-with-context attempt for email: {login_data.email}")
 
     user = user_service.get_user_by_email(db, login_data.email)
-    if user is None or not verify_password(login_data.password, user.hashed_password):
+    if user is None or not verify_password(login_data.password, user.hashed_password):  # type: ignore[arg-type]
         logger.warning(f"[RBAC] Invalid credentials for email: {login_data.email}")
         raise UnauthorizedException("Invalid email or password")
 
@@ -153,11 +153,11 @@ async def refresh_access_token(
 ) -> TokenResponse:
     """Issue a new access token for the current session (extends JWT lifetime)."""
     user = user_service.get_user_by_id(db, current_user.id)
-    if not user or not user.is_active or user.is_deleted:
+    if not user or not user.is_active or user.is_deleted:  # type: ignore[truthy-bool]
         raise UnauthorizedException("Your account is deactivated. Contact system administrator.")
 
-    roles = rbac_service.get_user_roles(db, user.id)
-    resolved_role = roles[0].code if roles else (user.role.value if user.role else "USER")
+    roles = rbac_service.get_user_roles(db, user.id)  # type: ignore[arg-type]
+    resolved_role = roles[0].code if roles else (user.role.value if user.role else "USER")  # type: ignore[truthy-bool]
 
     token_data: dict = {
         "sub": str(user.id),
@@ -184,23 +184,23 @@ async def get_current_user_info(
     tenant_info = None
     if current_user.tenant_id is not None:
         tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
-        if tenant and tenant.is_active and not tenant.is_deleted:
+        if tenant and tenant.is_active and not tenant.is_deleted:  # type: ignore[truthy-bool]
             theme_config = None
             theme_template_id = getattr(tenant, "theme_template_id", None)
             if theme_template_id is not None:
                 theme_config = theme_template_service.get_template_config(db, theme_template_id)
             tenant_info = TenantInfo(
-                id=tenant.id,
-                name=tenant.name,
-                code=tenant.code,
-                logo_url=tenant.logo_url,
+                id=tenant.id,  # type: ignore[arg-type]
+                name=tenant.name,  # type: ignore[arg-type]
+                code=tenant.code,  # type: ignore[arg-type]
+                logo_url=tenant.logo_url,  # type: ignore[arg-type]
                 theme_template_id=getattr(tenant, "theme_template_id", None),
                 theme_config=theme_config,
-                address_line1=tenant.address_line1,
-                address_line2=tenant.address_line2,
-                city=tenant.city,
-                state=tenant.state,
-                pin_code=tenant.pin_code,
+                address_line1=tenant.address_line1,  # type: ignore[arg-type]
+                address_line2=tenant.address_line2,  # type: ignore[arg-type]
+                city=tenant.city,  # type: ignore[arg-type]
+                state=tenant.state,  # type: ignore[arg-type]
+                pin_code=tenant.pin_code,  # type: ignore[arg-type]
             )
 
     return UserWithRole(
@@ -227,7 +227,24 @@ async def logout(
         revoke_token(db, token, current_user.id)
         logger.info(f"User logged out: {current_user.email}")
     return {"message": "Logged out successfully"}
-    
+
+
+@router.get("/rbac/version", response_model=RBACVersionResponse)
+async def get_rbac_version(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> RBACVersionResponse:
+    """
+    Lightweight poll endpoint — returns only the current rbac_version string.
+    Clients should call this frequently; fetch /rbac/context only when version changes.
+    """
+    user = user_service.get_user_by_id(db, current_user.id)
+    if not user:
+        raise UnauthorizedException("User not found")
+    version = rbac_service.compute_rbac_version(db, user)
+    return RBACVersionResponse(version=version)
+
+
 @router.get("/rbac/context", response_model=LoginContextResponse)
 async def get_rbac_context(
     db: Session = Depends(get_db),
@@ -270,7 +287,7 @@ async def impersonate_user(
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
-    if not target_user.is_active:
+    if not target_user.is_active:  # type: ignore[truthy-bool]
         raise ForbiddenException("Cannot impersonate inactive user")
     
     if target_user.tenant_id is None:
@@ -279,7 +296,7 @@ async def impersonate_user(
     if not actor_is_system_admin:
         if current_user.tenant_id is None:
             raise ForbiddenException("Insufficient permissions")
-        if target_user.tenant_id != current_user.tenant_id:
+        if target_user.tenant_id != current_user.tenant_id:  # type: ignore[truthy-bool]
             raise ForbiddenException("You can only login as users from your tenant")
         if not _has_full_user_management_access(db, actor_user):
             raise ForbiddenException(
@@ -287,7 +304,7 @@ async def impersonate_user(
             )
     
     tenant = db.query(Tenant).filter(Tenant.id == target_user.tenant_id).first()
-    if not tenant or not tenant.is_active or tenant.is_deleted:
+    if not tenant or not tenant.is_active or tenant.is_deleted:  # type: ignore[truthy-bool]
         raise ForbiddenException("Cannot impersonate user from inactive tenant")
     
     return auth_service.get_login_context(

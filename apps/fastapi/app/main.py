@@ -156,14 +156,26 @@ app.mount("/homework-attachments", StaticFiles(directory="static/homework-attach
 @app.on_event("startup")
 async def startup_event():
     """Log application startup and initialize database tables."""
+    import asyncio
+
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     logger.info(f"Debug mode: {settings.DEBUG}")
-    
-    # Create database tables on startup (not at import time)
+
+    # Run create_all in a thread pool so it never blocks the async event loop.
+    # SQL Server schema introspection can be slow on first boot; running it in
+    # a background thread keeps the server responsive immediately.
     try:
-        logger.info(f"Connecting to database...")
-        Base.metadata.create_all(bind=engine)
+        logger.info("Connecting to database...")
+        loop = asyncio.get_event_loop()
+        await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: Base.metadata.create_all(bind=engine)),
+            timeout=60,  # Abort if schema sync takes longer than 60 s
+        )
         logger.info("[OK] Database tables initialized successfully")
+    except asyncio.TimeoutError:
+        logger.error("✗ Database schema sync timed out (>60 s) — server will continue")
+        conn_info = DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL
+        logger.info(f"  Connection target: {conn_info}")
     except Exception as e:
         logger.error(f"✗ Failed to initialize database tables")
         logger.error(f"  Error: {str(e)}")
@@ -172,7 +184,6 @@ async def startup_event():
         logger.info("    1. Ensure SQL Server is running")
         logger.info("    2. Check DB_SERVER and DB_NAME in .env file")
         logger.info("    3. Verify SQL Server instance name is correct")
-        # Safely show connection info (mask credentials)
         conn_info = DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL
         logger.info(f"    4. Current connection target: {conn_info}")
 
