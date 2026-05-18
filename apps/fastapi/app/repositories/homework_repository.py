@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import and_, or_, text
 
 from app.models.homework import Homework, HomeworkAttachment
 
@@ -37,6 +37,29 @@ def _resolve_teacher_id(db: Session, tenant_id: int, user_id: int) -> Optional[i
 # Homework CRUD
 # ---------------------------------------------------------------------------
 
+def _build_class_division_scope_filter(scopes: tuple):
+    """Match homework assigned to any of the viewer's class/division scopes."""
+    if not scopes:
+        return Homework.id == -1
+
+    clauses = []
+    for scope in scopes:
+        class_id = scope.class_id if hasattr(scope, "class_id") else scope[0]
+        division_id = (
+            scope.class_division_id if hasattr(scope, "class_division_id") else scope[1]
+        )
+        class_match = Homework.class_id == class_id
+        if division_id is None:
+            division_match = Homework.class_division_id.is_(None)
+        else:
+            division_match = or_(
+                Homework.class_division_id.is_(None),
+                Homework.class_division_id == division_id,
+            )
+        clauses.append(and_(class_match, division_match))
+    return or_(*clauses)
+
+
 def list_homework(
     db: Session,
     *,
@@ -50,13 +73,21 @@ def list_homework(
     search: Optional[str] = None,
     skip: int = 0,
     limit: int = 25,
+    viewer_context: Optional[object] = None,
 ) -> Tuple[List[Homework], int]:
     query = db.query(Homework).filter(
         Homework.tenant_id == tenant_id,
         Homework.is_deleted == False,  # noqa: E712
     )
 
-    if teacher_id is not None:
+    viewer_kind = getattr(viewer_context, "kind", None) if viewer_context else None
+    if viewer_kind in ("teacher", "student", "parent"):
+        query = query.filter(
+            _build_class_division_scope_filter(getattr(viewer_context, "scopes", ()))
+        )
+        if getattr(viewer_context, "published_only", False):
+            query = query.filter(Homework.status == "Published")
+    elif teacher_id is not None:
         query = query.filter(Homework.teacher_id == teacher_id)
     if class_id is not None:
         query = query.filter(Homework.class_id == class_id)

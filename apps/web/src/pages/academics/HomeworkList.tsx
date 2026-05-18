@@ -26,6 +26,9 @@ export default function HomeworkList() {
     onDeleteClick: controller.handleDeleteClick,
     canEdit: hasPermission("HOMEWORK_MGMT:edit"),
     canDelete: hasPermission("HOMEWORK_MGMT:delete"),
+    emptyMessage: controller.readOnlyAudience
+      ? "No homework assigned for your class yet."
+      : "No homework found. Click 'Assign Homework' to create one.",
   });
 
   if (!canView) {
@@ -58,26 +61,30 @@ export default function HomeworkList() {
               searchValue={controller.search}
               onSearchChange={controller.setSearch}
               searchPlaceholder="Search homework by title..."
-              filters={[
-                {
-                  label: "Academic Year",
-                  value: controller.academicYearFilter,
-                  onChange: controller.setAcademicYearFilter,
-                  options: controller.academicYearOptions,
-                },
-                {
-                  label: "Class",
-                  value: controller.classFilter,
-                  onChange: controller.setClassFilter,
-                  options: controller.classOptions,
-                },
-                {
-                  label: "Status",
-                  value: controller.statusFilter,
-                  onChange: controller.setStatusFilter,
-                  options: controller.statusOptions,
-                },
-              ]}
+              filters={
+                controller.readOnlyAudience
+                  ? []
+                  : [
+                      {
+                        label: "Academic Year",
+                        value: controller.academicYearFilter,
+                        onChange: controller.setAcademicYearFilter,
+                        options: controller.academicYearOptions,
+                      },
+                      {
+                        label: "Class",
+                        value: controller.classFilter,
+                        onChange: controller.setClassFilter,
+                        options: controller.classOptions,
+                      },
+                      {
+                        label: "Status",
+                        value: controller.statusFilter,
+                        onChange: controller.setStatusFilter,
+                        options: controller.statusOptions,
+                      },
+                    ]
+              }
               {...(hasPermission("HOMEWORK_MGMT:create")
                 ? {
                     onAddClick: () => navigate("/homework/new"),

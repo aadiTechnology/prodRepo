@@ -1,8 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { homeworkService, type HomeworkResponse } from "../api/services/homeworkService";
 import { academicYearService } from "../api/services/dropdownServices";
+import { useAuth } from "../context/AuthContext";
+import { useRBAC } from "../context/RBACContext";
+import { isHomeworkReadOnlyAudience } from "../utils/homeworkAudience";
 
 export function useHomeworkListController() {
+  const { user } = useAuth();
+  const { roles } = useRBAC();
+  const readOnlyAudience = useMemo(
+    () => isHomeworkReadOnlyAudience(user?.role, roles),
+    [user?.role, roles],
+  );
   const [homework, setHomework] = useState<HomeworkResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,8 +38,10 @@ export function useHomeworkListController() {
   const [selectedRow, setSelectedRow] = useState<HomeworkResponse | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Load dropdown options once — classes are scoped to teacher's assignments
+  // Admin/teacher filters — students and parents are scoped on the server
   useEffect(() => {
+    if (readOnlyAudience) return;
+
     homeworkService.getTeacherClasses()
       .then((classes) => {
         setClassOptions(classes.map((c) => ({ label: c.name, value: String(c.id) })));
@@ -44,7 +55,7 @@ export function useHomeworkListController() {
         );
       })
       .catch(() => {});
-  }, []);
+  }, [readOnlyAudience]);
 
   const fetchHomework = async () => {
     try {
@@ -54,9 +65,12 @@ export function useHomeworkListController() {
         skip: page * rowsPerPage,
         limit: rowsPerPage,
         search: search || undefined,
-        class_id: classFilter ? Number(classFilter) : undefined,
-        academic_year_id: academicYearFilter ? Number(academicYearFilter) : undefined,
-        status: (statusFilter as "Draft" | "Published") || undefined,
+        class_id: readOnlyAudience || !classFilter ? undefined : Number(classFilter),
+        academic_year_id:
+          readOnlyAudience || !academicYearFilter ? undefined : Number(academicYearFilter),
+        status: readOnlyAudience
+          ? "Published"
+          : (statusFilter as "Draft" | "Published") || undefined,
       });
       setHomework(response.data);
       setTotal(response.total);
@@ -132,5 +146,6 @@ export function useHomeworkListController() {
       { label: "Draft", value: "Draft" },
       { label: "Published", value: "Published" },
     ],
+    readOnlyAudience,
   };
 }

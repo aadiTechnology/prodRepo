@@ -119,18 +119,24 @@ def list_homework(
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_user),
 ):
-    # If the current user has a teacher profile, enforce that they can only see
-    # their own homework — the caller-supplied teacher_id is ignored.
-    resolved_teacher_id = homework_service._resolve_teacher_id(
-        db, current_user.tenant_id, current_user.id
+    viewer_context = homework_service.get_viewer_context(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
     )
-    if resolved_teacher_id is not None:
-        teacher_id = resolved_teacher_id
+
+    # Teachers/students/parents are scoped by assigned class+division on the server.
+    # Admins may optionally filter by teacher_id from the query string.
+    effective_teacher_id = teacher_id
+    if viewer_context.kind in ("teacher", "student", "parent"):
+        effective_teacher_id = None
 
     items, total = homework_service.list_homework(
         db,
         tenant_id=current_user.tenant_id,
-        teacher_id=teacher_id,
+        teacher_id=effective_teacher_id,
         class_id=class_id,
         class_division_id=class_division_id,
         subject_id=subject_id,
@@ -139,6 +145,7 @@ def list_homework(
         search=search,
         skip=skip,
         limit=limit,
+        viewer_context=viewer_context,
     )
     pages = math.ceil(total / limit) if limit > 0 else 0
     page = (skip // limit) + 1 if limit > 0 else 1
@@ -157,8 +164,18 @@ def get_homework(
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_user),
 ):
+    viewer_context = homework_service.get_viewer_context(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+    )
     hw = homework_service.get_homework(
-        db, tenant_id=current_user.tenant_id, homework_id=homework_id
+        db,
+        tenant_id=current_user.tenant_id,
+        homework_id=homework_id,
+        viewer_context=viewer_context,
     )
     return homework_service._to_response(hw)
 
@@ -225,8 +242,19 @@ def upload_attachment(
     current_user: Any = Depends(get_current_user),
 ):
     """Upload a file attachment for the given homework."""
-    # Verify homework belongs to this tenant
-    homework_service.get_homework(db, tenant_id=current_user.tenant_id, homework_id=homework_id)
+    viewer_context = homework_service.get_viewer_context(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+    )
+    homework_service.get_homework(
+        db,
+        tenant_id=current_user.tenant_id,
+        homework_id=homework_id,
+        viewer_context=viewer_context,
+    )
 
     extension = os.path.splitext(file.filename or "")[1].lower()
     if extension not in ALLOWED_EXTENSIONS:
@@ -277,7 +305,19 @@ def delete_attachment(
     current_user: Any = Depends(get_current_user),
 ):
     """Remove an attachment from a homework record."""
-    homework_service.get_homework(db, tenant_id=current_user.tenant_id, homework_id=homework_id)
+    viewer_context = homework_service.get_viewer_context(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+    )
+    homework_service.get_homework(
+        db,
+        tenant_id=current_user.tenant_id,
+        homework_id=homework_id,
+        viewer_context=viewer_context,
+    )
     result = homework_service.delete_attachment(db, homework_id=homework_id, attachment_id=attachment_id)
     # Delete file from disk (best-effort)
     try:

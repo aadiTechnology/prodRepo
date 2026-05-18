@@ -33,6 +33,7 @@ type HomeworkListConfigArgs = {
   onViewClick?: (row: HomeworkRow) => void;
   canEdit?: boolean;
   canDelete?: boolean;
+  emptyMessage?: string;
 };
 
 export const createHomeworkListConfig = ({
@@ -41,6 +42,7 @@ export const createHomeworkListConfig = ({
   onViewClick,
   canEdit = true,
   canDelete = true,
+  emptyMessage = "No homework found. Click 'Assign Homework' to create one.",
 }: HomeworkListConfigArgs): ListConfig<HomeworkRow> => ({
   columns: [
     {
@@ -120,7 +122,7 @@ export const createHomeworkListConfig = ({
   ],
 
   uiPolicy: {
-    emptyMessage: "No homework found. Click 'Assign Homework' to create one.",
+    emptyMessage,
     errorFallbackMessage: "Failed to load homework list.",
     retryLabel: "Retry",
   },

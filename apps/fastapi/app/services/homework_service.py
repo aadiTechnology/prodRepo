@@ -7,6 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.models.homework import Homework, HomeworkAttachment
 from app.repositories import homework_repository as repo
+from app.services.homework_access import (
+    HomeworkViewerContext,
+    homework_visible_to_viewer,
+    resolve_homework_viewer_context,
+)
 from app.schemas.homework_schema import (
     ClassOption,
     HomeworkAttachmentResponse,
@@ -67,6 +72,25 @@ def _resolve_teacher_id(db: Session, tenant_id: int, user_id: int) -> Optional[i
     return repo._resolve_teacher_id(db, tenant_id, user_id)
 
 
+def get_viewer_context(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    email: str,
+    legacy_role: object,
+) -> HomeworkViewerContext:
+    teacher_id = repo._resolve_teacher_id(db, tenant_id, user_id)
+    return resolve_homework_viewer_context(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        email=email,
+        legacy_role=legacy_role,
+        teacher_id=teacher_id,
+    )
+
+
 # ---------------------------------------------------------------------------
 # CRUD
 # ---------------------------------------------------------------------------
@@ -84,7 +108,12 @@ def list_homework(
     search: Optional[str] = None,
     skip: int = 0,
     limit: int = 25,
+    viewer_context: Optional[HomeworkViewerContext] = None,
 ) -> Tuple[List[Homework], int]:
+    effective_status = hw_status
+    if viewer_context is not None and viewer_context.published_only:
+        effective_status = "Published"
+
     return repo.list_homework(
         db,
         tenant_id=tenant_id,
@@ -93,15 +122,28 @@ def list_homework(
         class_division_id=class_division_id,
         subject_id=subject_id,
         academic_year_id=academic_year_id,
-        hw_status=hw_status,
+        hw_status=effective_status,
         search=search,
         skip=skip,
         limit=limit,
+        viewer_context=viewer_context,
     )
 
 
-def get_homework(db: Session, *, tenant_id: int, homework_id: int) -> Homework:
-    return repo.get_homework(db, tenant_id=tenant_id, homework_id=homework_id)
+def get_homework(
+    db: Session,
+    *,
+    tenant_id: int,
+    homework_id: int,
+    viewer_context: Optional[HomeworkViewerContext] = None,
+) -> Homework:
+    hw = repo.get_homework(db, tenant_id=tenant_id, homework_id=homework_id)
+    if viewer_context is not None and not homework_visible_to_viewer(hw, viewer_context):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Homework details not found",
+        )
+    return hw
 
 
 def create_homework(
