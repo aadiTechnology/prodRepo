@@ -44,11 +44,19 @@ def _include_menu_with_parents_from_cache(
         current_id: int = int(current.id)  # type: ignore
         if current_id in seen_menu_ids:
             return
-        if not current.is_active or current.is_deleted:  # type: ignore
+        # Check boolean attributes - convert Column to bool if needed
+        try:
+            is_active = bool(current.is_active)  # type: ignore
+            is_deleted = bool(current.is_deleted)  # type: ignore
+        except (TypeError, ValueError):
+            return
+        if not is_active or is_deleted:
             return
         menu_rows.append(current)
-        seen_menu_ids.add(current_id)  # type: ignore
-        parent_id: int | None = int(current.parent_id) if current.parent_id else None  # type: ignore
+        seen_menu_ids.add(current_id)
+        parent_id: int | None = None
+        if current.parent_id:  # type: ignore
+            parent_id = int(current.parent_id)  # type: ignore
         if parent_id is None:
             return
         # Look up parent from cache instead of querying DB (OPTIMIZATION!)
@@ -65,22 +73,31 @@ def _include_menu_with_parents(db: Session, menu: Menu, menu_rows: List[Menu], s
     ancestors are skipped (walk aborts).
     """
     current = menu
-    while current and current.id not in seen_menu_ids:
-        if not current.is_active or current.is_deleted:
+    current_id = int(current.id)  # type: ignore
+    while current and current_id not in seen_menu_ids:
+        try:
+            is_active = bool(current.is_active)  # type: ignore
+            is_deleted = bool(current.is_deleted)  # type: ignore
+        except (TypeError, ValueError):
+            return
+        if not is_active or is_deleted:
             return
         menu_rows.append(current)
-        seen_menu_ids.add(current.id)
-        if not current.parent_id:
+        seen_menu_ids.add(current_id)
+        parent_id = current.parent_id  # type: ignore
+        if parent_id is None:
             return
         current = (
             db.query(Menu)
             .filter(
-                Menu.id == current.parent_id,
+                Menu.id == parent_id,
                 Menu.is_active == True,  # noqa: E712
                 Menu.is_deleted == False,  # noqa: E712
             )
             .first()
         )
+        if current:
+            current_id = int(current.id)  # type: ignore
 
 
 def get_user_roles(db: Session, user_id: int) -> List[Role]:
@@ -121,16 +138,23 @@ def set_user_roles(
     acting_user: User | Any | None = None,
 ) -> None:
     """Replace user roles with the given set."""
-    if acting_user and acting_user.tenant_id is not None and user.tenant_id != acting_user.tenant_id:
-        raise ForbiddenException("Cannot update roles for a user from a different tenant.")
+    if acting_user is not None:
+        acting_user_tenant_id = acting_user.tenant_id  # type: ignore
+        user_tenant_id = user.tenant_id  # type: ignore
+        if (acting_user_tenant_id is not None) is True and (user_tenant_id == acting_user_tenant_id) is False:
+            raise ForbiddenException("Cannot update roles for a user from a different tenant.")
 
     for role_id in role_ids:
         role = db.query(Role).filter(Role.id == role_id, Role.is_deleted == False).first()
         if not role:
             raise ValidationException(f"Role with id {role_id} not found.")
         _validate_role_scope(role, user, "assign")
-        if acting_user and acting_user.tenant_id is not None and role.tenant_id != acting_user.tenant_id:  # type: ignore
-            raise ForbiddenException(f"Cannot assign role '{role.code}' from a different tenant.")
+        if acting_user is not None:
+            acting_user_tenant_id = acting_user.tenant_id  # type: ignore
+            if acting_user_tenant_id is not None:
+                role_tenant_id = role.tenant_id  # type: ignore
+                if (role_tenant_id == acting_user_tenant_id) is False:
+                    raise ForbiddenException(f"Cannot assign role '{role.code}' from a different tenant.")
     
     db.execute(user_roles.delete().where(user_roles.c.user_id == user.id))
 
@@ -146,15 +170,18 @@ def set_user_roles(
 
 def _validate_menu_belongs_to_role_scope(menu: Menu, role: Role) -> None:
     """Validate that a menu can be assigned to a role based on tenant scope."""
-    if menu.tenant_id is None:
+    menu_tenant_id = menu.tenant_id  # type: ignore
+    role_tenant_id = role.tenant_id  # type: ignore
+    
+    if menu_tenant_id is None:
         return
     
-    if role.tenant_id is not None and menu.tenant_id != role.tenant_id:  # type: ignore
-        raise ForbiddenException(
-            f"Cannot assign menu '{menu.name}' to role '{role.code}' - menu belongs to a different tenant."
-        )
-    
-    if role.tenant_id is None:
+    if (role_tenant_id is not None) is True:
+        if (menu_tenant_id == role_tenant_id) is False:
+            raise ForbiddenException(
+                f"Cannot assign menu '{menu.name}' to role '{role.code}' - menu belongs to a different tenant."
+            )
+    else:
         raise ForbiddenException(
             f"Cannot assign tenant-specific menu '{menu.name}' to a platform role."
         )
@@ -180,7 +207,7 @@ def set_role_menus(db: Session, role: Role, menu_ids: List[int], acting_user_id:
     """Replace menus assigned to a role."""
     for mid in menu_ids:
         menu = db.query(Menu).filter(Menu.id == mid, Menu.is_deleted == False).first()
-        if not menu:
+        if menu is None:
             raise ValidationException(f"Menu with id {mid} not found.")
         _validate_menu_belongs_to_role_scope(menu, role)
     
@@ -334,7 +361,8 @@ def compute_rbac_version(db: Session, user: User) -> str:
     Used by clients to poll /auth/rbac/context cheaply and decide if they should
     replace local state (driving "live" sidebar updates).
     """
-    role_ids = [r.id for r in get_user_roles(db, user.id)]
+    user_id = int(user.id)  # type: ignore
+    role_ids = [r.id for r in get_user_roles(db, user_id)]
 
     # Latest change across this user's RoleMenuPermission rows.
     perms_ts = None
@@ -471,7 +499,7 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
             raise ValidationException(f"Menu with id {p.menu_id} not found.")
         
         if menu.tenant_id is not None and role.tenant_id is not None:
-            if menu.tenant_id != role.tenant_id:
+            if menu.tenant_id != role.tenant_id:  # type: ignore
                 raise ForbiddenException(
                     f"Cannot assign permissions for menu '{menu.name}' from different tenant."
                 )
@@ -485,12 +513,14 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
         acting_user = db.query(User).get(acting_user_id)
         if acting_user:
             # Check if acting user is SUPER_ADMIN
+            user_role = acting_user.role  # type: ignore
+            user_tenant_id = acting_user.tenant_id  # type: ignore
             is_super_admin = (
-                acting_user.role == "SUPER_ADMIN" or 
-                (acting_user.role == "ADMIN" and acting_user.tenant_id is None)
+                user_role == "SUPER_ADMIN" or 
+                (user_role == "ADMIN" and user_tenant_id is None)
             )
             
-            if not is_super_admin:
+            if not is_super_admin:  # type: ignore[misc]  # noqa: E712
                 # Get acting user's effective permissions
                 user_perms_codes, _ = resolve_user_permissions_and_menus(db, acting_user)
                 user_perms = set(user_perms_codes)
@@ -603,8 +633,13 @@ def backfill_role_menu_permissions_from_role_menus(
 
 def sync_global_menus_to_tenant_admin_roles(db: Session, *, created_by: int | None = None) -> tuple[int, int]:
     """
-    Ensure each tenant-scoped ADMIN role is linked to every active global menu (tenant_id NULL)
+    Ensure each tenant-scoped ADMIN role is linked to NEW active global menus (tenant_id NULL)
     via role_menus and RoleMenuPermission. Use after adding new catalog menus (e.g. seed_rbac).
+    
+    IMPORTANT: This function ONLY adds new menus. It NEVER modifies or removes existing 
+    permission assignments. If an admin role already has permissions set for a menu, 
+    they are preserved exactly as configured by the admin.
+    
     Returns (role_menus_rows_inserted, role_menu_permissions_rows_inserted).
     """
     global_menu_ids = [
@@ -639,12 +674,16 @@ def sync_global_menus_to_tenant_admin_roles(db: Session, *, created_by: int | No
             for r in db.query(RoleMenuPermission.menu_id).filter(RoleMenuPermission.role_id == role.id).all()
         }
         for mid in global_menu_ids:
+            # Only add to role_menus if NOT already linked
             if mid not in existing_rm:
                 db.execute(
                     insert(role_menus),
                     [{"role_id": role.id, "menu_id": mid}],
                 )
                 rm_inserts += 1
+            
+            # Only add to RoleMenuPermission if NOT already linked
+            # This preserves any existing custom permission settings
             if mid not in existing_rmp:
                 db.add(
                     RoleMenuPermission(
@@ -660,10 +699,13 @@ def sync_global_menus_to_tenant_admin_roles(db: Session, *, created_by: int | No
                 )
                 rmp_inserts += 1
                 existing_rmp.add(mid)
+    
     if rm_inserts or rmp_inserts:
         db.commit()
+    
     logger.info(
-        "[RBAC] sync_global_menus_to_tenant_admin_roles: role_menus +%s, role_menu_permissions +%s",
+        "[RBAC] sync_global_menus_to_tenant_admin_roles: Added NEW menus - role_menus +%s, role_menu_permissions +%s. "
+        "Existing permissions NOT modified.",
         rm_inserts,
         rmp_inserts,
     )

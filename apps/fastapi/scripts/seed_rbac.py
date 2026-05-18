@@ -13,10 +13,42 @@ from app.models import Feature, Menu
 from datetime import datetime
 from app.services import rbac_service
 
+def cleanup_deprecated_menus(db: Session) -> None:
+    """Remove deprecated test and aman modules and their children from the database."""
+    from app.models import RoleMenuPermission
+    
+    deprecated_menu_names = ["test2", "test", "aman"]
+    
+    for menu_name in deprecated_menu_names:
+        # Find all menus matching this name
+        menus = db.query(Menu).filter(Menu.name == menu_name).all()
+        for menu in menus:
+            # First find and delete all children of this menu to prevent ck_menus_hierarchy conflict
+            children = db.query(Menu).filter(Menu.parent_id == menu.id).all()
+            for child in children:
+                # Delete child's role menu permissions
+                db.query(RoleMenuPermission).filter(RoleMenuPermission.menu_id == child.id).delete()
+                # Delete the child itself
+                db.delete(child)
+                print(f"[CLEANUP] Removed child menu: {child.name} under deprecated menu: {menu_name}")
+            
+            # Delete parent's role menu permissions
+            db.query(RoleMenuPermission).filter(RoleMenuPermission.menu_id == menu.id).delete()
+            # Delete the menu itself
+            db.delete(menu)
+            print(f"[CLEANUP] Removed deprecated menu: {menu_name}")
+    
+    db.flush()
+
+
 def seed_rbac_data():
     db: Session = SessionLocal()
     try:
         print("[SEED] Starting Comprehensive RBAC seeding...")
+        
+        # Clean up deprecated modules first
+        cleanup_deprecated_menus(db)
+        db.commit()
         
         # 1. Features
         features_data = [
@@ -43,12 +75,16 @@ def seed_rbac_data():
                 db.flush()
                 print(f"[SEED] Created feature: {f['code']}")
             else:
-                feature.name = f["name"]
-                feature.category = f["category"]
+                feature.name = f["name"]  # type: ignore
+                feature.category = f["category"]  # type: ignore
                 print(f"[SEED] Updated feature: {f['code']}")
             feature_map[f["code"]] = feature.id
 
         # 2. Hierarchy Data
+        # NOTE: This is the authoritative list of modules and pages.
+        # DO NOT include modules like "test", "aman", or other temporary/deprecated items.
+        # Each time seed runs, it will ONLY add NEW modules to tenant ADMIN roles.
+        # Existing permission assignments made by admins are NEVER modified or overwritten.
         hierarchy = [
             {
                 "name": "Dashboard", "level": 1, "icon": "dashboardIcon", "sort_order": 1,
@@ -147,8 +183,8 @@ def seed_rbac_data():
                 print(f"[SEED] Created Parent: {p_data['name']}")
             else:
                 # Update parent if needed
-                parent.icon = p_data["icon"]
-                parent.sort_order = p_data["sort_order"]
+                parent.icon = p_data["icon"]  # type: ignore
+                parent.sort_order = p_data["sort_order"]  # type: ignore
                 print(f"[SEED] Updated Parent: {p_data['name']}")
 
             # Check for children
@@ -168,13 +204,16 @@ def seed_rbac_data():
                         db.add(child)
                         print(f"[SEED] Created Child: {c_data['name']} under {p_data['name']}")
                     else:
-                        child.path = c_data["path"]
+                        child.path = c_data["path"]  # type: ignore
                         if fid is not None:
-                            child.feature_id = fid
+                            child.feature_id = fid  # type: ignore
                         print(f"[SEED] Updated Child: {c_data['name']}")
 
         # Ensure newly seeded global menus are granted to tenant ADMIN roles,
         # so they become visible in Permission Mapping for admin delegation.
+        # NOTE: This ONLY adds NEW menus. Existing permission assignments made by admins 
+        # are PRESERVED and never modified. Run as many times as needed without affecting
+        # manually configured role permissions.
         rm_added, rmp_added = rbac_service.sync_global_menus_to_tenant_admin_roles(db)
         if rm_added or rmp_added:
             print(
