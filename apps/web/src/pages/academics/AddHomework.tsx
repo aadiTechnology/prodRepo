@@ -136,13 +136,20 @@ export default function AddHomework() {
       .catch(() => {});
 
     academicYearService.list()
-      .then((years: any[]) =>
-        setAcademicYearOptions(
-          years.map((y: any) => ({ label: y.name || y.code, value: String(y.id) })),
-        ),
-      )
+      .then((years: any[]) => {
+        const options = years.map((y: any) => ({ label: y.name || y.code, value: String(y.id) }));
+        setAcademicYearOptions(options);
+
+        // Auto-select current academic year for create mode
+        if (!isEditMode && options.length > 0) {
+          const currentYear = years.find((y: any) => y.is_current === true) || years[0];
+          if (currentYear) {
+            handleFieldValueChange("academic_year_id", String(currentYear.id));
+          }
+        }
+      })
       .catch(() => {});
-  }, []);
+  }, [isEditMode, handleFieldValueChange]);
 
   // When academic year changes — reset class, division, and subject dropdowns
   useEffect(() => {
