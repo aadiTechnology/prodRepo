@@ -58,6 +58,8 @@ class StudentService:
                     mobile=student.mobile_number,
                     roll_no=student.roll_no,
                     class_=class_display,
+                    class_id=student.class_id,
+                    class_division_id=student.class_division_id,
                     status="Active" if student.is_active else "Inactive"
                 )
             )

@@ -98,7 +98,7 @@ def _resolve_teacher_assignment_scopes(
     return tuple(scopes)
 
 
-def _resolve_student_record(db: Session, *, tenant_id: int, email: str) -> Student | None:
+def _resolve_student_record(db: Session, *, tenant_id: int, user_id: int, email: str) -> Student | None:
     from sqlalchemy import or_
 
     email_norm = email.strip().lower()
@@ -114,6 +114,21 @@ def _resolve_student_record(db: Session, *, tenant_id: int, email: str) -> Stude
     )
     if student:
         return student
+
+    # Fallback to matching by user full_name
+    user = db.query(User).filter(User.id == user_id).first()
+    if user and user.full_name:
+        name_match = (
+            db.query(Student)
+            .filter(
+                Student.tenant_id == tenant_id,
+                Student.is_active == True,  # noqa: E712
+                Student.student_name.ilike(user.full_name.strip())
+            )
+            .first()
+        )
+        if name_match:
+            return name_match
 
     if not email_norm.endswith("@student.local"):
         return None
@@ -147,11 +162,14 @@ def _resolve_parent_students(
 
     user = db.query(User).filter(User.id == user_id).first()
     phone = (user.phone_number if user else None) or None
+    full_name = (user.full_name if user else None) or None
 
     identity_filters = [LeadParent.email.ilike(email.strip())]
     if phone:
         identity_filters.append(LeadParent.mobile_number == phone)
         identity_filters.append(LeadParent.alternate_mobile == phone)
+    if full_name:
+        identity_filters.append(LeadParent.parent_name.ilike(full_name.strip()))
 
     parent = (
         db.query(LeadParent)
@@ -210,7 +228,7 @@ def resolve_homework_viewer_context(
         return HomeworkViewerContext(kind="admin", scopes=(), published_only=False)
 
     if is_student_user(db, user_id, legacy_role):
-        student = _resolve_student_record(db, tenant_id=tenant_id, email=email)
+        student = _resolve_student_record(db, tenant_id=tenant_id, user_id=user_id, email=email)
         scopes = _scopes_from_students([student]) if student else ()
         return HomeworkViewerContext(kind="student", scopes=scopes, published_only=True)
 

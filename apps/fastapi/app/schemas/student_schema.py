@@ -73,6 +73,8 @@ class StudentListItem(BaseModel):
     mobile: Optional[str]
     roll_no: Optional[str] = None
     class_: Optional[str] = Field(None, alias="class")
+    class_id: Optional[int] = None
+    class_division_id: Optional[int] = None
 
     model_config = {
         "populate_by_name": True,
