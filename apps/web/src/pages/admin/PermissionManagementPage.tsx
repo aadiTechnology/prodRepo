@@ -6,7 +6,7 @@
 
 import { useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Box, Snackbar } from "@mui/material";
+import { Alert, Snackbar } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import { PageHeader } from "../../components/layout";
 import {
@@ -107,76 +107,66 @@ const PermissionManagementPage = () => {
             links={[{ title: "Permission Mapping", path: "#" }]}
             homePath="/"
             actions={
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-end",
-                  gap: 1,
-                  width: { xs: "100%", sm: "auto" },
-                }}
-              >
-                {/* Row 1 — reset / save */}
-                <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                  <FormHeaderIconAction
-                    variant="cancel"
-                    tooltipTitle="Reset Changes"
-                    onClick={controller.handleReset}
-                    disabled={
-                      !controller.selectedRole ||
-                      !controller.hasChanges ||
-                      controller.loadingSave
-                    }
-                  />
-                  <FormHeaderIconAction
-                    variant="save"
-                    tooltipTitle="Save Permissions"
-                    onClick={controller.handleSave}
-                    disabled={
-                      !controller.selectedRole ||
-                      !controller.hasChanges ||
-                      !controller.canEdit
-                    }
-                    loading={controller.loadingSave}
-                  />
-                </Box>
-
-                {/* Row 2 — filters + search + add */}
-                <ListPageToolbar
-                  searchValue={controller.searchQuery}
-                  onSearchChange={controller.setSearchQuery}
-                  searchPlaceholder="Search modules..."
-                  filters={[
-                    ...(controller.isSystemAdmin
-                      ? [
-                          {
-                            label: "Tenant",
-                            value: controller.selectedTenantId,
-                            onChange: controller.handleTenantChange,
-                            options: controller.tenantOptions,
-                          },
-                        ]
-                      : []),
-                    {
-                      label: "Role",
-                      value: controller.selectedRole?.id?.toString() || "",
-                      onChange: (val) =>
-                        controller.handleRoleChange(parseInt(val || "0")),
-                      options: controller.roles.map((r) => ({
-                        label: r.name,
-                        value: r.id.toString(),
-                      })),
-                    },
-                  ]}
-                  {...(controller.isSystemAdmin
-                    ? {
-                        onAddClick: () => navigate("/admin/menus/add"),
-                        addLabel: "Add Module / Page",
-                        addIcon: <AddIcon sx={{ fontSize: 24 }} />,
+              <ListPageToolbar
+                searchValue={controller.searchQuery}
+                onSearchChange={controller.setSearchQuery}
+                searchPlaceholder="Search modules..."
+                actionsAfterSearch
+                filters={[
+                  ...(controller.isSystemAdmin
+                    ? [
+                        {
+                          label: "Tenant",
+                          value: controller.selectedTenantId,
+                          onChange: controller.handleTenantChange,
+                          options: controller.tenantOptions,
+                        },
+                      ]
+                    : []),
+                  {
+                    label: "Role",
+                    value: controller.selectedRole?.id?.toString() || "",
+                    onChange: (val) =>
+                      controller.handleRoleChange(parseInt(val || "0")),
+                    options: controller.roles.map((r) => ({
+                      label: r.name,
+                      value: r.id.toString(),
+                    })),
+                  },
+                ]}
+                renderActions={
+                  <>
+                    <FormHeaderIconAction
+                      variant="cancel"
+                      tooltipTitle="Reset Changes"
+                      onClick={controller.handleReset}
+                      disabled={
+                        !controller.selectedRole ||
+                        !controller.hasChanges ||
+                        controller.loadingSave
                       }
-                    : {})}
-                />
-              </Box>
+                    />
+                    <FormHeaderIconAction
+                      variant="save"
+                      tooltipTitle="Save Permissions"
+                      onClick={controller.handleSave}
+                      disabled={
+                        !controller.selectedRole ||
+                        !controller.hasChanges ||
+                        !controller.canEdit
+                      }
+                      loading={controller.loadingSave}
+                    />
+                  </>
+                }
+                {...(controller.isSystemAdmin
+                  ? {
+                      onAddClick: () => navigate("/admin/menus/add"),
+                      addLabel: "Add Module / Page",
+                      addIcon: <AddIcon sx={{ fontSize: 24 }} />,
+                    }
+                  : {})}
+              />
             }
           />
 
