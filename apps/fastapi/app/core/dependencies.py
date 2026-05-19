@@ -3,7 +3,7 @@ from enum import Enum
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, cast
 from app.core.database import get_db, SessionLocal
 from app.models.user import User, UserRole
 from app.schemas.auth import CurrentUser
@@ -107,11 +107,11 @@ def get_current_user(
     logger.debug(f"User authenticated: {user.email} (role: {user.role.value}, tenant_id: {user.tenant_id})")
 
     return CurrentUser(
-        id=user.id,
-        email=user.email,
-        full_name=user.full_name,
-        role=user.role,
-        tenant_id=user.tenant_id,
+        id=cast(int, user.id),
+        email=cast(str, user.email),
+        full_name=cast(str, user.full_name),
+        role=cast(UserRole, user.role),
+        tenant_id=cast(Optional[int], user.tenant_id),
         is_impersonation=payload.get("is_impersonation"),
         original_user_id=payload.get("original_user_id"),
     )
