@@ -288,14 +288,11 @@ export default function HomeworkList() {
         <Box
           sx={{
             px: { xs: 1.5, sm: 3 },
-            py: { xs: 2, sm: 3 },
+            py: { xs: 1.5, sm: 2 },
             mt: { xs: -0.5, sm: -1.5 },
             display: "flex",
             flexDirection: "column",
-            gap: { xs: 2.5, sm: 3.5 },
-            width: "100%",
-            maxWidth: 1400,
-            mx: "auto",
+            gap: 2.5,
           }}
         >
           {/* Child Switcher Pill row for Parents */}
