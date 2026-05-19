@@ -52,6 +52,7 @@ const SubjectList = lazy(() => import("../pages/academics/SubjectList"));
 const AddSubject = lazy(() => import("../pages/academics/AddSubject"));
 const AssignStudentFee = lazy(() => import("../pages/Fees/AssignStudentFee"));
 const PermissionManagementPage = lazy(() => import("../pages/admin/PermissionManagementPage"));
+const AddMenuPage = lazy(() => import("../pages/admin/AddMenuPage"));
 const FeeInstallmentStatus = lazy(() => import("../pages/Fees/FeeInstallmentStatus"));
 const CollectPaymentPage = lazy(() => import("../pages/Fees/CollectPaymentPage"));
 const SprintPerformanceReportPage = lazy(() => import("../pages/reports/SprintPerformanceReportPage"));
@@ -300,6 +301,8 @@ export default function AppRoutes() {
           />
           <Route path="/fees/assign-student-fee" element={<ProtectedRoute requiredPermissions="FEE_MGMT:create"><AssignStudentFee /></ProtectedRoute>} />
           <Route path="/admin/permission-management" element={<ProtectedRoute requiredPermissions={["ADMIN_MGMT:view", "SYSTEM_CONFIG:view"]}><PermissionManagementPage /></ProtectedRoute>} />
+          <Route path="/admin/menus/add" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN"]}><AddMenuPage /></ProtectedRoute>} />
+          <Route path="/admin/menus/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN"]}><AddMenuPage /></ProtectedRoute>} />
           <Route path="/admin/theme-studio" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><ThemeStudioPage /></ProtectedRoute>} />
 
           {/* Communication — Notices */}

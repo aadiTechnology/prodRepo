@@ -1,30 +1,75 @@
 /**
  * Permission Management Page
- * Manage role-based menu permissions
- * Fully token-aware and architecture-compliant list page
+ * Manage role-based menu permissions.
+ * Fully token-aware and architecture-compliant list page.
  */
 
-import { useMemo } from "react";
-import {
-  Box,
-  Typography,
-  Alert,
-  Snackbar,
-} from "@mui/material";
+import { useMemo, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { Alert, Box, Snackbar } from "@mui/material";
+import { Add as AddIcon } from "@mui/icons-material";
 import { PageHeader } from "../../components/layout";
-import { ListPageLayout, EntityTableSection, ListPageToolbar } from "../../components/reusable";
+import {
+  ListPageLayout,
+  EntityTableSection,
+  ListPageToolbar,
+  TableRowActions,
+} from "../../components/reusable";
 import { FormHeaderIconAction } from "../../components/primitives";
-import { usePermissionListController, PermissionTableRow } from "../../hooks/usePermissionListController";
+import ConfirmDialog from "../../components/semantic/ConfirmDialog";
+import menuService from "../../api/services/menuService";
+import {
+  usePermissionListController,
+  type PermissionTableRow,
+} from "../../hooks/usePermissionListController";
 import { createPermissionListConfig } from "./PermissionManagementPage.listConfig";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   PERMISSION MANAGEMENT PAGE COMPONENT
+   PERMISSION MANAGEMENT PAGE
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const PermissionManagementPage = () => {
   const controller = usePermissionListController();
+  const navigate = useNavigate();
 
-  // ── Table Configuration ──────────────────────────────────────────────────
+  // ── Delete state ──────────────────────────────────────────────────────────
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // ── Row-action handlers ───────────────────────────────────────────────────
+  const handleEditMenu = useCallback(
+    (id: number) => navigate(`/admin/menus/${id}/edit`),
+    [navigate]
+  );
+
+  const handleDeleteMenu = useCallback(
+    (id: number, name: string) => setDeleteTarget({ id, name }),
+    []
+  );
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await menuService.deleteMenu(deleteTarget.id);
+      controller.setSuccess(`"${deleteTarget.name}" deleted successfully.`);
+      setDeleteTarget(null);
+      if (controller.selectedRole) {
+        await controller.handleRoleChange(controller.selectedRole.id);
+      }
+    } catch (err: unknown) {
+      controller.setError(
+        (err as { message?: string })?.message || "Failed to delete menu."
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }, [deleteTarget, controller]);
+
+  // ── Table column config ────────────────────────────────────────────────────
   const columnConfig = useMemo(
     () =>
       createPermissionListConfig({
@@ -51,9 +96,7 @@ const PermissionManagementPage = () => {
     ]
   );
 
-  // ═════════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ═════════════════════════════════════════════════════════════════════════
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <ListPageLayout
       pageBackground
@@ -64,111 +107,122 @@ const PermissionManagementPage = () => {
             links={[{ title: "Permission Mapping", path: "#" }]}
             homePath="/"
             actions={
-              <ListPageToolbar
-                searchValue={controller.searchQuery}
-                onSearchChange={controller.setSearchQuery}
-                searchPlaceholder="Search modules..."
-                actionsAfterSearch
-                filters={[
-                  ...(controller.isSystemAdmin
-                    ? [
-                        {
-                          label: "Tenant",
-                          value: controller.selectedTenantId,
-                          onChange: controller.handleTenantChange,
-                          options: controller.tenantOptions,
-                        },
-                      ]
-                    : []),
-                  {
-                    label: "Role",
-                    value: controller.selectedRole?.id?.toString() || "",
-                    onChange: (val) => controller.handleRoleChange(parseInt(val || "0")),
-                    options: controller.roles.map((r) => ({
-                      label: r.name,
-                      value: r.id.toString(),
-                    })),
-                  },
-                ]}
-                renderActions={
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                    {/* Reset Button */}
-                    <FormHeaderIconAction
-                      variant="cancel"
-                      tooltipTitle="Reset Changes"
-                      onClick={controller.handleReset}
-                      disabled={!controller.selectedRole || !controller.hasChanges || controller.loadingSave}
-                    />
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-end",
+                  gap: 1,
+                  width: { xs: "100%", sm: "auto" },
+                }}
+              >
+                {/* Row 1 — reset / save */}
+                <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                  <FormHeaderIconAction
+                    variant="cancel"
+                    tooltipTitle="Reset Changes"
+                    onClick={controller.handleReset}
+                    disabled={
+                      !controller.selectedRole ||
+                      !controller.hasChanges ||
+                      controller.loadingSave
+                    }
+                  />
+                  <FormHeaderIconAction
+                    variant="save"
+                    tooltipTitle="Save Permissions"
+                    onClick={controller.handleSave}
+                    disabled={
+                      !controller.selectedRole ||
+                      !controller.hasChanges ||
+                      !controller.canEdit
+                    }
+                    loading={controller.loadingSave}
+                  />
+                </Box>
 
-                    {/* Save Button */}
-                    <FormHeaderIconAction
-                      variant="save"
-                      tooltipTitle="Save Permissions"
-                      onClick={controller.handleSave}
-                      disabled={!controller.selectedRole || !controller.hasChanges || !controller.canEdit}
-                      loading={controller.loadingSave}
-                    />
-                  </Box>
-                }
-              />
+                {/* Row 2 — filters + search + add */}
+                <ListPageToolbar
+                  searchValue={controller.searchQuery}
+                  onSearchChange={controller.setSearchQuery}
+                  searchPlaceholder="Search modules..."
+                  filters={[
+                    ...(controller.isSystemAdmin
+                      ? [
+                          {
+                            label: "Tenant",
+                            value: controller.selectedTenantId,
+                            onChange: controller.handleTenantChange,
+                            options: controller.tenantOptions,
+                          },
+                        ]
+                      : []),
+                    {
+                      label: "Role",
+                      value: controller.selectedRole?.id?.toString() || "",
+                      onChange: (val) =>
+                        controller.handleRoleChange(parseInt(val || "0")),
+                      options: controller.roles.map((r) => ({
+                        label: r.name,
+                        value: r.id.toString(),
+                      })),
+                    },
+                  ]}
+                  {...(controller.isSystemAdmin
+                    ? {
+                        onAddClick: () => navigate("/admin/menus/add"),
+                        addLabel: "Add Module / Page",
+                        addIcon: <AddIcon sx={{ fontSize: 24 }} />,
+                      }
+                    : {})}
+                />
+              </Box>
             }
           />
 
           {controller.error && (
-            <Box sx={{ mx: 2, mb: 1, mt: 1 }}>
-              <Alert
-                severity="error"
-                onClose={() => controller.setError(null)}
-                sx={{ borderRadius: "12px" }}
-              >
-                {controller.error}
-              </Alert>
-            </Box>
+            <Alert
+              severity="error"
+              onClose={() => controller.setError(null)}
+              sx={{ mx: 2, mt: 1, mb: 1, borderRadius: "12px" }}
+            >
+              {controller.error}
+            </Alert>
           )}
         </>
       }
     >
-      {/* Permission Table Section */}
-      {(!controller.loadingRoles || controller.allRows.length > 0) && (
-        <Box
-          sx={{
-            opacity: controller.selectedRole ? 1 : 0.6,
-            pointerEvents: controller.selectedRole ? "auto" : "none",
-          }}
-        >
-          <EntityTableSection<PermissionTableRow>
-            label="Permission Directory"
-            totalRows={controller.allRows.length}
-            page={controller.page}
-            rowsPerPage={controller.rowsPerPage}
-            onPageChange={controller.handlePageChange}
-            onRowsPerPageChange={controller.handleRowsPerPageChange}
-            columns={columnConfig.columns}
-            data={controller.paginatedRows}
-            loading={controller.loadingMenus}
-            stickyHeader
-            size="small"
-          />
-        </Box>
-      )}
+      {/* Permission table */}
+      <EntityTableSection<PermissionTableRow>
+        label="Permission Directory"
+        totalRows={controller.allRows.length}
+        page={controller.page}
+        rowsPerPage={controller.rowsPerPage}
+        onPageChange={controller.handlePageChange}
+        onRowsPerPageChange={controller.handleRowsPerPageChange}
+        columns={columnConfig.columns}
+        data={controller.paginatedRows}
+        loading={controller.loadingRoles || controller.loadingMenus}
+        emptyMessage={
+          !controller.selectedRole
+            ? "Select a role above to view its permissions."
+            : "No modules found for this role."
+        }
+        stickyHeader
+        size="small"
+        renderRowActions={
+          controller.isSystemAdmin
+            ? (row) => (
+                <TableRowActions
+                  onEdit={() => handleEditMenu(row.id)}
+                  onDelete={() => handleDeleteMenu(row.id, row.name)}
+                />
+              )
+            : undefined
+        }
+      />
 
-      {controller.loadingRoles && (
-        <Box sx={{ mx: 2, py: 4, textAlign: "center" }}>
-          <Typography variant="body2" color="text.secondary">
-            Loading roles...
-          </Typography>
-        </Box>
-      )}
-
-      {controller.selectedRole && controller.loadingMenus && (
-        <Box sx={{ mx: 2, py: 4, textAlign: "center" }}>
-          <Typography variant="body2" color="text.secondary">
-            Loading permissions...
-          </Typography>
-        </Box>
-      )}
-
-      {/* Error Snackbar */}
+      {/* Error snackbar */}
       <Snackbar
         open={!!controller.error}
         autoHideDuration={6000}
@@ -184,7 +238,7 @@ const PermissionManagementPage = () => {
         </Alert>
       </Snackbar>
 
-      {/* Success Snackbar */}
+      {/* Success snackbar */}
       <Snackbar
         open={!!controller.success}
         autoHideDuration={4000}
@@ -199,6 +253,17 @@ const PermissionManagementPage = () => {
           {controller.success}
         </Alert>
       </Snackbar>
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete Menu Entry"
+        message={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
+        confirmLabel={deleting ? "Deleting…" : "Delete"}
+        loading={deleting}
+        onConfirm={() => void handleConfirmDelete()}
+        onClose={() => !deleting && setDeleteTarget(null)}
+      />
     </ListPageLayout>
   );
 };
