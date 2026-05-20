@@ -15,18 +15,8 @@ export default function InvoiceList() {
       createInvoiceListConfig({
         onViewInvoice: (invoice) => navigate(`/fees/invoices/${invoice.id}/detail`),
         onCollectPayment: (invoice) =>
-          navigate("/fees/installment-status", {
-            state: {
-              student: {
-                id: invoice.student_id,
-                student_name: invoice.student_name,
-                admission_no: invoice.admission_no,
-                class_id: invoice.class_id,
-                class_name: invoice.class_name,
-              },
-              classId: invoice.class_id,
-              academicYearId: invoice.academic_year_id,
-            },
+          navigate("/fees/collect-payment", {
+            state: { invoice_id: invoice.id },
           }),
       }),
     [navigate]

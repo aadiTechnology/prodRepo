@@ -13,8 +13,6 @@ from app.core.exception_handlers import (
     generic_exception_handler,
 )
 from fastapi.exceptions import RequestValidationError
-from app.routers import student_fee_ledger
-
 # Import all models first to ensure SQLAlchemy relationships are properly configured
 # This must happen before any database operations or router imports
 from app.models import (  # noqa: F401
@@ -50,7 +48,7 @@ from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, 
 
 
 from app.routers import fee_discount, fee_category_router
-from app.routers import installment_tracking, fee_installment_status, fee_collection
+from app.routers import installment_tracking, fee_collection
 from app.routers import invoice
 from app.routers import lead as lead_router
 from app.routers import enrollment as enrollment_router
@@ -113,7 +111,6 @@ app.include_router(academic.router)
 app.include_router(academic_year.router)
 app.include_router(class_router.router)
 app.include_router(class_fee_structure_assignment.router)
-app.include_router(student_fee_ledger.router) 
 app.include_router(student_fee_assignment.router)
 from app.routers import student
 app.include_router(student.router, prefix="/api")
@@ -121,7 +118,6 @@ app.include_router(teacher_router.router, prefix="/api")
 app.include_router(teacher_assignment.router)
 app.include_router(fee_structure.router)
 app.include_router(installment_tracking.router)
-app.include_router(fee_installment_status.router)
 app.include_router(fee_collection.router)
 app.include_router(invoice.router)
 app.include_router(invoice.api_router)

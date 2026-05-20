@@ -7,9 +7,6 @@ import {
   Select,
   MenuItem,
   Button,
-  Grid,
-  Card,
-  CardContent,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import {
@@ -21,14 +18,8 @@ import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import { useStudentListController } from "../../hooks/useStudentListController";
 import { createStudentListConfig, renderStudentRowActions } from "./StudentList.listConfig";
-import studentService from "../../api/services/studentService";
-import type { Student } from "../../types/student";
 
 const StudentList = () => {
-  // Mock values for summary cards (replace with real API calls as needed)
-  const averageAttendance = 94.8; // %
-  const graduationRate = 92; // %
-  const pendingEnrollment = 12; // count
   const navigate = useNavigate();
   // Fetch all class options from backend (schoolClassService)
   const [classOptions, setClassOptions] = useState([{ value: '', label: 'All' }]);
@@ -149,47 +140,6 @@ const StudentList = () => {
               </Box>
             }
           />
-          {/* Summary Cards Row (now below search bar) */}
-          <Box sx={{ mb: 3, mt: 2 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
-                  <CardContent>
-                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>TOTAL STUDENTS</Typography>
-                    <Typography variant="h5" fontWeight={800}>{totalStudents.toLocaleString()}</Typography>
-                    <Typography variant="caption" color="success.main">↑ 2.3% from last term</Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
-                  <CardContent>
-                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>AVERAGE ATTENDANCE</Typography>
-                    <Typography variant="h5" fontWeight={800} color="success.main">{averageAttendance}%</Typography>
-                    <Typography variant="caption" color="success.main">● Above target</Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
-                  <CardContent>
-                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>GRADUATION RATE</Typography>
-                    <Typography variant="h5" fontWeight={800}>{graduationRate}%</Typography>
-                    <Typography variant="caption" color="text.secondary">● Class of 2024</Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
-                  <CardContent>
-                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>PENDING ENROLLMENT</Typography>
-                    <Typography variant="h5" fontWeight={800} color="error.main">{pendingEnrollment}</Typography>
-                    <Typography variant="caption" color="error.main">● Requires action</Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-          </Box>
           {error && (
             <Box sx={{ m: 2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <Typography variant="body2" color="error">

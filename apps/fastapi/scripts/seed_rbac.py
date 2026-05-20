@@ -14,30 +14,48 @@ from datetime import datetime
 from app.services import rbac_service
 
 def cleanup_deprecated_menus(db: Session) -> None:
-    """Remove deprecated test and aman modules and their children from the database."""
+    """Remove deprecated menus and their RBAC links from the database."""
     from app.models import RoleMenuPermission
-    
-    deprecated_menu_names = ["test2", "test", "aman"]
-    
+    from app.models.role import role_menus
+
+    deprecated_menu_names = [
+        "test2",
+        "test",
+        "aman",
+        "Enrollment",
+        "Fee Installment Status",
+        "Assign Student Fee",
+        "Student Fee Ledger",
+    ]
+    deprecated_menu_paths = [
+        "/admissions/enrollment",
+        "/fees/installment-status",
+        "/fees/assign-student-fee",
+        "/fees/ledger",
+    ]
+
+    def _purge_menu(menu: Menu) -> None:
+        children = db.query(Menu).filter(Menu.parent_id == menu.id).all()
+        for child in children:
+            _purge_menu(child)
+        db.query(RoleMenuPermission).filter(RoleMenuPermission.menu_id == menu.id).delete()
+        db.execute(role_menus.delete().where(role_menus.c.menu_id == menu.id))
+        db.delete(menu)
+        print(f"[CLEANUP] Removed deprecated menu: {menu.name} ({menu.path or 'no path'})")
+
+    seen_ids: set[int] = set()
     for menu_name in deprecated_menu_names:
-        # Find all menus matching this name
-        menus = db.query(Menu).filter(Menu.name == menu_name).all()
-        for menu in menus:
-            # First find and delete all children of this menu to prevent ck_menus_hierarchy conflict
-            children = db.query(Menu).filter(Menu.parent_id == menu.id).all()
-            for child in children:
-                # Delete child's role menu permissions
-                db.query(RoleMenuPermission).filter(RoleMenuPermission.menu_id == child.id).delete()
-                # Delete the child itself
-                db.delete(child)
-                print(f"[CLEANUP] Removed child menu: {child.name} under deprecated menu: {menu_name}")
-            
-            # Delete parent's role menu permissions
-            db.query(RoleMenuPermission).filter(RoleMenuPermission.menu_id == menu.id).delete()
-            # Delete the menu itself
-            db.delete(menu)
-            print(f"[CLEANUP] Removed deprecated menu: {menu_name}")
-    
+        for menu in db.query(Menu).filter(Menu.name == menu_name).all():
+            if menu.id not in seen_ids:
+                seen_ids.add(menu.id)
+                _purge_menu(menu)
+
+    for menu_path in deprecated_menu_paths:
+        for menu in db.query(Menu).filter(Menu.path == menu_path).all():
+            if menu.id not in seen_ids:
+                seen_ids.add(menu.id)
+                _purge_menu(menu)
+
     db.flush()
 
 
@@ -129,8 +147,6 @@ def seed_rbac_data():
                     {"name": "Fee Category", "path": "/fees/categories", "feature": "FEE_MGMT"},
                     {"name": "Fee Structure", "path": "/fees/setup", "feature": "FEE_MGMT"},
                     {"name": "Fee Discount", "path": "/fees/discounts", "feature": "FEE_MGMT"},
-                    {"name": "Fee Installment Status", "path": "/fees/installment-status", "feature": "FEE_MGMT"},
-                    {"name": "Assign Student Fee", "path": "/fees/assign-student-fee", "feature": "FEE_MGMT"},
                     {"name": "Fee Report", "path": "/fees/reports", "feature": "FEE_MGMT"},
                 ]
             },

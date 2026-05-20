@@ -14,7 +14,6 @@ import FeeCategoryManagement from "../pages/Fees/FeeCategoryManagement";
 import AddEditFeeCategory from "../pages/Fees/AddEditFeeCategory";
 import FeeDiscountsPage from "../pages/Fees/FeeDiscountsPage";
 import AddFeeDiscount from "../pages/AddFeeDiscount";
-import StudentFeeLedger from "../pages/StudentFeeLedger";
 import StudentList from "../pages/students/StudentList";
 // ═══════════════════════════════════════════════════════════════════════════
 // Lazy-loaded Pages - Code splitting for better performance
@@ -50,10 +49,8 @@ const ClassList = lazy(() => import("../pages/academics/ClassList"));
 const AddClass = lazy(() => import("../pages/academics/AddClass"));
 const SubjectList = lazy(() => import("../pages/academics/SubjectList"));
 const AddSubject = lazy(() => import("../pages/academics/AddSubject"));
-const AssignStudentFee = lazy(() => import("../pages/Fees/AssignStudentFee"));
 const PermissionManagementPage = lazy(() => import("../pages/admin/PermissionManagementPage"));
 const AddMenuPage = lazy(() => import("../pages/admin/AddMenuPage"));
-const FeeInstallmentStatus = lazy(() => import("../pages/Fees/FeeInstallmentStatus"));
 const CollectPaymentPage = lazy(() => import("../pages/Fees/CollectPaymentPage"));
 const SprintPerformanceReportPage = lazy(() => import("../pages/reports/SprintPerformanceReportPage"));
 const SprintwisePerformanceReportPage = lazy(() => import("../pages/reports/SprintwisePerformanceReportPage"));
@@ -234,13 +231,6 @@ export default function AppRoutes() {
           <Route path="/fees/setup" element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeStructureSetup /></ProtectedRoute>} />
           <Route path="/fees/setup/add" element={<ProtectedRoute requiredPermissions="FEE_MGMT:create"><FeeStructureForm /></ProtectedRoute>} />
           <Route path="/fees/setup/:id/edit" element={<ProtectedRoute requiredPermissions="FEE_MGMT:edit"><FeeStructureForm /></ProtectedRoute>} />
-          <Route path="/fees/ledger" element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><StudentFeeLedger /></ProtectedRoute>} />
-
-          {/* Installment status / payment collection */}
-          <Route
-            path="/fees/installment-status"
-            element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeInstallmentStatus /></ProtectedRoute>}
-          />
           <Route
             path="/fees/collect-payment"
             element={<ProtectedRoute requiredPermissions="FEE_MGMT:create"><CollectPaymentPage /></ProtectedRoute>}
@@ -299,7 +289,6 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
-          <Route path="/fees/assign-student-fee" element={<ProtectedRoute requiredPermissions="FEE_MGMT:create"><AssignStudentFee /></ProtectedRoute>} />
           <Route path="/admin/permission-management" element={<ProtectedRoute requiredPermissions={["ADMIN_MGMT:view", "SYSTEM_CONFIG:view"]}><PermissionManagementPage /></ProtectedRoute>} />
           <Route path="/admin/menus/add" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN"]}><AddMenuPage /></ProtectedRoute>} />
           <Route path="/admin/menus/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN"]}><AddMenuPage /></ProtectedRoute>} />
