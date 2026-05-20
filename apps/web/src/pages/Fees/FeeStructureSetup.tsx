@@ -154,7 +154,7 @@ const FeeStructureSetup = () => {
       <ConfirmDialog
         open={controller.confirmOpen}
         title="Delete Fee Structure?"
-        message="This will remove the configuration and linked installment schedule. Are you sure?"
+        message="This will remove your defined structure. Are you sure you want to continue?"
         confirmText="Delete"
         onConfirm={controller.handleConfirmDelete}
         onCancel={() => controller.setConfirmOpen(false)}

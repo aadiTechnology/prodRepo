@@ -34,6 +34,37 @@ export interface FeeInstallmentPreview {
   due_date: string;
 }
 
+export const INSTALLMENT_COUNT_BY_TYPE: Record<
+  FeeStructureFormData["installment_type"],
+  number
+> = {
+  MONTHLY: 12,
+  QUARTERLY: 4,
+  YEARLY: 1,
+};
+
+export function installmentCountForType(
+  type: FeeStructureFormData["installment_type"]
+): number {
+  return INSTALLMENT_COUNT_BY_TYPE[type] ?? 1;
+}
+
+export function installmentCountHelperText(
+  type: FeeStructureFormData["installment_type"]
+): string {
+  const count = installmentCountForType(type);
+  switch (type) {
+    case "MONTHLY":
+      return `${count} installments — one per month for the academic year`;
+    case "QUARTERLY":
+      return `${count} installments — one per quarter for the academic year`;
+    case "YEARLY":
+      return `${count} installment — yearly / one-time payment`;
+    default:
+      return `${count} installment(s)`;
+  }
+}
+
 export function createFeeStructureFormConfig({
   isEditMode,
   academicYears,
@@ -41,6 +72,7 @@ export function createFeeStructureFormConfig({
   installments,
   categories,
   divisions,
+  installmentType,
   onInstallmentUpdate,
 }: {
   isEditMode: boolean;
@@ -49,8 +81,10 @@ export function createFeeStructureFormConfig({
   installments: FeeInstallmentPreview[];
   categories: FeeCategory[];
   divisions: { id: number; division_name: string }[];
+  installmentType: FeeStructureFormData["installment_type"];
   onInstallmentUpdate: (index: number, field: keyof FeeInstallmentPreview, value: any) => void;
 }): FormConfig<FeeStructureFormData> {
+  const installmentCount = installmentCountForType(installmentType);
   return {
     fields: {
       name: {
@@ -231,7 +265,12 @@ export function createFeeStructureFormConfig({
         name: "num_installments",
         label: "No. of Installments",
         type: "text",
-        props: { type: "number" },
+        props: {
+          type: "number",
+          disabled: true,
+          InputProps: { readOnly: true },
+        },
+        helperText: installmentCountHelperText(installmentType),
       },
       description: {
         name: "description",
@@ -289,7 +328,8 @@ export function createFeeStructureFormConfig({
         render: (ctx: FormRenderContext<FeeStructureFormData>) => (
           <Box sx={{ mt: 2 }}>
             <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700 }}>
-              Installment Schedule Preview
+              Installment Schedule Preview ({installmentCount} installment
+              {installmentCount === 1 ? "" : "s"} — {installmentType.toLowerCase()})
             </Typography>
             {installments.length > 0 ? (
               <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.25, overflow: "hidden" }}>
@@ -347,7 +387,9 @@ export function createFeeStructureFormConfig({
             ) : (
               <Box sx={{ p: 2, textAlign: "center", bgcolor: "grey.50", borderRadius: 1, border: "1px dashed", borderColor: "grey.300" }}>
                 <Typography variant="body2" color="textSecondary">
-                  Enter amount and installments to see preview
+                  Enter total amount to preview {installmentCount}{" "}
+                  {installmentType.toLowerCase()} installment
+                  {installmentCount === 1 ? "" : "s"}
                 </Typography>
               </Box>
             )}

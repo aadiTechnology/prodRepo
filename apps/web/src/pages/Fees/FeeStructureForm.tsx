@@ -5,6 +5,7 @@ import BaseForm from "../../components/reusable/BaseForm";
 import { useFormManager } from "../../hooks/useFormManager";
 import {
   createFeeStructureFormConfig,
+  installmentCountForType,
   type FeeStructureFormData,
   type FeeInstallmentPreview,
 } from "./FeeStructure.formConfig";
@@ -32,6 +33,13 @@ function calculateInstallments({ total, count, type, startDate }: {
   });
 }
 import { type FormValidationConfig } from "../../utils/formValidation";
+
+const resolveCurrentAcademicYearId = (years: AcademicYear[]): string => {
+  const current =
+    years.find((y) => y.is_current === true || (y as { is_current?: number }).is_current === 1) ??
+    years[0];
+  return current?.id != null ? String(current.id) : "";
+};
 
 const FeeStructureForm = () => {
   const navigate = useNavigate();
@@ -111,12 +119,20 @@ const FeeStructureForm = () => {
         ]);
         setCategories(cats);
         setAcademicYears(years);
+        if (!isEditMode) {
+          const currentYearId = resolveCurrentAcademicYearId(years);
+          if (currentYearId) {
+            setFormData((prev) =>
+              prev.academic_year_id ? prev : { ...prev, academic_year_id: currentYearId }
+            );
+          }
+        }
       } catch (err) {
         console.error("Failed to load lookups", err);
       }
     };
     fetchLookups();
-  }, []);
+  }, [isEditMode, setFormData]);
 
   // Fetch Classes when Academic Year changes
   useEffect(() => {
@@ -280,6 +296,15 @@ const FeeStructureForm = () => {
     if (isEditMode) fetchStructure();
   }, [isEditMode, fetchStructure]);
 
+  // Derive installment count from installment type
+  useEffect(() => {
+    if (isInitialLoadRef.current) return;
+    const count = installmentCountForType(formData.installment_type);
+    if (formData.num_installments !== count) {
+      handleFieldValueChange("num_installments", count);
+    }
+  }, [formData.installment_type, formData.num_installments, handleFieldValueChange]);
+
   // Installment preview logic (extracted, improved date logic)
   useEffect(() => {
     const count = parseInt(formData.num_installments?.toString() || "0", 10);
@@ -337,6 +362,7 @@ const FeeStructureForm = () => {
       installments,
       categories: filteredCategories,
       divisions,
+      installmentType: formData.installment_type,
       onInstallmentUpdate: handleInstallmentUpdate,
     });
     // Make total_amount read-only when categories drive the value
@@ -349,7 +375,17 @@ const FeeStructureForm = () => {
       };
     }
     return cfg;
-  }, [isEditMode, academicYears, classes, installments, categories, hasSelectedCategories]);
+  }, [
+    isEditMode,
+    academicYears,
+    classes,
+    installments,
+    categories,
+    hasSelectedCategories,
+    formData.class_id,
+    formData.installment_type,
+    handleInstallmentUpdate,
+  ]);
 
   const onConfirmSubmit = async () => {
     setLoading(true);
