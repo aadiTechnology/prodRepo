@@ -3,16 +3,10 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Grid,
   IconButton,
   MenuItem,
   Select,
-  Skeleton,
-  Stack,
   Tooltip,
-  Typography,
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useNavigate } from "react-router-dom";
@@ -23,13 +17,11 @@ import {
   ListPageLayout,
   ListPageToolbar,
 } from "../../components/reusable";
-import { colorTokens } from "../../tokens/colors";
 import { type FeeDueStatusFilter } from "../../api/services/feesApi";
 import { useFeeDueListController, type FeeDueTableRow } from "../../hooks/useFeeDueListController";
 import {
   createFeeDueListV2Columns,
   FEE_DUE_STATUS_OPTIONS,
-  formatCurrency,
 } from "./FeeDueListV2.listConfig";
 
 export default function FeeDueListV2() {
@@ -97,48 +89,6 @@ export default function FeeDueListV2() {
               />
             }
           />
-          <Box sx={{ px: 2 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <Card
-                  sx={{
-                    borderRadius: 3,
-                    boxShadow: "none",
-                    border: `1px solid ${colorTokens.border.default}`,
-                    backgroundColor: colorTokens.background.paper,
-                  }}
-                >
-                  <CardContent>
-                    <Typography variant="subtitle2" sx={{ color: colorTokens.text.secondary, fontWeight: 600 }}>
-                      TOTAL DUE
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                      {controller.loading ? <Skeleton width={120} /> : formatCurrency(controller.summary.total_due)}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Card
-                  sx={{
-                    borderRadius: 3,
-                    boxShadow: "none",
-                    border: `1px solid ${colorTokens.border.default}`,
-                    backgroundColor: colorTokens.background.paper,
-                  }}
-                >
-                  <CardContent>
-                    <Typography variant="subtitle2" sx={{ color: colorTokens.text.secondary, fontWeight: 600 }}>
-                      OVERDUE STUDENTS
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                      {controller.loading ? <Skeleton width={80} /> : controller.summary.overdue_students}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-          </Box>
         </>
       }
     >

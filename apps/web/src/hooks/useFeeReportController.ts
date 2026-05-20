@@ -25,7 +25,7 @@ export function useFeeReportController() {
 
   // Pagination
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // Data
   const [summary, setSummary] = useState<FeeReportSummary>(DEFAULT_SUMMARY);

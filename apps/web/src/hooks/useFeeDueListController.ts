@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import feesApi, { type FeeDueListItem, type FeeDueStatusFilter } from "../api/services/feesApi";
 
 export type FeeDueTableRow = FeeDueListItem & { __skeleton?: boolean; __key: string };
-
-type Summary = { total_due: number; overdue_students: number };
 
 export type UseFeeDueListControllerResult = {
   search: string;
@@ -23,7 +21,6 @@ export type UseFeeDueListControllerResult = {
   academicYearId: number | null;
   classes: Array<{ id: number; name: string }>;
   installmentOptions: string[];
-  summary: Summary;
   total: number;
   rows: FeeDueTableRow[];
   loading: boolean;
@@ -106,7 +103,6 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
     enabled: !!academicYearId,
   });
 
-  const summary = dueListQuery.data?.summary ?? { total_due: 0, overdue_students: 0 };
   const records = dueListQuery.data?.data ?? [];
   const total = dueListQuery.data?.total ?? 0;
 
@@ -130,7 +126,6 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
     academicYearId,
     classes,
     installmentOptions: installmentQuery.data ?? [],
-    summary,
     total,
     rows,
     loading: dueListQuery.isLoading,
