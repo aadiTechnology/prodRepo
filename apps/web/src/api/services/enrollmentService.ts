@@ -57,6 +57,11 @@ export interface EnrollmentUploadResponse {
 const BASE = "/api/admissions/enrollments";
 
 const enrollmentService = {
+  getNextAdmissionNo: async (): Promise<string> => {
+    const res = await apiClient.get<{ admission_no: string }>(`${BASE}/next-admission-no`);
+    return res.data.admission_no;
+  },
+
   prefillFromLead: async (leadId: number): Promise<EnrollmentPrefill> => {
     const res = await apiClient.get(`${BASE}/prefill/${leadId}`);
     return res.data;

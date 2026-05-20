@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-import random
-import string
+import re
 
 from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
@@ -111,11 +110,52 @@ class EnrollmentService:
         self.db.flush()
         return parent
 
+    def _admission_no_prefix(self, tenant_id: int) -> str:
+        return f"ADM-{tenant_id}-"
+
+    def _format_admission_no(self, tenant_id: int, sequence: int) -> str:
+        return f"{self._admission_no_prefix(tenant_id)}{sequence:06d}"
+
+    def _next_admission_sequence(self, tenant_id: int) -> int:
+        prefix = self._admission_no_prefix(tenant_id)
+        rows = (
+            self.db.query(Student.admission_no)
+            .filter(
+                Student.tenant_id == tenant_id,
+                Student.admission_no.isnot(None),
+            )
+            .all()
+        )
+        max_seq = 0
+        for (admission_no,) in rows:
+            val = (admission_no or "").strip()
+            if not val:
+                continue
+            if val.startswith(prefix):
+                suffix = val[len(prefix) :]
+                if suffix.isdigit():
+                    max_seq = max(max_seq, int(suffix))
+                    continue
+            match = re.search(r"(\d+)\s*$", val)
+            if match:
+                max_seq = max(max_seq, int(match.group(1)))
+        return max_seq + 1
+
+    def get_next_admission_no(self, tenant_id: int) -> str:
+        return self._format_admission_no(tenant_id, self._next_admission_sequence(tenant_id))
+
     def _generate_admission_no(self, tenant_id: int) -> str:
-        for _ in range(20):
-            suffix = "".join(random.choices(string.digits, k=6))
-            candidate = f"ADM-{tenant_id}-{suffix}"
-            exists = self.db.query(Student.id).filter(Student.admission_no == candidate).first()
+        start_seq = self._next_admission_sequence(tenant_id)
+        for offset in range(20):
+            candidate = self._format_admission_no(tenant_id, start_seq + offset)
+            exists = (
+                self.db.query(Student.id)
+                .filter(
+                    Student.tenant_id == tenant_id,
+                    Student.admission_no == candidate,
+                )
+                .first()
+            )
             if not exists:
                 return candidate
         raise HTTPException(status_code=500, detail="Unable to generate admission number")

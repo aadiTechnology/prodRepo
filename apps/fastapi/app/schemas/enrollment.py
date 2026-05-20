@@ -4,6 +4,10 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 
+class NextAdmissionNoResponse(BaseModel):
+    admission_no: str
+
+
 class EnrollmentPrefillResponse(BaseModel):
     lead_id: int
     student_name: Optional[str] = None

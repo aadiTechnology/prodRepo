@@ -14,6 +14,7 @@ from app.schemas.enrollment import (
     EnrollmentCreateRequest,
     EnrollmentCreateResponse,
     EnrollmentPrefillResponse,
+    NextAdmissionNoResponse,
 )
 from app.services.enrollment_service import EnrollmentService
 
@@ -22,6 +23,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admissions/enrollments", tags=["Enrollment"])
 UPLOAD_DIR = "static/enrollment-documents"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+@router.get("/next-admission-no", response_model=NextAdmissionNoResponse)
+def get_next_admission_no(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_permission("Lead Management", "create")),
+):
+    if current_user.tenant_id is None:
+        raise HTTPException(status_code=400, detail="Tenant context is required")
+    try:
+        admission_no = EnrollmentService(db).get_next_admission_no(current_user.tenant_id)
+        return NextAdmissionNoResponse(admission_no=admission_no)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("get_next_admission_no failed: %s", e)
+        raise HTTPException(status_code=500, detail="Unable to generate admission number")
 
 
 @router.get("/prefill/{lead_id}", response_model=EnrollmentPrefillResponse)

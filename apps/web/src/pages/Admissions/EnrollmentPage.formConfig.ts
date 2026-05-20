@@ -27,6 +27,7 @@ type CreateEnrollmentFormConfigArgs = {
   divisionOptions: Option[];
   feePlanOptions: Option[];
   discountOptions: Option[];
+  autoAssignAdmissionNo?: boolean;
 };
 
 export function createEnrollmentFormConfig({
@@ -35,6 +36,7 @@ export function createEnrollmentFormConfig({
   divisionOptions,
   feePlanOptions,
   discountOptions,
+  autoAssignAdmissionNo = false,
 }: CreateEnrollmentFormConfigArgs): FormConfig<EnrollmentFormData> {
   return {
     fields: {
@@ -71,8 +73,11 @@ export function createEnrollmentFormConfig({
         name: "admission_no",
         label: "Admission No",
         type: "text",
-        placeholder: "AUTO",
+        placeholder: autoAssignAdmissionNo ? "Auto-generated" : "Enter admission number",
         required: false,
+        props: autoAssignAdmissionNo
+          ? { disabled: true, InputProps: { readOnly: true } }
+          : undefined,
       },
       roll_no: {
         name: "roll_no",

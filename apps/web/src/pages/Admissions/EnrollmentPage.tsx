@@ -78,6 +78,14 @@ const viewModeFieldSx = {
 
 const sectionTitleSx = { mt: 1.25 } as const;
 
+const resolveCurrentAcademicYearId = (
+  years: { id?: number | string; is_current?: boolean | number }[]
+): string => {
+  const current =
+    years.find((y) => y.is_current === true || y.is_current === 1) ?? years[0];
+  return current?.id != null ? String(current.id) : "";
+};
+
 const emptyForm = (): EnrollmentFormData => ({
   student_name: "",
   date_of_birth: "",
@@ -161,7 +169,9 @@ export default function EnrollmentPage() {
   const [selectedLead, setSelectedLead] = useState<LeadOption | null>(null);
 
   // Dropdown options
-  const [academicYears, setAcademicYears] = useState<{ id: number; name: string }[]>([]);
+  const [academicYears, setAcademicYears] = useState<
+    { id: number; name: string; is_current?: boolean }[]
+  >([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [divisions, setDivisions] = useState<ClassDivision[]>([]);
   const [feePlans, setFeePlans] = useState<FeePlanOption[]>([]);
@@ -221,7 +231,22 @@ export default function EnrollmentPage() {
       .getAll()
       .then((data: any) => {
         const items = data?.data || data || [];
-        setAcademicYears(items.map((y: any) => ({ id: Number(y.id), name: y.name || String(y.id) })));
+        setAcademicYears(
+          items.map((y: any) => ({
+            id: Number(y.id),
+            name: y.name || String(y.id),
+            is_current: y.is_current === true || y.is_current === 1,
+          }))
+        );
+
+        if (!isEditMode && !isViewMode) {
+          const currentYearId = resolveCurrentAcademicYearId(items);
+          if (currentYearId) {
+            setFormData((prev) =>
+              prev.academic_year_id ? prev : { ...prev, academic_year_id: currentYearId }
+            );
+          }
+        }
       })
       .catch(() => { });
 
@@ -252,7 +277,19 @@ export default function EnrollmentPage() {
       .catch(() => {
         setDiscounts([]);
       });
-  }, []);
+
+    if (!isEditMode && !isViewMode && tenantId) {
+      enrollmentService
+        .getNextAdmissionNo()
+        .then((admissionNo) => {
+          if (!admissionNo) return;
+          setFormData((prev) =>
+            prev.admission_no ? prev : { ...prev, admission_no: admissionNo }
+          );
+        })
+        .catch(() => {});
+    }
+  }, [isEditMode, isViewMode, setFormData, tenantId]);
 
   // Prefill from lead if leadId param exists
   useEffect(() => {
@@ -281,7 +318,9 @@ export default function EnrollmentPage() {
           parent_name: prefill.parent_name ?? prev.parent_name,
           mobile_number: prefill.mobile_number ?? prev.mobile_number,
           email: prefill.email ?? prev.email,
-          academic_year_id: prefill.academic_year_id ? String(prefill.academic_year_id) : prev.academic_year_id,
+          academic_year_id: prefill.academic_year_id
+            ? String(prefill.academic_year_id)
+            : prev.academic_year_id || resolveCurrentAcademicYearId(academicYears),
           class_id: prefill.class_id ? String(prefill.class_id) : prev.class_id,
           class_division_id: prefill.class_division_id ? String(prefill.class_division_id) : prev.class_division_id,
           admission_date: prefill.expected_admission_date ?? prev.admission_date,
@@ -295,7 +334,7 @@ export default function EnrollmentPage() {
       })
       .catch(() => { })
       .finally(() => setFetchLoading(false));
-  }, [leadId, isEditMode, isViewMode, setFormData]);
+  }, [leadId, isEditMode, isViewMode, setFormData, academicYears]);
 
   // Prefill from student if enrollment is used in edit mode
   useEffect(() => {
@@ -734,7 +773,9 @@ export default function EnrollmentPage() {
       parent_name: prefill.parent_name ?? prev.parent_name,
       mobile_number: prefill.mobile_number ?? prev.mobile_number,
       email: prefill.email ?? prev.email,
-      academic_year_id: prefill.academic_year_id ? String(prefill.academic_year_id) : prev.academic_year_id,
+      academic_year_id: prefill.academic_year_id
+        ? String(prefill.academic_year_id)
+        : prev.academic_year_id || resolveCurrentAcademicYearId(academicYears),
       class_id: prefill.class_id ? String(prefill.class_id) : prev.class_id,
       class_division_id: prefill.class_division_id ? String(prefill.class_division_id) : prev.class_division_id,
       admission_date: prefill.expected_admission_date ?? prev.admission_date,
@@ -754,6 +795,7 @@ export default function EnrollmentPage() {
       divisionOptions,
       feePlanOptions,
       discountOptions,
+      autoAssignAdmissionNo: !isEditMode && !isViewMode,
     });
 
     if (!isStudentFlow) {
@@ -807,7 +849,7 @@ export default function EnrollmentPage() {
       config.layoutRows.splice(0, 0, {
         kind: "custom" as const,
         grid: { xs: 12 },
-        render: (ctx) => <FormSectionLabel title="Convert from Lead (Optional)" icon={<PersonSearchIcon />} />,
+        render: (ctx) => <FormSectionLabel title="Convert from Lead" icon={<PersonSearchIcon />} />,
       });
 
       // 2. Lead Selection Autocomplete
@@ -1141,7 +1183,7 @@ export default function EnrollmentPage() {
         headerConfig={{
           links: [
             {
-              title: isStudentFlow ? "Students" : "Admissions",
+              title: isStudentFlow ? "Students" : "Lead Management",
               path: isStudentFlow ? "/students" : "/admissions/leads",
             },
             {
