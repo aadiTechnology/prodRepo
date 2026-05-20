@@ -19,7 +19,6 @@ import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { useLeadListController } from "../../hooks/useLeadListController";
 import type { Lead } from "../../types/lead";
-import { formatShortDate } from "../../utils/formatters";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Lead Management Page Component
@@ -118,29 +117,6 @@ const LeadManagementPage = () => {
             "—"
           ),
       },
-      {
-        id: "next_followup_date",
-        label: "Next Follow-up",
-        render: (row: Lead) =>
-          row.next_followup_date ? (
-            <Box
-              component="span"
-              sx={{
-                color: isOverdue(row.next_followup_date)
-                  ? "error.main"
-                  : "text.primary",
-                fontWeight: isOverdue(row.next_followup_date) ? 600 : 400,
-                fontSize: "0.82rem",
-              }}
-            >
-              {formatShortDate(row.next_followup_date)}
-            </Box>
-          ) : (
-            <Box component="span" sx={{ color: "text.disabled", fontSize: "0.82rem" }}>
-              Not scheduled
-            </Box>
-          ),
-      },
     ],
     []
   );
@@ -218,7 +194,6 @@ const LeadManagementPage = () => {
         renderRowActions={(row) => (
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <TableRowActions
-              onView={() => navigate(`/admissions/leads/${row.id}`)}
               onEdit={() => navigate(`/admissions/leads/${row.id}/edit`)}
               onDelete={() => handleDeleteClick(row)}
             />
@@ -291,12 +266,5 @@ const LeadManagementPage = () => {
     </ListPageLayout>
   );
 };
-
-function isOverdue(dateStr: string): boolean {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const d = new Date(dateStr);
-  return d < today;
-}
 
 export default LeadManagementPage;

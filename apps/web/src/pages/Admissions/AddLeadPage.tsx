@@ -21,6 +21,14 @@ import PersonIcon from "@mui/icons-material/Person";
 import ChildCareIcon from "@mui/icons-material/ChildCare";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 
+function isTeacherUser(user: { role?: string; roles?: string[] | null; is_active?: boolean }): boolean {
+  const roleCodes = [
+    ...(Array.isArray(user.roles) ? user.roles : []),
+    ...(user.role ? [user.role] : []),
+  ].map((r) => String(r).toUpperCase());
+  return roleCodes.includes("TEACHER") && user.is_active !== false;
+}
+
 const emptyForm = (): AddLeadFormData => ({
   parent_name: "",
   mobile_number: "",
@@ -113,7 +121,7 @@ export default function AddLeadPage() {
     }).catch(() => {});
 
     userService.getAllUsers().then((data: any) => {
-      const items = data?.data || data || [];
+      const items = (data?.data || data || []).filter(isTeacherUser);
       setStaffOptions(
         items.map((u: any) => ({
           id: String(u.id),
