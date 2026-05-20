@@ -170,7 +170,8 @@ const FeeCategoryManagement = () => {
         <Alert
           onClose={() => controller.setSnackbar(null)}
           severity="success"
-          sx={{ width: "100%" }}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: "12px" }}
         >
           {controller.snackbar}
         </Alert>

@@ -633,6 +633,23 @@ export default function CollectPaymentPage() {
     [selectedInvoice?.due_amount, formData.allocation_mode, formData.payment_method]
   );
 
+  const breadcrumbLinks = useMemo(() => {
+    const invoiceId = selectedInvoice?.id ?? selectedInvoiceId;
+    const links: { title: string; path: string }[] = [
+      { title: "Invoice List", path: "/fees/invoices" },
+    ];
+    if (invoiceId) {
+      links.push({
+        title: "Invoice Detail",
+        path: `/fees/invoices/${invoiceId}/detail`,
+      });
+    } else {
+      links.push({ title: "Invoice Detail", path: "#" });
+    }
+    links.push({ title: "Collection", path: "#" });
+    return links;
+  }, [selectedInvoice?.id, selectedInvoiceId]);
+
   // ─── Submission handler ────────────────────────────────────────────────
   const handleCollectPayment = useCallback(async () => {
     if (!selectedInvoice) return;
@@ -763,11 +780,7 @@ export default function CollectPaymentPage() {
       canSubmit={!!selectedInvoice && selectedInvoice.due_amount > 0}
       formTopSlot={topSlot}
       headerConfig={{
-        links: [
-          { title: "Fees", path: "/fees" },
-          { title: "Invoices", path: "/fees/invoices" },
-          { title: "Collection", path: "#" },
-        ],
+        links: breadcrumbLinks,
         homePath: "/",
         saveTooltipCreate: "Save Payment",
         cancelTooltip: "Discard",

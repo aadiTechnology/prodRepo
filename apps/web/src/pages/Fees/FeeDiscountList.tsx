@@ -195,7 +195,12 @@ const FeeDiscountList = () => {
                 anchorOrigin={{ vertical: "top", horizontal: "center" }}
                 onClose={() => setSnackbar(null)}
             >
-                <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: "100%" }}>
+                <Alert
+                    onClose={() => setSnackbar(null)}
+                    severity="success"
+                    variant="filled"
+                    sx={{ width: "100%", borderRadius: "12px" }}
+                >
                     {snackbar}
                 </Alert>
             </Snackbar>
