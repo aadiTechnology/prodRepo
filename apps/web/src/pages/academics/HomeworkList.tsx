@@ -16,6 +16,8 @@ import {
   Stack,
   Paper,
   alpha,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import {
@@ -28,8 +30,11 @@ import {
   Warning as OverdueIcon,
   ChevronRight as ViewIcon,
   Download as DownloadIcon,
+  ViewList as ListIcon,
+  GridView as GridIcon,
 } from "@mui/icons-material";
-import { PageHeader } from "../../components/layout";
+import { PageHeader, PageLayout } from "../../components/layout";
+import { AppCard } from "../../components/primitives";
 import {
   ListPageLayout,
   ListPageToolbar,
@@ -90,6 +95,9 @@ export default function HomeworkList() {
   const [children, setChildren] = useState<any[]>([]);
   const [selectedChild, setSelectedChild] = useState<any | null>(null);
   const [tabValue, setTabValue] = useState(0); // 0: All, 1: Active, 2: Overdue
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [listPage, setListPage] = useState(0);
+  const [listRowsPerPage, setListRowsPerPage] = useState(10);
 
   // Fetch student profile or parent's children info
   useEffect(() => {
@@ -257,7 +265,7 @@ export default function HomeworkList() {
 
   if (!canView) {
     return (
-      <ListPageLayout
+      <PageLayout
         header={
           <PageHeader
             links={[{ title: "Homework", path: "#" }]}
@@ -268,16 +276,15 @@ export default function HomeworkList() {
         <Alert severity="error" sx={{ m: 2 }}>
           Access Denied: You do not have permission to view this page.
         </Alert>
-      </ListPageLayout>
+      </PageLayout>
     );
   }
 
-  // Render Premium Student/Parent Dashboard View
+  // Render Standardized Student/Parent Dashboard View
   if (controller.readOnlyAudience) {
     return (
-      <ListPageLayout
+      <PageLayout
         pageBackground
-        contentPaddingSize="none"
         header={
           <PageHeader
             links={[{ title: "Homework", path: "#" }]}
@@ -288,18 +295,27 @@ export default function HomeworkList() {
         <Box
           sx={{
             px: { xs: 1.5, sm: 3 },
-            py: { xs: 1.5, sm: 2 },
-            mt: { xs: -0.5, sm: -1.5 },
+            py: { xs: 0.6, sm: 0.9 },
+            mt: { xs: -0.2, sm: -1.15 },
             display: "flex",
             flexDirection: "column",
-            gap: 2.5,
+            gap: { xs: 1.8, sm: 1.8 },
           }}
         >
-          {/* Child Switcher Pill row for Parents */}
+          {/* Child Selector for Parents */}
           {isParent && children.length > 1 && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 800, color: colorTokens.sidebar.text.primary, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                Select Child:
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 700,
+                  color: colorTokens.text.primary,
+                  textTransform: "uppercase",
+                  fontSize: "0.8rem",
+                  letterSpacing: "0.5px",
+                }}
+              >
+                Child:
               </Typography>
               <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
                 {children.map((child) => (
@@ -309,7 +325,15 @@ export default function HomeworkList() {
                     onClick={() => setSelectedChild(child)}
                     variant={selectedChild?.id === child.id ? "filled" : "outlined"}
                     avatar={
-                      <Avatar src={child.photo_url || undefined} sx={{ bgcolor: selectedChild?.id === child.id ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.05)" }}>
+                      <Avatar
+                        src={child.photo_url || undefined}
+                        sx={{
+                          bgcolor:
+                            selectedChild?.id === child.id
+                              ? alpha(colorTokens.primary.contrast, 0.3)
+                              : alpha(colorTokens.text.secondary, 0.1),
+                        }}
+                      >
                         {child.name[0]}
                       </Avatar>
                     }
@@ -318,15 +342,28 @@ export default function HomeworkList() {
                       px: 1,
                       py: 2.5,
                       borderRadius: "16px",
-                      bgcolor: selectedChild?.id === child.id ? colorTokens.primary.main : "#ffffff",
-                      color: selectedChild?.id === child.id ? "#ffffff" : colorTokens.sidebar.text.primary,
-                      border: `1.5px solid ${selectedChild?.id === child.id ? colorTokens.primary.main : colorTokens.border.default}`,
-                      boxShadow: selectedChild?.id === child.id ? `0 6px 16px ${alpha(colorTokens.primary.main, 0.3)}` : "none",
+                      bgcolor:
+                        selectedChild?.id === child.id
+                          ? colorTokens.primary.main
+                          : colorTokens.surface.card,
+                      color:
+                        selectedChild?.id === child.id
+                          ? colorTokens.primary.contrast
+                          : colorTokens.text.primary,
+                      border: `1.5px solid ${
+                        selectedChild?.id === child.id
+                          ? colorTokens.primary.main
+                          : colorTokens.border.default
+                      }`,
+                      boxShadow:
+                        selectedChild?.id === child.id
+                          ? `0 4px 12px ${alpha(colorTokens.primary.main, 0.25)}`
+                          : "none",
                       transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
                       "&:hover": {
                         transform: "translateY(-2px)",
-                        boxShadow: `0 6px 12px ${alpha(colorTokens.primary.main, 0.15)}`,
-                      }
+                        boxShadow: `0 4px 8px ${alpha(colorTokens.primary.main, 0.15)}`,
+                      },
                     }}
                   />
                 ))}
@@ -334,243 +371,194 @@ export default function HomeworkList() {
             </Box>
           )}
 
-          {/* Student Profile Overview Banner */}
-          <Paper
-            elevation={0}
+          {/* ── Summary Analytics ── */}
+          <Box
             sx={{
-              p: { xs: 3, md: 4 },
-              borderRadius: "24px",
-              border: "none",
-              background: `linear-gradient(135deg, ${colorTokens.primary.main} 0%, ${colorTokens.preschool.turquoise.main} 100%)`,
-              display: "flex",
-              flexDirection: { xs: "column", md: "row" },
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 4,
-              boxShadow: `0 12px 30px ${alpha(colorTokens.primary.main, 0.25)}`,
-              color: "#ffffff",
-              position: "relative",
-              overflow: "hidden",
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(auto-fit, minmax(200px, 1fr))" },
+              gap: { xs: 1.5, sm: 2 },
             }}
           >
-            {/* Background Decorative Elements */}
-            <Box sx={{ position: "absolute", top: -50, right: -50, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.1)", zIndex: 0 }} />
-            <Box sx={{ position: "absolute", bottom: -80, left: '20%', width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,0.05)", zIndex: 0 }} />
-
-            <Box sx={{ display: "flex", alignItems: "center", gap: 3, width: { xs: "100%", md: "auto" }, zIndex: 1 }}>
-              <Avatar
-                src={selectedChild?.photo_url || undefined}
-                sx={{
-                  width: 100,
-                  height: 100,
-                  border: "4px solid rgba(255, 255, 255, 0.3)",
-                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
-                  bgcolor: "rgba(255, 255, 255, 0.2)",
-                  fontSize: "2.5rem",
-                  fontWeight: 800,
-                  color: "#ffffff"
-                }}
-              >
-                {selectedChild?.name?.[0] || "S"}
-              </Avatar>
-              <Box>
-                <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: "-0.5px" }}>
-                  {selectedChild?.name || "Student Profile"}
-                </Typography>
-                <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" gap={1}>
-                  <Chip
-                    size="small"
-                    label={`Roll No. ${selectedChild?.roll_no || "—"}`}
-                    sx={{ fontWeight: 800, bgcolor: "rgba(255, 255, 255, 0.2)", color: "#ffffff", backdropFilter: "blur(10px)" }}
-                  />
-                  <Typography variant="body1" sx={{ fontWeight: 700, opacity: 0.9 }}>
-                    Class {selectedChild?.class_name || selectedChild?.className || "—"} {[selectedChild?.class_division_name, selectedChild?.division_name].filter(Boolean).join(" - ") ? `- ${[selectedChild?.class_division_name, selectedChild?.division_name].filter(Boolean).join(" - ")}` : ""}
-                  </Typography>
-                </Stack>
-                {selectedChild?.admission_no && (
-                  <Typography variant="caption" sx={{ opacity: 0.8, display: "block", mt: 1, fontWeight: 600 }}>
-                    Admission No: {selectedChild?.admission_no}
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-
-            <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 4, md: 6 }, zIndex: 1, flexDirection: { xs: "row", sm: "row" }, width: { xs: "100%", md: "auto" }, justifyContent: "space-around" }}>
-              {/* Circular Gauge Ring */}
-              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <Box sx={{ position: "relative", display: "inline-flex" }}>
-                  <CircularProgress
-                    variant="determinate"
-                    value={100}
-                    size={110}
-                    thickness={5}
-                    sx={{ color: "rgba(255, 255, 255, 0.2)" }}
-                  />
-                  <CircularProgress
-                    variant="determinate"
-                    value={stats.activeRatio || 1}
-                    size={110}
-                    thickness={5}
-                    sx={{
-                      color: "#ffffff",
-                      position: "absolute",
-                      left: 0,
-                      strokeLinecap: "round",
-                    }}
-                  />
-                  <Box
-                    sx={{
-                      top: 0,
-                      left: 0,
-                      bottom: 0,
-                      right: 0,
-                      position: "absolute",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Typography variant="h5" component="div" sx={{ fontWeight: 800, color: "#ffffff" }}>
-                      {stats.activeRatio}%
-                    </Typography>
-                  </Box>
+            {/* Total Tasks Card */}
+            <AppCard
+              sx={{
+                height: "100%",
+                background: `linear-gradient(135deg, ${alpha(colorTokens.primary.main, 0.14)} 0%, ${alpha(colorTokens.primary.main, 0.06)} 100%)`,
+                border: `1.5px solid ${alpha(colorTokens.primary.main, 0.35)}`,
+                position: "relative",
+                overflow: "hidden",
+                transition: "all 0.25s ease",
+                "&:hover": {
+                  transform: "translateY(-4px)",
+                  boxShadow: `0 12px 24px ${alpha(colorTokens.primary.main, 0.2)}`,
+                  borderColor: alpha(colorTokens.primary.main, 0.45),
+                },
+                "&::before": {
+                  content: '""',
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  width: "100px",
+                  height: "100px",
+                  background: `radial-gradient(circle at top right, ${alpha(colorTokens.primary.main, 0.15)}, transparent 70%)`,
+                  pointerEvents: "none",
+                }
+              }}
+              paddingSize="dense"
+            >
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "16px",
+                    bgcolor: alpha(colorTokens.primary.main, 0.22),
+                    color: colorTokens.primary.main,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: `inset 0 0 0 1.5px ${alpha(colorTokens.primary.main, 0.3)}`,
+                    flexShrink: 0,
+                  }}
+                >
+                  <HomeworkIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
                 </Box>
-                <Typography variant="caption" sx={{ mt: 1, fontWeight: 700, color: "rgba(255,255,255,0.9)", textTransform: "uppercase", letterSpacing: "1px" }}>
-                  Completion Rate
-                </Typography>
-              </Box>
-
-              {/* Attendance-style Homework Metrics inside Banner */}
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", display: "block", fontWeight: 700, textTransform: "uppercase" }}>
+                <Box flex={1} minWidth={0}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', fontSize: '0.65rem' }}>
                     Total Tasks
                   </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 0.5, fontSize: '1.65rem', lineHeight: 1.1 }}>
                     {stats.total}
                   </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", display: "block", fontWeight: 700, textTransform: "uppercase" }}>
-                    Subjects
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                    {stats.subjectsCount}
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.primary.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
+                    Assigned
                   </Typography>
                 </Box>
-              </Box>
-            </Box>
-          </Paper>
+              </Stack>
+            </AppCard>
 
-          {/* Metrics Quick Cards Row */}
-          <Grid container spacing={3}>
-            {/* Total Assigned */}
-            <Grid size={{ xs: 12, sm: 4 }}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 3,
-                  borderRadius: "20px",
-                  bgcolor: "#ffffff",
-                  border: `1.5px solid ${colorTokens.border.subtle}`,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 3,
-                  boxShadow: "0 4px 15px rgba(0, 0, 0, 0.02)",
-                  transition: "transform 0.2s",
-                  "&:hover": { transform: "translateY(-3px)", boxShadow: "0 8px 25px rgba(0,0,0,0.06)" }
-                }}
-              >
-                <Avatar sx={{ bgcolor: "rgba(66, 153, 225, 0.1)", color: "#3182CE", width: 64, height: 64 }}>
-                  <HomeworkIcon sx={{ fontSize: 32 }} />
-                </Avatar>
-                <Box>
-                  <Typography variant="caption" sx={{ color: "#718096", fontWeight: 800, fontSize: "0.75rem", letterSpacing: "0.5px" }}>
-                    TOTAL ASSIGNED
-                  </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 900, color: "#2D3748" }}>
-                    {stats.total}
-                  </Typography>
+            {/* Active / Due Soon Card */}
+            <AppCard
+              sx={{
+                height: "100%",
+                background: `linear-gradient(135deg, ${alpha(colorTokens.success.main, 0.14)} 0%, ${alpha(colorTokens.success.main, 0.06)} 100%)`,
+                border: `1.5px solid ${alpha(colorTokens.success.main, 0.35)}`,
+                position: "relative",
+                overflow: "hidden",
+                transition: "all 0.25s ease",
+                "&:hover": {
+                  transform: "translateY(-4px)",
+                  boxShadow: `0 12px 24px ${alpha(colorTokens.success.main, 0.2)}`,
+                  borderColor: alpha(colorTokens.success.main, 0.45),
+                },
+                "&::before": {
+                  content: '""',
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  width: "100px",
+                  height: "100px",
+                  background: `radial-gradient(circle at top right, ${alpha(colorTokens.success.main, 0.15)}, transparent 70%)`,
+                  pointerEvents: "none",
+                }
+              }}
+              paddingSize="dense"
+            >
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "16px",
+                    bgcolor: alpha(colorTokens.success.main, 0.22),
+                    color: colorTokens.success.main,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: `inset 0 0 0 1.5px ${alpha(colorTokens.success.main, 0.3)}`,
+                    flexShrink: 0,
+                  }}
+                >
+                  <ActiveIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
                 </Box>
-              </Paper>
-            </Grid>
-
-            {/* Active */}
-            <Grid size={{ xs: 12, sm: 4 }}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 3,
-                  borderRadius: "20px",
-                  bgcolor: "#ffffff",
-                  border: `1.5px solid ${colorTokens.border.subtle}`,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 3,
-                  boxShadow: "0 4px 15px rgba(0, 0, 0, 0.02)",
-                  transition: "transform 0.2s",
-                  "&:hover": { transform: "translateY(-3px)", boxShadow: "0 8px 25px rgba(0,0,0,0.06)" }
-                }}
-              >
-                <Avatar sx={{ bgcolor: "rgba(72, 187, 120, 0.1)", color: "#38A169", width: 64, height: 64 }}>
-                  <ActiveIcon sx={{ fontSize: 32 }} />
-                </Avatar>
-                <Box>
-                  <Typography variant="caption" sx={{ color: "#718096", fontWeight: 800, fontSize: "0.75rem", letterSpacing: "0.5px" }}>
-                    DUE SOON
+                <Box flex={1} minWidth={0}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', fontSize: '0.65rem' }}>
+                    Active
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 900, color: "#38A169" }}>
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 0.5, fontSize: '1.65rem', lineHeight: 1.1 }}>
                     {stats.active}
                   </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-
-            {/* Overdue */}
-            <Grid size={{ xs: 12, sm: 4 }}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 3,
-                  borderRadius: "20px",
-                  bgcolor: "#ffffff",
-                  border: `1.5px solid ${colorTokens.border.subtle}`,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 3,
-                  boxShadow: "0 4px 15px rgba(0, 0, 0, 0.02)",
-                  transition: "transform 0.2s",
-                  "&:hover": { transform: "translateY(-3px)", boxShadow: "0 8px 25px rgba(0,0,0,0.06)" }
-                }}
-              >
-                <Avatar sx={{ bgcolor: "rgba(255, 107, 107, 0.1)", color: "#FF6B6B", width: 64, height: 64 }}>
-                  <OverdueIcon sx={{ fontSize: 32 }} />
-                </Avatar>
-                <Box>
-                  <Typography variant="caption" sx={{ color: "#718096", fontWeight: 800, fontSize: "0.75rem", letterSpacing: "0.5px" }}>
-                    OVERDUE TASKS
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.success.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
+                    Due soon
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 900, color: "#FF6B6B" }}>
+                </Box>
+              </Stack>
+            </AppCard>
+
+            {/* Overdue Card */}
+            <AppCard
+              sx={{
+                height: "100%",
+                background: `linear-gradient(135deg, ${alpha(colorTokens.error.main, 0.14)} 0%, ${alpha(colorTokens.error.main, 0.06)} 100%)`,
+                border: `1.5px solid ${alpha(colorTokens.error.main, 0.35)}`,
+                position: "relative",
+                overflow: "hidden",
+                transition: "all 0.25s ease",
+                "&:hover": {
+                  transform: "translateY(-4px)",
+                  boxShadow: `0 12px 24px ${alpha(colorTokens.error.main, 0.2)}`,
+                  borderColor: alpha(colorTokens.error.main, 0.45),
+                },
+                "&::before": {
+                  content: '""',
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  width: "100px",
+                  height: "100px",
+                  background: `radial-gradient(circle at top right, ${alpha(colorTokens.error.main, 0.15)}, transparent 70%)`,
+                  pointerEvents: "none",
+                }
+              }}
+              paddingSize="dense"
+            >
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "16px",
+                    bgcolor: alpha(colorTokens.error.main, 0.22),
+                    color: colorTokens.error.main,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: `inset 0 0 0 1.5px ${alpha(colorTokens.error.main, 0.3)}`,
+                    flexShrink: 0,
+                  }}
+                >
+                  <OverdueIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
+                </Box>
+                <Box flex={1} minWidth={0}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', fontSize: '0.65rem' }}>
+                    Overdue
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 0.5, fontSize: '1.65rem', lineHeight: 1.1 }}>
                     {stats.overdue}
                   </Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.error.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
+                    Past due
+                  </Typography>
                 </Box>
-              </Paper>
-            </Grid>
-          </Grid>
+              </Stack>
+            </AppCard>
+          </Box>
 
-          {/* Homework list container card */}
-          <Paper
-            elevation={0}
+          {/* Homework list container */}
+          <Box
             sx={{
-              p: { xs: 2.5, md: 4 },
-              borderRadius: "24px",
-              border: `1px solid ${colorTokens.border.default}`,
-              background: "#FFFFFF",
-              boxShadow: "0 8px 30px rgba(0, 0, 0, 0.04)",
               display: "flex",
               flexDirection: "column",
-              minHeight: 400,
             }}
           >
             {/* Tab header controller */}
@@ -581,52 +569,192 @@ export default function HomeworkList() {
                 alignItems: "center",
                 flexWrap: "wrap",
                 gap: 2,
-                mb: 4,
-                borderBottom: `2px solid ${alpha(colorTokens.border.subtle, 0.5)}`,
-                pb: 1.5,
+                mb: 2,
               }}
             >
               <Tabs
                 value={tabValue}
-                onChange={(e, v) => setTabValue(v)}
+                onChange={(e, v) => { setTabValue(v); setListPage(0); }}
                 textColor="primary"
                 indicatorColor="primary"
                 sx={{
-                  "& .MuiTab-root": { fontWeight: 800, px: 3, fontSize: "0.95rem", color: colorTokens.sidebar.text.secondary, textTransform: "none", minWidth: 120 },
+                  "& .MuiTab-root": {
+                    fontWeight: 700,
+                    px: 2,
+                    fontSize: "0.9rem",
+                    color: colorTokens.text.secondary,
+                    textTransform: "none",
+                    minWidth: 100,
+                  },
                   "& .Mui-selected": { color: `${colorTokens.primary.main} !important` },
-                  "& .MuiTabs-indicator": { height: "4px", borderRadius: "4px 4px 0 0" },
+                  "& .MuiTabs-indicator": {
+                    height: "3px",
+                    borderRadius: "3px 3px 0 0",
+                  },
                 }}
               >
                 <Tab label="All Tasks" />
                 <Tab label={`Active (${stats.active})`} />
                 <Tab label={`Overdue (${stats.overdue})`} />
               </Tabs>
-              <Typography variant="body2" sx={{ color: colorTokens.sidebar.text.secondary, fontWeight: 700, px: 2, py: 1, bgcolor: alpha(colorTokens.border.subtle, 0.3), borderRadius: "12px" }}>
-                Showing {finalHomeworkList.length} of {filteredHomeworkByChild.length} items
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    bgcolor: alpha(colorTokens.border.default, 0.2),
+                    borderRadius: '12px',
+                    p: 0.5,
+                  }}
+                >
+                  <Tooltip title="List View">
+                    <IconButton
+                      size="small"
+                      onClick={() => setViewMode("list")}
+                      sx={{
+                        bgcolor: viewMode === "list" ? colorTokens.surface.card : "transparent",
+                        color: viewMode === "list" ? colorTokens.primary.main : colorTokens.text.secondary,
+                        boxShadow: viewMode === "list" ? "0 2px 8px rgba(0,0,0,0.08)" : "none",
+                        borderRadius: "8px",
+                      }}
+                    >
+                      <ListIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Grid View">
+                    <IconButton
+                      size="small"
+                      onClick={() => setViewMode("grid")}
+                      sx={{
+                        bgcolor: viewMode === "grid" ? colorTokens.surface.card : "transparent",
+                        color: viewMode === "grid" ? colorTokens.primary.main : colorTokens.text.secondary,
+                        boxShadow: viewMode === "grid" ? "0 2px 8px rgba(0,0,0,0.08)" : "none",
+                        borderRadius: "8px",
+                      }}
+                    >
+                      <GridIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: colorTokens.text.secondary,
+                    fontWeight: 700,
+                    px: 1.5,
+                    py: 0.75,
+                    bgcolor: alpha(colorTokens.border.default, 0.5),
+                    borderRadius: "10px",
+                    fontSize: "0.8rem",
+                  }}
+                >
+                  {finalHomeworkList.length} of {filteredHomeworkByChild.length}
+                </Typography>
+              </Box>
             </Box>
 
             {/* Main Homework List view */}
             {controller.loading ? (
-              <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", flexGrow: 1, py: 8 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  flexGrow: 1,
+                  py: 8,
+                }}
+              >
                 <CircularProgress size={48} thickness={4} />
               </Box>
             ) : finalHomeworkList.length === 0 ? (
-              <Box sx={{ textAlign: "center", py: 10, px: 2, flexGrow: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                <HomeworkIcon sx={{ fontSize: 80, color: "rgba(0, 0, 0, 0.08)", mb: 3 }} />
-                <Typography variant="h5" sx={{ fontWeight: 900, color: "#2D3748", mb: 1 }}>
-                  No Tasks Found
-                </Typography>
-                <Typography variant="body1" sx={{ color: colorTokens.sidebar.text.secondary, maxWidth: 400, mx: "auto" }}>
+              <Box
+                sx={{
+                  textAlign: "center",
+                  py: 10,
+                  px: 2,
+                  flexGrow: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <HomeworkIcon
+                  sx={{
+                    fontSize: 72,
+                    color: alpha(colorTokens.text.secondary, 0.3),
+                    mb: 2,
+                  }}
+                />
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 800,
+                    color: colorTokens.text.primary,
+                    mb: 1,
+                  }}
+                >
                   {tabValue === 1
-                    ? "Great job! There are no pending homework tasks for this child right now."
+                    ? "No Active Tasks"
                     : tabValue === 2
-                      ? "Awesome! No overdue homework tasks to worry about."
+                      ? "No Overdue Tasks"
+                      : "No Tasks Yet"}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: colorTokens.text.secondary,
+                    maxWidth: 320,
+                  }}
+                >
+                  {tabValue === 1
+                    ? "Great! You have no pending homework tasks."
+                    : tabValue === 2
+                      ? "Awesome! No overdue homework to worry about."
                       : "No homework has been assigned yet."}
                 </Typography>
               </Box>
+            ) : viewMode === "list" ? (
+              <AppCard
+                paddingSize="none"
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                  borderRadius: "14px",
+                  border: `1px solid ${colorTokens.border.default}`,
+                  boxShadow: "0 4px 14px rgba(0, 0, 0, 0.03)",
+                }}
+              >
+                <EntityTableSection<HomeworkRow>
+                  label="Tasks"
+                  totalRows={finalHomeworkList.length}
+                  page={listPage}
+                  rowsPerPage={listRowsPerPage}
+                  onPageChange={setListPage}
+                  onRowsPerPageChange={setListRowsPerPage}
+                  columns={listConfig.columns}
+                  data={finalHomeworkList.slice(listPage * listRowsPerPage, listPage * listRowsPerPage + listRowsPerPage)}
+                  loading={controller.loading}
+                  emptyMessage="No tasks found."
+                  rowActions={listConfig.actions.rowActions}
+                  stickyHeader
+                  size="small"
+                />
+              </AppCard>
             ) : (
-              <Grid container spacing={3}>
+              <Card
+                variant="outlined"
+                sx={{
+                  p: { xs: 2.5, md: 4 },
+                  borderRadius: "24px",
+                  borderColor: colorTokens.border.default,
+                  background: colorTokens.surface.card,
+                  boxShadow: "0 4px 16px rgba(0, 0, 0, 0.04)",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <Grid container spacing={2.5}>
                 {finalHomeworkList.map((hw) => {
                   const isOverdue = new Date(hw.submission_date) < new Date();
                   const subColor = getSubjectColor(hw.subject_name);
@@ -634,46 +762,67 @@ export default function HomeworkList() {
                   return (
                     <Grid key={hw.id} size={{ xs: 12, sm: 6, lg: 4 }}>
                       <Card
-                        elevation={0}
+                        variant="outlined"
                         sx={{
-                          borderRadius: "20px",
-                          border: `1.5px solid ${alpha(colorTokens.border.default, 0.6)}`,
-                          bgcolor: "#fafafa",
+                          borderRadius: "16px",
+                          borderColor: colorTokens.border.default,
+                          bgcolor: colorTokens.surface.card,
                           height: "100%",
                           display: "flex",
                           flexDirection: "column",
                           transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.02)",
                           "&:hover": {
                             borderColor: colorTokens.primary.main,
-                            transform: "translateY(-6px)",
-                            boxShadow: `0 12px 30px ${alpha(colorTokens.primary.main, 0.12)}`,
-                            bgcolor: "#ffffff"
+                            transform: "translateY(-4px)",
+                            boxShadow: `0 8px 20px ${alpha(colorTokens.primary.main, 0.12)}`,
                           },
                         }}
                       >
-                        <CardContent sx={{ p: 3, flexGrow: 1, display: "flex", flexDirection: "column" }}>
-                          {/* Subject and state */}
-                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2.5 }}>
+                        <CardContent
+                          sx={{
+                            p: 2.5,
+                            flexGrow: 1,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 1.5,
+                          }}
+                        >
+                          {/* Subject and State */}
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              gap: 1,
+                            }}
+                          >
                             <Chip
                               label={hw.subject_name || "General"}
+                              size="small"
                               sx={{
-                                fontWeight: 800,
-                                fontSize: "0.75rem",
+                                fontWeight: 700,
+                                fontSize: "0.7rem",
                                 bgcolor: subColor.bg,
                                 color: subColor.text,
-                                borderRadius: "10px",
-                                px: 1
+                                borderRadius: "8px",
+                                height: 24,
                               }}
                             />
                             <Chip
                               label={isOverdue ? "Overdue" : "Active"}
                               size="small"
                               sx={{
-                                fontWeight: 800,
+                                fontWeight: 700,
                                 fontSize: "0.7rem",
-                                borderRadius: "10px",
-                                bgcolor: isOverdue ? "rgba(255, 107, 107, 0.1)" : "rgba(72, 187, 120, 0.1)",
-                                color: isOverdue ? "#FF6B6B" : "#38A169"
+                                borderRadius: "8px",
+                                bgcolor: isOverdue
+                                  ? alpha(colorTokens.error.main, 0.1)
+                                  : alpha(colorTokens.success.main, 0.1),
+                                color: isOverdue
+                                  ? colorTokens.error.main
+                                  : colorTokens.success.main,
+                                height: 24,
                               }}
                             />
                           </Box>
@@ -683,46 +832,90 @@ export default function HomeworkList() {
                             variant="h6"
                             sx={{
                               fontWeight: 800,
-                              color: "#1A202C",
+                              color: colorTokens.text.primary,
                               lineHeight: 1.35,
-                              mb: 2.5,
                               display: "-webkit-box",
                               WebkitLineClamp: 2,
                               WebkitBoxOrient: "vertical",
                               overflow: "hidden",
-                              height: "2.7em",
                             }}
                           >
                             {hw.title}
                           </Typography>
 
-                          {/* Informational Blocks */}
-                          <Stack spacing={1.5} sx={{ mb: 3, mt: "auto" }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                              <Avatar sx={{ width: 28, height: 28, bgcolor: alpha(colorTokens.sidebar.text.secondary, 0.1), color: colorTokens.sidebar.text.secondary }}>
-                                <PersonIcon sx={{ fontSize: 16 }} />
-                              </Avatar>
-                              <Typography variant="body2" sx={{ color: colorTokens.sidebar.text.primary, fontWeight: 700 }}>
-                                {hw.teacher_name || "Assigned Teacher"}
+                          {/* Info Stack */}
+                          <Stack spacing={1} sx={{ mt: "auto", mb: 1 }}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <PersonIcon
+                                sx={{
+                                  fontSize: 18,
+                                  color: colorTokens.text.secondary,
+                                }}
+                              />
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: colorTokens.text.secondary,
+                                  fontWeight: 600,
+                                  fontSize: "0.8rem",
+                                }}
+                              >
+                                {hw.teacher_name || "Teacher"}
                               </Typography>
                             </Box>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                              <Avatar sx={{ width: 28, height: 28, bgcolor: alpha(colorTokens.sidebar.text.secondary, 0.1), color: colorTokens.sidebar.text.secondary }}>
-                                <CalendarIcon sx={{ fontSize: 16 }} />
-                              </Avatar>
-                              <Typography variant="body2" sx={{ color: colorTokens.sidebar.text.primary, fontWeight: 700 }}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <CalendarIcon
+                                sx={{
+                                  fontSize: 18,
+                                  color: colorTokens.text.secondary,
+                                }}
+                              />
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: colorTokens.text.secondary,
+                                  fontWeight: 600,
+                                  fontSize: "0.8rem",
+                                }}
+                              >
                                 Assigned: {formatDate(hw.assigned_date)}
                               </Typography>
                             </Box>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                              <Avatar sx={{ width: 28, height: 28, bgcolor: isOverdue ? alpha(colorTokens.error.main, 0.1) : alpha(colorTokens.warning.main, 0.15), color: isOverdue ? colorTokens.error.main : colorTokens.warning.dark }}>
-                                <CalendarIcon sx={{ fontSize: 16 }} />
-                              </Avatar>
-                              <Typography
-                                variant="body2"
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <CalendarIcon
                                 sx={{
-                                  color: isOverdue ? colorTokens.error.main : colorTokens.warning.dark,
-                                  fontWeight: 800,
+                                  fontSize: 18,
+                                  color: isOverdue
+                                    ? colorTokens.error.main
+                                    : colorTokens.warning.dark,
+                                }}
+                              />
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: isOverdue
+                                    ? colorTokens.error.main
+                                    : colorTokens.warning.dark,
+                                  fontWeight: 700,
+                                  fontSize: "0.8rem",
                                 }}
                               >
                                 Due: {formatDate(hw.submission_date)}
@@ -735,25 +928,42 @@ export default function HomeworkList() {
                             <Box
                               sx={{
                                 mt: 1,
-                                p: 1.5,
-                                borderRadius: "12px",
-                                bgcolor: alpha(colorTokens.primary.main, 0.05),
+                                p: 1.25,
+                                borderRadius: "10px",
+                                bgcolor: alpha(colorTokens.primary.main, 0.06),
                                 display: "flex",
                                 alignItems: "center",
-                                gap: 1.5,
+                                gap: 1,
+                                border: `1px solid ${alpha(
+                                  colorTokens.primary.main,
+                                  0.15
+                                )}`,
                               }}
                             >
-                              <Avatar sx={{ width: 26, height: 26, bgcolor: alpha(colorTokens.primary.main, 0.15), color: colorTokens.primary.main }}>
-                                <DownloadIcon sx={{ fontSize: 14 }} />
-                              </Avatar>
-                              <Typography variant="caption" sx={{ fontWeight: 800, color: colorTokens.primary.main, fontSize: "0.75rem" }}>
-                                {hw.attachments.length} {hw.attachments.length === 1 ? "File Attached" : "Files Attached"}
+                              <DownloadIcon
+                                sx={{
+                                  fontSize: 16,
+                                  color: colorTokens.primary.main,
+                                }}
+                              />
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  fontWeight: 700,
+                                  color: colorTokens.primary.main,
+                                  fontSize: "0.75rem",
+                                }}
+                              >
+                                {hw.attachments.length}{" "}
+                                {hw.attachments.length === 1
+                                  ? "File"
+                                  : "Files"}
                               </Typography>
                             </Box>
                           )}
                         </CardContent>
 
-                        {/* Footer card action */}
+                        {/* Footer Action */}
                         <Box sx={{ p: 2, pt: 0 }}>
                           <Button
                             fullWidth
@@ -762,9 +972,11 @@ export default function HomeworkList() {
                             onClick={() => navigate(`/homework/${hw.id}`)}
                             endIcon={<ViewIcon />}
                             sx={{
-                              borderRadius: "14px",
-                              py: 1.2,
-                              fontWeight: 800,
+                              borderRadius: "12px",
+                              py: 1,
+                              fontWeight: 700,
+                              fontSize: "0.85rem",
+                              textTransform: "none",
                               bgcolor: colorTokens.primary.main,
                               "&:hover": {
                                 bgcolor: colorTokens.primary.dark,
@@ -779,10 +991,11 @@ export default function HomeworkList() {
                   );
                 })}
               </Grid>
+            </Card>
             )}
-          </Paper>
+          </Box>
         </Box>
-      </ListPageLayout>
+      </PageLayout>
     );
   }
 
