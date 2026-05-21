@@ -211,14 +211,6 @@ export default function InvoiceDetail() {
               >
                 Pay Now
               </Button>
-              <Button
-                variant="contained"
-                sx={{ textTransform: "none" }}
-                onClick={controller.onCollectPayment}
-                disabled={!detail.available_actions.includes("collect_payment")}
-              >
-                Collect Payment
-              </Button>
             </Box>
           </Box>
         )}
