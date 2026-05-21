@@ -4,6 +4,7 @@ import type {
   InvoiceItem,
   InvoiceListParams,
   InvoiceListResponse,
+  InvoiceUpdatePayload,
 } from "../../types/invoice";
 
 function normalizeInvoiceItem(raw: any): InvoiceItem {
@@ -89,6 +90,11 @@ const invoiceService = {
 
   deleteInvoice: async (invoiceId: number): Promise<void> => {
     await apiClient.delete(`/fees/invoices/${invoiceId}`);
+  },
+
+  updateInvoice: async (invoiceId: number, payload: InvoiceUpdatePayload): Promise<InvoiceItem> => {
+    const response = await apiClient.put(`/fees/invoices/${invoiceId}`, payload);
+    return normalizeInvoiceItem(response.data);
   },
 };
 

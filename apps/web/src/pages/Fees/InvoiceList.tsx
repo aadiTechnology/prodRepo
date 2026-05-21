@@ -14,10 +14,7 @@ export default function InvoiceList() {
     () =>
       createInvoiceListConfig({
         onViewInvoice: (invoice) => navigate(`/fees/invoices/${invoice.id}/detail`),
-        onCollectPayment: (invoice) =>
-          navigate("/fees/collect-payment", {
-            state: { invoice_id: invoice.id },
-          }),
+        onEditInvoice: (invoice) => navigate(`/fees/invoices/${invoice.id}/edit`),
       }),
     [navigate]
   );

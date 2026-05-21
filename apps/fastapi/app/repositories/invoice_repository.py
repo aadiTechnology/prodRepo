@@ -7,6 +7,12 @@ from sqlalchemy.orm import Session
 
 from app.models.student_invoice import StudentInvoice
 
+# ORM / API field name -> physical SQL Server column name
+_UPDATE_COLUMN_MAP = {
+    "installment": "Installment",
+}
+
+
 def list_invoices(
     db: Session,
     *,
@@ -201,7 +207,8 @@ def update_invoice(
     params: dict = {"tenant_id": tenant_id, "invoice_id": invoice_id}
 
     for key, value in update_fields.items():
-        set_parts.append(f"{key} = :{key}")
+        column = _UPDATE_COLUMN_MAP.get(key, key)
+        set_parts.append(f"[{column}] = :{key}" if column != key else f"{column} = :{key}")
         params[key] = value
 
     sql = text(
