@@ -33,6 +33,18 @@ interface LeadOption {
   label: string;
 }
 
+function buildLeadDisplayLabel(
+  leadId: number,
+  studentName?: string | null,
+  leadOptions?: LeadOption[]
+): string {
+  const match = leadOptions?.find((o) => o.id === leadId);
+  if (match) return match.label;
+  const name = studentName?.trim();
+  if (name) return name;
+  return `Lead #${leadId}`;
+}
+
 interface FeePlanOption {
   id: number;
   name: string;
@@ -309,7 +321,10 @@ export default function EnrollmentPage() {
     enrollmentService
       .prefillFromLead(idNum)
       .then((prefill) => {
-        setSelectedLead({ id: prefill.lead_id, label: `Lead #${prefill.lead_id}` });
+        setSelectedLead({
+          id: prefill.lead_id,
+          label: buildLeadDisplayLabel(prefill.lead_id, prefill.student_name, leadOptions),
+        });
         setFormData((prev) => ({
           ...prev,
           student_name: prefill.student_name ?? prev.student_name,
@@ -334,7 +349,16 @@ export default function EnrollmentPage() {
       })
       .catch(() => { })
       .finally(() => setFetchLoading(false));
-  }, [leadId, isEditMode, isViewMode, setFormData, academicYears]);
+  }, [leadId, isEditMode, isViewMode, setFormData, academicYears, leadOptions]);
+
+  // Keep lead dropdown label in sync once options load (e.g. enroll-from-lead route)
+  useEffect(() => {
+    if (!selectedLead?.id || leadOptions.length === 0) return;
+    const match = leadOptions.find((o) => o.id === selectedLead.id);
+    if (match && match.label !== selectedLead.label) {
+      setSelectedLead(match);
+    }
+  }, [leadOptions, selectedLead?.id, selectedLead?.label]);
 
   // Prefill from student if enrollment is used in edit mode
   useEffect(() => {
@@ -860,6 +884,8 @@ export default function EnrollmentPage() {
           <Autocomplete
             options={leadOptions}
             value={selectedLead}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            getOptionLabel={(option) => option.label}
             onChange={(_, value) => {
               setSelectedLead(value);
               if (!value) return;
