@@ -15,6 +15,14 @@ import {
   type FeeCategoryFormData,
 } from "./FeeCategory.formConfig";
 
+const resolveCurrentAcademicYearId = (
+  years: { id: number; is_current?: boolean | number }[]
+): string => {
+  const current =
+    years.find((y) => y.is_current === true || y.is_current === 1) ?? years[0];
+  return current?.id != null ? String(current.id) : "";
+};
+
 const AddEditFeeCategory = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id?: string }>();
@@ -24,25 +32,10 @@ const AddEditFeeCategory = () => {
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
-  const [academicYears, setAcademicYears] = useState<{ id: number; name: string }[]>([]);
+  const [academicYears, setAcademicYears] = useState<
+    { id: number; name: string; is_current?: boolean | number }[]
+  >([]);
   const [classes, setClasses] = useState<{ id: number; name: string }[]>([]);
-
-  // Fetch academic years and classes for dropdowns
-  useEffect(() => {
-    const loadLookups = async () => {
-      try {
-        const [years, cls] = await Promise.all([
-          getAcademicYears(),
-          schoolClassService.getAll()
-        ]);
-        setAcademicYears((years || []).map((y: any) => ({ id: y.id, name: y.name })));
-        setClasses((cls || []).map((c: any) => ({ id: c.id, name: c.name })));
-      } catch {
-        // Non-critical: dropdown will be empty
-      }
-    };
-    loadLookups();
-  }, []);
 
   const initialValues = useMemo<FeeCategoryFormData>(
     () => ({
@@ -84,6 +77,37 @@ const AddEditFeeCategory = () => {
   });
 
   const { formData, setFormData, fieldErrors, setFieldErrors, handleChange, handleFieldValueChange, handleSubmit } = formManager;
+
+  useEffect(() => {
+    const loadLookups = async () => {
+      try {
+        const [yearsRaw, cls] = await Promise.all([
+          getAcademicYears(),
+          schoolClassService.getAll(),
+        ]);
+        const years = (yearsRaw || []).map(
+          (y: { id: number; name: string; is_current?: boolean | number }) => ({
+            id: y.id,
+            name: y.name,
+            is_current: y.is_current,
+          })
+        );
+        setAcademicYears(years);
+        setClasses((cls || []).map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })));
+        if (!isEditMode) {
+          const currentYearId = resolveCurrentAcademicYearId(years);
+          if (currentYearId) {
+            setFormData((prev) =>
+              prev.academic_year_id ? prev : { ...prev, academic_year_id: currentYearId }
+            );
+          }
+        }
+      } catch {
+        // Non-critical: dropdown will be empty
+      }
+    };
+    void loadLookups();
+  }, [isEditMode, setFormData]);
 
   const fetchCategory = useCallback(async () => {
     if (!id) return;

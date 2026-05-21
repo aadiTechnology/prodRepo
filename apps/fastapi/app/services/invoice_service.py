@@ -345,10 +345,20 @@ def update_invoice(
     if not update_data:
         return _to_invoice_response(existing)
 
-    next_student_id = int(existing["student_id"])
+    next_student_id = int(update_data.get("student_id", existing["student_id"]))
     next_academic_year_id = int(update_data.get("academic_year_id", existing["academic_year_id"]))
     next_class_id = int(update_data.get("class_id", existing["class_id"]))
     next_fee_structure_id = int(update_data.get("fee_structure_id", existing["fee_structure_id"]))
+
+    student = (
+        db.query(Student)
+        .filter(Student.id == next_student_id, Student.tenant_id == tenant_id, Student.is_active == True)  # noqa: E712
+        .first()
+    )
+    if not student:
+        raise NotFoundException("Student", next_student_id)
+    if int(student.academic_year_id) != next_academic_year_id or int(student.class_id) != next_class_id:
+        raise ValidationException("Selected student does not match academic year and class")
 
     _validate_relations(
         db,
@@ -374,6 +384,26 @@ def update_invoice(
         raise ValidationException("paid_amount cannot be greater than total_amount")
     if due_amount != (total_amount - paid_amount):
         raise ValidationException("due_amount must be equal to total_amount - paid_amount")
+
+    installment_name = update_data.pop("installment", None)
+    if installment_name is not None:
+        fee_structure = (
+            db.query(FeeStructure)
+            .filter(
+                FeeStructure.id == next_fee_structure_id,
+                FeeStructure.tenant_id == tenant_id,
+                FeeStructure.is_deleted == False,  # noqa: E712
+            )
+            .first()
+        )
+        if not fee_structure:
+            raise NotFoundException("FeeStructure", next_fee_structure_id)
+        selected_installment_id, _, _ = _resolve_installment_for_generation(
+            fee_structure=fee_structure,
+            installment_name=str(installment_name),
+        )
+        update_data["fee_installment_id"] = selected_installment_id
+        update_data["installment"] = str(installment_name).strip()
 
     update_data["status"] = _calc_status(total_amount=total_amount, paid_amount=paid_amount, due_date=due_date)
     invoice_repository.update_invoice(db, tenant_id=tenant_id, invoice_id=invoice_id, update_fields=update_data)
@@ -528,7 +558,7 @@ def _resolve_installment_for_generation(
     *,
     fee_structure: FeeStructure,
     installment_name: str,
-) -> tuple[int, float]:
+) -> tuple[int, float, int]:
     target_name = (installment_name or "").strip()
     if not target_name:
         raise ValidationException("Installment is required")

@@ -244,6 +244,10 @@ export default function AppRoutes() {
             element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><InvoiceDetail /></ProtectedRoute>}
           />
           <Route
+            path="/fees/invoices/:invoiceId/edit"
+            element={<ProtectedRoute requiredPermissions="FEE_MGMT:edit"><GenerateInvoice /></ProtectedRoute>}
+          />
+          <Route
             path="/fees/receipt/:paymentId"
             element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><ReceiptPage /></ProtectedRoute>}
           />

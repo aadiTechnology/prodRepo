@@ -8,12 +8,12 @@ function money(v: number): string {
 
 type InvoiceListConfigArgs = {
   onViewInvoice: (invoice: InvoiceItem) => void;
-  onCollectPayment: (invoice: InvoiceItem) => void;
+  onEditInvoice: (invoice: InvoiceItem) => void;
 };
 
 export function createInvoiceListConfig({
   onViewInvoice,
-  onCollectPayment,
+  onEditInvoice,
 }: InvoiceListConfigArgs): ListConfig<InvoiceItem, "invoice_no" | "due_date" | "student_name"> {
   return {
     columns: [
@@ -55,7 +55,7 @@ export function createInvoiceListConfig({
     actions: {
       rowActions: (invoice: InvoiceItem) => ({
         onView: () => onViewInvoice(invoice),
-        onEdit: () => onCollectPayment(invoice),
+        onEdit: () => onEditInvoice(invoice),
       }),
     },
   };

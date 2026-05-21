@@ -23,9 +23,12 @@ class InvoiceCreateRequest(InvoiceBase):
 
 
 class InvoiceUpdateRequest(BaseModel):
+    student_id: Optional[int] = Field(None, ge=1)
     academic_year_id: Optional[int] = Field(None, ge=1)
     class_id: Optional[int] = Field(None, ge=1)
     fee_structure_id: Optional[int] = Field(None, ge=1)
+    fee_installment_id: Optional[int] = Field(None, ge=1)
+    installment: Optional[str] = Field(None, min_length=1, max_length=100)
     invoice_no: Optional[str] = Field(None, min_length=1, max_length=50)
     total_amount: Optional[float] = Field(None, ge=0)
     paid_amount: Optional[float] = Field(None, ge=0)

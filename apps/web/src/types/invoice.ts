@@ -87,3 +87,17 @@ export interface InvoiceDetailResponse {
   payment_history: InvoicePaymentHistoryItem[];
   available_actions: string[];
 }
+
+export interface InvoiceUpdatePayload {
+  student_id?: number;
+  academic_year_id?: number;
+  class_id?: number;
+  fee_structure_id?: number;
+  fee_installment_id?: number;
+  installment?: string;
+  invoice_no?: string;
+  total_amount?: number;
+  paid_amount?: number;
+  due_amount?: number;
+  due_date?: string;
+}

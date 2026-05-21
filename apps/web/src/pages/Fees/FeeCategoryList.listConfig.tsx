@@ -15,12 +15,6 @@ export function createFeeCategoryListConfig({
   return {
     columns: [
       {
-        id: "academic_year_name",
-        label: "Academic Year",
-        render: (cat: FeeCategoryResponse) => cat.academic_year_name ?? "—",
-        align: "left" as const,
-      },
-      {
         id: "class",
         label: "Class",
         render: (cat: FeeCategoryResponse) => cat.class_name ?? "—",

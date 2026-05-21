@@ -11,6 +11,7 @@ export type GenerateInvoiceFormData = {
   payable_amount: number | null;
   invoice_date: string;
   due_date: string;
+  invoice_no: string;
 };
 
 type GenerateInvoiceFormConfigArgs = {
@@ -50,8 +51,7 @@ export function generateInvoiceFormConfig({
   disablePayableAmount,
   studentSelectionSlot,
 }: GenerateInvoiceFormConfigArgs): FormConfig<GenerateInvoiceFormData> {
-  return {
-    fields: {
+  const fields: FormConfig<GenerateInvoiceFormData>["fields"] = {
       academic_year_id: {
         name: "academic_year_id",
         label: "Academic Year",
@@ -154,24 +154,29 @@ export function generateInvoiceFormConfig({
           disabled: disableDates,
         },
       },
-    },
-    layoutRows: [
-      { kind: "section", title: "Academic Form", grid: { xs: 12 } },
-      { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["academic_year_id"] },
-      { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["class_id"] },
-      { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["division_id"] },
-      { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["fee_structure_id"] },
-      { kind: "section", title: "Installment Time", grid: { xs: 12 } },
-      { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["installment_name"] },
-      { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["payable_amount"] },
-      { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["invoice_date"] },
-      { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["due_date"] },
-      { kind: "section", title: "Student Selection", grid: { xs: 12 } },
-      {
-        kind: "custom",
-        grid: { xs: 12 },
-        render: () => studentSelectionSlot ?? null,
-      },
-    ],
   };
+
+  const layoutRows: FormConfig<GenerateInvoiceFormData>["layoutRows"] = [
+    { kind: "section", title: "Academic Form", grid: { xs: 12 } },
+    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["academic_year_id"] },
+    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["class_id"] },
+    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["division_id"] },
+    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["fee_structure_id"] },
+    { kind: "section", title: "Installment Time", grid: { xs: 12 } },
+    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["installment_name"] },
+    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["payable_amount"] },
+    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["invoice_date"] },
+    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["due_date"] },
+  ];
+
+  layoutRows.push(
+    { kind: "section", title: "Student Selection", grid: { xs: 12 } },
+    {
+      kind: "custom",
+      grid: { xs: 12 },
+      render: () => studentSelectionSlot ?? null,
+    }
+  );
+
+  return { fields, layoutRows };
 }

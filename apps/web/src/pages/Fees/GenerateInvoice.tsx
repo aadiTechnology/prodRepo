@@ -7,7 +7,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useSnackbar } from "notistack";
 
 import BaseForm from "../../components/reusable/BaseForm";
@@ -16,12 +16,24 @@ import type { SelectItemOption } from "../../components/semantic";
 import { useFormManager } from "../../hooks/useFormManager";
 import type { ApiError } from "../../api/client";
 import invoiceApi from "../../api/invoiceApi";
+import invoiceService from "../../api/services/invoiceService";
+import studentService from "../../api/services/studentService";
 import {
   generateInvoiceFormConfig,
   type GenerateInvoiceFormData,
 } from "../../formConfig/generateInvoiceFormConfig";
 import type { FormValidationConfig } from "../../utils/formValidation";
 import { colorTokens } from "../../tokens/colors";
+
+const toDateInputValue = (raw: unknown): string => {
+  if (!raw) return "";
+  const text = String(raw).trim();
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().split("T")[0];
+};
 
 const defaultFormData = (): GenerateInvoiceFormData => ({
   academic_year_id: null,
@@ -32,17 +44,30 @@ const defaultFormData = (): GenerateInvoiceFormData => ({
   payable_amount: null,
   invoice_date: "",
   due_date: "",
+  invoice_no: "",
 });
 
 export default function GenerateInvoice() {
   const navigate = useNavigate();
+  const { invoiceId: routeInvoiceId } = useParams<{ invoiceId?: string }>();
+  const numericInvoiceId = Number(routeInvoiceId);
+  const isEditMode =
+    Boolean(routeInvoiceId) && Number.isFinite(numericInvoiceId) && numericInvoiceId > 0;
+
   const { enqueueSnackbar } = useSnackbar();
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [fetchLoading, setFetchLoading] = useState(isEditMode);
+  const [editHydrated, setEditHydrated] = useState(!isEditMode);
+  const [editPaidAmount, setEditPaidAmount] = useState(0);
+  const [editInvoiceStudentId, setEditInvoiceStudentId] = useState<number | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [studentsPage, setStudentsPage] = useState(0);
   const [studentsRowsPerPage, setStudentsRowsPerPage] = useState(10);
+  const prevAcademicYearRef = useRef<number | null | undefined>(undefined);
+  const prevClassIdRef = useRef<number | null | undefined>(undefined);
+  const prevDivisionIdRef = useRef<number | null | undefined>(undefined);
 
   const validationConfig = useMemo<FormValidationConfig<GenerateInvoiceFormData>>(
     () => ({
@@ -66,8 +91,27 @@ export default function GenerateInvoice() {
           },
         },
       ],
+      ...(isEditMode
+        ? {
+            payable_amount: [
+              {
+                type: "custom" as const,
+                validate: (values) => {
+                  const total = Number(values.payable_amount);
+                  if (!Number.isFinite(total) || total < 0) {
+                    return "Enter a valid invoice amount";
+                  }
+                  if (total < editPaidAmount) {
+                    return `Amount cannot be less than paid amount (₹${editPaidAmount.toLocaleString()})`;
+                  }
+                  return "";
+                },
+              },
+            ],
+          }
+        : {}),
     }),
-    []
+    [isEditMode, editPaidAmount]
   );
 
   const {
@@ -159,59 +203,141 @@ export default function GenerateInvoice() {
     mutationFn: invoiceApi.generateInvoices,
   });
 
-  useEffect(() => {
-    setFormData((prev) => {
-      if (prev.class_id === null && prev.division_id === null) return prev;
-      return {
-        ...prev,
-        class_id: null,
-        division_id: null,
-        fee_structure_id: null,
-        installment_name: "",
-        payable_amount: null,
-      };
-    });
-    setSelectedStudentIds([]);
-    setStudentsPage(0);
-  }, [formData.academic_year_id, setFormData]);
+  const updateMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof invoiceService.updateInvoice>[1]) =>
+      invoiceService.updateInvoice(numericInvoiceId, payload),
+  });
 
   useEffect(() => {
-    setFormData((prev) => {
-      if (prev.division_id === null) return prev;
-      return {
-        ...prev,
-        division_id: null,
-        fee_structure_id: null,
-        installment_name: "",
-        payable_amount: null,
-      };
-    });
-    setSelectedStudentIds([]);
-    setStudentsPage(0);
-  }, [formData.class_id, setFormData]);
-
-  useEffect(() => {
-    setFormData((prev) => {
-      if (
-        prev.fee_structure_id === null &&
-        !prev.installment_name &&
-        prev.payable_amount === null
-      ) {
-        return prev;
+    if (!isEditMode) return;
+    let mounted = true;
+    const loadInvoice = async () => {
+      try {
+        setFetchLoading(true);
+        setError(null);
+        const detail = await invoiceService.getInvoiceDetailById(numericInvoiceId);
+        if (!mounted) return;
+        const inv = detail.invoice;
+        const paid = Number(inv.paid_amount || 0);
+        let divisionId = detail.student_info.division_id ?? null;
+        if (!divisionId && inv.student_id) {
+          try {
+            const student = await studentService.getStudentById(String(inv.student_id));
+            divisionId = student.class_division_id ?? null;
+          } catch {
+            // Division remains optional for display; user can re-select if missing.
+          }
+        }
+        setEditPaidAmount(paid);
+        setEditInvoiceStudentId(inv.student_id);
+        setSelectedStudentIds([inv.student_id]);
+        setFormData({
+          academic_year_id: inv.academic_year_id,
+          class_id: inv.class_id,
+          division_id: divisionId,
+          fee_structure_id: inv.fee_structure_id,
+          installment_name: inv.installment ?? inv.installment_name ?? "",
+          payable_amount: Number(inv.total_amount || 0),
+          invoice_date: toDateInputValue(inv.created_at),
+          due_date: toDateInputValue(inv.due_date),
+          invoice_no: inv.invoice_no ?? "",
+        });
+        setEditHydrated(true);
+        prevAcademicYearRef.current = inv.academic_year_id;
+        prevClassIdRef.current = inv.class_id;
+        prevDivisionIdRef.current = divisionId;
+      } catch (err: unknown) {
+        if (!mounted) return;
+        const apiError = err as ApiError;
+        setError(
+          (apiError?.response?.data?.detail as string | undefined) ||
+            (apiError?.response?.data?.message as string | undefined) ||
+            "Unable to load invoice for editing"
+        );
+      } finally {
+        if (mounted) setFetchLoading(false);
       }
-      return {
-        ...prev,
-        fee_structure_id: null,
-        installment_name: "",
-        payable_amount: null,
-      };
-    });
+    };
+    void loadInvoice();
+    return () => {
+      mounted = false;
+    };
+  }, [isEditMode, numericInvoiceId, setFormData]);
+
+  useEffect(() => {
+    if (!isEditMode || !editHydrated || !editInvoiceStudentId) return;
+    if (students.length === 0) return;
+    setSelectedStudentIds((prev) =>
+      prev.length === 1 && prev[0] === editInvoiceStudentId ? prev : [editInvoiceStudentId]
+    );
+  }, [isEditMode, editHydrated, editInvoiceStudentId, students]);
+
+  useEffect(() => {
+    if (isEditMode && !editHydrated) return;
+    const yearId = formData.academic_year_id;
+    if (prevAcademicYearRef.current === undefined) {
+      prevAcademicYearRef.current = yearId;
+      return;
+    }
+    if (prevAcademicYearRef.current === yearId) return;
+    prevAcademicYearRef.current = yearId;
+    prevClassIdRef.current = null;
+    prevDivisionIdRef.current = null;
+    setFormData((prev) => ({
+      ...prev,
+      class_id: null,
+      division_id: null,
+      fee_structure_id: null,
+      installment_name: "",
+      payable_amount: null,
+    }));
     setSelectedStudentIds([]);
     setStudentsPage(0);
-  }, [formData.division_id]);
+  }, [formData.academic_year_id, setFormData, isEditMode, editHydrated]);
+
+  useEffect(() => {
+    if (isEditMode && !editHydrated) return;
+    const classId = formData.class_id;
+    if (prevClassIdRef.current === undefined) {
+      prevClassIdRef.current = classId;
+      return;
+    }
+    if (prevClassIdRef.current === classId) return;
+    prevClassIdRef.current = classId;
+    prevDivisionIdRef.current = null;
+    setFormData((prev) => ({
+      ...prev,
+      division_id: null,
+      fee_structure_id: null,
+      installment_name: "",
+      payable_amount: null,
+    }));
+    setSelectedStudentIds([]);
+    setStudentsPage(0);
+  }, [formData.class_id, setFormData, isEditMode, editHydrated]);
+
+  useEffect(() => {
+    if (isEditMode && !editHydrated) return;
+    const divisionId = formData.division_id;
+    if (prevDivisionIdRef.current === undefined) {
+      prevDivisionIdRef.current = divisionId;
+      return;
+    }
+    if (prevDivisionIdRef.current === divisionId) return;
+    prevDivisionIdRef.current = divisionId;
+    setFormData((prev) => ({
+      ...prev,
+      fee_structure_id: null,
+      installment_name: "",
+      payable_amount: null,
+    }));
+    setSelectedStudentIds([]);
+    setStudentsPage(0);
+  }, [formData.division_id, setFormData, isEditMode, editHydrated]);
 
   useEffect(() => {
     if (!formData.fee_structure_id) return;
+    if (isEditMode && (feeStructuresLoading || feeStructures.length === 0)) return;
     const isValid = feeStructures.some((item) => item.id === formData.fee_structure_id);
     if (!isValid) {
       setFormData((prev) => ({
@@ -221,19 +347,27 @@ export default function GenerateInvoice() {
         payable_amount: null,
       }));
     }
-  }, [formData.fee_structure_id, feeStructures, setFormData]);
+  }, [formData.fee_structure_id, feeStructures, feeStructuresLoading, setFormData, isEditMode]);
 
   useEffect(() => {
     if (!formData.installment_name) return;
+    if (isEditMode && (installmentsLoading || installmentNameOptions.length === 0)) return;
     const isValid = installmentNameOptions.some(
       (option) => option.value === formData.installment_name
     );
     if (!isValid) {
       setFormData((prev) => ({ ...prev, installment_name: "" }));
     }
-  }, [formData.installment_name, installmentNameOptions, setFormData]);
+  }, [
+    formData.installment_name,
+    installmentNameOptions,
+    installmentsLoading,
+    setFormData,
+    isEditMode,
+  ]);
 
   useEffect(() => {
+    if (isEditMode) return;
     if (!formData.installment_name) return;
     const selectedInstallment = installmentNameOptions.find(
       (option) => option.value === formData.installment_name
@@ -249,7 +383,7 @@ export default function GenerateInvoice() {
       }
       return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
     });
-  }, [formData.installment_name, installmentNameOptions, setFormData]);
+  }, [formData.installment_name, installmentNameOptions, setFormData, isEditMode]);
 
   const academicYearOptions = useMemo<SelectItemOption[]>(
     () =>
@@ -306,11 +440,15 @@ export default function GenerateInvoice() {
     selectableStudents.every((student) => selectedStudentIds.includes(student.id));
 
   const handleToggleStudent = useCallback((studentId: number, checked: boolean) => {
+    if (isEditMode) {
+      setSelectedStudentIds(checked ? [studentId] : []);
+      return;
+    }
     setSelectedStudentIds((prev) => {
       if (checked) return Array.from(new Set([...prev, studentId]));
       return prev.filter((id) => id !== studentId);
     });
-  }, []);
+  }, [isEditMode]);
 
   const handleSelectAll = useCallback((checked: boolean) => {
     if (!checked) {
@@ -322,9 +460,49 @@ export default function GenerateInvoice() {
 
   const handleConfirmSubmit = async () => {
     if (!filtersReady) {
-      setError("Please select filters before generating invoices");
+      setError(isEditMode ? "Please complete all required fields" : "Please select filters before generating invoices");
       return;
     }
+
+    if (isEditMode) {
+      if (!selectedStudentIds.length) {
+        setError("Please select a student");
+        return;
+      }
+      const totalAmount = Number(formData.payable_amount ?? 0);
+      if (!Number.isFinite(totalAmount) || totalAmount < editPaidAmount) {
+        setError(`Total amount must be at least ₹${editPaidAmount.toLocaleString()} (already paid)`);
+        return;
+      }
+      setError(null);
+      try {
+        await updateMutation.mutateAsync({
+          student_id: selectedStudentIds[0],
+          academic_year_id: formData.academic_year_id as number,
+          class_id: formData.class_id as number,
+          fee_structure_id: formData.fee_structure_id as number,
+          installment: formData.installment_name,
+          invoice_no: formData.invoice_no.trim(),
+          total_amount: totalAmount,
+          paid_amount: editPaidAmount,
+          due_amount: totalAmount - editPaidAmount,
+          due_date: formData.due_date,
+        });
+        setSnackbar("Invoice updated successfully");
+        if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current);
+        redirectTimeoutRef.current = setTimeout(() => navigate("/fees/invoices"), 1000);
+      } catch (err) {
+        const apiError = err as ApiError;
+        const errorMessage =
+          (apiError?.response?.data?.detail as string | undefined) ||
+          (apiError?.response?.data?.message as string | undefined) ||
+          "Failed to update invoice";
+        setError(errorMessage);
+        enqueueSnackbar(errorMessage, { variant: "error" });
+      }
+      return;
+    }
+
     if (!selectedStudentIds.length) {
       setError("Please select at least one student");
       return;
@@ -383,14 +561,19 @@ export default function GenerateInvoice() {
       {
         id: "select",
         label: "Select",
-        renderHeader: () => (
-          <Checkbox
-            checked={isAllSelected}
-            indeterminate={!isAllSelected && selectedStudentIds.length > 0}
-            onChange={(e) => handleSelectAll(e.target.checked)}
-            inputProps={{ "aria-label": "Select all students" }}
-          />
-        ),
+        renderHeader: () =>
+          isEditMode ? (
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              Select
+            </Typography>
+          ) : (
+            <Checkbox
+              checked={isAllSelected}
+              indeterminate={!isAllSelected && selectedStudentIds.length > 0}
+              onChange={(e) => handleSelectAll(e.target.checked)}
+              inputProps={{ "aria-label": "Select all students" }}
+            />
+          ),
         width: 90,
         render: (student: (typeof students)[number]) => (
           <Checkbox
@@ -429,7 +612,7 @@ export default function GenerateInvoice() {
         render: (student: (typeof students)[number]) => student.roll_no || "-",
       },
     ],
-    [selectedStudentIds, handleToggleStudent, isAllSelected, handleSelectAll]
+    [selectedStudentIds, handleToggleStudent, isAllSelected, handleSelectAll, isEditMode]
   );
 
   const studentsSection = useMemo(() => (
@@ -505,15 +688,42 @@ export default function GenerateInvoice() {
     paginatedStudents,
   ]);
 
-  const installmentOptions = useMemo<SelectItemOption[]>(
-    () =>
-      installmentNameOptions.map((option) => ({
-        id: option.value,
-        value: option.value,
-        label: option.label,
-      })),
-    [installmentNameOptions]
-  );
+  const installmentOptions = useMemo<SelectItemOption[]>(() => {
+    const options = installmentNameOptions.map((option) => ({
+      id: option.value,
+      value: option.value,
+      label: option.label,
+    }));
+    const current = formData.installment_name?.trim();
+    if (
+      isEditMode &&
+      current &&
+      !options.some((option) => option.value === current)
+    ) {
+      options.unshift({ id: current, value: current, label: current });
+    }
+    return options;
+  }, [installmentNameOptions, isEditMode, formData.installment_name]);
+
+  const feeStructureSelectOptions = useMemo<SelectItemOption[]>(() => {
+    const options = feeStructureOptions;
+    const currentId = formData.fee_structure_id;
+    if (
+      isEditMode &&
+      currentId &&
+      !options.some((option) => Number(option.value) === currentId)
+    ) {
+      return [
+        {
+          id: String(currentId),
+          value: String(currentId),
+          label: `Fee Structure #${currentId}`,
+        },
+        ...options,
+      ];
+    }
+    return options;
+  }, [feeStructureOptions, isEditMode, formData.fee_structure_id]);
 
 
 
@@ -523,7 +733,7 @@ export default function GenerateInvoice() {
         academicYearOptions,
         classOptions,
         divisionOptions,
-        feeStructureOptions,
+        feeStructureOptions: feeStructureSelectOptions,
         installmentOptions,
         academicYearsLoading,
         classesLoading,
@@ -531,7 +741,8 @@ export default function GenerateInvoice() {
         feeStructuresLoading,
         disableClass: !formData.academic_year_id || classesLoading,
         disableDivision: !formData.class_id || divisionsLoading,
-        disableFeeStructure: !filtersReady || feeStructuresLoading || feeStructureOptions.length === 0,
+        disableFeeStructure:
+          !filtersReady || feeStructuresLoading || feeStructureSelectOptions.length === 0,
         disableInstallment:
           !formData.fee_structure_id || installmentsLoading || installmentOptions.length === 0,
         disablePayableAmount: true,
@@ -543,6 +754,7 @@ export default function GenerateInvoice() {
       classOptions,
       divisionOptions,
       feeStructureOptions,
+      feeStructureSelectOptions,
       academicYearsLoading,
       classesLoading,
       divisionsLoading,
@@ -568,9 +780,9 @@ export default function GenerateInvoice() {
       handleSubmit={handleSubmit}
       setFormError={setError}
       onConfirmSubmit={handleConfirmSubmit}
-      isEditMode={false}
-      loading={generateMutation.isPending}
-      fetchLoading={academicYearsLoading}
+      isEditMode={isEditMode}
+      loading={isEditMode ? updateMutation.isPending : generateMutation.isPending}
+      fetchLoading={fetchLoading || academicYearsLoading}
       error={error}
       onErrorDismiss={() => setError(null)}
       snackbar={snackbar}
@@ -578,21 +790,31 @@ export default function GenerateInvoice() {
       headerConfig={{
         links: [
           { title: "Invoice List", path: "/fees/invoices" },
-          { title: "Generate Invoice", path: "#" },
+          { title: isEditMode ? "Edit Invoice" : "Generate Invoice", path: "#" },
         ],
         homePath: "/",
-        cancelTooltip: "Reset",
+        cancelTooltip: isEditMode ? "Cancel" : "Reset",
         saveTooltipCreate: "Save",
+        saveTooltipEdit: "Update",
       }}
       onCancelNavigate={() => {
+        if (isEditMode) {
+          navigate(`/fees/invoices/${numericInvoiceId}/detail`);
+          return;
+        }
         resetForm(defaultFormData());
         setSelectedStudentIds([]);
         setStudentsPage(0);
         setError(null);
         setSnackbar(null);
       }}
-      confirmMessage="Are you sure you want to generate invoices?"
+      confirmMessage={
+        isEditMode
+          ? "Are you sure you want to update this invoice?"
+          : "Are you sure you want to generate invoices?"
+      }
       submitLabelCreate="Save"
+      submitLabelEdit="Save"
       footerActionOrder="cancel-first"
       canSubmit={true}
     />
