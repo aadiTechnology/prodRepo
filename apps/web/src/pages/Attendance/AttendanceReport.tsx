@@ -32,7 +32,14 @@ import attendanceService, { AttendanceReportResponse } from "../../api/services/
 import studentService from "../../api/services/studentService";
 import teacherService, { TeacherResponse } from "../../api/services/teacherService";
 import { useAuth } from "../../context/AuthContext";
-import { useRBAC } from "../../context/RBACContext";
+import { useAttendanceReportRole } from "../../hooks/useAttendanceReportRole";
+import {
+  AttendanceMonthCalendar,
+  type AttendanceCalendarStatus,
+} from "./components/AttendanceMonthCalendar";
+import holidayApi, { parseHolidayDateRange } from "../../services/holidayApi";
+
+const STUDENT_REPORT_LIMIT = 500;
 
 // ── Shared select style ───────────────────────────────────────────────────────
 const filterSelectSx = {
@@ -87,10 +94,70 @@ const HeaderGradientIconButton = ({
   </Tooltip>
 );
 
+const parseIsoDate = (value: string) => {
+  const [y, m, d] = value.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
+const monthBounds = (month: Date) => {
+  const year = month.getFullYear();
+  const monthIndex = month.getMonth();
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    start: `${year}-${pad(monthIndex + 1)}-01`,
+    end: `${year}-${pad(monthIndex + 1)}-${pad(lastDay)}`,
+  };
+};
+
+const summarizeStudentRecords = (
+  records: { status: string }[]
+) => {
+  let total_present = 0;
+  let total_absent = 0;
+  let total_half_day = 0;
+  let total_leave = 0;
+
+  for (const record of records) {
+    switch (record.status) {
+      case "Present":
+        total_present += 1;
+        break;
+      case "Absent":
+        total_absent += 1;
+        break;
+      case "Half Day":
+        total_half_day += 1;
+        break;
+      case "Leave":
+        total_leave += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  const workingDays = total_present + total_absent + total_half_day + total_leave;
+  const pct = (count: number) =>
+    workingDays > 0 ? Math.round((count / workingDays) * 100) : 0;
+
+  return {
+    total_present,
+    total_absent,
+    total_half_day,
+    total_leave,
+    workingDays,
+    attendancePct: pct(total_present),
+    presentPct: pct(total_present),
+    absentPct: pct(total_absent),
+    halfDayPct: pct(total_half_day),
+    leavePct: pct(total_leave),
+  };
+};
+
 const AttendanceReport = () => {
   const { user } = useAuth();
-  const { hasRole } = useRBAC();
-  const isTeacher = hasRole("TEACHER");
+  const { isTeacher, isStudent } = useAttendanceReportRole();
 
   // State
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
@@ -112,6 +179,8 @@ const AttendanceReport = () => {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [holidayDates, setHolidayDates] = useState<Set<string>>(new Set());
 
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -119,8 +188,10 @@ const AttendanceReport = () => {
     severity: 'success'
   });
 
-  // Load initial data
+  // Load initial data (admin / teacher only)
   useEffect(() => {
+    if (isStudent) return;
+
     const loadInitialData = async () => {
       try {
         const [years, classList, teacherList] = await Promise.all([
@@ -160,7 +231,51 @@ const AttendanceReport = () => {
       }
     };
     loadInitialData();
-  }, [isTeacher, user?.id, user?.email]);
+  }, [isStudent, isTeacher, user?.id, user?.email]);
+
+  // Active academic year + holidays for student calendar
+  useEffect(() => {
+    if (!isStudent) return;
+
+    const loadStudentContext = async () => {
+      try {
+        const years = await academicYearService.getAll();
+        setAcademicYears(years);
+        const activeYear = years.find((y) => y.is_active);
+        if (!activeYear) {
+          setHolidayDates(new Set());
+          return;
+        }
+
+        const { data } = await holidayApi.list({
+          academic_year_id: activeYear.id,
+          page: 1,
+          page_size: 200,
+        });
+
+        const dates = new Set<string>();
+        for (const row of data) {
+          const { start, end } = parseHolidayDateRange(row.holiday_date);
+          if (!start) continue;
+          const startMs = Date.parse(`${start}T00:00:00`);
+          const endMs = Date.parse(`${(end || start)}T00:00:00`);
+          if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) continue;
+          for (let t = startMs; t <= endMs; t += 86400000) {
+            const d = new Date(t);
+            dates.add(
+              `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+            );
+          }
+        }
+        setHolidayDates(dates);
+      } catch (err) {
+        console.error("Failed to load student holiday context", err);
+        setHolidayDates(new Set());
+      }
+    };
+
+    void loadStudentContext();
+  }, [isStudent]);
 
   const filteredClasses = useMemo(() => {
     if (!isTeacher) return classes;
@@ -188,8 +303,9 @@ const AttendanceReport = () => {
     return classDivisions.filter((d) => d.id === myTeacher.class_division_id);
   }, [filters.class_id, filteredClasses, isTeacher, teachers, user?.id, user?.email]);
 
-  // Update divisions when class changes
+  // Update divisions when class changes (admin / teacher)
   useEffect(() => {
+    if (isStudent) return;
     if (filters.class_id) {
       const selectedClass = filteredClasses.find(c => c.id === filters.class_id);
       const nextDivisions = selectedClass?.divisions || [];
@@ -201,9 +317,10 @@ const AttendanceReport = () => {
       setDivisions([]);
       setFilters(prev => ({ ...prev, division_id: 0, student_id: 0 }));
     }
-  }, [filters.class_id, filteredClasses, filters.division_id]);
+  }, [filters.class_id, filteredClasses, filters.division_id, isStudent]);
 
   useEffect(() => {
+    if (isStudent) return;
     setDivisions(filteredDivisions);
     if (filteredDivisions.length === 0) {
       setFilters((prev) => ({ ...prev, division_id: 0, student_id: 0 }));
@@ -212,10 +329,11 @@ const AttendanceReport = () => {
     if (!filteredDivisions.some((d) => d.id === filters.division_id)) {
       setFilters((prev) => ({ ...prev, division_id: filteredDivisions[0].id, student_id: 0 }));
     }
-  }, [filteredDivisions, filters.division_id]);
+  }, [filteredDivisions, filters.division_id, isStudent]);
 
-  // Update students list when division changes
+  // Update students list when division changes (admin / teacher)
   useEffect(() => {
+    if (isStudent) return;
     const loadStudents = async () => {
       if (filters.class_id && filters.division_id) {
         try {
@@ -246,7 +364,7 @@ const AttendanceReport = () => {
       }
     };
     loadStudents();
-  }, [filters.class_id, filters.division_id]);
+  }, [filters.class_id, filters.division_id, isStudent]);
 
   const fetchReport = useCallback(async () => {
     if (filters.from_date > filters.to_date) {
@@ -256,23 +374,35 @@ const AttendanceReport = () => {
 
     setLoading(true);
     try {
-      const data = await attendanceService.getReport({
-        from_date: filters.from_date,
-        to_date: filters.to_date,
-        class_id: filters.class_id || undefined,
-        division_id: filters.division_id || undefined,
-        student_id: filters.student_id || undefined,
-        limit: rowsPerPage,
-        offset: page * rowsPerPage
-      });
+      const data = await attendanceService.getReport(
+        isStudent
+          ? {
+              from_date: filters.from_date,
+              to_date: filters.to_date,
+              limit: STUDENT_REPORT_LIMIT,
+              offset: 0,
+            }
+          : {
+              from_date: filters.from_date,
+              to_date: filters.to_date,
+              class_id: filters.class_id || undefined,
+              division_id: filters.division_id || undefined,
+              student_id: filters.student_id || undefined,
+              limit: rowsPerPage,
+              offset: page * rowsPerPage,
+            }
+      );
       setReportData(data);
+      if (isStudent) {
+        setCalendarMonth(parseIsoDate(filters.to_date));
+      }
     } catch (err) {
       console.error("Failed to fetch report", err);
       setSnackbar({ open: true, message: "Unable to load attendance data", severity: 'error' });
     } finally {
       setLoading(false);
     }
-  }, [filters, page, rowsPerPage]);
+  }, [filters, page, rowsPerPage, isStudent]);
 
   useEffect(() => {
     fetchReport();
@@ -384,6 +514,21 @@ const AttendanceReport = () => {
   ], []);
 
   const handleResetFilters = () => {
+    const defaultFrom = new Date(new Date().setDate(new Date().getDate() - 7))
+      .toISOString()
+      .split("T")[0];
+    const defaultTo = new Date().toISOString().split("T")[0];
+
+    if (isStudent) {
+      setFilters((prev) => ({
+        ...prev,
+        from_date: defaultFrom,
+        to_date: defaultTo,
+      }));
+      setReportData(null);
+      return;
+    }
+
     const myTeacher = teachers.find(
       (t) =>
         String(t.user_id) === String(user?.id) ||
@@ -394,12 +539,54 @@ const AttendanceReport = () => {
       class_id: isTeacher ? (myTeacher?.class_id || 0) : 0,
       division_id: isTeacher ? (myTeacher?.class_division_id || 0) : 0,
       student_id: 0,
-      from_date: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split("T")[0],
-      to_date: new Date().toISOString().split("T")[0],
+      from_date: defaultFrom,
+      to_date: defaultTo,
     });
     setReportData(null);
     setPage(0);
   };
+
+  const studentMonthRecords = useMemo(() => {
+    if (!reportData || !isStudent) return [];
+    const { start: monthStart, end: monthEnd } = monthBounds(calendarMonth);
+    const rangeStart =
+      monthStart > filters.from_date ? monthStart : filters.from_date;
+    const rangeEnd = monthEnd < filters.to_date ? monthEnd : filters.to_date;
+    if (rangeStart > rangeEnd) return [];
+
+    return reportData.records.filter((record) => {
+      const iso = record.date.slice(0, 10);
+      return iso >= rangeStart && iso <= rangeEnd;
+    });
+  }, [
+    reportData,
+    isStudent,
+    calendarMonth,
+    filters.from_date,
+    filters.to_date,
+  ]);
+
+  const studentStats = useMemo(() => {
+    if (!reportData || !isStudent) return null;
+    return summarizeStudentRecords(studentMonthRecords);
+  }, [reportData, isStudent, studentMonthRecords]);
+
+  const calendarStatusByDate = useMemo(() => {
+    if (!reportData) return {} as Record<string, AttendanceCalendarStatus>;
+    const map: Record<string, AttendanceCalendarStatus> = {};
+    for (const record of reportData.records) {
+      const iso = record.date.slice(0, 10);
+      if (holidayDates.has(iso)) {
+        map[iso] = "Holiday";
+      } else {
+        map[iso] = record.status as AttendanceCalendarStatus;
+      }
+    }
+    for (const iso of holidayDates) {
+      if (!map[iso]) map[iso] = "Holiday";
+    }
+    return map;
+  }, [reportData, holidayDates]);
 
   const headerActions = (
     <Stack
@@ -452,14 +639,16 @@ const AttendanceReport = () => {
         <HeaderGradientIconButton
           onClick={handleResetFilters}
           icon={<RefreshIcon sx={{ fontSize: 22 }} />}
-          label="Reset Filters"
+          label={isStudent ? "Reset date range" : "Reset Filters"}
         />
-        <HeaderGradientIconButton
-          onClick={handleExport}
-          icon={<ExportIcon sx={{ fontSize: 22 }} />}
-          label="Export CSV"
-          disabled={!reportData || reportData.records.length === 0}
-        />
+        {!isStudent && (
+          <HeaderGradientIconButton
+            onClick={handleExport}
+            icon={<ExportIcon sx={{ fontSize: 22 }} />}
+            label="Export CSV"
+            disabled={!reportData || reportData.records.length === 0}
+          />
+        )}
       </Stack>
     </Stack>
   );
@@ -549,7 +738,17 @@ const AttendanceReport = () => {
       pageBackground={true}
       header={
         <PageHeader
-          links={[{ title: "Attendance", path: "/attendance/mark" }, { title: "Attendance Report", path: "/attendance/report" }]}
+          links={
+            isStudent
+              ? [
+                  { title: "Attendance", path: "/attendance/report" },
+                  { title: "My Attendance", path: "/attendance/report" },
+                ]
+              : [
+                  { title: "Attendance", path: "/attendance/mark" },
+                  { title: "Attendance Report", path: "/attendance/report" },
+                ]
+          }
           homePath="/"
           actions={headerActions}
         />
@@ -565,10 +764,268 @@ const AttendanceReport = () => {
           gap: { xs: 1.8, sm: 1.8 },
         }}
       >
-        {/* ── Filters (Row 1) ── */}
-        {filterCard}
+        {/* ── Filters (Row 1) — admin / teacher only ── */}
+        {!isStudent && filterCard}
 
-        {reportData && (
+        {reportData && isStudent && studentStats && (
+          <>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(auto-fit, minmax(200px, 1fr))" },
+                gap: { xs: 1.5, sm: 2 },
+              }}
+            >
+              <AppCard
+                sx={{
+                  height: "100%",
+                  background: `linear-gradient(135deg, ${alpha(colorTokens.preschool.mint.main, 0.14)} 0%, ${alpha(colorTokens.preschool.mint.main, 0.06)} 100%)`,
+                  border: `1.5px solid ${alpha(colorTokens.preschool.mint.main, 0.35)}`,
+                }}
+                paddingSize="dense"
+              >
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: "16px",
+                      bgcolor: alpha(colorTokens.preschool.mint.main, 0.22),
+                      color: colorTokens.preschool.mint.main,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <CheckCircleIcon sx={{ fontSize: 32 }} />
+                  </Box>
+                  <Box flex={1} minWidth={0}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: "uppercase", fontSize: "0.65rem" }}>
+                      Present Days
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5, fontSize: "1.65rem", lineHeight: 1.1 }}>
+                      {studentStats.total_present}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.mint.main, mt: 0.75, display: "block", fontSize: "0.7rem" }}>
+                      {studentStats.presentPct}%
+                    </Typography>
+                  </Box>
+                </Stack>
+              </AppCard>
+
+              <AppCard
+                sx={{
+                  height: "100%",
+                  background: `linear-gradient(135deg, ${alpha(colorTokens.preschool.coral.main, 0.14)} 0%, ${alpha(colorTokens.preschool.coral.main, 0.06)} 100%)`,
+                  border: `1.5px solid ${alpha(colorTokens.preschool.coral.main, 0.35)}`,
+                }}
+                paddingSize="dense"
+              >
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: "16px",
+                      bgcolor: alpha(colorTokens.preschool.coral.main, 0.22),
+                      color: colorTokens.preschool.coral.main,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <CancelIcon sx={{ fontSize: 32 }} />
+                  </Box>
+                  <Box flex={1} minWidth={0}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: "uppercase", fontSize: "0.65rem" }}>
+                      Absent Days
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5, fontSize: "1.65rem", lineHeight: 1.1 }}>
+                      {studentStats.total_absent}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.coral.main, mt: 0.75, display: "block", fontSize: "0.7rem" }}>
+                      {studentStats.absentPct}%
+                    </Typography>
+                  </Box>
+                </Stack>
+              </AppCard>
+
+              <AppCard
+                sx={{
+                  height: "100%",
+                  background: `linear-gradient(135deg, ${alpha(colorTokens.preschool.peach.main, 0.14)} 0%, ${alpha(colorTokens.preschool.peach.main, 0.06)} 100%)`,
+                  border: `1.5px solid ${alpha(colorTokens.preschool.peach.main, 0.35)}`,
+                }}
+                paddingSize="dense"
+              >
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: "16px",
+                      bgcolor: alpha(colorTokens.preschool.peach.main, 0.22),
+                      color: colorTokens.preschool.peach.main,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <WarningIcon sx={{ fontSize: 32 }} />
+                  </Box>
+                  <Box flex={1} minWidth={0}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: "uppercase", fontSize: "0.65rem" }}>
+                      Half Days
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5, fontSize: "1.65rem", lineHeight: 1.1 }}>
+                      {studentStats.total_half_day}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.peach.main, mt: 0.75, display: "block", fontSize: "0.7rem" }}>
+                      {studentStats.halfDayPct}%
+                    </Typography>
+                  </Box>
+                </Stack>
+              </AppCard>
+
+              <AppCard
+                sx={{
+                  height: "100%",
+                  background: `linear-gradient(135deg, ${alpha(colorTokens.preschool.lavender.main, 0.14)} 0%, ${alpha(colorTokens.preschool.lavender.main, 0.06)} 100%)`,
+                  border: `1.5px solid ${alpha(colorTokens.preschool.lavender.main, 0.35)}`,
+                }}
+                paddingSize="dense"
+              >
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: "16px",
+                      bgcolor: alpha(colorTokens.preschool.lavender.main, 0.22),
+                      color: colorTokens.preschool.lavender.main,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <EventNoteIcon sx={{ fontSize: 32 }} />
+                  </Box>
+                  <Box flex={1} minWidth={0}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: "uppercase", fontSize: "0.65rem" }}>
+                      On Leave
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5, fontSize: "1.65rem", lineHeight: 1.1 }}>
+                      {studentStats.total_leave}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.lavender.main, mt: 0.75, display: "block", fontSize: "0.7rem" }}>
+                      {studentStats.leavePct}%
+                    </Typography>
+                  </Box>
+                </Stack>
+              </AppCard>
+            </Box>
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", lg: "1fr 1.15fr" },
+                gap: { xs: 1.5, sm: 2 },
+                alignItems: "stretch",
+              }}
+            >
+              <AppCard
+                sx={{
+                  borderRadius: "14px",
+                  border: `1px solid ${colorTokens.border.default}`,
+                  boxShadow: "0 4px 14px rgba(0, 0, 0, 0.03)",
+                }}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2 }}>
+                  Attendance Overview
+                </Typography>
+                <Stack
+                  direction="column"
+                  spacing={3}
+                  alignItems="center"
+                >
+                  <Box sx={{ position: "relative", display: "inline-flex" }}>
+                    <CircularProgress
+                      variant="determinate"
+                      value={studentStats.attendancePct}
+                      size={132}
+                      thickness={4}
+                      sx={{
+                        color: colorTokens.preschool.mint.main,
+                        "& .MuiCircularProgress-circle": { strokeLinecap: "round" },
+                      }}
+                    />
+                    <Box
+                      sx={{
+                        top: 0,
+                        left: 0,
+                        bottom: 0,
+                        right: 0,
+                        position: "absolute",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexDirection: "column",
+                      }}
+                    >
+                      <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
+                        {studentStats.attendancePct}%
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                        Attendance
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Stack spacing={1.25} sx={{ flex: 1, width: "100%" }}>
+                    {[
+                      { label: "Total Working Days", value: studentStats.workingDays, color: colorTokens.text.primary },
+                      { label: "Days Present", value: studentStats.total_present, color: colorTokens.preschool.mint.main },
+                      { label: "Days Absent", value: studentStats.total_absent, color: colorTokens.preschool.coral.main },
+                      { label: "Days Half Day", value: studentStats.total_half_day, color: colorTokens.preschool.peach.main },
+                      { label: "Days On Leave", value: studentStats.total_leave, color: colorTokens.preschool.lavender.main },
+                    ].map((row) => (
+                      <Stack
+                        key={row.label}
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        sx={{
+                          py: 0.75,
+                          borderBottom: `1px solid ${colorTokens.border.subtle}`,
+                          "&:last-child": { borderBottom: "none" },
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                          {row.label}
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 800, color: row.color }}>
+                          {row.value}
+                        </Typography>
+                      </Stack>
+                    ))}
+                  </Stack>
+                </Stack>
+              </AppCard>
+
+              <AttendanceMonthCalendar
+                month={calendarMonth}
+                onMonthChange={setCalendarMonth}
+                statusByDate={calendarStatusByDate}
+              />
+            </Box>
+          </>
+        )}
+
+        {reportData && !isStudent && (
           <>
             {/* ── Summary Analytics (Row 2) ── */}
             <Box
@@ -871,7 +1328,9 @@ const AttendanceReport = () => {
               No Data Available
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 350, lineHeight: 1.6 }}>
-              Select your filters from the toolbar above to generate the Attendance Analytics Dashboard.
+              {isStudent
+                ? "Choose a date range above to view your attendance summary."
+                : "Select your filters from the toolbar above to generate the Attendance Analytics Dashboard."}
             </Typography>
           </Box>
         )}
