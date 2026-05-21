@@ -73,11 +73,10 @@ export function createEnrollmentFormConfig({
         name: "admission_no",
         label: "Admission No",
         type: "text",
-        placeholder: autoAssignAdmissionNo ? "Auto-generated" : "Enter admission number",
+        placeholder: autoAssignAdmissionNo
+          ? "Auto-generated — edit if needed"
+          : "Enter admission number",
         required: false,
-        props: autoAssignAdmissionNo
-          ? { disabled: true, InputProps: { readOnly: true } }
-          : undefined,
       },
       roll_no: {
         name: "roll_no",
