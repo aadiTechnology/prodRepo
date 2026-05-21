@@ -1,0 +1,753 @@
+"""Dashboard router - Unified role-based landing stats endpoint."""
+from datetime import datetime, date, timedelta
+from typing import Optional, List
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import text, func, and_, or_, case, extract, cast, Date
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.core.dependencies import get_current_user, get_rbac_role_codes
+from app.core.logging_config import get_logger
+from app.schemas.auth import CurrentUser
+
+from app.models.student import Student
+from app.models.teacher import Teacher
+from app.models.student_attendance import StudentAttendance
+from app.models.student_invoice import StudentInvoice
+from app.models.notice import Notice
+from app.models.homework import Homework
+from app.models.lead import Lead, LeadStatus
+from app.models.academic import SchoolClass, ClassDivision
+
+from app.schemas.dashboard import (
+    DashboardResponse,
+    AdminDashboardResponse,
+    TeacherDashboardResponse,
+    StudentDashboardResponse,
+    AttendanceOverview,
+    LeadStatusCount,
+    FeeCollectionSummary,
+    ClassStudentCount,
+    StudentSnapshot,
+    RecentNoticeItem,
+    AssignedClassInfo,
+    AbsenteeDetail,
+    WeeklyTrendPoint,
+    StudentProfileInfo,
+    StudentAttendanceSummary,
+    StudentFeeStatus,
+    StudentHomeworkSummary,
+)
+
+logger = get_logger(__name__)
+
+router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
+
+
+# ─── Helper: fetch recent published notices ───────────────────────────────────
+def _fetch_recent_notices(db: Session, tenant_id: int, limit: int = 5) -> List[RecentNoticeItem]:
+    """Fetch the most recent published notices for a tenant."""
+    try:
+        records = (
+            db.query(Notice)
+            .filter(Notice.tenant_id == tenant_id)
+            .filter(Notice.is_published == True)
+            .filter(Notice.is_deleted == False)
+            .order_by(Notice.published_at.desc())
+            .limit(limit)
+            .all()
+        )
+
+        def _priority(notice_type: str) -> str:
+            nt = (notice_type or "").upper()
+            if any(k in nt for k in ("URGENT", "EMERGENCY", "ALERT")):
+                return "High"
+            if any(k in nt for k in ("ACADEMIC", "EXAM", "TEST")):
+                return "Medium"
+            return "Normal"
+
+        result = []
+        for n in records:
+            published_at = n.published_at  # type: ignore[assignment]
+            result.append(RecentNoticeItem(
+                id=n.id,  # type: ignore[arg-type]
+                title=n.title,  # type: ignore[arg-type]
+                notice_type=n.notice_type,  # type: ignore[arg-type]
+                published_at=(
+                    published_at.strftime("%d %b %Y") if published_at is not None else None
+                ),
+                priority=_priority(n.notice_type),  # type: ignore[arg-type]
+            ))
+        return result
+    except Exception as e:
+        logger.warning(f"Could not fetch recent notices: {e}")
+        return []
+
+
+# ─── Per-class gender + new-enrollment counts ─────────────────────────────────
+def _class_gender_counts(db: Session, tenant_id: int, class_id: int, division_id: int, today: date):
+    base = (
+        db.query(Student)
+        .filter(Student.tenant_id == tenant_id)
+        .filter(Student.class_id == class_id)
+        .filter(Student.class_division_id == division_id)
+        .filter(Student.is_active == True)
+    )
+    boys = base.filter(func.lower(Student.gender).in_(["male", "boy", "m"])).count()
+    girls = base.filter(func.lower(Student.gender).in_(["female", "girl", "f"])).count()
+    new_this_month = (
+        base
+        .filter(extract("month", Student.created_at) == today.month)
+        .filter(extract("year", Student.created_at) == today.year)
+        .count()
+    )
+    return boys, girls, new_this_month
+
+
+# ─── Endpoint ─────────────────────────────────────────────────────────────────
+@router.get("/me", response_model=DashboardResponse)
+def get_my_dashboard(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    # Per-section date overrides — take precedence over global start_date/end_date
+    att_start_date: Optional[date] = None,
+    att_end_date: Optional[date] = None,
+    fee_start_date: Optional[date] = None,
+    fee_end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    import time
+    from sqlalchemy.exc import DBAPIError, OperationalError
+
+    max_retries = 3
+    retry_delay = 1.5
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            return _get_my_dashboard_impl(
+                db, current_user, start_date, end_date,
+                att_start_date=att_start_date, att_end_date=att_end_date,
+                fee_start_date=fee_start_date, fee_end_date=fee_end_date,
+            )
+        except (OperationalError, DBAPIError) as e:
+            logger.warning(f"Database transient error (attempt {attempt}/{max_retries}): {e}")
+            if attempt == max_retries:
+                logger.error("Max retries reached on dashboard fetch", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database connection timeout. Please try again.",
+                )
+            try:
+                db.rollback()
+            except Exception as rb_err:
+                logger.warning(f"Failed to rollback: {rb_err}")
+            time.sleep(retry_delay)
+
+
+def _build_admin_dashboard(
+    db: Session,
+    tenant_id: int,
+    role_str: str,
+    eff_att_start: Optional[date],
+    eff_att_end: Optional[date],
+    eff_fee_start: Optional[date],
+    eff_fee_end: Optional[date],
+) -> DashboardResponse:
+
+    # 1. Attendance Overview — section-specific date range
+    att_q = (
+        db.query(StudentAttendance.status, func.count(StudentAttendance.id))
+        .filter(StudentAttendance.tenant_id == tenant_id)
+        .filter(StudentAttendance.is_deleted == False)
+    )
+    if eff_att_start and eff_att_end:
+        att_counts = (
+            att_q.filter(StudentAttendance.attendance_date.between(eff_att_start, eff_att_end))
+            .group_by(StudentAttendance.status).all()
+        )
+    else:
+        latest = (
+            db.query(StudentAttendance.attendance_date)
+            .filter(StudentAttendance.tenant_id == tenant_id)
+            .filter(StudentAttendance.is_deleted == False)
+            .order_by(StudentAttendance.attendance_date.desc()).first()
+        )
+        if latest:
+            att_counts = (
+                att_q.filter(StudentAttendance.attendance_date == latest[0])
+                .group_by(StudentAttendance.status).all()
+            )
+        else:
+            att_counts = []
+
+    overview = AttendanceOverview()
+    for sv, cnt in att_counts:
+        sl = sv.lower()
+        if "present" in sl:
+            overview.present = cnt
+        elif "absent" in sl:
+            overview.absent = cnt
+        elif "half" in sl:
+            overview.half_day = cnt
+        elif "leave" in sl:
+            overview.leave = cnt
+
+    # 2. Lead Pipeline
+    lead_q = db.query(
+        LeadStatus.name, LeadStatus.color_code, func.count(Lead.id)
+    ).select_from(LeadStatus)
+
+    lead_cond = [
+        Lead.lead_status_id == LeadStatus.id,
+        Lead.is_deleted == False,
+        Lead.tenant_id == tenant_id,
+    ]
+    lead_counts = (
+        lead_q.outerjoin(Lead, and_(*lead_cond))
+        .filter(or_(LeadStatus.tenant_id == tenant_id, LeadStatus.tenant_id.is_(None)))
+        .filter(LeadStatus.is_active == True)
+        .group_by(LeadStatus.id, LeadStatus.name, LeadStatus.color_code, LeadStatus.sequence_order)
+        .order_by(LeadStatus.sequence_order).all()
+    )
+    pipeline = [LeadStatusCount(status=n, color_code=c, count=cnt) for n, c, cnt in lead_counts]
+    if not pipeline:
+        pipeline = [
+            LeadStatusCount(status="New", color_code="#2196F3", count=0),
+            LeadStatusCount(status="Contacted", color_code="#FF9800", count=0),
+            LeadStatusCount(status="Converted", color_code="#4CAF50", count=0),
+            LeadStatusCount(status="Lost", color_code="#F44336", count=0),
+        ]
+
+    # 3. Fee Collection — section-specific date range
+    fee_q = (
+        db.query(
+            func.sum(StudentInvoice.total_amount),
+            func.sum(StudentInvoice.paid_amount),
+            func.sum(StudentInvoice.due_amount),
+        )
+        .filter(StudentInvoice.tenant_id == tenant_id)
+    )
+    if eff_fee_start and eff_fee_end:
+        fee_q = fee_q.filter(cast(StudentInvoice.created_at, Date).between(eff_fee_start, eff_fee_end))
+    fee_row = fee_q.first()
+    fee_col = FeeCollectionSummary(
+        total_fee=float(fee_row[0] or 0.0) if fee_row else 0.0,
+        total_paid=float(fee_row[1] or 0.0) if fee_row else 0.0,
+        total_balance=float(fee_row[2] or 0.0) if fee_row else 0.0,
+    )
+
+    # 4. Student Snapshot — enrollment counts + gender breakdown + class breakdown
+    active_students = (
+        db.query(func.count(Student.id))
+        .filter(Student.tenant_id == tenant_id)
+        .filter(Student.is_active == True)
+        .scalar() or 0
+    )
+    total_classes = (
+        db.query(func.count(SchoolClass.id))
+        .filter(SchoolClass.tenant_id == tenant_id)
+        .filter(SchoolClass.is_active == True)
+        .filter(SchoolClass.is_deleted == False)
+        .scalar() or 0
+    )
+    boys_count = (
+        db.query(func.count(Student.id))
+        .filter(Student.tenant_id == tenant_id)
+        .filter(Student.is_active == True)
+        .filter(func.lower(Student.gender).in_(["male", "boy", "m"]))
+        .scalar() or 0
+    )
+    girls_count = (
+        db.query(func.count(Student.id))
+        .filter(Student.tenant_id == tenant_id)
+        .filter(Student.is_active == True)
+        .filter(func.lower(Student.gender).in_(["female", "girl", "f"]))
+        .scalar() or 0
+    )
+    class_rows = (
+        db.query(SchoolClass.name, func.count(Student.id))
+        .join(Student, Student.class_id == SchoolClass.id)
+        .filter(Student.tenant_id == tenant_id)
+        .filter(Student.is_active == True)
+        .filter(SchoolClass.is_active == True)
+        .group_by(SchoolClass.id, SchoolClass.name)
+        .order_by(SchoolClass.name)
+        .limit(12).all()
+    )
+    snapshot = StudentSnapshot(
+        active_students=active_students,
+        total_classes=total_classes,
+        boys_count=boys_count,
+        girls_count=girls_count,
+        class_breakdown=[ClassStudentCount(class_name=n, count=c) for n, c in class_rows],
+    )
+
+    # 5. Recent Notices
+    recent_notices = _fetch_recent_notices(db, tenant_id, limit=5)
+
+    admin_data = AdminDashboardResponse(
+        attendance_overview=overview,
+        lead_pipeline=pipeline,
+        fee_collection=fee_col,
+        student_snapshot=snapshot,
+        recent_notices=recent_notices,
+    )
+    return DashboardResponse(role=role_str, data=admin_data)
+
+def _build_teacher_dashboard(
+    db: Session,
+    tenant_id: int,
+    today: date,
+    current_user: CurrentUser,
+    role_str: str,
+    eff_att_start: Optional[date],
+    eff_att_end: Optional[date],
+) -> DashboardResponse:
+    teacher = (
+        db.query(Teacher)
+        .filter(Teacher.tenant_id == tenant_id)
+        .filter((Teacher.user_id == current_user.id) | (Teacher.email == current_user.email))
+        .filter(Teacher.is_deleted == False)
+        .first()
+    )
+    if not teacher:
+        return DashboardResponse(
+            role=role_str,
+            data=TeacherDashboardResponse(
+                assigned_classes=[],
+                today_attendance=AttendanceOverview(),
+                absentees_list=[],
+                weekly_trend=[WeeklyTrendPoint(date="Mon", present_rate=100.0)],
+                recent_notices=_fetch_recent_notices(db, tenant_id),
+            ),
+        )
+
+    # Gather assigned class-division pairs
+    assigned_pairs = []
+    if teacher.class_id is not None and teacher.class_division_id is not None:
+        assigned_pairs.append((teacher.class_id, teacher.class_division_id))
+
+    from app.services.teacher_assignment_service import _ensure_teacher_assignments_table
+    try:
+        _ensure_teacher_assignments_table(db)
+        dyn = db.execute(
+            text("""
+                SELECT class_id, class_division_id
+                FROM teacher_assignments
+                WHERE teacher_id = :tid AND tenant_id = :ten AND is_active = 1
+            """),
+            {"tid": teacher.id, "ten": tenant_id},
+        ).fetchall()
+        for row in dyn:
+            assigned_pairs.append((row[0], row[1]))
+    except Exception as e:
+        logger.warning(f"Dynamic assignments error: {e}")
+
+    assigned_pairs = list(set(assigned_pairs))
+
+    # Build assigned class info list with gender + new-enrolment counts
+    assigned_infos = []
+    for cid, did in assigned_pairs:
+        cls = db.query(SchoolClass).filter(SchoolClass.id == cid).first()
+        div = db.query(ClassDivision).filter(ClassDivision.id == did).first()
+        if not (cls and div):
+            continue
+        stu_count = (
+            db.query(func.count(Student.id))
+            .filter(Student.tenant_id == tenant_id)
+            .filter(Student.class_id == cid)
+            .filter(Student.class_division_id == did)
+            .filter(Student.is_active == True)
+            .scalar() or 0
+        )
+        boys, girls, new_month = _class_gender_counts(db, tenant_id, cid, did, today)
+        assigned_infos.append(AssignedClassInfo(
+            class_id=cid,
+            class_name=str(cls.name) if cls.name is not None else "Unknown",
+            division_id=did,
+            division_name=str(div.division_name) if div.division_name is not None else "Unknown",
+            student_count=stu_count,
+            boys_count=boys,
+            girls_count=girls,
+            new_this_month=new_month,
+        ))
+
+    # Attendance for assigned classes — section-specific date range
+    att_counts = []
+    absentees = []
+    if assigned_pairs:
+        clauses = [
+            and_(StudentAttendance.class_id == cid, StudentAttendance.class_division_id == did)
+            for cid, did in assigned_pairs
+        ]
+        base_att = (
+            db.query(StudentAttendance.status, func.count(StudentAttendance.id))
+            .filter(StudentAttendance.tenant_id == tenant_id)
+            .filter(StudentAttendance.is_deleted == False)
+            .filter(or_(*clauses))
+        )
+        absent_q = (
+            db.query(StudentAttendance)
+            .join(Student, Student.id == StudentAttendance.student_id)
+            .filter(StudentAttendance.tenant_id == tenant_id)
+            .filter(StudentAttendance.status == "Absent")
+            .filter(StudentAttendance.is_deleted == False)
+            .filter(or_(*clauses))
+        )
+
+        if eff_att_start and eff_att_end:
+            att_counts = (
+                base_att.filter(StudentAttendance.attendance_date.between(eff_att_start, eff_att_end))
+                .group_by(StudentAttendance.status).all()
+            )
+            absent_records = absent_q.filter(
+                StudentAttendance.attendance_date.between(eff_att_start, eff_att_end)
+            ).all()
+        else:
+            latest = (
+                db.query(StudentAttendance.attendance_date)
+                .filter(StudentAttendance.tenant_id == tenant_id)
+                .filter(StudentAttendance.is_deleted == False)
+                .order_by(StudentAttendance.attendance_date.desc()).first()
+            )
+            if latest:
+                target = latest[0]
+                att_counts = (
+                    base_att.filter(StudentAttendance.attendance_date == target)
+                    .group_by(StudentAttendance.status).all()
+                )
+                absent_records = absent_q.filter(StudentAttendance.attendance_date == target).all()
+            else:
+                att_counts = []
+                absent_records = []
+
+        for rec in absent_records:
+            c_m = db.query(SchoolClass).filter(SchoolClass.id == rec.class_id).first()
+            d_m = db.query(ClassDivision).filter(ClassDivision.id == rec.class_division_id).first()
+            absentees.append(AbsenteeDetail(
+                student_id=rec.student_id,  # type: ignore[arg-type]
+                student_name=str(rec.student.student_name) if rec.student and rec.student.student_name is not None else "Unknown",
+                class_name=str(c_m.name) if c_m and c_m.name is not None else "Unknown",
+                division_name=str(d_m.division_name) if d_m and d_m.division_name is not None else "Unknown",
+                remarks=str(rec.remarks) if rec.remarks is not None else None,
+            ))
+
+    overview = AttendanceOverview()
+    for sv, cnt in att_counts:
+        sl = sv.lower()
+        if "present" in sl:
+            overview.present = cnt
+        elif "absent" in sl:
+            overview.absent = cnt
+        elif "half" in sl:
+            overview.half_day = cnt
+        elif "leave" in sl:
+            overview.leave = cnt
+
+    # Weekly trend (last 5 days)
+    weekly_points = []
+    for i in range(4, -1, -1):
+        day = today - timedelta(days=i)
+        if assigned_pairs:
+            clauses = [
+                and_(StudentAttendance.class_id == cid, StudentAttendance.class_division_id == did)
+                for cid, did in assigned_pairs
+            ]
+            row = (
+                db.query(
+                    func.sum(case(
+                        (or_(StudentAttendance.status == "Present", StudentAttendance.status == "Half Day"), 1),
+                        else_=0,
+                    )),
+                    func.count(StudentAttendance.id),
+                )
+                .filter(StudentAttendance.tenant_id == tenant_id)
+                .filter(StudentAttendance.attendance_date == day)
+                .filter(StudentAttendance.is_deleted == False)
+                .filter(or_(*clauses))
+                .first()
+            )
+            pres, tot = (row[0] or 0 if row else 0), (row[1] or 0 if row else 0)
+            rate = (pres / tot * 100.0) if tot > 0 else 0.0
+        else:
+            rate = 0.0
+        weekly_points.append(WeeklyTrendPoint(date=day.strftime("%a"), present_rate=round(rate, 1)))
+
+    teacher_data = TeacherDashboardResponse(
+        assigned_classes=assigned_infos,
+        today_attendance=overview,
+        absentees_list=absentees,
+        weekly_trend=weekly_points,
+        recent_notices=_fetch_recent_notices(db, tenant_id, limit=5),
+    )
+    return DashboardResponse(role=role_str, data=teacher_data)
+
+def _build_student_dashboard(
+    db: Session,
+    tenant_id: int,
+    today: date,
+    current_user: CurrentUser,
+    role_str: str,
+) -> DashboardResponse:
+    student = (
+        db.query(Student)
+        .filter(Student.tenant_id == tenant_id)
+        .filter(Student.email == current_user.email)
+        .filter(Student.is_active == True)
+        .first()
+    )
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Active student profile not found for this account.",
+        )
+
+    # Resolve class / division names
+    c_name = student.class_model.name if student.class_model else None
+    d_name = None
+    if student.class_division_id is not None:
+        div_rec = db.query(ClassDivision).filter(ClassDivision.id == student.class_division_id).first()
+        d_name = div_rec.division_name if div_rec else None
+
+    # Parent phone — prefer LeadParent relationship, fall back to student's mobile
+    parent_phone: Optional[str] = None
+    try:
+        if student.parent:
+            parent_phone = getattr(student.parent, "mobile_number", None) or getattr(student.parent, "phone", None)
+    except Exception:
+        pass
+    if not parent_phone:
+        parent_phone = str(student.mobile_number) if student.mobile_number is not None else None
+
+    # Admission date formatted string
+    admission_date_str: Optional[str] = None
+    if student.admission_date is not None:
+        try:
+            admission_date_str = student.admission_date.strftime("%d %b %Y")
+        except Exception:
+            admission_date_str = str(student.admission_date)
+
+    profile_info = StudentProfileInfo(
+        student_id=student.id,  # type: ignore[arg-type]
+        student_name=str(student.student_name) if student.student_name is not None else "Unknown",
+        roll_no=str(student.roll_no) if student.roll_no is not None else None,
+        admission_no=str(student.admission_no) if student.admission_no is not None else None,
+        class_name=str(c_name) if c_name is not None else None,
+        division_name=str(d_name) if d_name is not None else None,
+        photo_url=str(student.photo_url) if student.photo_url is not None else None,
+        parent_name=str(student.parent_name) if student.parent_name is not None else None,
+        parent_phone=parent_phone,
+        admission_date=admission_date_str,
+    )
+
+    # Attendance summary (lifetime)
+    att_counts = (
+        db.query(StudentAttendance.status, func.count(StudentAttendance.id))
+        .filter(StudentAttendance.tenant_id == tenant_id)
+        .filter(StudentAttendance.student_id == student.id)
+        .filter(StudentAttendance.is_deleted == False)
+        .group_by(StudentAttendance.status).all()
+    )
+    pres, abs_v, half, lve = 0, 0, 0, 0
+    for sv, cnt in att_counts:
+        sl = sv.lower()
+        if "present" in sl:
+            pres = cnt
+        elif "absent" in sl:
+            abs_v = cnt
+        elif "half" in sl:
+            half = cnt
+        elif "leave" in sl:
+            lve = cnt
+    total_att = pres + abs_v + half + lve
+    pct = ((pres + half * 0.5) / total_att * 100.0) if total_att > 0 else 100.0
+    att_summary = StudentAttendanceSummary(
+        present=pres,
+        absent=abs_v,
+        half_day=half,
+        leave=lve,
+        percentage=round(pct, 1),
+    )
+
+    # Fee status
+    fee_row = (
+        db.query(
+            func.sum(StudentInvoice.total_amount),
+            func.sum(StudentInvoice.paid_amount),
+            func.sum(StudentInvoice.due_amount),
+        )
+        .filter(StudentInvoice.tenant_id == tenant_id)
+        .filter(StudentInvoice.student_id == student.id)
+        .first()
+    )
+    total_fee = float(fee_row[0] or 0.0) if fee_row else 0.0
+    total_paid = float(fee_row[1] or 0.0) if fee_row else 0.0
+    total_balance = float(fee_row[2] or 0.0) if fee_row else 0.0
+
+    # Next due date from unpaid invoices
+    next_due_str: Optional[str] = None
+    try:
+        next_inv = (
+            db.query(StudentInvoice)
+            .filter(StudentInvoice.tenant_id == tenant_id)
+            .filter(StudentInvoice.student_id == student.id)
+            .filter(StudentInvoice.status != "Paid")
+            .filter(StudentInvoice.due_amount > 0)
+            .order_by(StudentInvoice.due_date.asc())
+            .first()
+        )
+        if next_inv is not None and next_inv.due_date is not None:
+            next_due_str = next_inv.due_date.strftime("%d %b %Y")
+    except Exception as e:
+        logger.warning(f"Could not fetch next due date: {e}")
+
+    fee_status = StudentFeeStatus(
+        total_fee=total_fee,
+        total_paid=total_paid,
+        total_balance=total_balance,
+        is_overdue=total_balance > 0.0,
+        next_due_date=next_due_str,
+    )
+
+    # Homework pending count (Published assignments not yet past submission date)
+    homework_summary = StudentHomeworkSummary()
+    if student.class_id is not None:
+        try:
+            hw_q = (
+                db.query(func.count(Homework.id))
+                .filter(Homework.tenant_id == tenant_id)
+                .filter(Homework.class_id == student.class_id)
+                .filter(Homework.status == "Published")
+                .filter(Homework.is_deleted == False)
+                .filter(Homework.submission_date >= today)
+            )
+            if student.class_division_id is not None:
+                hw_q = hw_q.filter(
+                    or_(
+                        Homework.class_division_id == student.class_division_id,
+                        Homework.class_division_id.is_(None),
+                    )
+                )
+            hw_total = hw_q.scalar() or 0
+            homework_summary = StudentHomeworkSummary(pending_count=hw_total, total_count=hw_total)
+        except Exception as e:
+            logger.warning(f"Could not fetch homework count: {e}")
+
+    # Resolve class teacher
+    class_teacher: Optional[str] = None
+    if student.class_id is not None and student.class_division_id is not None:
+        from app.services.teacher_assignment_service import _ensure_teacher_assignments_table
+        try:
+            _ensure_teacher_assignments_table(db)
+            t_row = db.execute(
+                text("""
+                    SELECT t.full_name
+                    FROM teacher_assignments ta
+                    JOIN teachers t ON t.id = ta.teacher_id
+                    WHERE ta.class_id = :cid AND ta.class_division_id = :did
+                      AND ta.tenant_id = :ten AND ta.is_active = 1 AND t.is_deleted = 0
+                """),
+                {"cid": student.class_id, "did": student.class_division_id, "ten": tenant_id},
+            ).first()
+            if t_row:
+                class_teacher = str(t_row[0]) if t_row[0] is not None else None
+            else:
+                legacy = (
+                    db.query(Teacher)
+                    .filter(Teacher.tenant_id == tenant_id)
+                    .filter(Teacher.class_id == student.class_id)
+                    .filter(Teacher.class_division_id == student.class_division_id)
+                    .filter(Teacher.is_deleted == False)
+                    .first()
+                )
+                class_teacher = str(legacy.full_name) if legacy and legacy.full_name is not None else None
+        except Exception as e:
+            logger.warning(f"Could not resolve class teacher: {e}")
+
+    student_data = StudentDashboardResponse(
+        profile=profile_info,
+        attendance=att_summary,
+        fee_status=fee_status,
+        class_teacher=class_teacher,
+        homework=homework_summary,
+        recent_notices=_fetch_recent_notices(db, tenant_id, limit=5),
+    )
+    return DashboardResponse(role=role_str, data=student_data)
+
+def _get_my_dashboard_impl(
+    db: Session,
+    current_user: CurrentUser,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    att_start_date: Optional[date] = None,
+    att_end_date: Optional[date] = None,
+    fee_start_date: Optional[date] = None,
+    fee_end_date: Optional[date] = None,
+):
+    """
+    Get dynamic, tenant-scoped dashboard statistics based on the authenticated user's active role.
+    """
+    tenant_id = current_user.tenant_id or 1
+    today = datetime.utcnow().date()
+
+    # Resolve effective date ranges per section (section-specific > global fallback)
+    eff_att_start: Optional[date] = att_start_date or start_date
+    eff_att_end: Optional[date] = att_end_date or end_date
+    eff_fee_start: Optional[date] = fee_start_date or start_date
+    eff_fee_end: Optional[date] = fee_end_date or end_date
+
+    # Determine active role via RBAC
+    rbac_role_codes = get_rbac_role_codes(db, current_user.id)
+    role_str = "STUDENT"
+
+    is_system_admin = any("system_admin" in r or "super_admin" in r for r in rbac_role_codes)
+    is_tenant_admin = any("tenant_admin" in r or "admin" in r for r in rbac_role_codes)
+    is_teacher = any("teacher" in r for r in rbac_role_codes)
+    is_student = any("student" in r for r in rbac_role_codes)
+
+    if is_system_admin:
+        role_str = "SYSTEM_ADMIN"
+    elif is_tenant_admin:
+        role_str = "TENANT_ADMIN"
+    elif is_teacher:
+        role_str = "TEACHER"
+    elif is_student:
+        role_str = "STUDENT"
+    else:
+        from app.models.user import UserRole
+        if current_user.role == UserRole.SUPER_ADMIN:
+            role_str = "SYSTEM_ADMIN"
+        elif current_user.role in (UserRole.ADMIN, UserRole.TENANT_ADMIN):
+            role_str = "TENANT_ADMIN"
+        elif "teacher" in current_user.email.lower():
+            role_str = "TEACHER"
+        else:
+            role_str = "STUDENT"
+
+    logger.info(f"Dashboard for {current_user.email} → {role_str} (tenant {tenant_id})")
+
+    try:
+        if role_str in ("SYSTEM_ADMIN", "TENANT_ADMIN"):
+            return _build_admin_dashboard(
+                db, tenant_id, role_str,
+                eff_att_start, eff_att_end, eff_fee_start, eff_fee_end,
+            )
+        if role_str == "TEACHER":
+            return _build_teacher_dashboard(
+                db, tenant_id, today, current_user, role_str,
+                eff_att_start, eff_att_end,
+            )
+        return _build_student_dashboard(
+            db, tenant_id, today, current_user, role_str,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Dashboard compilation error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while compiling your dashboard statistics.",
+        )
+

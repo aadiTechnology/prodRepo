@@ -18,7 +18,7 @@ import StudentList from "../pages/students/StudentList";
 // ═══════════════════════════════════════════════════════════════════════════
 // Lazy-loaded Pages - Code splitting for better performance
 // ═══════════════════════════════════════════════════════════════════════════
-const Home = lazy(() => import("../pages/Home"));
+const Dashboard = lazy(() => import("../pages/Dashboard"));
 const Users = lazy(() => import("../pages/Users"));
 const TeacherList = lazy(() => import("../pages/teachers/TeacherList"));
 const AddTeacher = lazy(() => import("../pages/teachers/AddTeacher"));
@@ -118,7 +118,7 @@ export default function AppRoutes() {
 
         {/* Protected routes with layout */}
         <Route element={<MainLayout />}>
-          <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/students" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:view"><StudentList /></ProtectedRoute>} />
           <Route
             path="/students/add"
@@ -194,7 +194,7 @@ export default function AppRoutes() {
           <Route path="/teacher-assignments" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:view"><TeacherAssignmentsPage /></ProtectedRoute>} />
           <Route path="/teacher-assignments/assign" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:create"><AssignTeacher /></ProtectedRoute>} />
           <Route path="/teacher-assignments/add" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:create"><AssignTeacher /></ProtectedRoute>} />
-          
+
           {/* AI Features */}
           <Route
             path="/ai/generate"
@@ -220,13 +220,13 @@ export default function AppRoutes() {
           <Route path="/tenants" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><TenantList /></ProtectedRoute>} />
           <Route path="/tenants/add" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><AddTenant /></ProtectedRoute>} />
           <Route path="/tenants/:id/edit" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><AddTenant /></ProtectedRoute>} />
-          
+
           {/* Sprint Management (RBAC) */}
           <Route path="/sprints" element={<ProtectedRoute requiredPermissions="SPRINT_MGMT:view"><SprintList /></ProtectedRoute>} />
           <Route path="/sprints/add" element={<ProtectedRoute requiredPermissions="SPRINT_MGMT:create"><SprintForm /></ProtectedRoute>} />
           <Route path="/sprints/:id/edit" element={<ProtectedRoute requiredPermissions="SPRINT_MGMT:edit"><SprintForm /></ProtectedRoute>} />
           <Route path="/sprints/assignments" element={<ProtectedRoute requiredPermissions="SPRINT_MGMT:view"><SprintAssignmentsPage /></ProtectedRoute>} />
-          
+
           {/* Fee Management */}
           <Route path="/fees/setup" element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeStructureSetup /></ProtectedRoute>} />
           <Route path="/fees/setup/add" element={<ProtectedRoute requiredPermissions="FEE_MGMT:create"><FeeStructureForm /></ProtectedRoute>} />
@@ -235,7 +235,7 @@ export default function AppRoutes() {
             path="/fees/collect-payment"
             element={<ProtectedRoute requiredPermissions="FEE_MGMT:create"><CollectPaymentPage /></ProtectedRoute>}
           />
-         <Route
+          <Route
             path="/fees/invoices"
             element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><InvoiceList /></ProtectedRoute>}
           />
@@ -263,7 +263,7 @@ export default function AppRoutes() {
             path="/fees/due-list-v2"
             element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeDueListV2 /></ProtectedRoute>}
           />
-          
+
           {/* FEES MODULE (from user request) */}
           <Route
             path="/fees/discounts"
@@ -327,7 +327,7 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
-          
+
           {/* Academic Year Management */}
           <Route path="/academic-years" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><AcademicYearList /></ProtectedRoute>} />
           <Route path="/academic-years/new" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:create"><AddAcademicYear /></ProtectedRoute>} />
@@ -359,7 +359,7 @@ export default function AppRoutes() {
             path="/academics/configuration/holidays/:id/edit"
             element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:edit"><HolidayForm /></ProtectedRoute>}
           />
-            <Route
+          <Route
             path="/calendar/academic"
             element={
               <ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view">

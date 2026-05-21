@@ -48,6 +48,7 @@ from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, 
 
 
 from app.routers import fee_discount, fee_category_router
+from app.routers import dashboard
 from app.routers import installment_tracking, fee_collection
 from app.routers import invoice
 from app.routers import lead as lead_router
@@ -128,6 +129,7 @@ app.include_router(lead_router.router)
 app.include_router(enrollment_router.router)
 app.include_router(attendance_router.router)
 app.include_router(fee_report_router.router)
+app.include_router(dashboard.router)
 app.include_router(notice.router)
 from app.routers import subject_router
 app.include_router(subject_router.router)
