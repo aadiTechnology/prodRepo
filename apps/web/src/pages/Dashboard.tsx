@@ -37,6 +37,7 @@ import {
   LocalAtm as FeeIcon,
   Warning as WarningIcon,
   Refresh as RefreshIcon,
+  AccessTime as AccessTimeIcon,
   WbSunny as SunIcon,
   WbTwilight as SunriseIcon,
   NightsStay as MoonIcon,
@@ -434,10 +435,10 @@ const WelcomeBanner: React.FC<{
   const hr = new Date().getHours();
   const greet =
     hr < 12
-      ? { text: "Good morning", icon: <SunriseIcon sx={{ color: "#FBBF24", fontSize: 26 }} /> }
+      ? { text: "Good morning", icon: <SunriseIcon sx={{ color: "#FDE68A", fontSize: 28 }} />, sub: "Have a productive day!" }
       : hr < 17
-      ? { text: "Good afternoon", icon: <SunIcon sx={{ color: "#F59E0B", fontSize: 26 }} /> }
-      : { text: "Good evening", icon: <MoonIcon sx={{ color: "#A78BFA", fontSize: 24 }} /> };
+      ? { text: "Good afternoon", icon: <SunIcon sx={{ color: "#FCD34D", fontSize: 28 }} />, sub: "Keep up the great work!" }
+      : { text: "Good evening", icon: <MoonIcon sx={{ color: "#C4B5FD", fontSize: 28 }} />, sub: "Hope your day went well." };
 
   const today = new Date().toLocaleDateString("en-IN", {
     weekday: "long",
@@ -446,131 +447,196 @@ const WelcomeBanner: React.FC<{
     day: "numeric",
   });
 
+  const firstName = name.trim().split(/\s+/)[0] || name;
+
   return (
     <Box
       sx={{
-        p: { xs: 3, md: 4 },
-        borderRadius: "24px",
-        background: "linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%)",
-        color: "#fff",
         mb: 3.5,
+        borderRadius: "24px",
         position: "relative",
         overflow: "hidden",
-        boxShadow: "0 20px 40px -15px rgba(15,23,42,0.5)",
-        display: "flex",
-        flexDirection: { xs: "column", sm: "row" },
-        alignItems: { xs: "flex-start", sm: "center" },
-        justifyContent: "space-between",
-        gap: 2.5,
+        boxShadow: "0 20px 60px -15px rgba(15,23,42,0.55)",
+        background: "linear-gradient(135deg, #0D1B3E 0%, #1A2F6E 45%, #1E40AF 100%)",
         "&::before": {
           content: '""',
           position: "absolute",
-          top: "-40%",
-          right: "-5%",
-          width: 350,
-          height: 350,
-          borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(59,130,246,0.18) 0%, transparent 70%)",
-          filter: "blur(25px)",
-        },
-        "&::after": {
-          content: '""',
-          position: "absolute",
-          bottom: "-30%",
-          left: "15%",
-          width: 250,
-          height: 250,
-          borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(236,72,153,0.1) 0%, transparent 70%)",
-          filter: "blur(18px)",
+          inset: 0,
+          background: [
+            "radial-gradient(ellipse 55% 120% at 100% 50%, rgba(99,102,241,0.28) 0%, transparent 60%)",
+            "radial-gradient(ellipse 40% 80% at 15% 0%, rgba(96,165,250,0.18) 0%, transparent 55%)",
+          ].join(", "),
+          pointerEvents: "none",
         },
       }}
     >
-      {/* Wave decoration */}
-      <svg
-        style={{ position: "absolute", bottom: 0, right: 0, opacity: 0.12, pointerEvents: "none", width: 320, height: 100 }}
-        viewBox="0 0 200 100"
-        preserveAspectRatio="none"
-      >
-        <path d="M0,75 Q50,35 100,75 T200,75 L200,100 L0,100 Z" fill="rgba(59,130,246,0.5)" />
-        <path d="M0,85 Q60,55 120,85 T200,85 L200,100 L0,100 Z" fill="rgba(236,72,153,0.3)" />
-      </svg>
+      {/* top shimmer line */}
+      <Box sx={{
+        position: "absolute", top: 0, left: 0, right: 0, height: 2,
+        background: "linear-gradient(90deg, transparent 0%, #60A5FA 30%, #A78BFA 60%, #34D399 80%, transparent 100%)",
+      }} />
 
-      <Box sx={{ zIndex: 1 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 0.5 }}>
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              bgcolor: "rgba(255,255,255,0.1)",
-              p: 0.75,
-              borderRadius: "10px",
-              border: "1px solid rgba(255,255,255,0.15)",
-            }}
-          >
+      {/* decorative circle */}
+      <Box sx={{
+        position: "absolute", right: -60, top: "50%", transform: "translateY(-50%)",
+        width: 340, height: 340, borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(99,102,241,0.22) 0%, transparent 70%)",
+        pointerEvents: "none",
+      }} />
+
+      <Box sx={{
+        position: "relative", zIndex: 1,
+        px: { xs: 3, md: 5 }, py: { xs: 3, md: 3.5 },
+        display: "flex",
+        flexDirection: { xs: "column", md: "row" },
+        alignItems: { xs: "flex-start", md: "center" },
+        gap: { xs: 2.5, md: 0 },
+      }}>
+
+        {/* ── Left: greeting ── */}
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 2 }}>
+          {/* icon bubble */}
+          <Box sx={{
+            flexShrink: 0,
+            width: 62, height: 62,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            borderRadius: "18px",
+            background: "rgba(255,255,255,0.1)",
+            border: "1.5px solid rgba(255,255,255,0.2)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.25)",
+          }}>
             {greet.icon}
           </Box>
-          <Typography variant="h5" fontWeight="900" sx={{ letterSpacing: "-0.3px" }}>
-            {greet.text}, {name}!{" "}
-            <span style={{ display: "inline-block", animation: "waveHand 2s infinite", transformOrigin: "70% 70%" }}>
-              👋
-            </span>
-          </Typography>
+          <Box>
+            <Typography sx={{
+              fontSize: { xs: "1.5rem", md: "1.75rem" },
+              fontWeight: 900,
+              lineHeight: 1.15,
+              letterSpacing: "-0.03em",
+              color: "#fff",
+            }}>
+              {greet.text},{" "}
+              <Box component="span" sx={{
+                background: "linear-gradient(90deg, #93C5FD, #C4B5FD)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}>
+                {firstName}
+              </Box>
+              {" "}
+              <Box component="span" sx={{ display: "inline-block", animation: "waveHand 2s infinite", transformOrigin: "70% 70%" }}>
+                👋
+              </Box>
+            </Typography>
+            <Typography sx={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.55)", fontWeight: 500, mt: 0.4 }}>
+              {today}
+            </Typography>
+          </Box>
         </Box>
-        <Typography variant="body2" sx={{ opacity: 0.75, fontWeight: 500 }}>
-          {today}
-        </Typography>
+
+        {/* ── Center: school name (only when we have it, hidden on mobile) ── */}
         {tenantName && (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.25 }}>
-            <SchoolIcon sx={{ fontSize: 22, opacity: 0.9 }} />
-            <Typography variant="subtitle1" fontWeight={800} sx={{ letterSpacing: "0.2px", lineHeight: 1.2 }}>
-              {tenantName}
+          <Box sx={{
+            display: { xs: "none", md: "flex" },
+            flexShrink: 0,
+            mx: 4,
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 0.5,
+            px: 4,
+            py: 2,
+            borderRadius: "16px",
+            background: "rgba(255,255,255,0.07)",
+            border: "1px solid rgba(255,255,255,0.14)",
+            backdropFilter: "blur(12px)",
+          }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <SchoolIcon sx={{ fontSize: 20, color: "#93C5FD", opacity: 0.9 }} />
+              <Typography sx={{
+                fontSize: "1.2rem",
+                fontWeight: 800,
+                letterSpacing: "-0.01em",
+                background: "linear-gradient(90deg, #FFFFFF 0%, #BFDBFE 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                whiteSpace: "nowrap",
+              }}>
+                {tenantName}
+              </Typography>
+            </Box>
+            <Typography sx={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              {greet.sub}
             </Typography>
           </Box>
         )}
-        <Typography variant="caption" sx={{ opacity: 0.6, fontWeight: 500, mt: 0.75, display: "block" }}>
-          Last login: {lastLoginLabel}
-        </Typography>
-      </Box>
 
-      <Box
-        sx={{
-          zIndex: 1,
+        {/* ── Right: last login + live + refresh ── */}
+        <Box sx={{
+          flexShrink: 0,
           display: "flex",
-          alignItems: "center",
-          gap: 1.5,
-          flexWrap: "wrap",
-          alignSelf: { xs: "flex-start", sm: "center" },
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Box sx={{ width: 8, height: 8, bgcolor: "#34D399", borderRadius: "50%", animation: "pulseGreen 2s infinite" }} />
-          <Typography variant="caption" sx={{ color: "#34D399", fontWeight: 800, letterSpacing: "1.2px" }}>
-            LIVE
-          </Typography>
+          flexDirection: "column",
+          alignItems: { xs: "flex-start", md: "flex-end" },
+          gap: 1.25,
+        }}>
+          {/* last login */}
+          <Box sx={{
+            display: "inline-flex", alignItems: "center", gap: 0.75,
+            px: 1.5, py: 0.6,
+            borderRadius: "10px",
+            bgcolor: "rgba(0,0,0,0.25)",
+            border: "1px solid rgba(255,255,255,0.1)",
+          }}>
+            <AccessTimeIcon sx={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }} />
+            <Typography sx={{ fontSize: "0.71rem", color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>
+              Last login · {lastLoginLabel}
+            </Typography>
+          </Box>
+
+          {/* live + refresh row */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+            <Box sx={{
+              display: "inline-flex", alignItems: "center", gap: 0.75,
+              px: 1.5, py: 0.65,
+              borderRadius: "999px",
+              bgcolor: "rgba(16,185,129,0.15)",
+              border: "1px solid rgba(52,211,153,0.4)",
+            }}>
+              <Box sx={{
+                width: 7, height: 7, borderRadius: "50%",
+                bgcolor: "#34D399",
+                boxShadow: "0 0 8px rgba(52,211,153,0.9)",
+                animation: "pulseGreen 2s infinite",
+              }} />
+              <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#6EE7B7", letterSpacing: "0.1em" }}>
+                LIVE
+              </Typography>
+            </Box>
+
+            {refreshing && (
+              <Typography sx={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.55)", fontWeight: 600 }}>
+                Syncing…
+              </Typography>
+            )}
+
+            <Tooltip title="Refresh dashboard">
+              <IconButton
+                onClick={onRefresh}
+                disabled={refreshing}
+                size="small"
+                sx={{
+                  width: 38, height: 38,
+                  bgcolor: "rgba(255,255,255,0.1)",
+                  color: "#fff",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.2)", transform: "rotate(180deg)" },
+                  transition: "all 0.35s ease",
+                }}
+              >
+                <RefreshIcon sx={{ fontSize: 18, animation: refreshing ? "spin 1s linear infinite" : "none" }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
-        {refreshing && (
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.65)", fontWeight: 600 }}>
-            Syncing…
-          </Typography>
-        )}
-        <Tooltip title="Refresh dashboard">
-          <IconButton
-            onClick={onRefresh}
-            disabled={refreshing}
-            size="small"
-            sx={{
-              bgcolor: "rgba(255,255,255,0.12)",
-              color: "#fff",
-              border: "1px solid rgba(255,255,255,0.2)",
-              "&:hover": { bgcolor: "rgba(255,255,255,0.2)", transform: "rotate(180deg)" },
-              transition: "all 0.4s ease",
-            }}
-          >
-            <RefreshIcon fontSize="small" sx={{ animation: refreshing ? "spin 1s linear infinite" : "none" }} />
-          </IconButton>
-        </Tooltip>
       </Box>
     </Box>
   );
