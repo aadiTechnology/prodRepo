@@ -55,12 +55,16 @@ export function useFeeStructureListController() {
       try {
         const years = await feeService.getAcademicYears();
         setAcademicYears(years);
+        if (!listState.filters.academicYearId && years.length > 0) {
+          const current = years.find((y) => y.is_current) ?? years[0];
+          listState.setFilter("academicYearId", String(current.id));
+        }
       } catch (err) {
         console.error("Failed to load academic years", err);
       }
     };
-    loadAcademicYears();
-  }, []);
+    void loadAcademicYears();
+  }, [listState.filters.academicYearId, listState.setFilter]);
 
   useEffect(() => {
     const loadClasses = async () => {

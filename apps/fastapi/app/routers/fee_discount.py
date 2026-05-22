@@ -38,10 +38,25 @@ def list_discounts(
     tenant_id: int = Depends(get_tenant_id),
     search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100)
+    page_size: int = Query(10, ge=1, le=100),
+    names_only: bool = Query(False, description="Return all distinct discount names from DB"),
+    include_inactive: bool = Query(
+        False,
+        description="Include inactive discounts (status=0); used for name dropdowns",
+    ),
 ):
+    if names_only:
+        names = fee_discount_service.get_all_discount_names(db, tenant_id)
+        return {"names": names}
     try:
-        discounts, total = fee_discount_service.get_discounts(db, tenant_id, search, page, page_size)
+        discounts, total = fee_discount_service.get_discounts(
+            db,
+            tenant_id,
+            search,
+            page,
+            page_size,
+            active_only=not include_inactive,
+        )
         response_data = [FeeDiscountResponse.from_orm(d).dict() for d in discounts]
         return {
             "data": response_data,

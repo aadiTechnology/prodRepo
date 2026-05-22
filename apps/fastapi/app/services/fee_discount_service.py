@@ -41,12 +41,38 @@ def create_discount(db: Session, tenant_id: int, data: FeeDiscountCreate):
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error")
 
-def get_discounts(db: Session, tenant_id: int, search: str = None, page: int = 1, page_size: int = 10):
-    # Only return active (status=True) discounts
-    query = db.query(FeeDiscount).filter(
-        FeeDiscount.tenant_id == tenant_id,
-        FeeDiscount.status == True
+def get_all_discount_names(db: Session, tenant_id: int) -> list[str]:
+    """Distinct discount names for the tenant (active and inactive, all stored rows)."""
+    rows = (
+        db.query(FeeDiscount.discount_name)
+        .filter(FeeDiscount.tenant_id == tenant_id)
+        .order_by(FeeDiscount.discount_name.asc())
+        .all()
     )
+    seen: set[str] = set()
+    names: list[str] = []
+    for (name,) in rows:
+        if not name:
+            continue
+        cleaned = name.strip()
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            names.append(cleaned)
+    names.sort(key=str.lower)
+    return names
+
+
+def get_discounts(
+    db: Session,
+    tenant_id: int,
+    search: str = None,
+    page: int = 1,
+    page_size: int = 10,
+    active_only: bool = True,
+):
+    query = db.query(FeeDiscount).filter(FeeDiscount.tenant_id == tenant_id)
+    if active_only:
+        query = query.filter(FeeDiscount.status == True)
     if search:
         query = query.filter(FeeDiscount.discount_name.ilike(f"%{search}%"))
     total = query.count()

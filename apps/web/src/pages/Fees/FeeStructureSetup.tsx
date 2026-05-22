@@ -52,33 +52,6 @@ const FeeStructureSetup = () => {
               renderActions={
                 <>
                   <Select
-                    value={controller.listState.filters.className}
-                    onChange={(e) =>
-                      controller.listState.setFilter("className", e.target.value as string)
-                    }
-                    displayEmpty
-                    size="small"
-                    sx={{
-                      minWidth: { xs: "100%", sm: 180 },
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: "15px",
-                        fontSize: "0.85rem",
-                        fontWeight: 600,
-                      },
-                    }}
-                  >
-                    <MenuItem value="">
-                      <Typography variant="body2" color="text.secondary">
-                        Class
-                      </Typography>
-                    </MenuItem>
-                    {controller.uniqueClasses.map((cls) => (
-                      <MenuItem key={cls.id} value={cls.name}>
-                        {cls.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  <Select
                     value={controller.listState.filters.academicYearId}
                     onChange={(e) =>
                       controller.listState.setFilter("academicYearId", e.target.value as string)
@@ -102,6 +75,33 @@ const FeeStructureSetup = () => {
                     {controller.academicYears.map((ay) => (
                       <MenuItem key={ay.id} value={ay.id.toString()}>
                         {ay.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <Select
+                    value={controller.listState.filters.className}
+                    onChange={(e) =>
+                      controller.listState.setFilter("className", e.target.value as string)
+                    }
+                    displayEmpty
+                    size="small"
+                    sx={{
+                      minWidth: { xs: "100%", sm: 180 },
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: "15px",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                      },
+                    }}
+                  >
+                    <MenuItem value="">
+                      <Typography variant="body2" color="text.secondary">
+                        Class
+                      </Typography>
+                    </MenuItem>
+                    {controller.uniqueClasses.map((cls) => (
+                      <MenuItem key={cls.id} value={cls.name}>
+                        {cls.name}
                       </MenuItem>
                     ))}
                   </Select>

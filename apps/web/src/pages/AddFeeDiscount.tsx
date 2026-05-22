@@ -1,5 +1,5 @@
-
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { Autocomplete, TextField } from "../components/primitives";
 import { useNavigate, useParams } from "react-router-dom";
 import feeDiscountService from "../api/services/feeDiscountService";
 import { useFormManager } from "../hooks/useFormManager";
@@ -27,6 +27,17 @@ export default function AddFeeDiscount() {
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [feeCategoryOptions, setFeeCategoryOptions] = useState<string[]>([]);
   const [classOptions, setClassOptions] = useState<string[]>([]);
+  const [discountNameOptions, setDiscountNameOptions] = useState<string[]>([]);
+  const [discountNamesLoading, setDiscountNamesLoading] = useState(true);
+
+  useEffect(() => {
+    setDiscountNamesLoading(true);
+    feeDiscountService
+      .listAllNames()
+      .then((names) => setDiscountNameOptions(names))
+      .catch(() => setDiscountNameOptions([]))
+      .finally(() => setDiscountNamesLoading(false));
+  }, []);
 
   // Fetch options for selects
   useEffect(() => {
@@ -134,10 +145,88 @@ export default function AddFeeDiscount() {
     }
   };
 
-  const formConfig = useMemo(
-    () => createAddFeeDiscountFormConfig({ isEditMode, feeCategoryOptions, classOptions }),
-    [isEditMode, feeCategoryOptions, classOptions]
-  );
+  const formConfig = useMemo(() => {
+    const config = createAddFeeDiscountFormConfig({
+      isEditMode,
+      feeCategoryOptions,
+      classOptions,
+    });
+    const nameField = config.fields.discountName;
+    if (nameField) {
+      nameField.type = "custom";
+      nameField.render = (ctx) => {
+        const name = String(ctx.formData.discountName ?? "").trim();
+        const nameError = ctx.fieldErrors.discountName;
+
+        return (
+          <Autocomplete<string, false, false, true>
+            freeSolo
+            forcePopupIcon
+            openOnFocus
+            fullWidth
+            loading={discountNamesLoading}
+            options={discountNameOptions}
+            getOptionLabel={(option) => option}
+            isOptionEqualToValue={(option, value) => option === value}
+            filterOptions={(options, state) => {
+              const q = state.inputValue.trim().toLowerCase();
+              if (!q) return options;
+              return options.filter((o) => o.toLowerCase().includes(q));
+            }}
+            noOptionsText={
+              discountNamesLoading ? "Loading…" : "No existing discounts"
+            }
+            value={name || null}
+            onChange={(_event, newValue) => {
+              const val =
+                typeof newValue === "string" ? newValue : newValue ?? "";
+              ctx.handleFieldValueChange("discountName", val);
+            }}
+            onInputChange={(_event, newInputValue, reason) => {
+              if (reason === "input" || reason === "clear") {
+                ctx.handleFieldValueChange("discountName", newInputValue);
+              }
+            }}
+            slotProps={{
+              popper: {
+                placement: "bottom-start",
+                sx: { zIndex: (theme) => theme.zIndex.modal + 2 },
+                modifiers: [{ name: "flip", enabled: false }],
+              },
+              paper: {
+                sx: { mt: 0.5, maxHeight: 280 },
+              },
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                name="discountName"
+                label="Discount Name"
+                required
+                error={Boolean(nameError)}
+                helperText={
+                  nameError ?? "Open the list or type a new discount name"
+                }
+                placeholder="Select or type discount name"
+                inputProps={{
+                  ...params.inputProps,
+                  minLength: 2,
+                  autoComplete: "off",
+                }}
+              />
+            )}
+          />
+        );
+      };
+    }
+    return config;
+  }, [
+    isEditMode,
+    feeCategoryOptions,
+    classOptions,
+    discountNameOptions,
+    discountNamesLoading,
+  ]);
 
   return (
     <BaseForm<AddFeeDiscountFormData>
