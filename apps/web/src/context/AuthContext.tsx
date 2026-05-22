@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { useRBAC } from "./RBACContext";
 import { enqueueSnackbar } from "notistack";
 import { getJwtExpiryMs } from "../utils/jwt";
+import { recordUserLogin } from "../utils/lastLoginStorage";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Type Definitions
@@ -142,6 +143,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // Fetch user information
       const userData = await authService.getCurrentUser();
+      recordUserLogin(userData.id);
       setUser(userData);
       saveUser(userData);
     } catch (error) {
@@ -173,6 +175,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         tenant: response.tenant || response.user.tenant,
         profile_image_path: response.user.profile_image_path
       };
+
+      recordUserLogin(userWithExtras.id);
 
       // Save user information
       setUser(userWithExtras);
@@ -208,6 +212,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       tenant: response.tenant || response.user.tenant,
       profile_image_path: response.user.profile_image_path
     };
+
+    recordUserLogin(userWithExtras.id);
 
     setUser(userWithExtras);
     saveUser(userWithExtras);

@@ -46,8 +46,6 @@ import {
   ContactPhone as ContactPhoneIcon,
   Assignment as HomeworkIcon,
   PersonAdd as PersonAddIcon,
-  WorkspacePremium as WorkspacePremiumIcon,
-  AutoAwesome as AutoAwesomeIcon,
   Edit as EditIcon,
   CheckBox as QuickMarkIcon,
 } from "@mui/icons-material";
@@ -62,6 +60,7 @@ import dashboardService, {
   RecentNoticeItem,
   DashboardFetchParams,
 } from "../api/services/dashboardService";
+import { formatLastLoginLabel, getPreviousLoginIso } from "../utils/lastLoginStorage";
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
 const C = {
@@ -425,11 +424,13 @@ const NoticesTable: React.FC<{ notices: RecentNoticeItem[]; navigate: ReturnType
 };
 
 // ─── Welcome banner ───────────────────────────────────────────────────────────
-const WelcomeBanner: React.FC<{ name: string; role: string; tenantName?: string }> = ({
-  name,
-  role,
-  tenantName,
-}) => {
+const WelcomeBanner: React.FC<{
+  name: string;
+  tenantName?: string;
+  lastLoginLabel: string;
+  refreshing: boolean;
+  onRefresh: () => void;
+}> = ({ name, tenantName, lastLoginLabel, refreshing, onRefresh }) => {
   const hr = new Date().getHours();
   const greet =
     hr < 12
@@ -517,47 +518,59 @@ const WelcomeBanner: React.FC<{ name: string; role: string; tenantName?: string 
             </span>
           </Typography>
         </Box>
-        <Typography variant="body2" sx={{ opacity: 0.75, fontWeight: 500, mb: 0.25 }}>
+        <Typography variant="body2" sx={{ opacity: 0.75, fontWeight: 500 }}>
           {today}
         </Typography>
         {tenantName && (
-          <Typography variant="caption" sx={{ opacity: 0.55, fontWeight: 600 }}>
-            {tenantName}
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.25 }}>
+            <SchoolIcon sx={{ fontSize: 22, opacity: 0.9 }} />
+            <Typography variant="subtitle1" fontWeight={800} sx={{ letterSpacing: "0.2px", lineHeight: 1.2 }}>
+              {tenantName}
+            </Typography>
+          </Box>
         )}
+        <Typography variant="caption" sx={{ opacity: 0.6, fontWeight: 500, mt: 0.75, display: "block" }}>
+          Last login: {lastLoginLabel}
+        </Typography>
       </Box>
 
-      <Box sx={{ zIndex: 1, display: "flex", gap: 1.5, flexWrap: "wrap" }}>
-        <Chip
-          icon={<WorkspacePremiumIcon sx={{ "&&": { color: "#FBBF24" } }} />}
-          label={role.replace(/_/g, " ")}
-          sx={{
-            bgcolor: "rgba(251,191,36,0.15)",
-            color: "#FBBF24",
-            fontWeight: 700,
-            border: "1px solid rgba(251,191,36,0.3)",
-            fontSize: "11px",
-            textTransform: "uppercase",
-            letterSpacing: "0.5px",
-            height: 30,
-            borderRadius: "8px",
-          }}
-        />
-        <Chip
-          icon={<AutoAwesomeIcon sx={{ "&&": { color: "#60A5FA" } }} />}
-          label="SmartKidz"
-          sx={{
-            bgcolor: "rgba(96,165,250,0.15)",
-            color: "#60A5FA",
-            fontWeight: 700,
-            border: "1px solid rgba(96,165,250,0.3)",
-            fontSize: "11px",
-            textTransform: "uppercase",
-            letterSpacing: "0.5px",
-            height: 30,
-            borderRadius: "8px",
-          }}
-        />
+      <Box
+        sx={{
+          zIndex: 1,
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          flexWrap: "wrap",
+          alignSelf: { xs: "flex-start", sm: "center" },
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box sx={{ width: 8, height: 8, bgcolor: "#34D399", borderRadius: "50%", animation: "pulseGreen 2s infinite" }} />
+          <Typography variant="caption" sx={{ color: "#34D399", fontWeight: 800, letterSpacing: "1.2px" }}>
+            LIVE
+          </Typography>
+        </Box>
+        {refreshing && (
+          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.65)", fontWeight: 600 }}>
+            Syncing…
+          </Typography>
+        )}
+        <Tooltip title="Refresh dashboard">
+          <IconButton
+            onClick={onRefresh}
+            disabled={refreshing}
+            size="small"
+            sx={{
+              bgcolor: "rgba(255,255,255,0.12)",
+              color: "#fff",
+              border: "1px solid rgba(255,255,255,0.2)",
+              "&:hover": { bgcolor: "rgba(255,255,255,0.2)", transform: "rotate(180deg)" },
+              transition: "all 0.4s ease",
+            }}
+          >
+            <RefreshIcon fontSize="small" sx={{ animation: refreshing ? "spin 1s linear infinite" : "none" }} />
+          </IconButton>
+        </Tooltip>
       </Box>
     </Box>
   );
@@ -1760,51 +1773,22 @@ export default function Dashboard() {
     [attFilter, fetchData]
   );
 
+  const lastLoginLabel = user?.id
+    ? formatLastLoginLabel(getPreviousLoginIso(user.id))
+    : "—";
+
   if (loading) return <DashboardSkeleton />;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* ── Welcome banner ── */}
-      {data && (
-        <WelcomeBanner
-          name={user?.full_name || "User"}
-          role={data.role}
-          tenantName={user?.tenant?.name}
-        />
-      )}
-
-      {/* ── Top action bar ── */}
-      <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Box sx={{ width: 8, height: 8, bgcolor: "#10B981", borderRadius: "50%", animation: "pulseGreen 2s infinite" }} />
-          <Typography variant="caption" sx={{ color: "#10B981", fontWeight: 800, letterSpacing: "1.2px", textTransform: "uppercase" }}>
-            Live
-          </Typography>
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          {refreshing && (
-            <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600, animation: "pulse 1.5s infinite" }}>
-              Syncing…
-            </Typography>
-          )}
-          <Tooltip title="Refresh dashboard">
-            <IconButton
-              onClick={() => fetchData(true)}
-              disabled={refreshing}
-              size="small"
-              sx={{
-                bgcolor: C.blueGlass,
-                color: C.blue,
-                border: `1px solid rgba(37,99,235,0.15)`,
-                "&:hover": { bgcolor: "rgba(37,99,235,0.14)", transform: "rotate(180deg)" },
-                transition: "all 0.4s ease",
-              }}
-            >
-              <RefreshIcon fontSize="small" sx={{ animation: refreshing ? "spin 1s linear infinite" : "none" }} />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      </Box>
+      <WelcomeBanner
+        name={user?.full_name || "User"}
+        tenantName={user?.tenant?.name}
+        lastLoginLabel={lastLoginLabel}
+        refreshing={refreshing}
+        onRefresh={() => fetchData(true)}
+      />
 
       {/* ── Error banner ── */}
       {error && (
