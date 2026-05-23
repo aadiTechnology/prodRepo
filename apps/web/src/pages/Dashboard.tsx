@@ -20,6 +20,7 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  MenuItem,
 } from "@mui/material";
 import {
   School as SchoolIcon,
@@ -60,7 +61,10 @@ import dashboardService, {
   StudentDashboardData,
   RecentNoticeItem,
   DashboardFetchParams,
+  AttendanceOverview,
+  FeeCollectionSummary,
 } from "../api/services/dashboardService";
+import schoolClassService, { SchoolClass } from "../api/services/schoolClassService";
 import { formatLastLoginLabel, getPreviousLoginIso } from "../utils/lastLoginStorage";
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
@@ -437,8 +441,8 @@ const WelcomeBanner: React.FC<{
     hr < 12
       ? { text: "Good morning", icon: <SunriseIcon sx={{ color: "#FDE68A", fontSize: 28 }} />, sub: "Have a productive day!" }
       : hr < 17
-      ? { text: "Good afternoon", icon: <SunIcon sx={{ color: "#FCD34D", fontSize: 28 }} />, sub: "Keep up the great work!" }
-      : { text: "Good evening", icon: <MoonIcon sx={{ color: "#C4B5FD", fontSize: 28 }} />, sub: "Hope your day went well." };
+        ? { text: "Good afternoon", icon: <SunIcon sx={{ color: "#FCD34D", fontSize: 28 }} />, sub: "Keep up the great work!" }
+        : { text: "Good evening", icon: <MoonIcon sx={{ color: "#C4B5FD", fontSize: 28 }} />, sub: "Hope your day went well." };
 
   const today = new Date().toLocaleDateString("en-IN", {
     weekday: "long",
@@ -671,6 +675,15 @@ interface AdminViewProps {
   feeFilter: SectionDateFilter;
   onAttFilterChange: (f: SectionDateFilter) => void;
   onFeeFilterChange: (f: SectionDateFilter) => void;
+  /** Override from fast attendance endpoint — replaces data.attendance_overview when set */
+  attOverride?: AttendanceOverview | null;
+  attCardLoading?: boolean;
+  /** Override from fast fees endpoint — replaces data.fee_collection when set */
+  feeOverride?: FeeCollectionSummary | null;
+  feeCardLoading?: boolean;
+  classes: Array<{ id: number; name: string }>;
+  selectedClassId: number | "";
+  onClassChange: (classId: number | "") => void;
 }
 
 const AdminDashboardView: React.FC<AdminViewProps> = ({
@@ -679,14 +692,24 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
   feeFilter,
   onAttFilterChange,
   onFeeFilterChange,
+  attOverride,
+  attCardLoading = false,
+  feeOverride,
+  feeCardLoading = false,
+  classes,
+  selectedClassId,
+  onClassChange,
 }) => {
   const navigate = useNavigate();
 
-  const { present, absent, half_day, leave } = data.attendance_overview;
+  // Use fast-endpoint override if available, fall back to full-load data
+  const attData = attOverride ?? data.attendance_overview;
+  const { present, absent, half_day, leave } = attData;
   const totalAtt = present + absent + half_day + leave;
   const attPct = totalAtt > 0 ? ((present + half_day * 0.5) / totalAtt) * 100 : 0;
 
-  const { total_fee, total_paid, total_balance } = data.fee_collection;
+  const feeData = feeOverride ?? data.fee_collection;
+  const { total_fee, total_paid, total_balance } = feeData;
   const feePct = total_fee > 0 ? (total_paid / total_fee) * 100 : 0;
   const totalLeads = data.lead_pipeline.reduce((a, c) => a + c.count, 0);
 
@@ -895,30 +918,79 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
                   View Details
                 </Button>
               }
-              dateFilter={<CardDateFilter value={attFilter} onChange={onAttFilterChange} />}
+              dateFilter={
+                <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", width: "100%" }}>
+                  <CardDateFilter value={attFilter} onChange={onAttFilterChange} />
+                  <TextField
+                    select
+                    size="small"
+                    value={selectedClassId}
+                    onChange={(e) => onClassChange(e.target.value as number | "")}
+                    SelectProps={{
+                      displayEmpty: true,
+                    }}
+                    sx={{
+                      minWidth: 130,
+                      "& .MuiOutlinedInput-root": {
+                        height: 26,
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        borderRadius: "6px",
+                        bgcolor: C.blueGlass,
+                        color: C.slateText,
+                        "& fieldset": {
+                          borderColor: "rgba(37,99,235,0.18)",
+                        },
+                        "&:hover fieldset": {
+                          borderColor: C.blue,
+                        },
+                        "&.Mui-focused fieldset": {
+                          borderColor: C.blue,
+                        },
+                      },
+                    }}
+                  >
+                    <MenuItem value="" sx={{ fontSize: "11px", fontWeight: 700, color: C.muted }}>All Classes</MenuItem>
+                    {classes.map((cls) => (
+                      <MenuItem key={cls.id} value={cls.id} sx={{ fontSize: "11px", fontWeight: 700 }}>
+                        {cls.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+              }
             />
-            <Box sx={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-              <AttRing pct={attPct} size={140} color={attPct >= 75 ? C.green : C.amber} gradId="adminAttGrad" />
-              <Grid container spacing={1.5} sx={{ flex: 1, minWidth: 160 }}>
-                {[
-                  { label: "Present", value: present, color: C.green, bg: C.greenGlass },
-                  { label: "Absent", value: absent, color: C.red, bg: C.redGlass },
-                  { label: "Half Day", value: half_day, color: C.amber, bg: C.amberGlass },
-                  { label: "On Leave", value: leave, color: C.blue, bg: C.blueGlass },
-                ].map((item) => (
-                  <Grid item xs={6} key={item.label}>
-                    <Box sx={{ p: 1.5, bgcolor: item.bg, borderRadius: "12px", borderLeft: `3px solid ${item.color}` }}>
-                      <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, textTransform: "uppercase", display: "block", fontSize: "10px" }}>
-                        {item.label}
-                      </Typography>
-                      <Typography variant="h5" sx={{ fontWeight: 900, color: item.color, mt: 0.3 }}>
-                        {item.value}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
+            {attCardLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
+                  <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
+                  <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading attendance…</Typography>
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                <AttRing pct={attPct} size={140} color={attPct >= 75 ? C.green : C.amber} gradId="adminAttGrad" />
+                <Grid container spacing={1.5} sx={{ flex: 1, minWidth: 160 }}>
+                  {[
+                    { label: "Present", value: present, color: C.green, bg: C.greenGlass },
+                    { label: "Absent", value: absent, color: C.red, bg: C.redGlass },
+                    { label: "Half Day", value: half_day, color: C.amber, bg: C.amberGlass },
+                    { label: "On Leave", value: leave, color: C.blue, bg: C.blueGlass },
+                  ].map((item) => (
+                    <Grid item xs={6} key={item.label}>
+                      <Box sx={{ p: 1.5, bgcolor: item.bg, borderRadius: "12px", borderLeft: `3px solid ${item.color}` }}>
+                        <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, textTransform: "uppercase", display: "block", fontSize: "10px" }}>
+                          {item.label}
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: item.color, mt: 0.3 }}>
+                          {item.value}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            )}
           </CardContent>
         </GCard>
       </Grid>
@@ -951,35 +1023,46 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
                 />
               }
             />
-            <Box sx={{ mb: 2.5 }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
-                <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>Recovery Rate</Typography>
-                <Typography variant="body2" sx={{ color: C.green, fontWeight: 800 }}>{feePct.toFixed(1)}%</Typography>
-              </Box>
-              <LinearProgress
-                variant="determinate"
-                value={feePct}
-                sx={{
-                  height: 10,
-                  borderRadius: 5,
-                  bgcolor: C.greenGlass,
-                  "& .MuiLinearProgress-bar": { background: `linear-gradient(90deg, ${C.green}, #34D399)`, borderRadius: 5 },
-                }}
-              />
-            </Box>
-            {[
-              { label: "Total Projected", value: fmtINR(total_fee), color: C.slateText, icon: <TrendIcon sx={{ fontSize: 16, color: C.slateText }} /> },
-              { label: "Total Collected", value: fmtINR(total_paid), color: C.green, icon: <PresentIcon sx={{ fontSize: 16, color: C.green }} /> },
-              { label: "Total Outstanding", value: fmtINR(total_balance), color: C.red, icon: <WarningIcon sx={{ fontSize: 16, color: C.red }} /> },
-            ].map((row) => (
-              <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                  {row.icon}
-                  <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>{row.label}</Typography>
+            {feeCardLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
+                  <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.greenGlass}`, borderTopColor: C.green, animation: "spin 0.8s linear infinite" }} />
+                  <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading fees…</Typography>
                 </Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: row.color }}>{row.value}</Typography>
               </Box>
-            ))}
+            ) : (
+              <>
+                <Box sx={{ mb: 2.5 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
+                    <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>Recovery Rate</Typography>
+                    <Typography variant="body2" sx={{ color: C.green, fontWeight: 800 }}>{feePct.toFixed(1)}%</Typography>
+                  </Box>
+                  <LinearProgress
+                    variant="determinate"
+                    value={feePct}
+                    sx={{
+                      height: 10,
+                      borderRadius: 5,
+                      bgcolor: C.greenGlass,
+                      "& .MuiLinearProgress-bar": { background: `linear-gradient(90deg, ${C.green}, #34D399)`, borderRadius: 5 },
+                    }}
+                  />
+                </Box>
+                {[
+                  { label: "Total Projected", value: fmtINR(total_fee), color: C.slateText, icon: <TrendIcon sx={{ fontSize: 16, color: C.slateText }} /> },
+                  { label: "Total Collected", value: fmtINR(total_paid), color: C.green, icon: <PresentIcon sx={{ fontSize: 16, color: C.green }} /> },
+                  { label: "Total Outstanding", value: fmtINR(total_balance), color: C.red, icon: <WarningIcon sx={{ fontSize: 16, color: C.red }} /> },
+                ].map((row) => (
+                  <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                      {row.icon}
+                      <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>{row.label}</Typography>
+                    </Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: row.color }}>{row.value}</Typography>
+                  </Box>
+                ))}
+              </>
+            )}
           </CardContent>
         </GCard>
       </Grid>
@@ -1092,11 +1175,26 @@ interface TeacherViewProps {
   data: TeacherDashboardData;
   attFilter: SectionDateFilter;
   onAttFilterChange: (f: SectionDateFilter) => void;
+  attOverride?: AttendanceOverview | null;
+  attCardLoading?: boolean;
+  classes: Array<{ id: number; name: string }>;
+  selectedClassId: number | "";
+  onClassChange: (classId: number | "") => void;
 }
 
-const TeacherDashboardView: React.FC<TeacherViewProps> = ({ data, attFilter, onAttFilterChange }) => {
+const TeacherDashboardView: React.FC<TeacherViewProps> = ({
+  data,
+  attFilter,
+  onAttFilterChange,
+  attOverride,
+  attCardLoading = false,
+  classes,
+  selectedClassId,
+  onClassChange,
+}) => {
   const navigate = useNavigate();
-  const { present, absent, half_day, leave } = data.today_attendance;
+  const attData = attOverride ?? data.today_attendance;
+  const { present, absent, half_day, leave } = attData;
   const totalAtt = present + absent + half_day + leave;
   const attPct = totalAtt > 0 ? ((present + half_day * 0.5) / totalAtt) * 100 : 0;
 
@@ -1198,19 +1296,66 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({ data, attFilter, onA
                 </Button>
               }
               dateFilter={
-                <CardDateFilter
-                  value={attFilter}
-                  onChange={onAttFilterChange}
-                  presets={[
-                    { key: "today", label: "Today" },
-                    { key: "week", label: "7 Days" },
-                    { key: "custom", label: "Custom" },
-                  ]}
-                />
+                <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", width: "100%" }}>
+                  <CardDateFilter
+                    value={attFilter}
+                    onChange={onAttFilterChange}
+                    presets={[
+                      { key: "today", label: "Today" },
+                      { key: "week", label: "7 Days" },
+                      { key: "custom", label: "Custom" },
+                    ]}
+                  />
+                  {classes.length > 0 && (
+                    <TextField
+                      select
+                      size="small"
+                      value={selectedClassId}
+                      onChange={(e) => onClassChange(e.target.value as number | "")}
+                      SelectProps={{
+                        displayEmpty: true,
+                      }}
+                      sx={{
+                        minWidth: 130,
+                        "& .MuiOutlinedInput-root": {
+                          height: 26,
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          borderRadius: "6px",
+                          bgcolor: C.blueGlass,
+                          color: C.slateText,
+                          "& fieldset": {
+                            borderColor: "rgba(37,99,235,0.18)",
+                          },
+                          "&:hover fieldset": {
+                            borderColor: C.blue,
+                          },
+                          "&.Mui-focused fieldset": {
+                            borderColor: C.blue,
+                          },
+                        },
+                      }}
+                    >
+                      <MenuItem value="" sx={{ fontSize: "11px", fontWeight: 700, color: C.muted }}>My Classes</MenuItem>
+                      {classes.map((cls) => (
+                        <MenuItem key={cls.id} value={cls.id} sx={{ fontSize: "11px", fontWeight: 700 }}>
+                          {cls.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                </Box>
               }
             />
 
-            {totalAtt === 0 ? (
+            {attCardLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
+                  <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
+                  <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading attendance…</Typography>
+                </Box>
+              </Box>
+            ) : totalAtt === 0 ? (
               <Box sx={{ textAlign: "center", py: 4 }}>
                 <AttendanceIcon sx={{ fontSize: 48, color: C.muted, mb: 1 }} />
                 <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600, mb: 2 }}>
@@ -1255,7 +1400,7 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({ data, attFilter, onA
                 </Typography>
                 <Box sx={{ maxHeight: 180, overflowY: "auto", display: "flex", flexDirection: "column", gap: 1 }}>
                   {data.absentees_list.map((s, i) => {
-                    const colors = ["#EF4444","#3B82F6","#8B5CF6","#10B981","#F59E0B"];
+                    const colors = ["#EF4444", "#3B82F6", "#8B5CF6", "#10B981", "#F59E0B"];
                     const bc = colors[s.student_name.charCodeAt(0) % colors.length];
                     return (
                       <Box
@@ -1781,18 +1926,67 @@ export default function Dashboard() {
   const [attFilter, setAttFilter] = useState<SectionDateFilter>(makeFilter("week"));
   const [feeFilter, setFeeFilter] = useState<SectionDateFilter>(makeFilter("month"));
 
-  const seqRef = useRef(0);
+  // ── Card-specific override state (populated by fast endpoints) ──────────────
+  const [attOverride, setAttOverride] = useState<AttendanceOverview | null>(null);
+  const [attCardLoading, setAttCardLoading] = useState(false);
+  const [feeOverride, setFeeOverride] = useState<FeeCollectionSummary | null>(null);
+  const [feeCardLoading, setFeeCardLoading] = useState(false);
 
+  // ── Class filter state ───────────────────────────────────────────────────────
+  const [classes, setClasses] = useState<Array<{ id: number; name: string }>>([]);
+  const [attClassId, setAttClassId] = useState<number | "">("");
+
+  const seqRef = useRef(0);
+  const attSeqRef = useRef(0);
+  const feeSeqRef = useRef(0);
+
+  // ── Unified attendance-only fetch ───────────────────────────────────────────
+  const fetchAttCardData = useCallback(
+    async (f: SectionDateFilter, classId: number | "") => {
+      if (f.preset === "custom" && (!f.start || !f.end)) return; // wait for both dates
+      const seq = ++attSeqRef.current;
+      setAttCardLoading(true);
+      try {
+        const { start, end } = effectiveDates(f);
+        const cid = classId === "" ? undefined : classId;
+        const result = await dashboardService.getAttendanceCard(start, end, cid);
+        if (seq === attSeqRef.current) setAttOverride(result);
+      } catch {
+        // silently keep previous data on error
+      } finally {
+        if (seq === attSeqRef.current) setAttCardLoading(false);
+      }
+    },
+    []
+  );
+
+  const handleAttFilterChange = useCallback(
+    (f: SectionDateFilter) => {
+      setAttFilter(f);
+      fetchAttCardData(f, attClassId);
+    },
+    [attClassId, fetchAttCardData]
+  );
+
+  const handleAttClassChange = useCallback(
+    (classId: number | "") => {
+      setAttClassId(classId);
+      fetchAttCardData(attFilter, classId);
+    },
+    [attFilter, fetchAttCardData]
+  );
+
+  // Full dashboard fetch — used only on initial load and global refresh
   const fetchData = useCallback(
-    async (isRefresh = false, af: SectionDateFilter = attFilter, ff: SectionDateFilter = feeFilter) => {
+    async (isRefresh = false) => {
       const seq = ++seqRef.current;
       try {
         if (isRefresh) setRefreshing(true);
         else setLoading(true);
         setError(null);
 
-        const attDates = effectiveDates(af);
-        const feeDates = effectiveDates(ff);
+        const attDates = effectiveDates(attFilter);
+        const feeDates = effectiveDates(feeFilter);
 
         const params: DashboardFetchParams = {
           attStart: attDates.start,
@@ -1802,7 +1996,16 @@ export default function Dashboard() {
         };
 
         const res = await dashboardService.getDashboardData(params);
-        if (seq === seqRef.current) setData(res);
+        if (seq === seqRef.current) {
+          setData(res);
+          // Sync or re-fetch card if specific class is selected
+          if (attClassId !== "") {
+            fetchAttCardData(attFilter, attClassId);
+          } else {
+            setAttOverride(null);
+          }
+          setFeeOverride(null);
+        }
       } catch {
         if (seq === seqRef.current) setError("Failed to load dashboard. Please try again.");
       } finally {
@@ -1812,7 +2015,7 @@ export default function Dashboard() {
         }
       }
     },
-    [attFilter, feeFilter]
+    [attFilter, feeFilter, attClassId, fetchAttCardData]
   );
 
   // Initial load + 5-minute auto-refresh
@@ -1821,22 +2024,53 @@ export default function Dashboard() {
     fetchData();
     const id = setInterval(() => { if (active) fetchData(true); }, 5 * 60 * 1000);
     return () => { active = false; clearInterval(id); };
-  }, [fetchData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleAttFilterChange = useCallback(
-    (f: SectionDateFilter) => {
-      setAttFilter(f);
-      fetchData(false, f, feeFilter);
-    },
-    [feeFilter, fetchData]
-  );
+  // Load tenant classes for Admins
+  useEffect(() => {
+    if (data && (data.role === "SYSTEM_ADMIN" || data.role === "TENANT_ADMIN")) {
+      schoolClassService.getAll()
+        .then((res) => {
+          setClasses(res.map(c => ({ id: c.id, name: c.name })));
+        })
+        .catch(err => console.error("Failed to load classes", err));
+    }
+  }, [data]);
 
+  // Extract unique assigned classes for Teachers
+  const teacherClasses = React.useMemo(() => {
+    if (data?.role !== "TEACHER" || !data.data) return [];
+    const teacherData = data.data as TeacherDashboardData;
+    const unique: { id: number; name: string }[] = [];
+    const seen = new Set<number>();
+    teacherData.assigned_classes?.forEach((c) => {
+      if (!seen.has(c.class_id)) {
+        seen.add(c.class_id);
+        unique.push({ id: c.class_id, name: c.class_name });
+      }
+    });
+    return unique;
+  }, [data]);
+
+  // ── Fast fee-only fetch — only this card refreshes ─────────────────────────
   const handleFeeFilterChange = useCallback(
-    (f: SectionDateFilter) => {
+    async (f: SectionDateFilter) => {
       setFeeFilter(f);
-      fetchData(false, attFilter, f);
+      if (f.preset === "custom" && (!f.start || !f.end)) return; // wait for both dates
+      const seq = ++feeSeqRef.current;
+      setFeeCardLoading(true);
+      try {
+        const { start, end } = effectiveDates(f);
+        const result = await dashboardService.getFeesCard(start, end);
+        if (seq === feeSeqRef.current) setFeeOverride(result);
+      } catch {
+        // silently keep previous data on error
+      } finally {
+        if (seq === feeSeqRef.current) setFeeCardLoading(false);
+      }
     },
-    [attFilter, fetchData]
+    []
   );
 
   const lastLoginLabel = user?.id
@@ -1887,12 +2121,24 @@ export default function Dashboard() {
             feeFilter={feeFilter}
             onAttFilterChange={handleAttFilterChange}
             onFeeFilterChange={handleFeeFilterChange}
+            attOverride={attOverride}
+            attCardLoading={attCardLoading}
+            feeOverride={feeOverride}
+            feeCardLoading={feeCardLoading}
+            classes={classes}
+            selectedClassId={attClassId}
+            onClassChange={handleAttClassChange}
           />
         ) : data.role === "TEACHER" ? (
           <TeacherDashboardView
             data={data.data as TeacherDashboardData}
             attFilter={attFilter}
             onAttFilterChange={handleAttFilterChange}
+            attOverride={attOverride}
+            attCardLoading={attCardLoading}
+            classes={teacherClasses}
+            selectedClassId={attClassId}
+            onClassChange={handleAttClassChange}
           />
         ) : (
           <StudentDashboardView data={data.data as StudentDashboardData} />

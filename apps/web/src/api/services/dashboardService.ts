@@ -154,6 +154,22 @@ const dashboardService = {
     });
     return data;
   },
+
+  /** Fetch ONLY attendance overview — fast, card-specific endpoint. */
+  async getAttendanceCard(startDate?: string, endDate?: string, classId?: number): Promise<AttendanceOverview> {
+    const { data } = await axiosInstance.get<AttendanceOverview>("/api/dashboard/attendance", {
+      params: { start_date: startDate, end_date: endDate, class_id: classId },
+    });
+    return data;
+  },
+
+  /** Fetch ONLY fee collection summary — fast, card-specific endpoint. */
+  async getFeesCard(startDate?: string, endDate?: string): Promise<FeeCollectionSummary> {
+    const { data } = await axiosInstance.get<FeeCollectionSummary>("/api/dashboard/fees", {
+      params: { start_date: startDate, end_date: endDate },
+    });
+    return data;
+  },
 };
 
 export default dashboardService;

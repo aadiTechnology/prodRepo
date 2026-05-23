@@ -145,6 +145,170 @@ def get_my_dashboard(
             time.sleep(retry_delay)
 
 
+
+# ─── Fast card-specific endpoints ────────────────────────────────────────────
+
+@router.get("/attendance", response_model=AttendanceOverview)
+def get_attendance_card(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    class_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Return only the attendance overview for the authenticated user's tenant.
+    Used by the Attendance Overview card filter — no full dashboard reload needed."""
+    tenant_id = current_user.tenant_id or 1
+    rbac_role_codes = get_rbac_role_codes(db, current_user.id)
+
+    is_teacher = any("teacher" in r for r in rbac_role_codes)
+
+    try:
+        overview = AttendanceOverview()
+        clauses = []
+
+        if is_teacher:
+            # Teacher: query their assigned classes only
+            teacher = (
+                db.query(Teacher)
+                .filter(Teacher.tenant_id == tenant_id)
+                .filter((Teacher.user_id == current_user.id) | (Teacher.email == current_user.email))
+                .filter(Teacher.is_deleted == False)
+                .first()
+            )
+            if not teacher:
+                return overview
+
+            assigned_pairs = []
+            if teacher.class_id is not None and teacher.class_division_id is not None:
+                assigned_pairs.append((teacher.class_id, teacher.class_division_id))
+            try:
+                from app.services.teacher_assignment_service import _ensure_teacher_assignments_table
+                _ensure_teacher_assignments_table(db)
+                dyn = db.execute(
+                    text("""
+                        SELECT class_id, class_division_id
+                        FROM teacher_assignments
+                        WHERE teacher_id = :tid AND tenant_id = :ten AND is_active = 1
+                    """),
+                    {"tid": teacher.id, "ten": tenant_id},
+                ).fetchall()
+                for row in dyn:
+                    assigned_pairs.append((row[0], row[1]))
+            except Exception as e:
+                logger.warning(f"Dynamic assignments error: {e}")
+
+            assigned_pairs = list(set(assigned_pairs))
+            if not assigned_pairs:
+                return overview
+
+            if class_id:
+                assigned_pairs = [pair for pair in assigned_pairs if pair[0] == class_id]
+                if not assigned_pairs:
+                    return overview
+
+            clauses = [
+                and_(StudentAttendance.class_id == cid, StudentAttendance.class_division_id == did)
+                for cid, did in assigned_pairs
+            ]
+            base_q = (
+                db.query(StudentAttendance.status, func.count(StudentAttendance.id))
+                .filter(StudentAttendance.tenant_id == tenant_id)
+                .filter(StudentAttendance.is_deleted == False)
+                .filter(or_(*clauses))
+            )
+        else:
+            # Admin: all students in tenant
+            base_q = (
+                db.query(StudentAttendance.status, func.count(StudentAttendance.id))
+                .filter(StudentAttendance.tenant_id == tenant_id)
+                .filter(StudentAttendance.is_deleted == False)
+            )
+            if class_id:
+                base_q = base_q.filter(StudentAttendance.class_id == class_id)
+
+        if start_date and end_date:
+            att_counts = (
+                base_q.filter(StudentAttendance.attendance_date.between(start_date, end_date))
+                .group_by(StudentAttendance.status).all()
+            )
+        else:
+            # Default: latest available date for this scope
+            latest_q = (
+                db.query(StudentAttendance.attendance_date)
+                .filter(StudentAttendance.tenant_id == tenant_id)
+                .filter(StudentAttendance.is_deleted == False)
+            )
+            if class_id:
+                latest_q = latest_q.filter(StudentAttendance.class_id == class_id)
+            elif is_teacher and clauses:
+                latest_q = latest_q.filter(or_(*clauses))
+
+            latest = latest_q.order_by(StudentAttendance.attendance_date.desc()).first()
+            if latest:
+                att_counts = (
+                    base_q.filter(StudentAttendance.attendance_date == latest[0])
+                    .group_by(StudentAttendance.status).all()
+                )
+            else:
+                att_counts = []
+
+        for sv, cnt in att_counts:
+            sl = sv.lower()
+            if "present" in sl:
+                overview.present = cnt
+            elif "absent" in sl:
+                overview.absent = cnt
+            elif "half" in sl:
+                overview.half_day = cnt
+            elif "leave" in sl:
+                overview.leave = cnt
+
+        return overview
+
+    except Exception as e:
+        logger.error(f"Attendance card error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load attendance data.",
+        )
+
+
+@router.get("/fees", response_model=FeeCollectionSummary)
+def get_fees_card(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Return only the fee collection summary for the authenticated user's tenant.
+    Used by the Fee Collection Progress card filter — no full dashboard reload needed."""
+    tenant_id = current_user.tenant_id or 1
+    try:
+        fee_q = (
+            db.query(
+                func.sum(StudentInvoice.total_amount),
+                func.sum(StudentInvoice.paid_amount),
+                func.sum(StudentInvoice.due_amount),
+            )
+            .filter(StudentInvoice.tenant_id == tenant_id)
+        )
+        if start_date and end_date:
+            fee_q = fee_q.filter(cast(StudentInvoice.created_at, Date).between(start_date, end_date))
+        fee_row = fee_q.first()
+        return FeeCollectionSummary(
+            total_fee=float(fee_row[0] or 0.0) if fee_row else 0.0,
+            total_paid=float(fee_row[1] or 0.0) if fee_row else 0.0,
+            total_balance=float(fee_row[2] or 0.0) if fee_row else 0.0,
+        )
+    except Exception as e:
+        logger.error(f"Fees card error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load fee data.",
+        )
+
+
 def _build_admin_dashboard(
     db: Session,
     tenant_id: int,
