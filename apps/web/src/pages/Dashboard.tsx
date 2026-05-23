@@ -1386,7 +1386,6 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   const totalClasses   = data.assigned_classes.length;
 
   // ── KPI renderer ───────────────────────────────────────────────────────────
-  // ── KPI renderer ───────────────────────────────────────────────────────────
   const renderKpi = (id: string) => {
     switch (id) {
       case "kpi_students":
@@ -1394,10 +1393,15 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
           <SnapCard title="My Students" value={totalStudents} icon={<PeopleIcon fontSize="small" />}
             accentColor={C.purple} glassBg={C.purpleGlass} onClick={() => navigate("/students")}
             sub={
-              <Box sx={{ display: "flex", gap: 1.5 }}>
-                <Typography variant="caption" sx={{ color: C.blue, fontWeight: 700 }}>♂ {totalBoys}</Typography>
-                <Typography variant="caption" sx={{ color: "#EC4899", fontWeight: 700 }}>♀ {totalGirls}</Typography>
-              </Box>
+              <>
+                <Sparkline color={C.purple} delay={0} />
+                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+                  <Chip label={`♂ ${totalBoys}`} size="small"
+                    sx={{ bgcolor: C.blueGlass, color: C.blue, fontWeight: 700, height: 18, fontSize: "11px", borderRadius: "5px" }} />
+                  <Chip label={`♀ ${totalGirls}`} size="small"
+                    sx={{ bgcolor: "rgba(236,72,153,0.08)", color: "#EC4899", fontWeight: 700, height: 18, fontSize: "11px", borderRadius: "5px" }} />
+                </Box>
+              </>
             }
           />
         );
@@ -1409,9 +1413,18 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
             glassBg={attPct >= 80 ? C.greenGlass : C.amberGlass}
             onClick={() => navigate("/attendance/mark")}
             sub={
-              <Typography variant="caption" sx={{ color: attPct >= 80 ? C.green : C.amber, fontWeight: 700 }}>
-                {totalAtt === 0 ? "Not marked yet" : `${attPct.toFixed(0)}% attendance`}
-              </Typography>
+              <>
+                <Sparkline color={attPct >= 80 ? C.green : C.amber} delay={0.2} />
+                <Chip
+                  label={totalAtt === 0 ? "Not marked yet" : `${attPct.toFixed(0)}% attendance`}
+                  size="small"
+                  sx={{
+                    bgcolor: attPct >= 80 ? C.greenGlass : C.amberGlass,
+                    color: attPct >= 80 ? C.green : C.amber,
+                    fontWeight: 700, height: 18, fontSize: "11px", borderRadius: "5px",
+                  }}
+                />
+              </>
             }
           />
         );
@@ -1419,14 +1432,26 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
         return (
           <SnapCard title="My Classes" value={totalClasses} icon={<ClassIcon fontSize="small" />}
             accentColor={C.blue} glassBg={C.blueGlass} onClick={() => navigate("/students")}
-            sub={<Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Assigned to you</Typography>}
+            sub={
+              <>
+                <Sparkline color={C.blue} delay={0.4} />
+                <Typography variant="caption" sx={{ color: C.blue, fontWeight: 700 }}>Assigned to you</Typography>
+              </>
+            }
           />
         );
       case "kpi_new":
         return (
           <SnapCard title="New This Month" value={newThisMonth} icon={<PersonAddIcon fontSize="small" />}
             accentColor={C.green} glassBg={C.greenGlass}
-            sub={<Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Students enrolled</Typography>}
+            sub={
+              <>
+                <Sparkline color={C.green} delay={0.6} />
+                <Typography variant="caption" sx={{ color: C.green, fontWeight: 700 }}>
+                  {newThisMonth > 0 ? "Students enrolled this month" : "No new enrollments yet"}
+                </Typography>
+              </>
+            }
           />
         );
       default:
@@ -1754,60 +1779,101 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
   }
 
   const renderKpi = (id: string) => {
+    const totalDays = attendance.present + attendance.absent;
     switch (id) {
       case "s_kpi_att":
         return (
-          <SortableSection key={id} id={id}>
-            <SnapCard
-              title="Attendance"
-              value={`${attendance.percentage.toFixed(0)}%`}
-              icon={<AttendanceIcon sx={{ fontSize: 20 }} />}
-              accentColor={attendance.percentage >= 75 ? C.green : C.red}
-              glassBg={attendance.percentage >= 75 ? C.greenGlass : C.redGlass}
-              sub={<Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Presence Rate</Typography>}
-            />
-          </SortableSection>
+          <SnapCard
+            title="Attendance"
+            value={`${attendance.percentage.toFixed(0)}%`}
+            icon={<AttendanceIcon fontSize="small" />}
+            accentColor={attendance.percentage >= 75 ? C.green : C.red}
+            glassBg={attendance.percentage >= 75 ? C.greenGlass : C.redGlass}
+            onClick={() => navigate("/attendance/report")}
+            sub={
+              <>
+                <Sparkline color={attendance.percentage >= 75 ? C.green : C.red} delay={0} />
+                <Chip
+                  label={attendance.percentage >= 75 ? "On Track" : "Needs Improvement"}
+                  size="small"
+                  sx={{
+                    bgcolor: attendance.percentage >= 75 ? C.greenGlass : C.redGlass,
+                    color: attendance.percentage >= 75 ? C.green : C.red,
+                    fontWeight: 700, height: 18, fontSize: "11px", borderRadius: "5px",
+                  }}
+                />
+              </>
+            }
+          />
         );
       case "s_kpi_present":
         return (
-          <SortableSection key={id} id={id}>
-            <SnapCard
-              title="Present Days"
-              value={String(attendance.present)}
-              icon={<PresentIcon sx={{ fontSize: 20 }} />}
-              accentColor={C.green}
-              glassBg={C.greenGlass}
-              sub={<Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>of {attendance.present + attendance.absent} school days</Typography>}
-            />
-          </SortableSection>
+          <SnapCard
+            title="Present Days"
+            value={String(attendance.present)}
+            icon={<PresentIcon fontSize="small" />}
+            accentColor={C.green}
+            glassBg={C.greenGlass}
+            onClick={() => navigate("/attendance/report")}
+            sub={
+              <>
+                <Sparkline color={C.green} delay={0.2} />
+                <Typography variant="caption" sx={{ color: C.green, fontWeight: 700 }}>
+                  of {totalDays} school days
+                </Typography>
+              </>
+            }
+          />
         );
       case "s_kpi_hw":
         return (
-          <SortableSection key={id} id={id}>
-            <SnapCard
-              title="Pending HW"
-              value={String(homework.pending_count)}
-              icon={<HomeworkIcon sx={{ fontSize: 20 }} />}
-              accentColor={homework.pending_count > 0 ? C.amber : C.green}
-              glassBg={homework.pending_count > 0 ? C.amberGlass : C.greenGlass}
-              sub={<Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>{homework.pending_count === 0 ? "All done!" : "Assignment(s)"}</Typography>}
-              onClick={() => navigate("/homework")}
-            />
-          </SortableSection>
+          <SnapCard
+            title="Pending HW"
+            value={String(homework.pending_count)}
+            icon={<HomeworkIcon fontSize="small" />}
+            accentColor={homework.pending_count > 0 ? C.amber : C.green}
+            glassBg={homework.pending_count > 0 ? C.amberGlass : C.greenGlass}
+            onClick={() => navigate("/homework")}
+            sub={
+              <>
+                <Sparkline color={homework.pending_count > 0 ? C.amber : C.green} delay={0.4} />
+                <Chip
+                  label={homework.pending_count === 0 ? "All Done ✓" : `${homework.pending_count} assignment${homework.pending_count !== 1 ? "s" : ""}`}
+                  size="small"
+                  sx={{
+                    bgcolor: homework.pending_count > 0 ? C.amberGlass : C.greenGlass,
+                    color: homework.pending_count > 0 ? C.amber : C.green,
+                    fontWeight: 700, height: 18, fontSize: "11px", borderRadius: "5px",
+                  }}
+                />
+              </>
+            }
+          />
         );
       case "s_kpi_fees":
         return (
-          <SortableSection key={id} id={id}>
-            <SnapCard
-              title="Fee Balance"
-              value={fmtINR(total_balance)}
-              icon={<FeeIcon sx={{ fontSize: 20 }} />}
-              accentColor={total_balance > 0 ? C.red : C.green}
-              glassBg={total_balance > 0 ? C.redGlass : C.greenGlass}
-              sub={<Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>{is_overdue ? "Dues Pending" : "Cleared"}</Typography>}
-              onClick={() => navigate("/fees/student-ledger")}
-            />
-          </SortableSection>
+          <SnapCard
+            title="Fee Balance"
+            value={fmtINR(total_balance)}
+            icon={<FeeIcon fontSize="small" />}
+            accentColor={total_balance > 0 ? C.red : C.green}
+            glassBg={total_balance > 0 ? C.redGlass : C.greenGlass}
+            onClick={() => navigate("/fees/student-ledger")}
+            sub={
+              <>
+                <Sparkline color={total_balance > 0 ? C.red : C.green} delay={0.6} />
+                <Chip
+                  label={is_overdue ? "Dues Pending" : "Cleared ✓"}
+                  size="small"
+                  sx={{
+                    bgcolor: is_overdue ? C.amberGlass : C.greenGlass,
+                    color: is_overdue ? C.amber : C.green,
+                    fontWeight: 700, height: 18, fontSize: "11px", borderRadius: "5px",
+                  }}
+                />
+              </>
+            }
+          />
         );
       default: return null;
     }
@@ -1962,25 +2028,33 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
   };
 
   return (
-    <Box>
-      {/* ── KPI row ── */}
-      <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
-        <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, gap: 3, mb: 3 }}>
-            {kpiOrder.map(renderKpi)}
-          </Box>
-        </SortableContext>
-      </DndContext>
+    <Grid container spacing={3}>
+      {/* ── KPI snap cards — individually draggable ── */}
+      <Grid item xs={12}>
+        <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
+          <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
+            <Grid container spacing={3}>
+              {kpiOrder.map((id) => (
+                <Grid item xs={12} sm={6} md={3} key={id}>
+                  <SortableSection id={id}>{renderKpi(id)}</SortableSection>
+                </Grid>
+              ))}
+            </Grid>
+          </SortableContext>
+        </DndContext>
+      </Grid>
 
       {/* ── Main cards ── */}
-      <DndContext sensors={cardSensors} collisionDetection={closestCenter} onDragEnd={handleCardDrag}>
-        <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 3 }}>
-            {cardOrder.map(renderCard)}
-          </Box>
-        </SortableContext>
-      </DndContext>
-    </Box>
+      <Grid item xs={12}>
+        <DndContext sensors={cardSensors} collisionDetection={closestCenter} onDragEnd={handleCardDrag}>
+          <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 3 }}>
+              {cardOrder.map(renderCard)}
+            </Box>
+          </SortableContext>
+        </DndContext>
+      </Grid>
+    </Grid>
   );
 };
 
