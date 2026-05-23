@@ -8,6 +8,29 @@ interface GetRolesParams {
   pageSize?: number;
   sortBy?: string;
   sortOrder?: string;
+  /** When true, only active roles (for assign-role dropdowns). */
+  activeOnly?: boolean;
+}
+
+type RoleListItem = Role & { is_deleted?: boolean };
+
+function parseRoleListResponse(data: unknown): RoleListResponse {
+  const body = data as {
+    data?: RoleListResponse;
+    items?: RoleListItem[];
+    totalCount?: number;
+    pageNumber?: number;
+    pageSize?: number;
+  };
+  const payload = body?.data ?? body;
+  const rawItems = payload?.items ?? [];
+  const items = rawItems.filter((r) => !r.is_deleted);
+  return {
+    items,
+    totalCount: payload?.totalCount ?? items.length,
+    pageNumber: payload?.pageNumber ?? 1,
+    pageSize: payload?.pageSize ?? items.length,
+  };
 }
 
 const roleService = {
@@ -15,7 +38,7 @@ const roleService = {
       const { data } = await axiosInstance.get("/tenants");
       return data.data || data;
     },
-  async getRoles(params: GetRolesParams): Promise<RoleListResponse> {
+  async getRoles(params: GetRolesParams = {}): Promise<RoleListResponse> {
     const { data } = await axiosInstance.get("/roles", {
       params: {
         search: params.search,
@@ -23,9 +46,16 @@ const roleService = {
         pageSize: params.pageSize,
         sortBy: params.sortBy,
         sortOrder: params.sortOrder,
+        status: params.activeOnly ? true : undefined,
       },
     });
-    return data.data;
+    return parseRoleListResponse(data);
+  },
+
+  /** Active, non-deleted roles for user create/edit role select. */
+  async getSelectableRoles(): Promise<RoleListItem[]> {
+    const list = await this.getRoles({ pageSize: 1000, activeOnly: true });
+    return list.items;
   },
 
   async getRoleSummary(): Promise<RoleSummary> {

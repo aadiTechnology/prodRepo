@@ -14,7 +14,7 @@ import {
   EntityTableSection,
 } from "../components/reusable";
 import { PageHeader } from "../components/layout";
-import { Box, Typography, Button } from "../components/primitives";
+import { Alert, Box, Button, Snackbar, Typography } from "../components/primitives";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 import { useUsersListController } from "../hooks";
@@ -55,6 +55,7 @@ const Users = () => {
     loading,
     error,
     snackbar,
+    closeSnackbar,
     fetchUsers,
     confirmDialogOpen,
     deleteLoading,
@@ -127,13 +128,6 @@ const Users = () => {
               </Button>
             </Box>
           )}
-          {snackbar && (
-            <Box sx={{ m: 2, display: "flex", justifyContent: "center" }}>
-              <Typography variant="body2" color="success.main">
-                {snackbar}
-              </Typography>
-            </Box>
-          )}
         </>
       }
     >
@@ -171,6 +165,22 @@ const Users = () => {
         onClose={closeDeleteConfirm}
         loading={deleteLoading}
       />
+
+      <Snackbar
+        open={!!snackbar}
+        autoHideDuration={3000}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        onClose={closeSnackbar}
+      >
+        <Alert
+          onClose={closeSnackbar}
+          severity="success"
+          variant="filled"
+          sx={{ width: "100%", borderRadius: "12px" }}
+        >
+          {snackbar}
+        </Alert>
+      </Snackbar>
     </ListPageLayout>
   );
 };

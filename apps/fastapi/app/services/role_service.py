@@ -13,6 +13,10 @@ from datetime import datetime
 
 logger = get_logger(__name__)
 
+# SQL Server BIT columns: use 0/1 (not == False/True — compiles to invalid "IS 0"/"IS 1").
+_NOT_DELETED = Role.is_deleted == 0
+_ACTIVE = Role.is_active == 1
+
 
 def get_roles(
     db: Session,
@@ -35,7 +39,7 @@ def get_roles(
     Tenant Admin (is_platform=False) -> Tenant roles where tenant_id = tenant_id.
     """
     try:
-        query = db.query(Role).filter(Role.is_deleted == False)
+        query = db.query(Role).filter(_NOT_DELETED)
 
         if is_platform:
             if tenant_id is not None:
@@ -49,7 +53,7 @@ def get_roles(
             query = query.filter(func.lower(Role.scope_type) == scope_type.lower())
 
         if status is not None:
-            query = query.filter(Role.is_active == status)
+            query = query.filter(Role.is_active == (1 if status else 0))
 
         if search:
             query = query.filter(Role.name.ilike(f"%{search}%"))
@@ -99,7 +103,7 @@ def get_role(db: Session, role_id: int) -> Role:
     from sqlalchemy.orm import joinedload
     role = (
         db.query(Role)
-        .filter(Role.id == role_id, Role.is_deleted == False)  # noqa: E712
+        .filter(Role.id == role_id, _NOT_DELETED)
         .options(joinedload(Role.permissions))
         .first()
     )
@@ -113,7 +117,11 @@ def create_role(db: Session, data: RoleCreate, created_by: int | None = None) ->
     # Validate code uniqueness, scope, tenant_id
     if not data.code or " " in data.code or not data.code.isupper():
         raise ConflictException("Role code required, uppercase, no spaces")
-    if db.query(Role).filter(Role.code == data.code, Role.tenant_id == data.tenant_id, Role.is_deleted == False).first():
+    if db.query(Role).filter(
+        Role.code == data.code,
+        Role.tenant_id == data.tenant_id,
+        _NOT_DELETED,
+    ).first():
         raise ConflictException("Role code must be unique")
     if data.scope_type == "Tenant" and not data.tenant_id:
         raise ConflictException("Tenant ID required for tenant scope")
@@ -183,9 +191,11 @@ def update_role(db: Session, role_id: int, data: RoleUpdate, updated_by: int | N
 
 
 def soft_delete_role(db: Session, role_id: int, deleted_by: int | None = None) -> None:
-    """Soft delete a role."""
+    """Soft delete a role (hidden from lists and dropdowns)."""
     role = get_role(db, role_id)
     role.is_deleted = True
+    role.is_active = False
+    role.deleted_at = datetime.utcnow()
     role.deleted_by = deleted_by
     db.commit()
     logger.info(f"Role soft-deleted: {role.code} (id={role.id})")

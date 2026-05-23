@@ -88,12 +88,17 @@ const RoleManagementPage = () => {
       />
 
       <Snackbar
-        open={Boolean(controller.snackbar && controller.snackbar.length > 0)}
+        open={!!controller.snackbar}
         autoHideDuration={3000}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
         onClose={() => controller.setSnackbar(null)}
       >
-        <Alert onClose={() => controller.setSnackbar(null)} severity="success" sx={{ width: "100%" }}>
+        <Alert
+          onClose={() => controller.setSnackbar(null)}
+          severity="success"
+          variant="filled"
+          sx={{ width: "100%", borderRadius: "12px" }}
+        >
           {controller.snackbar}
         </Alert>
       </Snackbar>

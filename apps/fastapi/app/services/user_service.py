@@ -130,8 +130,16 @@ def update_user(
             # Normalize role code to uppercase
             target_role_code = user.role.upper()
             
-            # Validate role existence
-            role_obj = db.query(Role).filter(Role.code == target_role_code).first()
+            # Validate role existence for this user's tenant
+            role_query = db.query(Role).filter(
+                Role.code == target_role_code,
+                Role.is_deleted == False,  # noqa: E712
+            )
+            if db_user.tenant_id is not None:
+                role_query = role_query.filter(Role.tenant_id == db_user.tenant_id)
+            else:
+                role_query = role_query.filter(Role.tenant_id.is_(None))
+            role_obj = role_query.first()
             if not role_obj:
                 logger.warning(f"Update failed: Role code {target_role_code} not found")
                 raise ConflictException(f"Role '{target_role_code}' does not exist.")

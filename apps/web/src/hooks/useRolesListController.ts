@@ -29,12 +29,18 @@ export function useRolesListController() {
         pageSize: rowsPerPage,
         sortBy: sortBy === 'createdAt' ? 'created_at' : sortBy,
         sortOrder,
+        activeOnly: true,
       });
-      const mappedRoles = (data.items ?? []).map((role: any) => ({
-        ...role,
-        status: role.is_active ? "ACTIVE" : "INACTIVE",
-        createdAt: role.created_at,
-      }));
+      const mappedRoles = (data.items ?? [])
+        .filter(
+          (role: { is_deleted?: boolean; is_active?: boolean }) =>
+            !role.is_deleted && role.is_active !== false
+        )
+        .map((role: any) => ({
+          ...role,
+          status: role.is_active ? "ACTIVE" : "INACTIVE",
+          createdAt: role.created_at,
+        }));
       setRoles(mappedRoles);
       setTotalRoles(data.totalCount);
     } catch (err: any) {
@@ -60,11 +66,14 @@ export function useRolesListController() {
     if (!roleToDelete) return;
     try {
       setDeleteLoading(true);
-      await roleService.deactivateRole(roleToDelete.id);
+      const deletedId = roleToDelete.id;
+      await roleService.deleteRole(deletedId);
       setConfirmDialogOpen(false);
       setRoleToDelete(null);
       setSnackbar("Role deleted successfully");
-      fetchRoles();
+      setRoles((prev) => prev.filter((r) => String(r.id) !== String(deletedId)));
+      setTotalRoles((prev) => Math.max(0, prev - 1));
+      void fetchRoles();
     } catch (err: any) {
       setError(err?.message || "Failed to delete role.");
     } finally {

@@ -58,7 +58,12 @@ export function createAddRoleFormConfig({
       {
         kind: "fields",
         grid: { xs: 12, sm: 6 },
-        fieldNames: ["name", "code"],
+        fieldNames: ["name"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 6 },
+        fieldNames: ["code"],
       },
       {
         kind: "fields",

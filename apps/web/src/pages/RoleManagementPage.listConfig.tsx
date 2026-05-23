@@ -49,7 +49,7 @@ export const createRoleListConfig = ({
     { id: "created-asc", label: "Date (oldest)", sortBy: "createdAt", sortOrder: "asc" },
   ],
   uiPolicy: {
-    emptyMessage: "No roles available.",
+    emptyMessage: "No active roles available.",
     errorFallbackMessage: "Failed to load roles.",
     retryLabel: "Retry",
   },

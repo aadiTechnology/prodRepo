@@ -38,11 +38,11 @@ def _assert_role_access(role: Role, current_user: CurrentUser, db: Session) -> N
 @router.get("/summary")
 async def role_summary(db: Session = Depends(get_db), current_user: CurrentUser = Depends(require_system_admin)):
     """Get a summary of roles."""
-    total_roles = db.query(Role).filter(Role.is_deleted == False).count()
-    platform_roles = db.query(Role).filter(Role.scope_type == "Platform", Role.is_deleted == False).count()
-    tenant_roles = db.query(Role).filter(Role.scope_type == "Tenant", Role.is_deleted == False).count()
-    active_roles = db.query(Role).filter(Role.is_active == True, Role.is_deleted == False).count()
-    inactive_roles = db.query(Role).filter(Role.is_active == False, Role.is_deleted == False).count()
+    total_roles = db.query(Role).filter(Role.is_deleted == 0).count()
+    platform_roles = db.query(Role).filter(Role.scope_type == "Platform", Role.is_deleted == 0).count()
+    tenant_roles = db.query(Role).filter(Role.scope_type == "Tenant", Role.is_deleted == 0).count()
+    active_roles = db.query(Role).filter(Role.is_active == 1, Role.is_deleted == 0).count()
+    inactive_roles = db.query(Role).filter(Role.is_active == 0, Role.is_deleted == 0).count()
     return {
         "success": True,
         "data": {
@@ -62,13 +62,16 @@ async def get_roles_dropdown(
 ):
     """Get simple role list for dropdowns (id and name only)."""
     try:
-        query = db.query(Role.id, Role.name).filter(Role.is_deleted == False, Role.is_active == True)
+        query = db.query(Role.id, Role.name, Role.code).filter(
+            Role.is_deleted == 0,
+            Role.is_active == 1,
+        )
         if not _is_system_admin(current_user, db):
             query = query.filter(Role.tenant_id == current_user.tenant_id)
         roles = query.all()
         return {
             "success": True,
-            "data": [{"id": r[0], "name": r[1]} for r in roles]
+            "data": [{"id": r[0], "name": r[1], "code": r[2]} for r in roles]
         }
     except Exception as e:
         logging.error(f"Error fetching roles dropdown: {str(e)}")

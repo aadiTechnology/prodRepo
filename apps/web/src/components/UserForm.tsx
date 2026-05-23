@@ -62,8 +62,8 @@ function UserForm({ open, onClose, onSubmit, user, isEdit = false }: UserFormPro
     async function fetchRoles() {
       setFetchingRoles(true);
       try {
-        const res = await roleService.getRoles({});
-        setRoles(res.items || []);
+        const items = await roleService.getSelectableRoles();
+        setRoles(items);
       } catch (e) {
         setError("Failed to fetch roles");
       } finally {

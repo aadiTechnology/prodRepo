@@ -25,6 +25,8 @@ export interface User {
   email: string;
   full_name: string;
   role: string;
+  /** RBAC role codes from account API (when available). */
+  roles?: string[];
   tenant_id?: number | null;
   phone_number?: string | null;
   is_active?: boolean;

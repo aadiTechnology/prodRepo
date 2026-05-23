@@ -29,6 +29,15 @@ export type FormFieldRendererProps<T extends Record<string, unknown>> = {
   ctx: FormRenderContext<T>;
 };
 
+function splitAutofillFieldProps(extra: Record<string, unknown>) {
+  const { inputName, preventAutofill, ...fieldProps } = extra;
+  return {
+    htmlName: typeof inputName === "string" ? inputName : undefined,
+    preventAutofill: preventAutofill === true,
+    fieldProps,
+  };
+}
+
 export default function FormFieldRenderer<T extends Record<string, unknown>>({
   field,
   ctx,
@@ -82,34 +91,44 @@ export default function FormFieldRenderer<T extends Record<string, unknown>>({
           {...(extra as Record<string, unknown>)}
         />
       );
-    case "email":
+    case "email": {
+      const { htmlName, preventAutofill, fieldProps } = splitAutofillFieldProps(
+        extra as Record<string, unknown>
+      );
       return (
         <EmailInput
           label={field.label}
-          name={name}
+          name={htmlName ?? String(name)}
           value={String(formData[name] ?? "")}
-          onChange={handleChange}
+          onChange={(e) => handleFieldValueChange(name, e.target.value)}
           required={field.required}
           placeholder={field.placeholder}
           error={showError}
           helperText={helperText}
-          {...(extra as Record<string, unknown>)}
+          preventAutofill={preventAutofill}
+          {...fieldProps}
         />
       );
-    case "password":
+    }
+    case "password": {
+      const { htmlName, preventAutofill, fieldProps } = splitAutofillFieldProps(
+        extra as Record<string, unknown>
+      );
       return (
         <PasswordInput
           label={field.label}
-          name={name}
+          name={htmlName ?? String(name)}
           value={String(formData[name] ?? "")}
-          onChange={handleChange}
+          onChange={(e) => handleFieldValueChange(name, e.target.value)}
           required={field.required}
           placeholder={field.placeholder}
           error={showError}
           helperText={helperText}
-          {...(extra as Record<string, unknown>)}
+          preventAutofill={preventAutofill}
+          {...fieldProps}
         />
       );
+    }
     case "phone":
       return (
         <PhoneInput

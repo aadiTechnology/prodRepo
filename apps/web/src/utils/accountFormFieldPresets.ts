@@ -9,7 +9,13 @@ export function accountEmailField<T extends Record<string, unknown> & { email: s
     type: "email",
     placeholder: options.placeholder,
     required: true,
-    props: { disabled: options.isEditMode },
+    props: options.isEditMode
+      ? { disabled: true, autoComplete: "email" }
+      : {
+          preventAutofill: true,
+          autoComplete: "off",
+          inputName: "user_account_email",
+        },
     helperText: (ctx) =>
       ctx.isEditMode ? "Account identifier cannot be changed" : undefined,
   };
@@ -26,6 +32,11 @@ export function accountPasswordField<T extends Record<string, unknown>>(
     placeholder: options.placeholder ?? "Enter secure password",
     required: true,
     conditionalRender: () => !options.isEditMode,
+    props: {
+      preventAutofill: true,
+      autoComplete: "new-password",
+      inputName: "user_account_password",
+    },
   };
 }
 
@@ -39,5 +50,10 @@ export function accountConfirmPasswordField<T extends Record<string, unknown>>(
     placeholder: options.placeholder ?? "Repeat password",
     required: true,
     conditionalRender: () => !options.isEditMode,
+    props: {
+      preventAutofill: true,
+      autoComplete: "new-password",
+      inputName: "user_account_password_confirm",
+    },
   };
 }

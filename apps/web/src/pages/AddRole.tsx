@@ -209,6 +209,7 @@ export default function RolePage() {
           ? "Are you sure you want to update this role?"
           : "Are you sure you want to save this role?"
       }
+      gridSpacing={3}
     />
   );
 }

@@ -56,17 +56,14 @@ class PermissionService {
       console.log("[PermissionService] getRolesForUser response:", response);
 
       // Handle multiple possible response structures
-      if (response.data?.data?.items) {
-        return response.data.data.items;
-      }
-      if (response.data?.items) {
-        return response.data.items;
-      }
-      if (Array.isArray(response.data?.data)) {
-        return response.data.data;
-      }
-      if (Array.isArray(response.data)) {
-        return response.data;
+      const rawItems =
+        response.data?.data?.items ??
+        response.data?.items ??
+        (Array.isArray(response.data?.data) ? response.data.data : null) ??
+        (Array.isArray(response.data) ? response.data : null) ??
+        [];
+      if (Array.isArray(rawItems)) {
+        return rawItems.filter((r: { is_deleted?: boolean }) => !r.is_deleted);
       }
       
       console.warn("[PermissionService] Unexpected response structure:", response);

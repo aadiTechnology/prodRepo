@@ -82,14 +82,12 @@ export function useUsersListController({
     try {
       setLoading(true);
       setError(null);
-      const [usersData, rolesData] = await Promise.all([
+      const [usersData, roleItems] = await Promise.all([
         userService.getAllUsers(),
-        roleService.getRoles({ pageSize: 1000 })
+        roleService.getSelectableRoles(),
       ]);
       setUsers(mapUsers(usersData as UserResponse[]));
-      if (rolesData && rolesData.items) {
-        setAllRoles(rolesData.items);
-      }
+      setAllRoles(roleItems);
     } catch (err: unknown) {
       const errorObject = err as { message?: string; detail?: string };
       setError(errorObject.message || errorObject.detail || "Failed to fetch users.");
@@ -106,10 +104,15 @@ export function useUsersListController({
   }, [fetchUsers]);
 
   useEffect(() => {
-    if (!snackbar) return;
-    const timer = setTimeout(() => setSnackbar(null), 3000);
-    return () => clearTimeout(timer);
-  }, [snackbar]);
+    const selected = listState.filters.role;
+    if (!selected || allRoles.length === 0) return;
+    const activeCodes = new Set(
+      allRoles.map((r: { code?: string; name: string }) => r.code || r.name)
+    );
+    if (!activeCodes.has(selected)) {
+      listState.setFilter("role", "");
+    }
+  }, [allRoles, listState.filters.role, listState.setFilter]);
 
   const openDeleteConfirm = useCallback((targetUser: AuthUser) => {
     setUserToDelete(targetUser);
@@ -127,7 +130,7 @@ export function useUsersListController({
       await userService.deleteUser(userToDelete.id);
       setConfirmDialogOpen(false);
       setUserToDelete(null);
-      setSnackbar("User deleted successfully");
+      setSnackbar("User deleted successfully.");
       await fetchUsers();
     } catch (err: unknown) {
       const errorObject = err as { message?: string; detail?: string };
@@ -175,7 +178,15 @@ export function useUsersListController({
 
   const roleFilterOptions = useMemo(() => {
     if (allRoles.length > 0) {
-      return allRoles.map((r) => ({ label: r.name, value: r.code }));
+      return allRoles
+        .filter(
+          (r: { is_deleted?: boolean; is_active?: boolean }) =>
+            !r.is_deleted && r.is_active !== false
+        )
+        .map((r: { name: string; code?: string }) => ({
+          label: r.name,
+          value: r.code || r.name,
+        }));
     }
     // Fallback if role fetch fails
     return uniqueRoles.map(role => {

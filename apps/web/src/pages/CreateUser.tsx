@@ -85,12 +85,26 @@ export default function CreateUser() {
     handleChange,
     handleFieldValueChange,
     handleSubmit,
+    resetForm,
   } = useFormManager<CreateUserFormData>({
     initialValues,
     validationConfig,
     dependentFieldPairs,
     onClearError: () => setError(null),
   });
+
+  useEffect(() => {
+    if (isEditMode) return;
+    resetForm(emptyForm());
+    setFieldErrors({});
+    // Browsers may autofill after mount; clear again once autofill runs.
+    const t1 = window.setTimeout(() => resetForm(emptyForm()), 50);
+    const t2 = window.setTimeout(() => resetForm(emptyForm()), 250);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [isEditMode, resetForm, setFieldErrors]);
 
   const formConfig = useMemo(
     () =>
@@ -105,8 +119,7 @@ export default function CreateUser() {
   const fetchRoles = useCallback(async () => {
     setRoleOptionsLoading(true);
     try {
-      const res = await roleService.getRoles({});
-      const items = res.items || [];
+      const items = await roleService.getSelectableRoles();
       const mappedRoles = items.map(
         (role: { id: unknown; code?: string; name?: string; scope?: string }) => ({
           id: String(role.id),
@@ -199,6 +212,7 @@ export default function CreateUser() {
 
   return (
     <BaseForm<CreateUserFormData>
+      key={isEditMode && editUser ? `edit-${editUser.id}` : "create-user"}
       formConfig={formConfig}
       formData={formData}
       setFormData={setFormData}
@@ -225,10 +239,35 @@ export default function CreateUser() {
         saveTooltipEdit: "Save",
       }}
       onCancelNavigate={() => navigate("/users")}
+      footerActionOrder="cancel-first"
       confirmMessage={(ctx) =>
         ctx.isEditMode
           ? "Are you sure you want to update this user?"
           : "Are you sure you want to create this user?"
+      }
+      formTopSlot={
+        !isEditMode ? (
+          <div
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              width: 0,
+              height: 0,
+              overflow: "hidden",
+              opacity: 0,
+              pointerEvents: "none",
+            }}
+          >
+            <input type="text" name="username" tabIndex={-1} defaultValue="" autoComplete="username" />
+            <input
+              type="password"
+              name="password"
+              tabIndex={-1}
+              defaultValue=""
+              autoComplete="current-password"
+            />
+          </div>
+        ) : undefined
       }
     />
   );
