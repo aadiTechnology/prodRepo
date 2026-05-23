@@ -357,6 +357,49 @@ const Sparkline: React.FC<{ color: string; delay?: number }> = ({ color, delay =
   </Box>
 );
 
+// ─── Notice type legend components (reusable) ────────────────────────────────
+const NOTICE_TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
+  holiday:      { label: "Holiday",      color: "#D97706", bg: "rgba(217,119,6,0.1)"      },
+  notice:       { label: "Notice",       color: C.blue,    bg: C.blueGlass                },
+  announcement: { label: "Announcement", color: C.purple,  bg: C.purpleGlass              },
+  event:        { label: "Event",        color: C.green,   bg: C.greenGlass               },
+};
+
+const NoticeTypeBadge: React.FC<{ type: string }> = ({ type }) => {
+  const key = (type || "notice").toLowerCase();
+  const cfg = NOTICE_TYPE_META[key] ?? { label: type || "Notice", color: C.muted, bg: "rgba(100,116,139,0.1)" };
+  return (
+    <Chip
+      label={cfg.label}
+      size="small"
+      sx={{ bgcolor: cfg.bg, color: cfg.color, fontWeight: 700, fontSize: "10px", height: 20, borderRadius: "5px" }}
+    />
+  );
+};
+
+const NoticeLegend: React.FC<{ notices: RecentNoticeItem[] }> = ({ notices }) => {
+  const types = [...new Set(notices.map((n) => (n.notice_type || "notice").toLowerCase()))];
+  if (types.length <= 1) return null;
+  return (
+    <Box sx={{ display: "flex", gap: 1.5, mb: 1.5, flexWrap: "wrap", alignItems: "center" }}>
+      <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        Legend:
+      </Typography>
+      {types.map((key) => {
+        const cfg = NOTICE_TYPE_META[key] ?? { label: key, color: C.muted, bg: "rgba(100,116,139,0.1)" };
+        return (
+          <Box key={key} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Box sx={{ width: 8, height: 8, borderRadius: "2px", bgcolor: cfg.color, flexShrink: 0 }} />
+            <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600, fontSize: "11px" }}>
+              {cfg.label}
+            </Typography>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+};
+
 // ─── Notices table ────────────────────────────────────────────────────────────
 const NoticesTable: React.FC<{ notices: RecentNoticeItem[]; navigate: ReturnType<typeof useNavigate> }> = ({
   notices,
@@ -381,50 +424,56 @@ const NoticesTable: React.FC<{ notices: RecentNoticeItem[]; navigate: ReturnType
   };
 
   return (
-    <Table size="small">
-      <TableHead>
-        <TableRow>
-          {["Title", "Date", "Priority", ""].map((h) => (
-            <TableCell
-              key={h}
-              sx={{ fontWeight: 700, color: C.muted, fontSize: "11px", borderBottom: `1px solid ${C.border}`, py: 1 }}
-            >
-              {h}
-            </TableCell>
-          ))}
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {notices.map((n) => (
-          <TableRow key={n.id} sx={{ "& td": { borderBottom: `1px solid ${C.border}`, py: 1.2 }, "&:last-child td": { borderBottom: 0 } }}>
-            <TableCell>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: C.slateText, maxWidth: 240 }} noWrap>
-                {n.title}
-              </Typography>
-            </TableCell>
-            <TableCell>
-              <Typography variant="caption" sx={{ color: C.muted }}>{n.published_at || "—"}</Typography>
-            </TableCell>
-            <TableCell>
-              <Chip
-                label={n.priority || "Normal"}
-                size="small"
-                sx={{ ...chipStyle(n.priority), fontWeight: 700, fontSize: "11px", height: 20, borderRadius: "5px" }}
-              />
-            </TableCell>
-            <TableCell align="right">
-              <Button
-                size="small"
-                onClick={() => navigate("/communication/notices")}
-                sx={{ color: C.blue, fontWeight: 700, fontSize: "11px", minWidth: 0, px: 1, textTransform: "none" }}
+    <>
+      <NoticeLegend notices={notices} />
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            {["Title", "Type", "Date", "Priority", ""].map((h) => (
+              <TableCell
+                key={h}
+                sx={{ fontWeight: 700, color: C.muted, fontSize: "11px", borderBottom: `1px solid ${C.border}`, py: 1 }}
               >
-                View
-              </Button>
-            </TableCell>
+                {h}
+              </TableCell>
+            ))}
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHead>
+        <TableBody>
+          {notices.map((n) => (
+            <TableRow key={n.id} sx={{ "& td": { borderBottom: `1px solid ${C.border}`, py: 1.2 }, "&:last-child td": { borderBottom: 0 } }}>
+              <TableCell>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: C.slateText, maxWidth: 200 }} noWrap>
+                  {n.title}
+                </Typography>
+              </TableCell>
+              <TableCell>
+                <NoticeTypeBadge type={n.notice_type} />
+              </TableCell>
+              <TableCell>
+                <Typography variant="caption" sx={{ color: C.muted }}>{n.published_at || "—"}</Typography>
+              </TableCell>
+              <TableCell>
+                <Chip
+                  label={n.priority || "Normal"}
+                  size="small"
+                  sx={{ ...chipStyle(n.priority), fontWeight: 700, fontSize: "11px", height: 20, borderRadius: "5px" }}
+                />
+              </TableCell>
+              <TableCell align="right">
+                <Button
+                  size="small"
+                  onClick={() => navigate("/communication/notices")}
+                  sx={{ color: C.blue, fontWeight: 700, fontSize: "11px", minWidth: 0, px: 1, textTransform: "none" }}
+                >
+                  View
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </>
   );
 };
 
@@ -848,55 +897,25 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
         />
       </Grid>
 
-      {/* ─ Row 2: Quick Administrative Actions ─ */}
+      {/* ─ Row 2: Recent Notices ─ */}
       <Grid item xs={12}>
         <GCard>
           <CardContent sx={{ p: 3 }}>
-            <Typography
-              variant="subtitle1"
-              sx={{ fontWeight: 800, color: C.slateText, mb: 2.5, display: "flex", alignItems: "center", gap: 1, letterSpacing: "-0.1px" }}
-            >
-              <TrendIcon color="primary" sx={{ fontSize: 20 }} />
-              Quick Administrative Actions
-            </Typography>
-            <Grid container spacing={2}>
-              {quickActions.map((qa) => (
-                <Grid item xs={12} sm={6} md={3} key={qa.label}>
-                  <Box
-                    onClick={() => navigate(qa.path)}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 2,
-                      p: 2,
-                      borderRadius: "14px",
-                      border: `1px solid ${C.border}`,
-                      cursor: "pointer",
-                      transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
-                      "&:hover": {
-                        bgcolor: qa.bg,
-                        borderColor: qa.color + "35",
-                        transform: "translateX(3px)",
-                        boxShadow: `0 4px 14px ${qa.color}12`,
-                      },
-                    }}
-                  >
-                    <Avatar sx={{ bgcolor: qa.bg, color: qa.color, width: 44, height: 44, borderRadius: "12px", flexShrink: 0 }}>
-                      {qa.icon}
-                    </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 800, color: C.slateText, lineHeight: 1.3 }}>
-                        {qa.label}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: C.muted, lineHeight: 1.3, display: "block" }}>
-                        {qa.desc}
-                      </Typography>
-                    </Box>
-                    <ArrowIcon sx={{ color: C.muted, fontSize: 18, flexShrink: 0 }} />
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
+            <CardHeader
+              title="Recent Notices"
+              icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
+              action={
+                <Button
+                  size="small"
+                  endIcon={<ArrowIcon />}
+                  onClick={() => navigate("/communication/notices")}
+                  sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}
+                >
+                  View All
+                </Button>
+              }
+            />
+            <NoticesTable notices={data.recent_notices} navigate={navigate} />
           </CardContent>
         </GCard>
       </Grid>
@@ -1142,25 +1161,55 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
         </GCard>
       </Grid>
 
-      {/* ─ Row 5: Recent Notices ─ */}
+      {/* ─ Row 5: Quick Administrative Actions ─ */}
       <Grid item xs={12}>
         <GCard>
           <CardContent sx={{ p: 3 }}>
-            <CardHeader
-              title="Recent Notices"
-              icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
-              action={
-                <Button
-                  size="small"
-                  endIcon={<ArrowIcon />}
-                  onClick={() => navigate("/communication/notices")}
-                  sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}
-                >
-                  View All
-                </Button>
-              }
-            />
-            <NoticesTable notices={data.recent_notices} navigate={navigate} />
+            <Typography
+              variant="subtitle1"
+              sx={{ fontWeight: 800, color: C.slateText, mb: 2.5, display: "flex", alignItems: "center", gap: 1, letterSpacing: "-0.1px" }}
+            >
+              <TrendIcon color="primary" sx={{ fontSize: 20 }} />
+              Quick Administrative Actions
+            </Typography>
+            <Grid container spacing={2}>
+              {quickActions.map((qa) => (
+                <Grid item xs={12} sm={6} md={3} key={qa.label}>
+                  <Box
+                    onClick={() => navigate(qa.path)}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 2,
+                      p: 2,
+                      borderRadius: "14px",
+                      border: `1px solid ${C.border}`,
+                      cursor: "pointer",
+                      transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                      "&:hover": {
+                        bgcolor: qa.bg,
+                        borderColor: qa.color + "35",
+                        transform: "translateX(3px)",
+                        boxShadow: `0 4px 14px ${qa.color}12`,
+                      },
+                    }}
+                  >
+                    <Avatar sx={{ bgcolor: qa.bg, color: qa.color, width: 44, height: 44, borderRadius: "12px", flexShrink: 0 }}>
+                      {qa.icon}
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 800, color: C.slateText, lineHeight: 1.3 }}>
+                        {qa.label}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: C.muted, lineHeight: 1.3, display: "block" }}>
+                        {qa.desc}
+                      </Typography>
+                    </Box>
+                    <ArrowIcon sx={{ color: C.muted, fontSize: 18, flexShrink: 0 }} />
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
           </CardContent>
         </GCard>
       </Grid>
