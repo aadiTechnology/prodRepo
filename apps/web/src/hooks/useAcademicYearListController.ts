@@ -53,9 +53,8 @@ export function useAcademicYearListController() {
       await academicYearService.softDelete(entityToDelete.id);
       setConfirmDialogOpen(false);
       setEntityToDelete(null);
-      setSuccess("Academic year deleted successfully!");
+      setSuccess("Academic year deleted successfully.");
       await fetchAcademicYears();
-      setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
       setError(err?.message || "Failed to delete academic year.");
     } finally {

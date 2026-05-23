@@ -4,7 +4,7 @@
  * Integrates RBAC for academic management permissions
  */
 
-import { Alert, Snackbar } from "@mui/material";
+import { Alert, Snackbar } from "../../components/primitives";
 import { Add as AddIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
@@ -73,9 +73,9 @@ const AcademicYearList = () => {
 
       <ConfirmDialog
         open={controller.confirmDialogOpen}
-        title="Delete Academic Year?"
-        message={`Are you sure you want to delete ${controller.entityToDelete?.name}?`}
-        confirmText={controller.deleteLoading ? "Deleting..." : "Delete"}
+        title="Please Confirm"
+        message="Are you sure you want to delete this academic year?"
+        confirmText={controller.deleteLoading ? "Deleting…" : "Confirm"}
         onConfirm={controller.handleConfirmDelete}
         onCancel={() => controller.setConfirmDialogOpen(false)}
         loading={controller.deleteLoading}
@@ -87,7 +87,12 @@ const AcademicYearList = () => {
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
         onClose={() => controller.setSuccess(null)}
       >
-        <Alert onClose={() => controller.setSuccess(null)} severity="success" sx={{ width: "100%" }}>
+        <Alert
+          onClose={() => controller.setSuccess(null)}
+          severity="success"
+          variant="filled"
+          sx={{ width: "100%", borderRadius: "12px" }}
+        >
           {controller.success}
         </Alert>
       </Snackbar>

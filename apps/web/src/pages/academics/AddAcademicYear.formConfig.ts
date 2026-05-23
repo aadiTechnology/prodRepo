@@ -61,6 +61,7 @@ export function createAddAcademicYearFormConfig({
         name: "is_active",
         label: "Status",
         type: "switch",
+        conditionalRender: () => isEditMode,
         helperText: "Control system access for this academic year",
       },
     },

@@ -70,10 +70,9 @@ const AddAcademicYear = () => {
     onClearError: () => setError(null),
   });
 
-  // Show is_active in both add and edit modes (if desired by business logic)
   const formConfig = useMemo(
-    () => createAddAcademicYearFormConfig({ isEditMode: true }), // always show is_active
-    []
+    () => createAddAcademicYearFormConfig({ isEditMode }),
+    [isEditMode]
   );
 
   const fetchAcademicYear = useCallback(async () => {
@@ -110,22 +109,26 @@ const AddAcademicYear = () => {
     setLoading(true);
     setError(null);
     try {
-      const payload = {
-        name: formData.name.trim(),
-        code: formData.code.trim(),
-        start_date: formData.start_date,
-        end_date: formData.end_date,
-        is_active: formData.is_active,
-      };
-
       if (validId) {
-        await academicYearService.update(Number(id), payload);
-        setSnackbar("Academic Year updated successfully.");
+        await academicYearService.update(Number(id), {
+          name: formData.name.trim(),
+          code: formData.code.trim(),
+          start_date: formData.start_date,
+          end_date: formData.end_date,
+          is_active: formData.is_active,
+        });
+        setSnackbar("Academic year updated successfully.");
       } else {
-        await academicYearService.create(payload);
-        setSnackbar("Academic Year created successfully.");
+        await academicYearService.create({
+          name: formData.name.trim(),
+          code: formData.code.trim(),
+          start_date: formData.start_date,
+          end_date: formData.end_date,
+          is_active: true,
+        });
+        setSnackbar("Academic year created successfully.");
       }
-      navigate("/academic-years");
+      window.setTimeout(() => navigate("/academic-years"), 1200);
     } catch (err: unknown) {
       let apiFieldErrors, message;
       try {
@@ -172,16 +175,17 @@ const AddAcademicYear = () => {
         homePath: "/",
         cancelTooltip: "Cancel",
         saveTooltipCreate: "Save",
-        saveTooltipEdit: "Save Changes",
+        saveTooltipEdit: "Save",
       }}
       onCancelNavigate={() => navigate("/academic-years")}
+      footerActionOrder="cancel-first"
       confirmMessage={(ctx) =>
         ctx.isEditMode
           ? "Are you sure you want to update this academic year?"
           : "Are you sure you want to create this academic year?"
       }
       submitLabelCreate="Save"
-      submitLabelEdit="Save Changes"
+      submitLabelEdit="Save"
     />
   );
 };
