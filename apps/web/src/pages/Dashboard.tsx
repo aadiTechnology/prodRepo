@@ -1727,6 +1727,9 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
 // ═══════════════════════════════════════════════════════════════════════════════
 // 3. STUDENT DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
+const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw", "s_kpi_fees"];
+const STUDENT_CARDS_DEFAULT = ["s_att", "s_fee", "s_homework", "s_notices"];
+
 const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }) => {
   const navigate = useNavigate();
   const { profile, attendance, fee_status, class_teacher, homework, recent_notices } = data;
@@ -1734,282 +1737,250 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
   const feePct = total_fee > 0 ? (total_paid / total_fee) * 100 : 0;
   const fmtINR = (n: number) => "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
-  return (
-    <Grid container spacing={3}>
-      {/* ─ Profile hero banner ─ */}
-      <Grid item xs={12}>
-        <Card
-          elevation={0}
-          sx={{
-            borderRadius: "24px",
-            background: "linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%)",
-            color: "#fff",
-            overflow: "hidden",
-            position: "relative",
-            boxShadow: "0 20px 40px -15px rgba(15,23,42,0.4)",
-          }}
-        >
-          <Box sx={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)", filter: "blur(20px)" }} />
-          <svg style={{ position: "absolute", bottom: 0, right: 0, opacity: 0.12, pointerEvents: "none", width: 320, height: 100 }} viewBox="0 0 200 100" preserveAspectRatio="none">
-            <path d="M0,75 Q50,35 100,75 T200,75 L200,100 L0,100 Z" fill="rgba(59,130,246,0.5)" />
-            <path d="M0,85 Q60,55 120,85 T200,85 L200,100 L0,100 Z" fill="rgba(236,72,153,0.3)" />
-          </svg>
-          <CardContent sx={{ p: { xs: 3, sm: 4.5 }, display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: "center", gap: 3.5, position: "relative", zIndex: 1 }}>
-            <Avatar
-              src={profile.photo_url || ""}
-              sx={{ width: 96, height: 96, border: "3px solid rgba(255,255,255,0.22)", bgcolor: "#fff", color: "#1E3A8A", fontSize: "34px", fontWeight: 900, boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}
-            >
-              {profile.student_name.charAt(0)}
-            </Avatar>
-            <Box sx={{ flex: 1, textAlign: { xs: "center", sm: "left" } }}>
-              <Typography variant="h5" sx={{ fontWeight: 900, mb: 0.75, letterSpacing: "-0.3px" }}>
-                Hi, {profile.student_name}! 👋
-              </Typography>
-              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", opacity: 0.85, mb: 1.5, justifyContent: { xs: "center", sm: "flex-start" } }}>
-                {profile.roll_no && <Typography variant="body2">Roll: <strong>{profile.roll_no}</strong></Typography>}
-                {profile.admission_no && <Typography variant="body2">Adm No: <strong>{profile.admission_no}</strong></Typography>}
-              </Box>
-              <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", justifyContent: { xs: "center", sm: "flex-start" } }}>
-                {profile.class_name && (
-                  <Chip label={profile.class_name + (profile.division_name ? ` — ${profile.division_name}` : "")} size="small"
-                    sx={{ bgcolor: "rgba(255,255,255,0.12)", color: "#fff", fontWeight: 700, borderRadius: "8px", border: "1px solid rgba(255,255,255,0.2)" }} />
-                )}
-                <Chip label="2025–26" size="small"
-                  sx={{ bgcolor: "rgba(255,255,255,0.12)", color: "#fff", fontWeight: 700, borderRadius: "8px", border: "1px solid rgba(255,255,255,0.2)" }} />
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Grid>
+  const kpiSensors  = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const cardSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const [kpiOrder,  setKpiOrder]  = useSectionOrder("student_kpi_order",   STUDENT_KPI_DEFAULT);
+  const [cardOrder, setCardOrder] = useSectionOrder("student_cards_order", STUDENT_CARDS_DEFAULT);
 
-      {/* ─ My Profile ─ */}
-      <Grid item xs={12} md={3}>
-        <GCard sx={{ height: "100%" }}>
-          <CardContent sx={{ p: 3 }}>
-            <CardHeader
-              title="My Profile"
-              action={
-                <Tooltip title="Edit Profile">
-                  <IconButton size="small" onClick={() => navigate("/profile")} sx={{ color: C.blue }}>
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              }
+  function handleKpiDrag(e: DragEndEvent) {
+    const { active, over } = e;
+    if (over && active.id !== over.id)
+      setKpiOrder(arrayMove(kpiOrder, kpiOrder.indexOf(String(active.id)), kpiOrder.indexOf(String(over.id))));
+  }
+  function handleCardDrag(e: DragEndEvent) {
+    const { active, over } = e;
+    if (over && active.id !== over.id)
+      setCardOrder(arrayMove(cardOrder, cardOrder.indexOf(String(active.id)), cardOrder.indexOf(String(over.id))));
+  }
+
+  const renderKpi = (id: string) => {
+    switch (id) {
+      case "s_kpi_att":
+        return (
+          <SortableSection key={id} id={id}>
+            <SnapCard
+              title="Attendance"
+              value={`${attendance.percentage.toFixed(0)}%`}
+              icon={<AttendanceIcon sx={{ fontSize: 20 }} />}
+              accentColor={attendance.percentage >= 75 ? C.green : C.red}
+              glassBg={attendance.percentage >= 75 ? C.greenGlass : C.redGlass}
+              sub={<Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Presence Rate</Typography>}
             />
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-              {[
-                { label: "Name", value: profile.student_name },
-                { label: "Class", value: profile.class_name ? `${profile.class_name}${profile.division_name ? ` — ${profile.division_name}` : ""}` : "N/A" },
-                { label: "Roll No", value: profile.roll_no || "—" },
-                { label: "Adm No", value: profile.admission_no || "—" },
-                { label: "Adm Date", value: profile.admission_date || "—" },
-                { label: "Parent", value: profile.parent_name || "—" },
-                { label: "Contact", value: profile.parent_phone || "—" },
-              ].map((row) => (
-                <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                  <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600, flexShrink: 0 }}>{row.label}</Typography>
-                  <Typography variant="caption" sx={{ color: C.slateText, fontWeight: 700, textAlign: "right", maxWidth: 140 }} noWrap>
-                    {row.value}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-            <Button variant="outlined" size="small" fullWidth onClick={() => navigate("/profile")}
-              sx={{ mt: 2.5, borderRadius: "8px", textTransform: "none", fontWeight: 700, borderColor: C.border, color: C.slateText }}>
-              View / Edit Profile
-            </Button>
-          </CardContent>
-        </GCard>
-      </Grid>
-
-      {/* ─ Attendance ─ */}
-      <Grid item xs={12} md={3}>
-        <GCard sx={{ height: "100%" }}>
-          <CardContent sx={{ p: 3, display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <CardHeader title="My Attendance" />
-            <AttRing
-              pct={attendance.percentage}
-              size={130}
-              color={attendance.percentage >= 75 ? C.green : C.red}
-              gradId="studAttGrad"
+          </SortableSection>
+        );
+      case "s_kpi_present":
+        return (
+          <SortableSection key={id} id={id}>
+            <SnapCard
+              title="Present Days"
+              value={String(attendance.present)}
+              icon={<PresentIcon sx={{ fontSize: 20 }} />}
+              accentColor={C.green}
+              glassBg={C.greenGlass}
+              sub={<Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>of {attendance.present + attendance.absent} school days</Typography>}
             />
-            <Grid container spacing={1.5} sx={{ mt: 2, width: "100%" }}>
-              <Grid item xs={6}>
-                <Box sx={{ p: 1.5, bgcolor: C.greenGlass, borderRadius: "10px", textAlign: "center" }}>
-                  <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, display: "block" }}>Present</Typography>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 900, color: C.green }}>{attendance.present} Days</Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={6}>
-                <Box sx={{ p: 1.5, bgcolor: C.redGlass, borderRadius: "10px", textAlign: "center" }}>
-                  <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, display: "block" }}>Absent</Typography>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 900, color: C.red }}>{attendance.absent} Days</Typography>
-                </Box>
-              </Grid>
-            </Grid>
-            <Button variant="text" size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/attendance/report")}
-              sx={{ mt: 2, color: C.blue, fontWeight: 700, textTransform: "none" }}>
-              View History
-            </Button>
-          </CardContent>
-        </GCard>
-      </Grid>
+          </SortableSection>
+        );
+      case "s_kpi_hw":
+        return (
+          <SortableSection key={id} id={id}>
+            <SnapCard
+              title="Pending HW"
+              value={String(homework.pending_count)}
+              icon={<HomeworkIcon sx={{ fontSize: 20 }} />}
+              accentColor={homework.pending_count > 0 ? C.amber : C.green}
+              glassBg={homework.pending_count > 0 ? C.amberGlass : C.greenGlass}
+              sub={<Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>{homework.pending_count === 0 ? "All done!" : "Assignment(s)"}</Typography>}
+              onClick={() => navigate("/homework")}
+            />
+          </SortableSection>
+        );
+      case "s_kpi_fees":
+        return (
+          <SortableSection key={id} id={id}>
+            <SnapCard
+              title="Fee Balance"
+              value={fmtINR(total_balance)}
+              icon={<FeeIcon sx={{ fontSize: 20 }} />}
+              accentColor={total_balance > 0 ? C.red : C.green}
+              glassBg={total_balance > 0 ? C.redGlass : C.greenGlass}
+              sub={<Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>{is_overdue ? "Dues Pending" : "Cleared"}</Typography>}
+              onClick={() => navigate("/fees/student-ledger")}
+            />
+          </SortableSection>
+        );
+      default: return null;
+    }
+  };
 
-      {/* ─ Fee Status ─ */}
-      <Grid item xs={12} md={3}>
-        <GCard sx={{ height: "100%" }}>
-          <CardContent sx={{ p: 3 }}>
-            <CardHeader
-              title="Fee Status"
-              action={
-                <Chip
-                  label={is_overdue ? "Dues Pending" : "Cleared ✓"}
-                  size="small"
-                  sx={{ bgcolor: is_overdue ? C.amberGlass : C.greenGlass, color: is_overdue ? C.amber : C.green, fontWeight: 800, fontSize: "11px", height: 20, borderRadius: "5px" }}
+  const renderCard = (id: string) => {
+    switch (id) {
+      case "s_att":
+        return (
+          <SortableSection key={id} id={id}>
+            <GCard>
+              <CardContent sx={{ p: 3 }}>
+                <CardHeader
+                  title="My Attendance"
+                  action={
+                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/attendance/report")}
+                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                      View History
+                    </Button>
+                  }
                 />
-              }
-            />
-            <Box sx={{ mb: 2 }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
-                <Typography variant="caption" sx={{ color: C.muted }}>Total: {fmtINR(total_fee)}</Typography>
-                <Typography variant="caption" sx={{ color: C.green, fontWeight: 800 }}>{feePct.toFixed(0)}% paid</Typography>
-              </Box>
-              <LinearProgress
-                variant="determinate"
-                value={feePct}
-                sx={{
-                  height: 8,
-                  borderRadius: 4,
-                  bgcolor: "rgba(0,0,0,0.04)",
-                  "& .MuiLinearProgress-bar": {
-                    background: is_overdue ? `linear-gradient(90deg, ${C.amber}, #FCD34D)` : `linear-gradient(90deg, ${C.green}, #34D399)`,
-                    borderRadius: 4,
-                  },
-                }}
-              />
-            </Box>
-            <Divider sx={{ mb: 2 }} />
-            {[
-              { label: "Total Fees", value: fmtINR(total_fee), color: C.slateText },
-              { label: "Paid", value: fmtINR(total_paid), color: C.green },
-              { label: "Balance", value: fmtINR(total_balance), color: total_balance > 0 ? C.red : C.green },
-            ].map((row) => (
-              <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
-                <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>{row.label}</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 800, color: row.color }}>{row.value}</Typography>
-              </Box>
-            ))}
-            {next_due_date && (
-              <Box sx={{ mt: 1.5, p: 1.5, bgcolor: C.amberGlass, borderRadius: "8px", border: `1px solid rgba(217,119,6,0.2)` }}>
-                <Typography variant="caption" sx={{ color: C.amber, fontWeight: 700 }}>
-                  Next Due: {fmtINR(total_balance)} by {next_due_date}
-                </Typography>
-              </Box>
-            )}
-            <Button variant="text" size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/fees/student-ledger")}
-              sx={{ mt: 2, color: C.blue, fontWeight: 700, textTransform: "none" }}>
-              View Details
-            </Button>
-          </CardContent>
-        </GCard>
-      </Grid>
-
-      {/* ─ Homework ─ */}
-      <Grid item xs={12} md={3}>
-        <GCard sx={{ height: "100%" }}>
-          <CardContent sx={{ p: 3, display: "flex", flexDirection: "column" }}>
-            <CardHeader title="Homework" />
-            <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 2 }}>
-              <Avatar
-                sx={{
-                  bgcolor: homework.pending_count > 0 ? C.amberGlass : C.greenGlass,
-                  color: homework.pending_count > 0 ? C.amber : C.green,
-                  width: 60,
-                  height: 60,
-                  borderRadius: "14px",
-                  mb: 2,
-                }}
-              >
-                <HomeworkIcon sx={{ fontSize: 30 }} />
-              </Avatar>
-              {homework.pending_count === 0 ? (
-                <>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: C.green, textAlign: "center" }}>
-                    No homework assigned
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: C.muted, mt: 0.5, textAlign: "center" }}>
-                    Great going! 🎉
-                  </Typography>
-                </>
-              ) : (
-                <>
-                  <Typography variant="h4" sx={{ fontWeight: 900, color: C.amber, letterSpacing: "-1px" }}>
-                    {homework.pending_count}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600, textAlign: "center" }}>
-                    Pending assignment{homework.pending_count !== 1 ? "s" : ""}
-                  </Typography>
-                </>
-              )}
-            </Box>
-            <Button variant="text" size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/homework")}
-              sx={{ color: C.blue, fontWeight: 700, textTransform: "none" }}>
-              View All
-            </Button>
-          </CardContent>
-        </GCard>
-      </Grid>
-
-      {/* ─ Notices + Academic Info ─ */}
-      <Grid item xs={12} md={7}>
-        <GCard sx={{ height: "100%" }}>
-          <CardContent sx={{ p: 3 }}>
-            <CardHeader
-              title="Latest Notices"
-              icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
-              action={
-                <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/communication/notices")}
-                  sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
-                  View All
-                </Button>
-              }
-            />
-            <NoticesCardContent notices={recent_notices} navigate={navigate} />
-          </CardContent>
-        </GCard>
-      </Grid>
-
-      <Grid item xs={12} md={5}>
-        <GCard sx={{ height: "100%" }}>
-          <CardContent sx={{ p: 3 }}>
-            <CardHeader title="Academic Info" icon={<SchoolIcon color="primary" sx={{ fontSize: 20 }} />} />
-            <Box sx={{ display: "flex", flexDirection: "column" }}>
-              {[
-                { label: "Class", value: profile.class_name ? `${profile.class_name}${profile.division_name ? ` — ${profile.division_name}` : ""}` : "N/A" },
-                { label: "Academic Year", value: "2025–26" },
-                { label: "Admission Date", value: profile.admission_date || "—" },
-                { label: "Class Teacher", value: class_teacher || "Not Assigned" },
-                { label: "Admission No", value: profile.admission_no || "—" },
-              ].map((row, i, arr) => (
-                <Box
-                  key={row.label}
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    py: 1.5,
-                    borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : 0,
-                  }}
-                >
-                  <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>{row.label}</Typography>
-                  <Typography variant="body2" sx={{ color: C.slateText, fontWeight: 700 }}>{row.value}</Typography>
+                <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                  <AttRing
+                    pct={attendance.percentage}
+                    size={110}
+                    color={attendance.percentage >= 75 ? C.green : C.red}
+                    gradId="studAttGrad"
+                  />
                 </Box>
-              ))}
-            </Box>
-          </CardContent>
-        </GCard>
-      </Grid>
-    </Grid>
+                <Grid container spacing={1}>
+                  {[
+                    { label: "Present", value: `${attendance.present} Days`, color: C.green, bg: C.greenGlass },
+                    { label: "Absent",  value: `${attendance.absent} Days`,  color: C.red,   bg: C.redGlass  },
+                  ].map((s) => (
+                    <Grid item xs={6} key={s.label}>
+                      <Box sx={{ p: 1, bgcolor: s.bg, borderRadius: "10px", textAlign: "center", borderLeft: `3px solid ${s.color}` }}>
+                        <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, display: "block" }}>{s.label}</Typography>
+                        <Typography sx={{ fontSize: "0.95rem", fontWeight: 900, color: s.color }}>{s.value}</Typography>
+                      </Box>
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </GCard>
+          </SortableSection>
+        );
+
+      case "s_fee":
+        return (
+          <SortableSection key={id} id={id}>
+            <GCard>
+              <CardContent sx={{ p: 3 }}>
+                <CardHeader
+                  title="Fee Status"
+                  action={
+                    <Chip
+                      label={is_overdue ? "Dues Pending" : "Cleared ✓"}
+                      size="small"
+                      sx={{ bgcolor: is_overdue ? C.amberGlass : C.greenGlass, color: is_overdue ? C.amber : C.green, fontWeight: 800, fontSize: "11px", height: 20, borderRadius: "5px" }}
+                    />
+                  }
+                />
+                <Box sx={{ mb: 2 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
+                    <Typography variant="caption" sx={{ color: C.muted }}>Total: {fmtINR(total_fee)}</Typography>
+                    <Typography variant="caption" sx={{ color: C.green, fontWeight: 800 }}>{feePct.toFixed(0)}% paid</Typography>
+                  </Box>
+                  <LinearProgress variant="determinate" value={feePct}
+                    sx={{ height: 8, borderRadius: 4, bgcolor: "rgba(0,0,0,0.04)",
+                      "& .MuiLinearProgress-bar": { background: is_overdue ? `linear-gradient(90deg, ${C.amber}, #FCD34D)` : `linear-gradient(90deg, ${C.green}, #34D399)`, borderRadius: 4 } }} />
+                </Box>
+                <Divider sx={{ mb: 2 }} />
+                {[
+                  { label: "Total Fees", value: fmtINR(total_fee),      color: C.slateText },
+                  { label: "Paid",       value: fmtINR(total_paid),     color: C.green },
+                  { label: "Balance",    value: fmtINR(total_balance),  color: total_balance > 0 ? C.red : C.green },
+                ].map((row) => (
+                  <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
+                    <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>{row.label}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800, color: row.color }}>{row.value}</Typography>
+                  </Box>
+                ))}
+                {next_due_date && (
+                  <Box sx={{ mt: 1.5, p: 1.5, bgcolor: C.amberGlass, borderRadius: "8px", border: `1px solid rgba(217,119,6,0.2)` }}>
+                    <Typography variant="caption" sx={{ color: C.amber, fontWeight: 700 }}>
+                      Next Due: {fmtINR(total_balance)} by {next_due_date}
+                    </Typography>
+                  </Box>
+                )}
+                <Button variant="text" size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/fees/student-ledger")}
+                  sx={{ mt: 2, color: C.blue, fontWeight: 700, textTransform: "none" }}>
+                  View Details
+                </Button>
+              </CardContent>
+            </GCard>
+          </SortableSection>
+        );
+
+      case "s_homework":
+        return (
+          <SortableSection key={id} id={id} sx={{ gridColumn: "1 / -1" }}>
+            <GCard>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+                  <Avatar sx={{ bgcolor: homework.pending_count > 0 ? C.amberGlass : C.greenGlass, color: homework.pending_count > 0 ? C.amber : C.green, width: 52, height: 52, borderRadius: "14px", flexShrink: 0 }}>
+                    <HomeworkIcon sx={{ fontSize: 26 }} />
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px" }}>Homework</Typography>
+                    <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mt: 0.25 }}>
+                      <Typography variant="h4" sx={{ fontWeight: 900, color: homework.pending_count > 0 ? C.amber : C.green, letterSpacing: "-1px", lineHeight: 1 }}>
+                        {homework.pending_count}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>
+                        {homework.pending_count === 0 ? "All assignments done — great going! 🎉" : `pending assignment${homework.pending_count !== 1 ? "s" : ""}`}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Button variant="outlined" size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/homework")}
+                    sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 700, borderColor: C.border, color: C.slateText, flexShrink: 0 }}>
+                    View All
+                  </Button>
+                </Box>
+              </CardContent>
+            </GCard>
+          </SortableSection>
+        );
+
+      case "s_notices":
+        return (
+          <SortableSection key={id} id={id} sx={{ gridColumn: "1 / -1" }}>
+            <GCard>
+              <CardContent sx={{ p: 3 }}>
+                <CardHeader
+                  title="Latest Notices & Holidays"
+                  icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
+                  action={
+                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/communication/notices")}
+                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                      View All
+                    </Button>
+                  }
+                />
+                <NoticesCardContent notices={recent_notices} navigate={navigate} />
+              </CardContent>
+            </GCard>
+          </SortableSection>
+        );
+
+      default: return null;
+    }
+  };
+
+  return (
+    <Box>
+      {/* ── KPI row ── */}
+      <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
+        <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, gap: 3, mb: 3 }}>
+            {kpiOrder.map(renderKpi)}
+          </Box>
+        </SortableContext>
+      </DndContext>
+
+      {/* ── Main cards ── */}
+      <DndContext sensors={cardSensors} collisionDetection={closestCenter} onDragEnd={handleCardDrag}>
+        <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 3 }}>
+            {cardOrder.map(renderCard)}
+          </Box>
+        </SortableContext>
+      </DndContext>
+    </Box>
   );
 };
 
