@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Alert, Autocomplete, Box, Button, TextField, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
@@ -10,8 +10,10 @@ import Groups2Icon from "@mui/icons-material/Groups2";
 import PaymentsIcon from "@mui/icons-material/Payments";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
-import ClearIcon from "@mui/icons-material/Clear";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { IconButton } from "@mui/material";
+import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 
 import BaseForm from "../../components/reusable/BaseForm";
 import FormSectionLabel from "../../components/reusable/FormSectionLabel";
@@ -196,6 +198,9 @@ export default function EnrollmentPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [birthCertName, setBirthCertName] = useState<string>("");
   const [photoName, setPhotoName] = useState<string>("");
+  const [documentDeleteTarget, setDocumentDeleteTarget] = useState<
+    "birth_certificate" | "photo" | null
+  >(null);
   const birthCertInputRef = useRef<HTMLInputElement | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -418,6 +423,8 @@ export default function EnrollmentPage() {
           photo_url: student.photo_url ?? prev.photo_url,
           birth_certificate_url: student.birth_certificate_url ?? prev.birth_certificate_url,
         }));
+        setBirthCertName(fileNameFromUrl(student.birth_certificate_url));
+        setPhotoName(fileNameFromUrl(student.photo_url));
       })
       .catch(() => setError("Failed to load student details."))
       .finally(() => setFetchLoading(false));
@@ -532,6 +539,31 @@ export default function EnrollmentPage() {
     await uploadDocument(file, "photo");
     if (photoInputRef.current) photoInputRef.current.value = "";
   };
+
+  const openDocumentInNewTab = useCallback((url?: string | null) => {
+    const absoluteUrl = toAbsoluteAssetUrl(url);
+    if (!absoluteUrl) return;
+    window.open(absoluteUrl, "_blank", "noopener,noreferrer");
+  }, []);
+
+  const requestDocumentDelete = useCallback((target: "birth_certificate" | "photo") => {
+    setDocumentDeleteTarget(target);
+  }, []);
+
+  const confirmDocumentDelete = useCallback(() => {
+    if (documentDeleteTarget === "birth_certificate") {
+      setBirthCertName("");
+      setFormData((prev) => ({ ...prev, birth_certificate_url: "" }));
+      if (birthCertInputRef.current) birthCertInputRef.current.value = "";
+      setSnackbar("Birth certificate removed successfully.");
+    } else if (documentDeleteTarget === "photo") {
+      setPhotoName("");
+      setFormData((prev) => ({ ...prev, photo_url: "" }));
+      if (photoInputRef.current) photoInputRef.current.value = "";
+      setSnackbar("Student photo removed successfully.");
+    }
+    setDocumentDeleteTarget(null);
+  }, [documentDeleteTarget, setFormData]);
 
   // Build submission payload
   const buildPayload = (): EnrollmentCreatePayload => ({
@@ -1046,26 +1078,37 @@ export default function EnrollmentPage() {
                 >
                   {uploadingBirthCert ? "Uploading birth certificate..." : "Upload Birth Certificate"}
                 </Button>
-                <Box sx={{ display: "flex", alignItems: "center", mt: 0.75, minHeight: 24 }}>
+                <Box sx={{ display: "flex", alignItems: "center", mt: 0.75, minHeight: 24, gap: 0.25 }}>
                   <Typography
                     variant="caption"
                     color="text.secondary"
                     sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
-                    {birthCertName || "No file selected"}
+                    {birthCertName ||
+                      fileNameFromUrl(formData.birth_certificate_url) ||
+                      "No file selected"}
                   </Typography>
-                  {birthCertName ? (
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => {
-                        setBirthCertName("");
-                        setFormData((prev) => ({ ...prev, birth_certificate_url: "" }));
-                      }}
-                      sx={{ p: 0.5 }}
-                    >
-                      <ClearIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
+                  {formData.birth_certificate_url ? (
+                    <>
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        aria-label="View birth certificate"
+                        onClick={() => openDocumentInNewTab(formData.birth_certificate_url)}
+                        sx={{ p: 0.5 }}
+                      >
+                        <VisibilityIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        aria-label="Delete birth certificate"
+                        onClick={() => requestDocumentDelete("birth_certificate")}
+                        sx={{ p: 0.5 }}
+                      >
+                        <DeleteOutlineIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </>
                   ) : null}
                 </Box>
               </Box>
@@ -1082,26 +1125,35 @@ export default function EnrollmentPage() {
                 >
                   {uploadingPhoto ? "Uploading photo..." : "Upload Student Photo"}
                 </Button>
-                <Box sx={{ display: "flex", alignItems: "center", mt: 0.75, minHeight: 24 }}>
+                <Box sx={{ display: "flex", alignItems: "center", mt: 0.75, minHeight: 24, gap: 0.25 }}>
                   <Typography
                     variant="caption"
                     color="text.secondary"
                     sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
-                    {photoName || "No file selected"}
+                    {photoName || fileNameFromUrl(formData.photo_url) || "No file selected"}
                   </Typography>
-                  {photoName ? (
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => {
-                        setPhotoName("");
-                        setFormData((prev) => ({ ...prev, photo_url: "" }));
-                      }}
-                      sx={{ p: 0.5 }}
-                    >
-                      <ClearIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
+                  {formData.photo_url ? (
+                    <>
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        aria-label="View student photo"
+                        onClick={() => openDocumentInNewTab(formData.photo_url)}
+                        sx={{ p: 0.5 }}
+                      >
+                        <VisibilityIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        aria-label="Delete student photo"
+                        onClick={() => requestDocumentDelete("photo")}
+                        sx={{ p: 0.5 }}
+                      >
+                        <DeleteOutlineIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </>
                   ) : null}
                 </Box>
                 {formData.photo_url ? (
@@ -1135,9 +1187,12 @@ export default function EnrollmentPage() {
     discountOptions,
     feePlanOptions,
     feePreview,
+    formData.birth_certificate_url,
     formData.photo_url,
     leadOptions,
+    openDocumentInNewTab,
     photoName,
+    requestDocumentDelete,
     selectedDiscountLabel,
     selectedLead,
     divisionOptions,
@@ -1173,8 +1228,23 @@ export default function EnrollmentPage() {
     );
   }
 
+  const documentDeleteLabel =
+    documentDeleteTarget === "birth_certificate"
+      ? "birth certificate"
+      : documentDeleteTarget === "photo"
+        ? "student photo"
+        : "document";
+
   return (
     <>
+      <ConfirmDialog
+        open={documentDeleteTarget != null}
+        title="Please Confirm"
+        message={`Are you sure you want to remove this ${documentDeleteLabel}?`}
+        confirmLabel="Confirm"
+        onConfirm={confirmDocumentDelete}
+        onClose={() => setDocumentDeleteTarget(null)}
+      />
       <input
         ref={birthCertInputRef}
         type="file"
