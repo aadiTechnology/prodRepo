@@ -410,6 +410,28 @@ function AddClassFeeStructureAssignment() {
               </Grid>
               {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 4 }}>
+                <CancelButton
+                  variant="text"
+                  onClick={() => navigate("/fees")}
+                  sx={(theme) => ({
+                    minWidth: 132,
+                    fontWeight: 700,
+                    borderRadius: 0,
+                    color: theme.palette.error.main,
+                    backgroundColor: 'transparent',
+                    boxShadow: 'none',
+                    border: 'none',
+                    fontSize: '1.21rem',
+                    px: 4.4,
+                    py: 1.1,
+                    '&:hover': {
+                      backgroundColor: 'transparent',
+                      textDecoration: 'underline',
+                    },
+                  })}
+                >
+                  Cancel
+                </CancelButton>
                 <SaveButton
                   type="submit"
                   variant="text"
@@ -433,28 +455,6 @@ function AddClassFeeStructureAssignment() {
                 >
                   Save
                 </SaveButton>
-                <CancelButton
-                  variant="text"
-                  onClick={() => navigate("/fees")}
-                  sx={(theme) => ({
-                    minWidth: 132,
-                    fontWeight: 700,
-                    borderRadius: 0,
-                    color: theme.palette.error.main,
-                    backgroundColor: 'transparent',
-                    boxShadow: 'none',
-                    border: 'none',
-                    fontSize: '1.21rem',
-                    px: 4.4,
-                    py: 1.1,
-                    '&:hover': {
-                      backgroundColor: 'transparent',
-                      textDecoration: 'underline',
-                    },
-                  })}
-                >
-                  Cancel
-                </CancelButton>
               </Box>
             </form>
           </Box>

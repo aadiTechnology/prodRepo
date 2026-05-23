@@ -178,7 +178,6 @@ const AddAcademicYear = () => {
         saveTooltipEdit: "Save",
       }}
       onCancelNavigate={() => navigate("/academic-years")}
-      footerActionOrder="cancel-first"
       confirmMessage={(ctx) =>
         ctx.isEditMode
           ? "Are you sure you want to update this academic year?"

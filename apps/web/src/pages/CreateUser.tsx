@@ -239,7 +239,6 @@ export default function CreateUser() {
         saveTooltipEdit: "Save",
       }}
       onCancelNavigate={() => navigate("/users")}
-      footerActionOrder="cancel-first"
       confirmMessage={(ctx) =>
         ctx.isEditMode
           ? "Are you sure you want to update this user?"

@@ -841,7 +841,6 @@ export default function GenerateInvoice() {
       }
       submitLabelCreate="Save"
       submitLabelEdit="Save"
-      footerActionOrder="cancel-first"
       canSubmit={true}
       gridSpacing={3}
     />

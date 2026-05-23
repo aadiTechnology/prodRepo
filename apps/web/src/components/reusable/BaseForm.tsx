@@ -51,7 +51,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
   formTopSlot,
   canSubmit = true,
   hideFooterActions = false,
-  footerActionOrder = "save-first",
+  footerActionOrder = "cancel-first",
   useErrorSnackbar = false,
   gridSpacing = 2,
 }: BaseFormProps<T>) {
