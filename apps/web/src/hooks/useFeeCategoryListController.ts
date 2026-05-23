@@ -4,6 +4,14 @@ import schoolClassService from "../api/services/schoolClassService";
 import type { FeeCategoryResponse } from "../types/fee";
 import { useListManager } from "./useListManager";
 
+const resolveCurrentAcademicYearId = (
+  years: { id: number; is_current?: boolean | number }[]
+): string => {
+  const current =
+    years.find((y) => y.is_current === true || y.is_current === 1) ?? years[0];
+  return current?.id != null ? String(current.id) : "";
+};
+
 export function useFeeCategoryListController() {
   const [categories, setCategories] = useState<FeeCategoryResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -13,7 +21,9 @@ export function useFeeCategoryListController() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<string | null>(null);
 
-  const [academicYears, setAcademicYears] = useState<{ id: number; name: string }[]>([]);
+  const [academicYears, setAcademicYears] = useState<
+    { id: number; name: string; is_current?: boolean | number }[]
+  >([]);
   const [uniqueClasses, setUniqueClasses] = useState<{ id: number; name: string }[]>([]);
 
   const listState = useListManager<{ className: string; academicYearId: string }, "name">({
@@ -35,8 +45,20 @@ export function useFeeCategoryListController() {
         schoolClassService.getAll()
       ]);
       setCategories(data || []);
-      setAcademicYears((years || []).map((y: any) => ({ id: y.id, name: y.name })));
+      const yearOptions = (years || []).map(
+        (y: { id: number; name: string; is_current?: boolean | number }) => ({
+          id: y.id,
+          name: y.name,
+          is_current: y.is_current,
+        })
+      );
+      setAcademicYears(yearOptions);
       setUniqueClasses((cls || []).map((c: any) => ({ id: c.id, name: c.name })));
+
+      const currentYearId = resolveCurrentAcademicYearId(yearOptions);
+      if (currentYearId && listState.filters.academicYearId === "") {
+        listState.setFilter("academicYearId", currentYearId);
+      }
     } catch (err: any) {
       setError(err?.message || err?.detail || "Failed to fetch categories.");
     } finally {

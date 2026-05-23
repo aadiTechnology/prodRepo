@@ -158,15 +158,15 @@ export function generateInvoiceFormConfig({
 
   const layoutRows: FormConfig<GenerateInvoiceFormData>["layoutRows"] = [
     { kind: "section", title: "Academic Form", grid: { xs: 12 } },
-    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["academic_year_id"] },
-    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["class_id"] },
-    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["division_id"] },
-    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["fee_structure_id"] },
+    { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["academic_year_id"] },
+    { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["class_id"] },
+    { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["division_id"] },
+    { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["fee_structure_id"] },
     { kind: "section", title: "Installment Time", grid: { xs: 12 } },
-    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["installment_name"] },
-    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["payable_amount"] },
-    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["invoice_date"] },
-    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["due_date"] },
+    { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["installment_name"] },
+    { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["payable_amount"] },
+    { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["invoice_date"] },
+    { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["due_date"] },
   ];
 
   layoutRows.push(

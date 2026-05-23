@@ -124,4 +124,6 @@ export type BaseFormProps<T extends Record<string, unknown>> = {
   footerActionOrder?: "save-first" | "cancel-first";
   /** If true, error message will be shown in a snackbar instead of an inline alert. */
   useErrorSnackbar?: boolean;
+  /** MUI Grid spacing between form field blocks (default 2). */
+  gridSpacing?: number;
 };

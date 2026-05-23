@@ -208,6 +208,7 @@ const AddEditFeeCategory = () => {
       }}
       onCancelNavigate={() => navigate("/fees/categories")}
       confirmMessage={isEditMode ? "Update this fee category?" : "Create this fee category?"}
+      gridSpacing={3}
     />
   );
 };

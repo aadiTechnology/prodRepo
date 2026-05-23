@@ -35,6 +35,14 @@ const toDateInputValue = (raw: unknown): string => {
   return parsed.toISOString().split("T")[0];
 };
 
+const resolveCurrentAcademicYearId = (
+  years: { id: number; is_current?: boolean | number }[]
+): number | null => {
+  const current =
+    years.find((y) => y.is_current === true || y.is_current === 1) ?? years[0];
+  return current?.id ?? null;
+};
+
 const defaultFormData = (): GenerateInvoiceFormData => ({
   academic_year_id: null,
   class_id: null,
@@ -133,6 +141,24 @@ export default function GenerateInvoice() {
     queryKey: ["generate-invoice", "academic-years"],
     queryFn: invoiceApi.getAcademicYears,
   });
+
+  useEffect(() => {
+    if (isEditMode) return;
+    if (academicYearsLoading || academicYears.length === 0) return;
+    if (formData.academic_year_id != null) return;
+
+    const currentId = resolveCurrentAcademicYearId(academicYears);
+    if (currentId == null) return;
+
+    prevAcademicYearRef.current = currentId;
+    handleFieldValueChange("academic_year_id", currentId);
+  }, [
+    isEditMode,
+    academicYears,
+    academicYearsLoading,
+    formData.academic_year_id,
+    handleFieldValueChange,
+  ]);
 
   const { data: classes = [], isLoading: classesLoading } = useQuery({
     queryKey: ["generate-invoice", "classes", formData.academic_year_id],
@@ -817,6 +843,7 @@ export default function GenerateInvoice() {
       submitLabelEdit="Save"
       footerActionOrder="cancel-first"
       canSubmit={true}
+      gridSpacing={3}
     />
   );
 }

@@ -3,6 +3,7 @@ import axiosInstance from "./axiosInstance";
 export interface AcademicYearOption {
   id: number;
   name: string;
+  is_current?: boolean | number;
 }
 
 export interface ClassOption {

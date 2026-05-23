@@ -53,6 +53,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
   hideFooterActions = false,
   footerActionOrder = "save-first",
   useErrorSnackbar = false,
+  gridSpacing = 2,
 }: BaseFormProps<T>) {
   const formId = useId();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -153,14 +154,14 @@ export default function BaseForm<T extends Record<string, unknown>>({
           {formTopSlot ? (
             <Box sx={{ mb: 2, px: { xs: 0, sm: 1 } }}>{formTopSlot}</Box>
           ) : null}
-          <Grid container spacing={2}>
+          <Grid container spacing={gridSpacing}>
             {formConfig.layoutRows.map((row, idx) => {
               const show = row.show?.(layoutCtx) ?? true;
               if (!show) return null;
               if (row.kind === "section") {
                 return (
                   <Grid key={`section-${idx}`} size={row.grid ?? { xs: 12 }}>
-                    <FormSectionLabel title={row.title} icon={row.icon} sx={{ mt: idx === 0 ? 0 : 2 }} />
+                    <FormSectionLabel title={row.title} icon={row.icon} sx={{ mt: idx === 0 ? 0 : 2, mb: 0.5 }} />
                   </Grid>
                 );
               }
@@ -173,7 +174,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
                 );
               }
               return (
-                <Grid key={`fields-${idx}`} size={row.grid}>
+                <Grid key={`fields-${idx}`} size={row.grid} sx={{ py: 0.75 }}>
                   <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     {row.fieldNames.map((fieldName) => {
                       const field = formConfig.fields[fieldName];
