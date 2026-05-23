@@ -50,7 +50,24 @@ import {
   PersonAdd as PersonAddIcon,
   Edit as EditIcon,
   CheckBox as QuickMarkIcon,
+  DragIndicator as DragHandleIcon,
 } from "@mui/icons-material";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  rectSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
@@ -87,6 +104,74 @@ const C = {
   cardBg: "rgba(255,255,255,0.72)",
   cardBorder: "rgba(255,255,255,0.55)",
   white: "#FFFFFF",
+};
+
+// ─── Draggable section infrastructure ────────────────────────────────────────
+function useSectionOrder(storageKey: string, defaultOrder: string[]): [string[], (next: string[]) => void] {
+  const [order, setOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed: string[] = JSON.parse(saved);
+        // Keep only IDs that still exist; append any new ones
+        const valid = parsed.filter((id) => defaultOrder.includes(id));
+        const added = defaultOrder.filter((id) => !valid.includes(id));
+        return [...valid, ...added];
+      }
+    } catch { /* ignore */ }
+    return defaultOrder;
+  });
+
+  const save = useCallback((next: string[]) => {
+    setOrder(next);
+    try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* ignore */ }
+  }, [storageKey]);
+
+  return [order, save];
+}
+
+const SortableSection: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <Box
+      ref={setNodeRef}
+      sx={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.55 : 1,
+        position: "relative",
+        "&:hover .drag-handle": { opacity: 1 },
+      }}
+    >
+      {/* Drag handle — visible on hover */}
+      <Box
+        className="drag-handle"
+        {...attributes}
+        {...listeners}
+        sx={{
+          position: "absolute",
+          top: 10,
+          right: 10,
+          zIndex: 10,
+          opacity: 0,
+          transition: "opacity 0.2s",
+          cursor: "grab",
+          bgcolor: "rgba(255,255,255,0.9)",
+          border: "1px solid rgba(0,0,0,0.08)",
+          borderRadius: "8px",
+          p: 0.5,
+          display: "flex",
+          alignItems: "center",
+          color: C.muted,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+          "&:active": { cursor: "grabbing" },
+        }}
+      >
+        <DragHandleIcon sx={{ fontSize: 18 }} />
+      </Box>
+      {children}
+    </Box>
+  );
 };
 
 // ─── Date Filter helpers ──────────────────────────────────────────────────────
@@ -865,11 +950,11 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
     },
     {
       label: "Collect Payment",
-      desc: "Log tuition and admission fees",
+      desc: "View and manage invoices",
       icon: <FeeIcon />,
       color: C.green,
       bg: C.greenGlass,
-      path: "/fees/collect",
+      path: "/fees/invoices",
     },
     {
       label: "Lead Pipeline",
@@ -889,407 +974,352 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
     },
   ];
 
-  return (
-    <Grid container spacing={3}>
-      {/* ─ Row 1: Snap cards with sparklines ─ */}
-      <Grid item xs={12} sm={6} md={3}>
-        <SnapCard
-          title="Active Students"
-          value={data.student_snapshot.active_students}
-          icon={<PeopleIcon fontSize="small" />}
-          accentColor={C.blue}
-          glassBg={C.blueGlass}
-          onClick={() => navigate("/students")}
-          sub={
-            <>
-              <Sparkline color={C.blue} delay={0} />
-              <Typography variant="caption" sx={{ color: C.green, fontWeight: 700 }}>
-                +2.5% since last week
-              </Typography>
-            </>
-          }
-        />
-      </Grid>
+  const ADMIN_KPI_DEFAULT     = ["admin_students", "admin_classes", "admin_fees", "admin_balance"];
+  const ADMIN_SECTIONS_DEFAULT = ["notices", "attendance_fee", "leads", "quick_actions"];
 
-      <Grid item xs={12} sm={6} md={3}>
-        <SnapCard
-          title="Total Classes"
-          value={data.student_snapshot.total_classes}
-          icon={<SchoolIcon fontSize="small" />}
-          accentColor={C.purple}
-          glassBg={C.purpleGlass}
-          sub={
-            <>
-              <Sparkline color={C.purple} delay={0.2} />
-              <Typography variant="caption" sx={{ color: C.green, fontWeight: 700 }}>
-                +1.2% since last week
-              </Typography>
-            </>
-          }
-        />
-      </Grid>
+  const kpiSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const [kpiOrder, setKpiOrder] = useSectionOrder("admin_kpi_order", ADMIN_KPI_DEFAULT);
+  function handleKpiDrag(e: DragEndEvent) {
+    const { active, over } = e;
+    if (over && active.id !== over.id)
+      setKpiOrder(arrayMove(kpiOrder, kpiOrder.indexOf(String(active.id)), kpiOrder.indexOf(String(over.id))));
+  }
 
-      <Grid item xs={12} sm={6} md={3}>
-        <SnapCard
-          title="Collected Fees"
-          value={fmtINR(total_paid)}
-          icon={<MoneyIcon fontSize="small" />}
-          accentColor={C.green}
-          glassBg={C.greenGlass}
-          onClick={() => navigate("/fees/report")}
-          sub={
-            <>
-              <Sparkline color={C.green} delay={0.4} />
-              <Chip
-                label={feePct >= 75 ? "On Track" : `${feePct.toFixed(0)}% Collected`}
-                size="small"
-                sx={{
-                  bgcolor: feePct >= 75 ? C.greenGlass : C.amberGlass,
-                  color: feePct >= 75 ? C.green : C.amber,
-                  fontWeight: 700,
-                  height: 18,
-                  fontSize: "11px",
-                  borderRadius: "5px",
-                }}
-              />
-            </>
-          }
-        />
-      </Grid>
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const [sectionOrder, setSectionOrder] = useSectionOrder("admin_dash_order", ADMIN_SECTIONS_DEFAULT);
 
-      <Grid item xs={12} sm={6} md={3}>
-        <SnapCard
-          title="Pending Balance"
-          value={fmtINR(total_balance)}
-          icon={<WarningIcon fontSize="small" />}
-          accentColor={C.red}
-          glassBg={C.redGlass}
-          sub={
-            <>
-              <Sparkline color={C.red} delay={0.6} />
-              <Typography variant="caption" sx={{ color: total_balance > 0 ? C.red : C.green, fontWeight: 700 }}>
-                {total_balance > 0 ? "-4.8% since last week" : "All dues cleared ✓"}
-              </Typography>
-            </>
-          }
-        />
-      </Grid>
+  function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (over && active.id !== over.id) {
+      setSectionOrder(arrayMove(sectionOrder, sectionOrder.indexOf(String(active.id)), sectionOrder.indexOf(String(over.id))));
+    }
+  }
 
-      {/* ─ Row 2: Recent Notices ─ */}
-      <Grid item xs={12}>
-        <GCard>
-          <CardContent sx={{ p: 3 }}>
-            <CardHeader
-              title="Recent Notices"
-              icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
-              action={
-                <Button
-                  size="small"
-                  endIcon={<ArrowIcon />}
-                  onClick={() => navigate("/communication/notices")}
-                  sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}
-                >
-                  View All
-                </Button>
-              }
-            />
-            <NoticesCardContent notices={data.recent_notices} navigate={navigate} />
-          </CardContent>
-        </GCard>
-      </Grid>
+  const renderAdminSection = (id: string) => {
+    switch (id) {
+      case "notices":
+        return (
+          <SortableSection key={id} id={id}>
+            <GCard>
+              <CardContent sx={{ p: 3 }}>
+                <CardHeader
+                  title="Recent Notices & Holidays"
+                  icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
+                  action={
+                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/communication/notices")}
+                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                      View All
+                    </Button>
+                  }
+                />
+                <NoticesCardContent notices={data.recent_notices} navigate={navigate} />
+              </CardContent>
+            </GCard>
+          </SortableSection>
+        );
 
-      {/* ─ Row 3: Attendance Overview + Fee Collection Progress ─ */}
-      <Grid item xs={12} md={7}>
-        <GCard sx={{ height: "100%" }}>
-          <CardContent sx={{ p: 3 }}>
-            <CardHeader
-              title="Attendance Overview"
-              icon={<AttendanceIcon color="primary" sx={{ fontSize: 20 }} />}
-              action={
-                <Button
-                  size="small"
-                  endIcon={<ArrowIcon />}
-                  onClick={() => navigate("/attendance/report")}
-                  sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}
-                >
-                  View Details
-                </Button>
-              }
-              dateFilter={
-                <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", width: "100%" }}>
-                  <CardDateFilter value={attFilter} onChange={onAttFilterChange} />
-                  <TextField
-                    select
-                    size="small"
-                    value={selectedClassId}
-                    onChange={(e) => onClassChange(e.target.value as number | "")}
-                    SelectProps={{
-                      displayEmpty: true,
-                    }}
-                    sx={{
-                      minWidth: 130,
-                      "& .MuiOutlinedInput-root": {
-                        height: 26,
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        borderRadius: "6px",
-                        bgcolor: C.blueGlass,
-                        color: C.slateText,
-                        "& fieldset": {
-                          borderColor: "rgba(37,99,235,0.18)",
-                        },
-                        "&:hover fieldset": {
-                          borderColor: C.blue,
-                        },
-                        "&.Mui-focused fieldset": {
-                          borderColor: C.blue,
-                        },
-                      },
-                    }}
-                  >
-                    <MenuItem value="" sx={{ fontSize: "11px", fontWeight: 700, color: C.muted }}>All Classes</MenuItem>
-                    {classes.map((cls) => (
-                      <MenuItem key={cls.id} value={cls.id} sx={{ fontSize: "11px", fontWeight: 700 }}>
-                        {cls.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
-              }
-            />
-            {attCardLoading ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
-                  <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
-                  <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading attendance…</Typography>
-                </Box>
-              </Box>
-            ) : (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-                <AttRing pct={attPct} size={140} color={attPct >= 75 ? C.green : C.amber} gradId="adminAttGrad" />
-                <Grid container spacing={1.5} sx={{ flex: 1, minWidth: 160 }}>
-                  {[
-                    { label: "Present", value: present, color: C.green, bg: C.greenGlass },
-                    { label: "Absent", value: absent, color: C.red, bg: C.redGlass },
-                    { label: "Half Day", value: half_day, color: C.amber, bg: C.amberGlass },
-                    { label: "On Leave", value: leave, color: C.blue, bg: C.blueGlass },
-                  ].map((item) => (
-                    <Grid item xs={6} key={item.label}>
-                      <Box sx={{ p: 1.5, bgcolor: item.bg, borderRadius: "12px", borderLeft: `3px solid ${item.color}` }}>
-                        <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, textTransform: "uppercase", display: "block", fontSize: "10px" }}>
-                          {item.label}
-                        </Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 900, color: item.color, mt: 0.3 }}>
-                          {item.value}
-                        </Typography>
+      case "attendance_fee":
+        return (
+          <SortableSection key={id} id={id}>
+            <Grid container spacing={3}>
+              {/* Attendance Overview */}
+              <Grid item xs={12} md={7}>
+                <GCard sx={{ height: "100%" }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <CardHeader
+                      title="Attendance Overview"
+                      icon={<AttendanceIcon color="primary" sx={{ fontSize: 20 }} />}
+                      action={
+                        <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/attendance/report")}
+                          sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                          View Details
+                        </Button>
+                      }
+                      dateFilter={
+                        <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", width: "100%" }}>
+                          <CardDateFilter value={attFilter} onChange={onAttFilterChange} />
+                          <TextField select size="small" value={selectedClassId}
+                            onChange={(e) => onClassChange(e.target.value as number | "")}
+                            SelectProps={{ displayEmpty: true }}
+                            sx={{
+                              minWidth: 130,
+                              "& .MuiOutlinedInput-root": {
+                                height: 26, fontSize: "11px", fontWeight: 700, borderRadius: "6px",
+                                bgcolor: C.blueGlass, color: C.slateText,
+                                "& fieldset": { borderColor: "rgba(37,99,235,0.18)" },
+                                "&:hover fieldset": { borderColor: C.blue },
+                                "&.Mui-focused fieldset": { borderColor: C.blue },
+                              },
+                            }}
+                          >
+                            <MenuItem value="" sx={{ fontSize: "11px", fontWeight: 700, color: C.muted }}>All Classes</MenuItem>
+                            {classes.map((cls) => (
+                              <MenuItem key={cls.id} value={cls.id} sx={{ fontSize: "11px", fontWeight: 700 }}>{cls.name}</MenuItem>
+                            ))}
+                          </TextField>
+                        </Box>
+                      }
+                    />
+                    {attCardLoading ? (
+                      <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
+                          <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
+                          <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading attendance…</Typography>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                        <AttRing pct={attPct} size={140} color={attPct >= 75 ? C.green : C.amber} gradId="adminAttGrad" />
+                        <Grid container spacing={1.5} sx={{ flex: 1, minWidth: 160 }}>
+                          {[
+                            { label: "Present",  value: present,  color: C.green, bg: C.greenGlass },
+                            { label: "Absent",   value: absent,   color: C.red,   bg: C.redGlass   },
+                            { label: "Half Day", value: half_day, color: C.amber, bg: C.amberGlass },
+                            { label: "On Leave", value: leave,    color: C.blue,  bg: C.blueGlass  },
+                          ].map((item) => (
+                            <Grid item xs={6} key={item.label}>
+                              <Box sx={{ p: 1.5, bgcolor: item.bg, borderRadius: "12px", borderLeft: `3px solid ${item.color}` }}>
+                                <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, textTransform: "uppercase", display: "block", fontSize: "10px" }}>
+                                  {item.label}
+                                </Typography>
+                                <Typography variant="h5" sx={{ fontWeight: 900, color: item.color, mt: 0.3 }}>{item.value}</Typography>
+                              </Box>
+                            </Grid>
+                          ))}
+                        </Grid>
+                      </Box>
+                    )}
+                  </CardContent>
+                </GCard>
+              </Grid>
+
+              {/* Fee Collection Progress */}
+              <Grid item xs={12} md={5}>
+                <GCard sx={{ height: "100%" }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <CardHeader
+                      title="Fee Collection Progress"
+                      icon={<FeeIcon color="success" sx={{ fontSize: 20 }} />}
+                      action={
+                        <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/fees/invoices")}
+                          sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                          Collect Fee
+                        </Button>
+                      }
+                      dateFilter={
+                        <CardDateFilter value={feeFilter} onChange={onFeeFilterChange}
+                          presets={[
+                            { key: "week", label: "7 Days" },
+                            { key: "month", label: "Month" },
+                            { key: "custom", label: "Custom" },
+                          ]}
+                        />
+                      }
+                    />
+                    {feeCardLoading ? (
+                      <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
+                          <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.greenGlass}`, borderTopColor: C.green, animation: "spin 0.8s linear infinite" }} />
+                          <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading fees…</Typography>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <>
+                        <Box sx={{ mb: 2.5 }}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
+                            <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>Recovery Rate</Typography>
+                            <Typography variant="body2" sx={{ color: C.green, fontWeight: 800 }}>{feePct.toFixed(1)}%</Typography>
+                          </Box>
+                          <LinearProgress variant="determinate" value={feePct}
+                            sx={{ height: 10, borderRadius: 5, bgcolor: C.greenGlass,
+                              "& .MuiLinearProgress-bar": { background: `linear-gradient(90deg, ${C.green}, #34D399)`, borderRadius: 5 } }}
+                          />
+                        </Box>
+                        {[
+                          { label: "Total Projected",  value: fmtINR(total_fee),     color: C.slateText, icon: <TrendIcon sx={{ fontSize: 16, color: C.slateText }} /> },
+                          { label: "Total Collected",  value: fmtINR(total_paid),    color: C.green,     icon: <PresentIcon sx={{ fontSize: 16, color: C.green }} /> },
+                          { label: "Total Outstanding",value: fmtINR(total_balance), color: C.red,       icon: <WarningIcon sx={{ fontSize: 16, color: C.red }} /> },
+                        ].map((row) => (
+                          <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                              {row.icon}
+                              <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>{row.label}</Typography>
+                            </Box>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: row.color }}>{row.value}</Typography>
+                          </Box>
+                        ))}
+                      </>
+                    )}
+                  </CardContent>
+                </GCard>
+              </Grid>
+            </Grid>
+          </SortableSection>
+        );
+
+      case "leads":
+        return (
+          <SortableSection key={id} id={id}>
+            <GCard>
+              <CardContent sx={{ p: 3 }}>
+                <CardHeader
+                  title="Admissions Lead Pipeline"
+                  icon={<PersonAddIcon color="primary" sx={{ fontSize: 20 }} />}
+                  action={
+                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/admissions/leads")}
+                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                      View All
+                    </Button>
+                  }
+                />
+                <Grid container spacing={2}>
+                  {data.lead_pipeline.map((lp, i) => {
+                    const pct = totalLeads > 0 ? (lp.count / totalLeads) * 100 : 0;
+                    return (
+                      <Grid item xs={12} sm={6} md={3} key={i}>
+                        <Box sx={{
+                          p: 2, borderRadius: "14px", border: `1.5px solid ${C.border}`,
+                          transition: "all 0.22s cubic-bezier(0.16,1,0.3,1)",
+                          "&:hover": { borderColor: (lp.color_code || C.blue) + "45", bgcolor: (lp.color_code || C.blue) + "08",
+                            transform: "translateY(-2px)", boxShadow: `0 4px 16px ${lp.color_code || C.blue}12` },
+                        }}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.75 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                              <Box sx={{ color: lp.color_code || C.blue, display: "flex", alignItems: "center" }}>
+                                {getLeadIcon(lp.status)}
+                              </Box>
+                              <Typography variant="body2" sx={{ fontWeight: 700, color: lp.color_code || C.slateText, fontSize: "12px" }}>
+                                {lp.status}
+                              </Typography>
+                            </Box>
+                            <Typography variant="h5" sx={{ fontWeight: 900, color: lp.color_code || C.slateText }}>{lp.count}</Typography>
+                          </Box>
+                          <Typography variant="caption" sx={{ color: C.muted, display: "block", mb: 1 }}>
+                            {totalLeads > 0 ? `${pct.toFixed(0)}% of pipeline` : "0% of pipeline"}
+                          </Typography>
+                          <LinearProgress variant="determinate" value={pct}
+                            sx={{ height: 4, borderRadius: 2, bgcolor: "rgba(0,0,0,0.04)",
+                              "& .MuiLinearProgress-bar": { bgcolor: lp.color_code || C.blue, borderRadius: 2 } }}
+                          />
+                        </Box>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </CardContent>
+            </GCard>
+          </SortableSection>
+        );
+
+      case "quick_actions":
+        return (
+          <SortableSection key={id} id={id}>
+            <GCard>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="subtitle1"
+                  sx={{ fontWeight: 800, color: C.slateText, mb: 2.5, display: "flex", alignItems: "center", gap: 1, letterSpacing: "-0.1px" }}>
+                  <TrendIcon color="primary" sx={{ fontSize: 20 }} />
+                  Quick Administrative Actions
+                </Typography>
+                <Grid container spacing={2}>
+                  {quickActions.map((qa) => (
+                    <Grid item xs={12} sm={6} md={3} key={qa.label}>
+                      <Box onClick={() => navigate(qa.path)} sx={{
+                        display: "flex", alignItems: "center", gap: 2, p: 2,
+                        borderRadius: "14px", border: `1px solid ${C.border}`, cursor: "pointer",
+                        transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                        "&:hover": { bgcolor: qa.bg, borderColor: qa.color + "35", transform: "translateX(3px)", boxShadow: `0 4px 14px ${qa.color}12` },
+                      }}>
+                        <Avatar sx={{ bgcolor: qa.bg, color: qa.color, width: 44, height: 44, borderRadius: "12px", flexShrink: 0 }}>
+                          {qa.icon}
+                        </Avatar>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: C.slateText, lineHeight: 1.3 }}>{qa.label}</Typography>
+                          <Typography variant="caption" sx={{ color: C.muted, lineHeight: 1.3, display: "block" }}>{qa.desc}</Typography>
+                        </Box>
+                        <ArrowIcon sx={{ color: C.muted, fontSize: 18, flexShrink: 0 }} />
                       </Box>
                     </Grid>
                   ))}
                 </Grid>
-              </Box>
-            )}
-          </CardContent>
-        </GCard>
-      </Grid>
+              </CardContent>
+            </GCard>
+          </SortableSection>
+        );
 
-      <Grid item xs={12} md={5}>
-        <GCard sx={{ height: "100%" }}>
-          <CardContent sx={{ p: 3 }}>
-            <CardHeader
-              title="Fee Collection Progress"
-              icon={<FeeIcon color="success" sx={{ fontSize: 20 }} />}
-              action={
-                <Button
-                  size="small"
-                  endIcon={<ArrowIcon />}
-                  onClick={() => navigate("/fees/collect")}
-                  sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}
-                >
-                  Collect Fee
-                </Button>
-              }
-              dateFilter={
-                <CardDateFilter
-                  value={feeFilter}
-                  onChange={onFeeFilterChange}
-                  presets={[
-                    { key: "week", label: "7 Days" },
-                    { key: "month", label: "Month" },
-                    { key: "custom", label: "Custom" },
-                  ]}
-                />
-              }
-            />
-            {feeCardLoading ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
-                  <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.greenGlass}`, borderTopColor: C.green, animation: "spin 0.8s linear infinite" }} />
-                  <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading fees…</Typography>
-                </Box>
-              </Box>
-            ) : (
-              <>
-                <Box sx={{ mb: 2.5 }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
-                    <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>Recovery Rate</Typography>
-                    <Typography variant="body2" sx={{ color: C.green, fontWeight: 800 }}>{feePct.toFixed(1)}%</Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={feePct}
-                    sx={{
-                      height: 10,
-                      borderRadius: 5,
-                      bgcolor: C.greenGlass,
-                      "& .MuiLinearProgress-bar": { background: `linear-gradient(90deg, ${C.green}, #34D399)`, borderRadius: 5 },
-                    }}
-                  />
-                </Box>
-                {[
-                  { label: "Total Projected", value: fmtINR(total_fee), color: C.slateText, icon: <TrendIcon sx={{ fontSize: 16, color: C.slateText }} /> },
-                  { label: "Total Collected", value: fmtINR(total_paid), color: C.green, icon: <PresentIcon sx={{ fontSize: 16, color: C.green }} /> },
-                  { label: "Total Outstanding", value: fmtINR(total_balance), color: C.red, icon: <WarningIcon sx={{ fontSize: 16, color: C.red }} /> },
-                ].map((row) => (
-                  <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                      {row.icon}
-                      <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>{row.label}</Typography>
-                    </Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: row.color }}>{row.value}</Typography>
-                  </Box>
-                ))}
+      default:
+        return null;
+    }
+  };
+
+  const renderAdminKpi = (id: string) => {
+    switch (id) {
+      case "admin_students":
+        return (
+          <SnapCard title="Active Students" value={data.student_snapshot.active_students}
+            icon={<PeopleIcon fontSize="small" />} accentColor={C.blue} glassBg={C.blueGlass}
+            onClick={() => navigate("/students")}
+            sub={<><Sparkline color={C.blue} delay={0} /><Typography variant="caption" sx={{ color: C.green, fontWeight: 700 }}>+2.5% since last week</Typography></>}
+          />
+        );
+      case "admin_classes":
+        return (
+          <SnapCard title="Total Classes" value={data.student_snapshot.total_classes}
+            icon={<SchoolIcon fontSize="small" />} accentColor={C.purple} glassBg={C.purpleGlass}
+            sub={<><Sparkline color={C.purple} delay={0.2} /><Typography variant="caption" sx={{ color: C.green, fontWeight: 700 }}>+1.2% since last week</Typography></>}
+          />
+        );
+      case "admin_fees":
+        return (
+          <SnapCard title="Collected Fees" value={fmtINR(total_paid)}
+            icon={<MoneyIcon fontSize="small" />} accentColor={C.green} glassBg={C.greenGlass}
+            onClick={() => navigate("/fees/report")}
+            sub={
+              <><Sparkline color={C.green} delay={0.4} />
+                <Chip label={feePct >= 75 ? "On Track" : `${feePct.toFixed(0)}% Collected`} size="small"
+                  sx={{ bgcolor: feePct >= 75 ? C.greenGlass : C.amberGlass, color: feePct >= 75 ? C.green : C.amber, fontWeight: 700, height: 18, fontSize: "11px", borderRadius: "5px" }} />
               </>
-            )}
-          </CardContent>
-        </GCard>
-      </Grid>
+            }
+          />
+        );
+      case "admin_balance":
+        return (
+          <SnapCard title="Pending Balance" value={fmtINR(total_balance)}
+            icon={<WarningIcon fontSize="small" />} accentColor={C.red} glassBg={C.redGlass}
+            sub={<><Sparkline color={C.red} delay={0.6} /><Typography variant="caption" sx={{ color: total_balance > 0 ? C.red : C.green, fontWeight: 700 }}>{total_balance > 0 ? "-4.8% since last week" : "All dues cleared ✓"}</Typography></>}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
-      {/* ─ Row 4: Admissions Lead Pipeline ─ */}
+  return (
+    <Grid container spacing={3}>
+      {/* ─ Row 1: KPI snap cards — individually draggable ─ */}
       <Grid item xs={12}>
-        <GCard>
-          <CardContent sx={{ p: 3 }}>
-            <CardHeader
-              title="Admissions Lead Pipeline"
-              icon={<PersonAddIcon color="primary" sx={{ fontSize: 20 }} />}
-              action={
-                <Button
-                  size="small"
-                  endIcon={<ArrowIcon />}
-                  onClick={() => navigate("/admissions/leads")}
-                  sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}
-                >
-                  View All
-                </Button>
-              }
-            />
-            <Grid container spacing={2}>
-              {data.lead_pipeline.map((lp, i) => {
-                const pct = totalLeads > 0 ? (lp.count / totalLeads) * 100 : 0;
-                return (
-                  <Grid item xs={12} sm={6} md={3} key={i}>
-                    <Box
-                      sx={{
-                        p: 2,
-                        borderRadius: "14px",
-                        border: `1.5px solid ${C.border}`,
-                        transition: "all 0.22s cubic-bezier(0.16,1,0.3,1)",
-                        "&:hover": {
-                          borderColor: (lp.color_code || C.blue) + "45",
-                          bgcolor: (lp.color_code || C.blue) + "08",
-                          transform: "translateY(-2px)",
-                          boxShadow: `0 4px 16px ${lp.color_code || C.blue}12`,
-                        },
-                      }}
-                    >
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.75 }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                          <Box sx={{ color: lp.color_code || C.blue, display: "flex", alignItems: "center" }}>
-                            {getLeadIcon(lp.status)}
-                          </Box>
-                          <Typography
-                            variant="body2"
-                            sx={{ fontWeight: 700, color: lp.color_code || C.slateText, fontSize: "12px" }}
-                          >
-                            {lp.status}
-                          </Typography>
-                        </Box>
-                        <Typography variant="h5" sx={{ fontWeight: 900, color: lp.color_code || C.slateText }}>
-                          {lp.count}
-                        </Typography>
-                      </Box>
-                      <Typography variant="caption" sx={{ color: C.muted, display: "block", mb: 1 }}>
-                        {totalLeads > 0 ? `${pct.toFixed(0)}% of pipeline` : "0% of pipeline"}
-                      </Typography>
-                      <LinearProgress
-                        variant="determinate"
-                        value={pct}
-                        sx={{
-                          height: 4,
-                          borderRadius: 2,
-                          bgcolor: "rgba(0,0,0,0.04)",
-                          "& .MuiLinearProgress-bar": { bgcolor: lp.color_code || C.blue, borderRadius: 2 },
-                        }}
-                      />
-                    </Box>
-                  </Grid>
-                );
-              })}
-            </Grid>
-          </CardContent>
-        </GCard>
-      </Grid>
-
-      {/* ─ Row 5: Quick Administrative Actions ─ */}
-      <Grid item xs={12}>
-        <GCard>
-          <CardContent sx={{ p: 3 }}>
-            <Typography
-              variant="subtitle1"
-              sx={{ fontWeight: 800, color: C.slateText, mb: 2.5, display: "flex", alignItems: "center", gap: 1, letterSpacing: "-0.1px" }}
-            >
-              <TrendIcon color="primary" sx={{ fontSize: 20 }} />
-              Quick Administrative Actions
-            </Typography>
-            <Grid container spacing={2}>
-              {quickActions.map((qa) => (
-                <Grid item xs={12} sm={6} md={3} key={qa.label}>
-                  <Box
-                    onClick={() => navigate(qa.path)}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 2,
-                      p: 2,
-                      borderRadius: "14px",
-                      border: `1px solid ${C.border}`,
-                      cursor: "pointer",
-                      transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
-                      "&:hover": {
-                        bgcolor: qa.bg,
-                        borderColor: qa.color + "35",
-                        transform: "translateX(3px)",
-                        boxShadow: `0 4px 14px ${qa.color}12`,
-                      },
-                    }}
-                  >
-                    <Avatar sx={{ bgcolor: qa.bg, color: qa.color, width: 44, height: 44, borderRadius: "12px", flexShrink: 0 }}>
-                      {qa.icon}
-                    </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 800, color: C.slateText, lineHeight: 1.3 }}>
-                        {qa.label}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: C.muted, lineHeight: 1.3, display: "block" }}>
-                        {qa.desc}
-                      </Typography>
-                    </Box>
-                    <ArrowIcon sx={{ color: C.muted, fontSize: 18, flexShrink: 0 }} />
-                  </Box>
+        <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
+          <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
+            <Grid container spacing={3}>
+              {kpiOrder.map((id) => (
+                <Grid item xs={12} sm={6} md={3} key={id}>
+                  <SortableSection id={id}>{renderAdminKpi(id)}</SortableSection>
                 </Grid>
               ))}
             </Grid>
-          </CardContent>
-        </GCard>
+          </SortableContext>
+        </DndContext>
+      </Grid>
+
+      {/* ─ Draggable sections ─ */}
+      <Grid item xs={12}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={sectionOrder} strategy={verticalListSortingStrategy}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {sectionOrder.map((id) => renderAdminSection(id))}
+            </Box>
+          </SortableContext>
+        </DndContext>
       </Grid>
     </Grid>
   );
@@ -1309,6 +1339,9 @@ interface TeacherViewProps {
   onClassChange: (classId: number | "") => void;
 }
 
+const TEACHER_KPI_DEFAULT   = ["kpi_students", "kpi_att", "kpi_classes", "kpi_new"];
+const TEACHER_CARDS_DEFAULT = ["card_att", "card_classes", "card_notices"];
+
 const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   data,
   attFilter,
@@ -1320,293 +1353,221 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   onClassChange,
 }) => {
   const navigate = useNavigate();
+
+  // ── KPI cards — individually draggable (grid) ──────────────────────────────
+  const kpiSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const [kpiOrder, setKpiOrder] = useSectionOrder("teacher_kpi_v2", TEACHER_KPI_DEFAULT);
+  function handleKpiDrag(e: DragEndEvent) {
+    const { active, over } = e;
+    if (over && active.id !== over.id)
+      setKpiOrder(arrayMove(kpiOrder, kpiOrder.indexOf(String(active.id)), kpiOrder.indexOf(String(over.id))));
+  }
+
+  // ── Main cards — each individually draggable (vertical list) ───────────────
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const [cardOrder, setCardOrder] = useSectionOrder("teacher_cards_v2", TEACHER_CARDS_DEFAULT);
+  function handleCardDrag(e: DragEndEvent) {
+    const { active, over } = e;
+    if (over && active.id !== over.id)
+      setCardOrder(arrayMove(cardOrder, cardOrder.indexOf(String(active.id)), cardOrder.indexOf(String(over.id))));
+  }
+
+  // ── Derived stats ──────────────────────────────────────────────────────────
   const attData = attOverride ?? data.today_attendance;
   const { present, absent, half_day, leave } = attData;
-  const totalAtt = present + absent + half_day + leave;
-  const attPct = totalAtt > 0 ? ((present + half_day * 0.5) / totalAtt) * 100 : 0;
+  const totalAtt  = present + absent + half_day + leave;
+  const attPct    = totalAtt > 0 ? ((present + half_day * 0.5) / totalAtt) * 100 : 0;
 
-  const totalStudents = data.assigned_classes.reduce((a, c) => a + c.student_count, 0);
-  const totalBoys = data.assigned_classes.reduce((a, c) => a + c.boys_count, 0);
-  const totalGirls = data.assigned_classes.reduce((a, c) => a + c.girls_count, 0);
-  const newThisMonth = data.assigned_classes.reduce((a, c) => a + c.new_this_month, 0);
-  const weekAvg =
-    data.weekly_trend.length > 0
-      ? Math.round(data.weekly_trend.reduce((a, p) => a + p.present_rate, 0) / data.weekly_trend.length)
-      : 0;
+  const totalStudents  = data.assigned_classes.reduce((a, c) => a + c.student_count, 0);
+  const totalBoys      = data.assigned_classes.reduce((a, c) => a + c.boys_count, 0);
+  const totalGirls     = data.assigned_classes.reduce((a, c) => a + c.girls_count, 0);
+  const newThisMonth   = data.assigned_classes.reduce((a, c) => a + c.new_this_month, 0);
+  const totalClasses   = data.assigned_classes.length;
 
-  return (
-    <Grid container spacing={3}>
-      {/* ─ Snapshot cards ─ */}
-      <Grid item xs={12} sm={6} md={3}>
-        <SnapCard
-          title="Today's Attendance"
-          value={`${present}/${totalAtt || "—"}`}
-          icon={<AttendanceIcon fontSize="small" />}
-          accentColor={C.blue}
-          glassBg={C.blueGlass}
-          onClick={() => navigate("/attendance/mark")}
-          sub={
-            <Box sx={{ display: "flex", gap: 1.5 }}>
+  // ── KPI renderer ───────────────────────────────────────────────────────────
+  // ── KPI renderer ───────────────────────────────────────────────────────────
+  const renderKpi = (id: string) => {
+    switch (id) {
+      case "kpi_students":
+        return (
+          <SnapCard title="My Students" value={totalStudents} icon={<PeopleIcon fontSize="small" />}
+            accentColor={C.purple} glassBg={C.purpleGlass} onClick={() => navigate("/students")}
+            sub={
+              <Box sx={{ display: "flex", gap: 1.5 }}>
+                <Typography variant="caption" sx={{ color: C.blue, fontWeight: 700 }}>♂ {totalBoys}</Typography>
+                <Typography variant="caption" sx={{ color: "#EC4899", fontWeight: 700 }}>♀ {totalGirls}</Typography>
+              </Box>
+            }
+          />
+        );
+      case "kpi_att":
+        return (
+          <SnapCard title="Present Today" value={`${present}/${totalAtt || "—"}`}
+            icon={<AttendanceIcon fontSize="small" />}
+            accentColor={attPct >= 80 ? C.green : C.amber}
+            glassBg={attPct >= 80 ? C.greenGlass : C.amberGlass}
+            onClick={() => navigate("/attendance/mark")}
+            sub={
               <Typography variant="caption" sx={{ color: attPct >= 80 ? C.green : C.amber, fontWeight: 700 }}>
-                {attPct.toFixed(0)}% Present
+                {totalAtt === 0 ? "Not marked yet" : `${attPct.toFixed(0)}% attendance`}
               </Typography>
-              <Typography variant="caption" sx={{ color: C.red, fontWeight: 700 }}>
-                {absent} Absent
-              </Typography>
-            </Box>
-          }
-        />
-      </Grid>
+            }
+          />
+        );
+      case "kpi_classes":
+        return (
+          <SnapCard title="My Classes" value={totalClasses} icon={<ClassIcon fontSize="small" />}
+            accentColor={C.blue} glassBg={C.blueGlass} onClick={() => navigate("/students")}
+            sub={<Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Assigned to you</Typography>}
+          />
+        );
+      case "kpi_new":
+        return (
+          <SnapCard title="New This Month" value={newThisMonth} icon={<PersonAddIcon fontSize="small" />}
+            accentColor={C.green} glassBg={C.greenGlass}
+            sub={<Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Students enrolled</Typography>}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
-      <Grid item xs={12} sm={6} md={3}>
-        <SnapCard
-          title="My Students"
-          value={totalStudents}
-          icon={<PeopleIcon fontSize="small" />}
-          accentColor={C.purple}
-          glassBg={C.purpleGlass}
-          onClick={() => navigate("/students")}
-          sub={
-            <Box sx={{ display: "flex", gap: 1.5 }}>
-              <Typography variant="caption" sx={{ color: C.blue, fontWeight: 700 }}>♂ {totalBoys} Boys</Typography>
-              <Typography variant="caption" sx={{ color: "#EC4899", fontWeight: 700 }}>♀ {totalGirls} Girls</Typography>
-            </Box>
-          }
-        />
-      </Grid>
+  // ── Main card renderer ──────────────────────────────────────────────────────
+  const renderCard = (id: string) => {
+    switch (id) {
 
-      <Grid item xs={12} sm={6} md={3}>
-        <SnapCard
-          title="Week Avg Attendance"
-          value={`${weekAvg}%`}
-          icon={<TrendIcon fontSize="small" />}
-          accentColor={weekAvg >= 80 ? C.green : C.amber}
-          glassBg={weekAvg >= 80 ? C.greenGlass : C.amberGlass}
-          sub={
-            <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>
-              Based on last 5 school days
-            </Typography>
-          }
-        />
-      </Grid>
-
-      <Grid item xs={12} sm={6} md={3}>
-        <SnapCard
-          title="New This Month"
-          value={newThisMonth}
-          icon={<PersonAddIcon fontSize="small" />}
-          accentColor={C.green}
-          glassBg={C.greenGlass}
-          sub={
-            <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>
-              New student{newThisMonth !== 1 ? "s" : ""} enrolled
-            </Typography>
-          }
-        />
-      </Grid>
-
-      {/* ─ Attendance detail (with date filter) + Classes ─ */}
-      <Grid item xs={12} md={5}>
-        <GCard sx={{ height: "100%" }}>
-          <CardContent sx={{ p: 3 }}>
-            <CardHeader
-              title="Class Attendance"
-              icon={<AttendanceIcon color="primary" sx={{ fontSize: 20 }} />}
-              action={
-                <Button
-                  size="small"
-                  endIcon={<ArrowIcon />}
-                  onClick={() => navigate("/attendance/mark")}
-                  sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}
-                >
-                  Edit
-                </Button>
-              }
-              dateFilter={
-                <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", width: "100%" }}>
-                  <CardDateFilter
-                    value={attFilter}
-                    onChange={onAttFilterChange}
-                    presets={[
-                      { key: "today", label: "Today" },
-                      { key: "week", label: "7 Days" },
-                      { key: "custom", label: "Custom" },
-                    ]}
-                  />
-                  {classes.length > 0 && (
-                    <TextField
-                      select
-                      size="small"
-                      value={selectedClassId}
-                      onChange={(e) => onClassChange(e.target.value as number | "")}
-                      SelectProps={{
-                        displayEmpty: true,
-                      }}
-                      sx={{
-                        minWidth: 130,
-                        "& .MuiOutlinedInput-root": {
-                          height: 26,
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          borderRadius: "6px",
-                          bgcolor: C.blueGlass,
-                          color: C.slateText,
-                          "& fieldset": {
-                            borderColor: "rgba(37,99,235,0.18)",
-                          },
-                          "&:hover fieldset": {
-                            borderColor: C.blue,
-                          },
-                          "&.Mui-focused fieldset": {
-                            borderColor: C.blue,
-                          },
-                        },
-                      }}
-                    >
-                      <MenuItem value="" sx={{ fontSize: "11px", fontWeight: 700, color: C.muted }}>My Classes</MenuItem>
-                      {classes.map((cls) => (
-                        <MenuItem key={cls.id} value={cls.id} sx={{ fontSize: "11px", fontWeight: 700 }}>
-                          {cls.name}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  )}
-                </Box>
-              }
-            />
-
-            {attCardLoading ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
-                  <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
-                  <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading attendance…</Typography>
-                </Box>
-              </Box>
-            ) : totalAtt === 0 ? (
-              <Box sx={{ textAlign: "center", py: 4 }}>
-                <AttendanceIcon sx={{ fontSize: 48, color: C.muted, mb: 1 }} />
-                <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600, mb: 2 }}>
-                  No attendance marked for this period.
-                </Typography>
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={() => navigate("/attendance/mark")}
-                  sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 700, bgcolor: C.blue }}
-                >
-                  Mark Now
-                </Button>
-              </Box>
-            ) : (
-              <>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 3, mb: 2.5, flexWrap: "wrap" }}>
-                  <AttRing pct={attPct} size={110} color={attPct >= 80 ? C.green : C.amber} gradId="teacherAttGrad" />
-                  <Box sx={{ flex: 1 }}>
-                    {[
-                      { label: "Present", value: present, color: C.green },
-                      { label: "Absent", value: absent, color: C.red },
-                      { label: "Half Day", value: half_day, color: C.amber },
-                      { label: "On Leave", value: leave, color: C.blue },
-                    ].map((row) => (
-                      <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.75 }}>
-                        <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>{row.label}</Typography>
-                        <Typography variant="body2" sx={{ color: row.color, fontWeight: 800 }}>{row.value}</Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                </Box>
-              </>
-            )}
-
-            {/* Absentees */}
-            {data.absentees_list.length > 0 && (
-              <>
-                <Divider sx={{ mb: 2 }} />
-                <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", display: "block", mb: 1.5 }}>
-                  Absent Students ({data.absentees_list.length})
-                </Typography>
-                <Box sx={{ maxHeight: 180, overflowY: "auto", display: "flex", flexDirection: "column", gap: 1 }}>
-                  {data.absentees_list.map((s, i) => {
-                    const colors = ["#EF4444", "#3B82F6", "#8B5CF6", "#10B981", "#F59E0B"];
-                    const bc = colors[s.student_name.charCodeAt(0) % colors.length];
-                    return (
-                      <Box
-                        key={i}
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1.5,
-                          p: 1,
-                          bgcolor: C.redGlass,
-                          borderRadius: "10px",
-                          border: `1px solid rgba(220,38,38,0.1)`,
-                          transition: "all 0.2s",
-                          "&:hover": { borderColor: "rgba(220,38,38,0.22)", transform: "translateX(2px)" },
-                        }}
-                      >
-                        <Avatar sx={{ width: 30, height: 30, bgcolor: bc, fontSize: "12px", fontWeight: 800 }}>
-                          {s.student_name.charAt(0)}
-                        </Avatar>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 700, color: C.slateText, lineHeight: 1.2 }}>{s.student_name}</Typography>
-                          <Typography variant="caption" sx={{ color: C.muted }}>{s.class_name} · {s.division_name}</Typography>
-                        </Box>
-                        {s.remarks && (
-                          <Tooltip title={s.remarks}>
-                            <Chip label="Remark" size="small" sx={{ bgcolor: C.amberGlass, color: C.amber, fontSize: "10px", fontWeight: 700, height: 18, borderRadius: "4px" }} />
-                          </Tooltip>
-                        )}
-                      </Box>
-                    );
-                  })}
-                </Box>
-              </>
-            )}
-          </CardContent>
-        </GCard>
-      </Grid>
-
-      <Grid item xs={12} md={7}>
-        <Grid container spacing={3} sx={{ height: "100%" }}>
-          {/* My Assigned Classes */}
-          <Grid item xs={12}>
+      // ── Attendance ─────────────────────────────────────────────────────────
+      case "card_att":
+        return (
+          <SortableSection key={id} id={id}>
             <GCard>
               <CardContent sx={{ p: 3 }}>
-                <CardHeader title="My Assigned Classes" icon={<ClassIcon color="primary" sx={{ fontSize: 20 }} />} />
-                {data.assigned_classes.length === 0 ? (
-                  <Typography variant="body2" sx={{ color: C.muted }}>No assigned classes. Contact administration.</Typography>
-                ) : (
-                  <Grid container spacing={1.5}>
-                    {data.assigned_classes.map((cls, i) => (
-                      <Grid item xs={12} sm={6} key={i}>
-                        <Box
+                <CardHeader
+                  title="Today's Attendance"
+                  icon={<AttendanceIcon color="primary" sx={{ fontSize: 20 }} />}
+                  action={
+                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/attendance/mark")}
+                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                      Mark Attendance
+                    </Button>
+                  }
+                  dateFilter={
+                    <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                      <CardDateFilter value={attFilter} onChange={onAttFilterChange}
+                        presets={[
+                          { key: "today",  label: "Today"  },
+                          { key: "week",   label: "7 Days" },
+                          { key: "custom", label: "Custom" },
+                        ]}
+                      />
+                      {classes.length > 0 && (
+                        <TextField select size="small" value={selectedClassId}
+                          onChange={(e) => onClassChange(e.target.value as number | "")}
+                          SelectProps={{ displayEmpty: true }}
                           sx={{
-                            p: 2,
-                            borderRadius: "12px",
-                            border: `1px solid ${C.border}`,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1.5,
-                            transition: "all 0.22s",
-                            "&:hover": { borderColor: C.blue + "35", bgcolor: C.blueGlass },
-                          }}
-                        >
-                          <Avatar sx={{ bgcolor: C.blueGlass, color: C.blue, borderRadius: "10px", width: 40, height: 40 }}>
-                            <SchoolIcon fontSize="small" />
+                            minWidth: 110,
+                            "& .MuiOutlinedInput-root": {
+                              height: 24, fontSize: "10px", fontWeight: 700, borderRadius: "6px",
+                              bgcolor: C.blueGlass, color: C.slateText,
+                              "& fieldset": { borderColor: "rgba(37,99,235,0.18)" },
+                              "&:hover fieldset": { borderColor: C.blue },
+                            },
+                          }}>
+                          <MenuItem value="" sx={{ fontSize: "11px" }}>All Classes</MenuItem>
+                          {classes.map((c) => <MenuItem key={c.id} value={c.id} sx={{ fontSize: "11px" }}>{c.name}</MenuItem>)}
+                        </TextField>
+                      )}
+                    </Box>
+                  }
+                />
+
+                {attCardLoading ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
+                    <Box sx={{ width: 32, height: 32, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
+                  </Box>
+                ) : totalAtt === 0 ? (
+                  <Box sx={{ textAlign: "center", py: 5 }}>
+                    <AttendanceIcon sx={{ fontSize: 48, color: C.muted, mb: 1.5 }} />
+                    <Typography variant="body1" sx={{ color: C.muted, fontWeight: 600, mb: 2 }}>
+                      Attendance not marked yet for today.
+                    </Typography>
+                    <Button variant="contained" onClick={() => navigate("/attendance/mark")}
+                      sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 700, bgcolor: C.blue, boxShadow: "none" }}>
+                      Mark Now
+                    </Button>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                    <AttRing pct={attPct} size={140} color={attPct >= 80 ? C.green : C.amber} gradId="teacherAttRing" />
+                    <Grid container spacing={1.5} sx={{ flex: 1, minWidth: 160 }}>
+                      {[
+                        { label: "Present",  value: present,  color: C.green, bg: C.greenGlass },
+                        { label: "Absent",   value: absent,   color: C.red,   bg: C.redGlass   },
+                        { label: "Half Day", value: half_day, color: C.amber, bg: C.amberGlass },
+                        { label: "On Leave", value: leave,    color: C.blue,  bg: C.blueGlass  },
+                      ].map((s) => (
+                        <Grid item xs={6} key={s.label}>
+                          <Box sx={{ p: 1.5, bgcolor: s.bg, borderRadius: "12px", borderLeft: `3px solid ${s.color}` }}>
+                            <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, textTransform: "uppercase", display: "block", fontSize: "10px" }}>
+                              {s.label}
+                            </Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 900, color: s.color, mt: 0.3 }}>{s.value}</Typography>
+                          </Box>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                )}
+              </CardContent>
+            </GCard>
+          </SortableSection>
+        );
+
+      // ── My Classes ─────────────────────────────────────────────────────────
+      case "card_classes":
+        return (
+          <SortableSection key={id} id={id}>
+            <GCard>
+              <CardContent sx={{ p: 3 }}>
+                <CardHeader
+                  title="My Assigned Classes"
+                  icon={<ClassIcon color="primary" sx={{ fontSize: 20 }} />}
+                  action={
+                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/students")}
+                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                      View Students
+                    </Button>
+                  }
+                />
+                {data.assigned_classes.length === 0 ? (
+                  <Box sx={{ textAlign: "center", py: 5 }}>
+                    <SchoolIcon sx={{ fontSize: 48, color: C.muted, mb: 1.5 }} />
+                    <Typography variant="body1" sx={{ color: C.muted, fontWeight: 600 }}>No classes assigned yet.</Typography>
+                  </Box>
+                ) : (
+                  <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                    {data.assigned_classes.map((cls, i) => (
+                      <Grid item xs={12} sm={6} md={4} key={i}>
+                        <Box onClick={() => navigate("/students")} sx={{
+                          display: "flex", alignItems: "center", gap: 2, p: 2,
+                          borderRadius: "14px", border: `1px solid ${C.border}`, cursor: "pointer",
+                          transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                          "&:hover": { bgcolor: C.blueGlass, borderColor: C.blue + "35", transform: "translateX(3px)", boxShadow: `0 4px 14px ${C.blue}12` },
+                        }}>
+                          <Avatar sx={{ bgcolor: C.blueGlass, color: C.blue, width: 44, height: 44, borderRadius: "12px", flexShrink: 0 }}>
+                            <SchoolIcon />
                           </Avatar>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: C.slateText }} noWrap>
+                            <Typography variant="body2" sx={{ fontWeight: 800, color: C.slateText, lineHeight: 1.3 }}>
                               {cls.class_name} — {cls.division_name}
                             </Typography>
-                            <Box sx={{ display: "flex", gap: 1.5, mt: 0.25 }}>
-                              <Typography variant="caption" sx={{ color: C.blue, fontWeight: 700 }}>{cls.student_count} Students</Typography>
-                              <Typography variant="caption" sx={{ color: C.muted }}>♂{cls.boys_count} ♀{cls.girls_count}</Typography>
-                            </Box>
+                            <Typography variant="caption" sx={{ color: C.muted, lineHeight: 1.3, display: "block" }}>
+                              {cls.student_count} students &nbsp;·&nbsp; ♂{cls.boys_count} ♀{cls.girls_count}
+                              {cls.new_this_month > 0 && ` · +${cls.new_this_month} new`}
+                            </Typography>
                           </Box>
-                          {cls.new_this_month > 0 && (
-                            <Chip label={`+${cls.new_this_month}`} size="small"
-                              sx={{ bgcolor: C.greenGlass, color: C.green, fontWeight: 700, fontSize: "10px", height: 18, borderRadius: "5px" }} />
-                          )}
+                          <ArrowIcon sx={{ color: C.muted, fontSize: 18, flexShrink: 0 }} />
                         </Box>
                       </Grid>
                     ))}
@@ -1614,136 +1575,62 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
                 )}
               </CardContent>
             </GCard>
-          </Grid>
+          </SortableSection>
+        );
 
-          {/* Weekly Trend */}
-          <Grid item xs={12}>
+      // ── Notices & Holidays ─────────────────────────────────────────────────
+      case "card_notices":
+        return (
+          <SortableSection key={id} id={id}>
             <GCard>
               <CardContent sx={{ p: 3 }}>
                 <CardHeader
-                  title="Weekly Attendance Trend"
+                  title="Recent Notices & Holidays"
+                  icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
                   action={
-                    <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>
-                      Avg: <strong style={{ color: weekAvg >= 80 ? C.green : C.amber }}>{weekAvg}%</strong>
-                    </Typography>
+                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/communication/notices")}
+                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                      View All
+                    </Button>
                   }
                 />
-                <Box sx={{ display: "flex", alignItems: "flex-end", gap: 1.5, height: 120, position: "relative" }}>
-                  {[25, 50, 75, 100].map((line) => (
-                    <Box
-                      key={line}
-                      sx={{
-                        position: "absolute",
-                        left: 0,
-                        right: 0,
-                        bottom: `${line}%`,
-                        height: 1,
-                        borderTop: "1px dashed rgba(0,0,0,0.05)",
-                        zIndex: 0,
-                      }}
-                    />
-                  ))}
-                  {data.weekly_trend.map((pt, i) => {
-                    const h = Math.max((pt.present_rate / 100) * 100, 4);
-                    const good = pt.present_rate >= 80;
-                    return (
-                      <Box key={i} sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 0.75, zIndex: 1 }}>
-                        <Typography variant="caption" sx={{ color: good ? C.green : C.amber, fontWeight: 800, fontSize: "11px" }}>
-                          {pt.present_rate > 0 ? `${pt.present_rate}%` : "—"}
-                        </Typography>
-                        <Tooltip title={`${pt.date}: ${pt.present_rate}%`}>
-                          <Box
-                            sx={{
-                              width: "100%",
-                              height: `${h}px`,
-                              borderRadius: "6px 6px 0 0",
-                              background: good ? `linear-gradient(to top, ${C.green}, #4ADE80)` : `linear-gradient(to top, ${C.amber}, #FCD34D)`,
-                              boxShadow: `0 2px 8px ${good ? C.green : C.amber}25`,
-                              animation: `riseUp 1s ease ${i * 0.08}s both`,
-                            }}
-                          />
-                        </Tooltip>
-                        <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, fontSize: "11px" }}>
-                          {pt.date}
-                        </Typography>
-                      </Box>
-                    );
-                  })}
-                </Box>
+                <NoticesCardContent notices={data.recent_notices} navigate={navigate} />
               </CardContent>
             </GCard>
-          </Grid>
-        </Grid>
+          </SortableSection>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <Grid container spacing={3}>
+      {/* ── Row 1: KPI snap cards — individually draggable ── */}
+      <Grid item xs={12}>
+        <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
+          <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
+            <Grid container spacing={3}>
+              {kpiOrder.map((id) => (
+                <Grid item xs={12} sm={6} md={3} key={id}>
+                  <SortableSection id={id}>{renderKpi(id)}</SortableSection>
+                </Grid>
+              ))}
+            </Grid>
+          </SortableContext>
+        </DndContext>
       </Grid>
 
-      {/* ─ Quick Mark CTA + Notices ─ */}
-      <Grid item xs={12} md={4}>
-        <Card
-          elevation={0}
-          sx={{
-            borderRadius: "20px",
-            background: `linear-gradient(135deg, ${C.blue} 0%, ${C.blueDark} 100%)`,
-            color: "#fff",
-            overflow: "hidden",
-            position: "relative",
-            boxShadow: "0 12px 30px -10px rgba(37,99,235,0.4)",
-            "&::before": {
-              content: '""',
-              position: "absolute",
-              top: -50,
-              right: -50,
-              width: 180,
-              height: 180,
-              borderRadius: "50%",
-              background: "rgba(255,255,255,0.07)",
-              filter: "blur(12px)",
-            },
-          }}
-        >
-          <CardContent sx={{ p: 3 }}>
-            <QuickMarkIcon sx={{ fontSize: 36, mb: 1, opacity: 0.9 }} />
-            <Typography variant="h6" sx={{ fontWeight: 900, mb: 0.5 }}>Quick Mark</Typography>
-            <Typography variant="body2" sx={{ opacity: 0.85, mb: 0.5 }}>
-              {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-            </Typography>
-            {data.assigned_classes[0] && (
-              <Typography variant="body2" sx={{ opacity: 0.8, mb: 1.5 }}>
-                {data.assigned_classes[0].class_name} — {data.assigned_classes[0].division_name}
-              </Typography>
-            )}
-            <Chip
-              label={totalAtt > 0 ? "✓ Marked Today" : "Not Marked Yet"}
-              size="small"
-              sx={{ bgcolor: totalAtt > 0 ? "rgba(74,222,128,0.25)" : "rgba(252,211,77,0.25)", color: totalAtt > 0 ? "#4ADE80" : "#FCD34D", fontWeight: 700, mb: 2, borderRadius: "6px", fontSize: "11px" }}
-            />
-            <Button
-              variant="contained"
-              endIcon={<ArrowIcon />}
-              onClick={() => navigate("/attendance/mark")}
-              sx={{ bgcolor: "#fff", color: C.blue, fontWeight: 800, borderRadius: "10px", textTransform: "none", "&:hover": { bgcolor: "rgba(255,255,255,0.9)" } }}
-            >
-              Go to Attendance
-            </Button>
-          </CardContent>
-        </Card>
-      </Grid>
-
-      <Grid item xs={12} md={8}>
-        <GCard sx={{ height: "100%" }}>
-          <CardContent sx={{ p: 3 }}>
-            <CardHeader
-              title="Recent Notices"
-              icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
-              action={
-                <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/communication/notices")}
-                  sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
-                  View All
-                </Button>
-              }
-            />
-            <NoticesCardContent notices={data.recent_notices} navigate={navigate} />
-          </CardContent>
-        </GCard>
+      {/* ── Main cards — each individually draggable ── */}
+      <Grid item xs={12}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCardDrag}>
+          <SortableContext items={cardOrder} strategy={verticalListSortingStrategy}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {cardOrder.map((id) => renderCard(id))}
+            </Box>
+          </SortableContext>
+        </DndContext>
       </Grid>
     </Grid>
   );
