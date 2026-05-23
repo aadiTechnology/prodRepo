@@ -1,6 +1,6 @@
 """Dashboard router - Unified role-based landing stats endpoint."""
 from datetime import datetime, date, timedelta
-from typing import Optional, List
+from typing import Optional, List, cast as typing_cast
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text, func, and_, or_, case, extract, cast, Date
 from sqlalchemy.orm import Session
@@ -695,15 +695,20 @@ def _build_teacher_dashboard(
             .all()
         )
         for hw in hw_rows:
+            hw_id = typing_cast(int, hw.id)
+            hw_title = typing_cast(str, hw.title)
+            hw_status = typing_cast(Optional[str], hw.status) or "Published"
+            hw_assigned = typing_cast(Optional[date], hw.assigned_date)
+            hw_submission = typing_cast(Optional[date], hw.submission_date)
             hw_items.append(TeacherHomeworkItem(
-                id=hw.id,
-                title=hw.title,
+                id=hw_id,
+                title=hw_title,
                 subject_name=hw.subject.name if hw.subject else None,
                 class_name=hw.class_model.name if hw.class_model else None,
                 division_name=hw.division.division_name if hw.division else None,
-                assigned_date=hw.assigned_date.strftime("%d %b %Y") if hw.assigned_date else None,
-                submission_date=hw.submission_date.strftime("%d %b %Y") if hw.submission_date else None,
-                status=hw.status or "Published",
+                assigned_date=hw_assigned.strftime("%d %b %Y") if hw_assigned else None,
+                submission_date=hw_submission.strftime("%d %b %Y") if hw_submission else None,
+                status=hw_status,
             ))
     except Exception as e:
         logger.warning(f"Homework fetch error: {e}")
