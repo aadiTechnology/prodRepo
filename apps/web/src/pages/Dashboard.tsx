@@ -21,6 +21,7 @@ import {
   TableHead,
   TableRow,
   MenuItem,
+  Alert,
 } from "@mui/material";
 import {
   School as SchoolIcon,
@@ -47,6 +48,7 @@ import {
   AssignmentInd as AssignmentIndIcon,
   ContactPhone as ContactPhoneIcon,
   Assignment as HomeworkIcon,
+  MenuBook as SubjectIcon,
   PersonAdd as PersonAddIcon,
   Edit as EditIcon,
   CheckBox as QuickMarkIcon,
@@ -1342,6 +1344,25 @@ interface TeacherViewProps {
 
 const TEACHER_KPI_DEFAULT   = ["kpi_students", "kpi_att", "kpi_classes", "kpi_new"];
 const TEACHER_CARDS_DEFAULT = ["card_att", "card_classes", "card_homework", "card_notices"];
+const TEACHER_CARDS_SUBJECT = ["card_homework", "card_classes", "card_att", "card_notices"];
+
+function aggregateTeacherDivisionStats(classes: TeacherDashboardData["assigned_classes"]) {
+  const seen = new Set<string>();
+  let students = 0;
+  let boys = 0;
+  let girls = 0;
+  let newMonth = 0;
+  classes.forEach((c) => {
+    const key = `${c.class_id}-${c.division_id}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    students += c.student_count;
+    boys += c.boys_count;
+    girls += c.girls_count;
+    newMonth += c.new_this_month;
+  });
+  return { students, boys, girls, newMonth, divisions: seen.size };
+}
 
 const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   data,
@@ -1355,6 +1376,12 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
 }) => {
   const navigate = useNavigate();
 
+  const isSubjectFocused = data.dashboard_mode === "subject_focused";
+  const canMarkAttendance = data.can_mark_attendance !== false && !isSubjectFocused;
+  const subjectSlots = data.assigned_classes.filter((c) => c.designation === "Subject Teacher");
+  const classTeacherSlots = data.assigned_classes.filter((c) => c.designation === "Class Teacher");
+  const divisionStats = aggregateTeacherDivisionStats(data.assigned_classes);
+
   // ── KPI cards — individually draggable (grid) ──────────────────────────────
   const kpiSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [kpiOrder, setKpiOrder] = useSectionOrder("teacher_kpi_v2", TEACHER_KPI_DEFAULT);
@@ -1366,7 +1393,10 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
 
   // ── Main cards — each individually draggable (vertical list) ───────────────
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-  const [cardOrder, setCardOrder] = useSectionOrder("teacher_cards_v2", TEACHER_CARDS_DEFAULT);
+  const [cardOrder, setCardOrder] = useSectionOrder(
+    "teacher_cards_v3",
+    isSubjectFocused ? TEACHER_CARDS_SUBJECT : TEACHER_CARDS_DEFAULT
+  );
   function handleCardDrag(e: DragEndEvent) {
     const { active, over } = e;
     if (over && active.id !== over.id)
@@ -1379,11 +1409,13 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   const totalAtt  = present + absent + half_day + leave;
   const attPct    = totalAtt > 0 ? ((present + half_day * 0.5) / totalAtt) * 100 : 0;
 
-  const totalStudents  = data.assigned_classes.reduce((a, c) => a + c.student_count, 0);
-  const totalBoys      = data.assigned_classes.reduce((a, c) => a + c.boys_count, 0);
-  const totalGirls     = data.assigned_classes.reduce((a, c) => a + c.girls_count, 0);
-  const newThisMonth   = data.assigned_classes.reduce((a, c) => a + c.new_this_month, 0);
-  const totalClasses   = data.assigned_classes.length;
+  const totalStudents  = divisionStats.students;
+  const totalBoys      = divisionStats.boys;
+  const totalGirls     = divisionStats.girls;
+  const newThisMonth   = divisionStats.newMonth;
+  const totalClasses   = isSubjectFocused
+    ? subjectSlots.length
+    : classTeacherSlots.length || divisionStats.divisions;
 
   // ── KPI renderer ───────────────────────────────────────────────────────────
   const renderKpi = (id: string) => {
@@ -1430,12 +1462,21 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
         );
       case "kpi_classes":
         return (
-          <SnapCard title="My Classes" value={totalClasses} icon={<ClassIcon fontSize="small" />}
-            accentColor={C.blue} glassBg={C.blueGlass} onClick={() => navigate("/students")}
+          <SnapCard
+            title={isSubjectFocused ? "My Subjects" : "My Classes"}
+            value={totalClasses}
+            icon={isSubjectFocused ? <SubjectIcon fontSize="small" /> : <ClassIcon fontSize="small" />}
+            accentColor={C.blue}
+            glassBg={C.blueGlass}
+            onClick={() => navigate(isSubjectFocused ? "/homework" : "/students")}
             sub={
               <>
                 <Sparkline color={C.blue} delay={0.4} />
-                <Typography variant="caption" sx={{ color: C.blue, fontWeight: 700 }}>Assigned to you</Typography>
+                <Typography variant="caption" sx={{ color: C.blue, fontWeight: 700 }}>
+                  {isSubjectFocused
+                    ? `${subjectSlots.length} subject assignment${subjectSlots.length === 1 ? "" : "s"}`
+                    : "Assigned to you"}
+                </Typography>
               </>
             }
           />
@@ -1469,13 +1510,15 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
           <GCard sx={{ height: "100%" }}>
             <CardContent sx={{ p: 2.5 }}>
               <CardHeader
-                title="Today's Attendance"
+                title={isSubjectFocused ? "Division Attendance" : "Today's Attendance"}
                 icon={<AttendanceIcon color="primary" sx={{ fontSize: 18 }} />}
                 action={
-                  <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/attendance/mark")}
-                    sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 11 }}>
-                    Mark
-                  </Button>
+                  canMarkAttendance ? (
+                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/attendance/mark")}
+                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 11 }}>
+                      Mark
+                    </Button>
+                  ) : null
                 }
                 dateFilter={
                   <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
@@ -1514,12 +1557,16 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
                 <Box sx={{ textAlign: "center", py: 3 }}>
                   <AttendanceIcon sx={{ fontSize: 36, color: C.muted, mb: 1 }} />
                   <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600, mb: 1.5, fontSize: "12px" }}>
-                    Not marked yet.
+                    {isSubjectFocused
+                      ? "Attendance not marked yet for your division."
+                      : "Not marked yet."}
                   </Typography>
-                  <Button variant="contained" size="small" onClick={() => navigate("/attendance/mark")}
-                    sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 700, bgcolor: C.blue, boxShadow: "none", fontSize: "11px" }}>
-                    Mark Now
-                  </Button>
+                  {canMarkAttendance && (
+                    <Button variant="contained" size="small" onClick={() => navigate("/attendance/mark")}
+                      sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 700, bgcolor: C.blue, boxShadow: "none", fontSize: "11px" }}>
+                      Mark Now
+                    </Button>
+                  )}
                 </Box>
               ) : (
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2.5, mt: 1 }}>
@@ -1553,44 +1600,76 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
           <GCard sx={{ height: "100%" }}>
             <CardContent sx={{ p: 2.5 }}>
               <CardHeader
-                title="My Classes"
-                icon={<ClassIcon color="primary" sx={{ fontSize: 18 }} />}
+                title={isSubjectFocused ? "My Teaching Assignments" : "My Classes"}
+                icon={isSubjectFocused ? <SubjectIcon color="primary" sx={{ fontSize: 18 }} /> : <ClassIcon color="primary" sx={{ fontSize: 18 }} />}
                 action={
-                  <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/students")}
-                    sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 11 }}>
-                    Students
+                  <Button
+                    size="small"
+                    endIcon={<ArrowIcon />}
+                    onClick={() => navigate(isSubjectFocused ? "/homework" : "/students")}
+                    sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 11 }}
+                  >
+                    {isSubjectFocused ? "Homework" : "Students"}
                   </Button>
                 }
               />
               {data.assigned_classes.length === 0 ? (
                 <Box sx={{ textAlign: "center", py: 3 }}>
                   <SchoolIcon sx={{ fontSize: 36, color: C.muted, mb: 1 }} />
-                  <Typography variant="body2" sx={{ color: C.muted, fontSize: "12px", fontWeight: 600 }}>No classes assigned.</Typography>
+                  <Typography variant="body2" sx={{ color: C.muted, fontSize: "12px", fontWeight: 600 }}>
+                    No assignments yet.
+                  </Typography>
                 </Box>
               ) : (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 1 }}>
-                  {data.assigned_classes.map((cls, i) => (
-                    <Box key={i} onClick={() => navigate("/students")} sx={{
-                      display: "flex", alignItems: "center", gap: 1.5, p: 1.25,
-                      borderRadius: "12px", border: `1px solid ${C.border}`, cursor: "pointer",
-                      transition: "all 0.2s",
-                      "&:hover": { bgcolor: C.blueGlass, borderColor: C.blue + "35", transform: "translateX(2px)" },
-                    }}>
-                      <Avatar sx={{ bgcolor: C.blueGlass, color: C.blue, width: 36, height: 36, borderRadius: "10px", flexShrink: 0 }}>
-                        <SchoolIcon sx={{ fontSize: 16 }} />
-                      </Avatar>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontWeight: 800, color: C.slateText, fontSize: "12px", lineHeight: 1.3 }}>
-                          {cls.class_name} — {cls.division_name}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: C.muted, fontSize: "10px" }}>
-                          {cls.student_count} students · ♂{cls.boys_count} ♀{cls.girls_count}
-                          {cls.new_this_month > 0 && ` · +${cls.new_this_month} new`}
-                        </Typography>
+                  {data.assigned_classes.map((cls, i) => {
+                    const isClassTeacher = cls.designation === "Class Teacher";
+                    const accent = isClassTeacher ? C.green : C.purple;
+                    const accentGlass = isClassTeacher ? C.greenGlass : C.purpleGlass;
+                    return (
+                      <Box
+                        key={`${cls.class_id}-${cls.division_id}-${cls.subject_id ?? "ct"}-${i}`}
+                        onClick={() => navigate(isClassTeacher ? "/students" : "/homework")}
+                        sx={{
+                          display: "flex", alignItems: "center", gap: 1.5, p: 1.25,
+                          borderRadius: "12px", border: `1px solid ${C.border}`, cursor: "pointer",
+                          transition: "all 0.2s",
+                          "&:hover": { bgcolor: accentGlass, borderColor: accent + "35", transform: "translateX(2px)" },
+                        }}
+                      >
+                        <Avatar sx={{ bgcolor: accentGlass, color: accent, width: 36, height: 36, borderRadius: "10px", flexShrink: 0 }}>
+                          {isClassTeacher ? <SchoolIcon sx={{ fontSize: 16 }} /> : <SubjectIcon sx={{ fontSize: 16 }} />}
+                        </Avatar>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+                            <Typography sx={{ fontWeight: 800, color: C.slateText, fontSize: "12px", lineHeight: 1.3 }}>
+                              {cls.class_name} — {cls.division_name}
+                            </Typography>
+                            <Chip
+                              label={cls.designation || "Class Teacher"}
+                              size="small"
+                              sx={{
+                                height: 18,
+                                fontSize: "9px",
+                                fontWeight: 800,
+                                bgcolor: accentGlass,
+                                color: accent,
+                              }}
+                            />
+                          </Box>
+                          <Typography variant="caption" sx={{ color: C.muted, fontSize: "10px", display: "block" }}>
+                            {cls.subject_name
+                              ? `Subject: ${cls.subject_name}`
+                              : "All subjects (class in-charge)"}
+                            {" · "}
+                            {cls.student_count} students · ♂{cls.boys_count} ♀{cls.girls_count}
+                            {cls.new_this_month > 0 && ` · +${cls.new_this_month} new`}
+                          </Typography>
+                        </Box>
+                        <ArrowIcon sx={{ color: C.muted, fontSize: 15, flexShrink: 0 }} />
                       </Box>
-                      <ArrowIcon sx={{ color: C.muted, fontSize: 15, flexShrink: 0 }} />
-                    </Box>
-                  ))}
+                    );
+                  })}
                 </Box>
               )}
             </CardContent>
@@ -1604,7 +1683,7 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
           <GCard>
             <CardContent sx={{ p: 3 }}>
               <CardHeader
-                title="Homework"
+                title={isSubjectFocused ? "My Subject Homework" : "Homework"}
                 icon={<HomeworkIcon color="primary" sx={{ fontSize: 20 }} />}
                 action={
                   <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/homework/assign")}
@@ -1712,6 +1791,23 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
 
   return (
     <Grid container spacing={3}>
+      {isSubjectFocused && (
+        <Grid item xs={12}>
+          <Alert severity="info" sx={{ borderRadius: "12px", fontSize: "0.85rem" }}>
+            You are logged in as a <strong>subject teacher</strong>. Homework and assignments are scoped to your
+            subjects. When you are assigned as a <strong>class teacher</strong>, this dashboard expands automatically
+            (all subjects, attendance marking, and full class view).
+          </Alert>
+        </Grid>
+      )}
+      {!isSubjectFocused && classTeacherSlots.length > 0 && subjectSlots.length > 0 && (
+        <Grid item xs={12}>
+          <Alert severity="success" sx={{ borderRadius: "12px", fontSize: "0.85rem" }}>
+            You have both <strong>class teacher</strong> and <strong>subject teacher</strong> roles. Class in-charge
+            divisions show all subjects; subject rows are limited to that subject.
+          </Alert>
+        </Grid>
+      )}
       {/* ── Row 1: KPI snap cards — individually draggable ── */}
       <Grid item xs={12}>
         <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>

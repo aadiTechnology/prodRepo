@@ -58,6 +58,9 @@ export interface AssignedClassInfo {
   boys_count: number;
   girls_count: number;
   new_this_month: number;
+  designation?: string;
+  subject_id?: number | null;
+  subject_name?: string | null;
 }
 
 export interface AbsenteeDetail {
@@ -91,6 +94,10 @@ export interface TeacherDashboardData {
   weekly_trend: WeeklyTrendPoint[];
   recent_notices: RecentNoticeItem[];
   recent_homework: TeacherHomeworkItem[];
+  dashboard_mode?: "full" | "subject_focused";
+  class_teacher_slot_count?: number;
+  subject_teacher_slot_count?: number;
+  can_mark_attendance?: boolean;
 }
 
 export interface StudentProfileInfo {

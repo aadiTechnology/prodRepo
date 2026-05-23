@@ -1,6 +1,6 @@
 """Dashboard router - Unified role-based landing stats endpoint."""
 from datetime import datetime, date, timedelta
-from typing import Optional, List, cast as typing_cast
+from typing import Any, Optional, List, cast as typing_cast
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text, func, and_, or_, case, extract, cast, Date
 from sqlalchemy.orm import Session
@@ -17,6 +17,8 @@ from app.models.student_invoice import StudentInvoice
 from app.models.notice import Notice
 from app.models.holiday import Holiday
 from app.models.homework import Homework
+from app.repositories.homework_repository import _build_class_division_scope_filter
+from app.services.homework_access import resolve_teacher_assignment_scopes
 from app.models.lead import Lead, LeadStatus
 from app.models.academic import SchoolClass, ClassDivision
 
@@ -223,26 +225,26 @@ def get_attendance_card(
             if not teacher:
                 return overview
 
-            assigned_pairs = []
-            if teacher.class_id is not None and teacher.class_division_id is not None:
-                assigned_pairs.append((teacher.class_id, teacher.class_division_id))
-            try:
-                from app.services.teacher_assignment_service import _ensure_teacher_assignments_table
-                _ensure_teacher_assignments_table(db)
-                dyn = db.execute(
-                    text("""
-                        SELECT class_id, class_division_id
-                        FROM teacher_assignments
-                        WHERE teacher_id = :tid AND tenant_id = :ten AND is_active = 1
-                    """),
-                    {"tid": teacher.id, "ten": tenant_id},
-                ).fetchall()
-                for row in dyn:
-                    assigned_pairs.append((row[0], row[1]))
-            except Exception as e:
-                logger.warning(f"Dynamic assignments error: {e}")
+            assignment_rows = _fetch_teacher_assignment_rows(
+                db, tenant_id, int(teacher.id)  # type: ignore[arg-type]
+            )
+            if (
+                not assignment_rows
+                and teacher.class_id is not None
+                and teacher.class_division_id is not None
+            ):
+                assignment_rows.append(_legacy_teacher_assignment_row(teacher))
 
-            assigned_pairs = list(set(assigned_pairs))
+            class_teacher_pairs: set[tuple[int, int]] = set()
+            all_division_pairs: set[tuple[int, int]] = set()
+            for row in assignment_rows:
+                cid = int(row["class_id"])
+                did = int(row["class_division_id"])
+                all_division_pairs.add((cid, did))
+                if row.get("subject_id") is None:
+                    class_teacher_pairs.add((cid, did))
+
+            assigned_pairs = list(class_teacher_pairs) if class_teacher_pairs else list(all_division_pairs)
             if not assigned_pairs:
                 return overview
 
@@ -503,6 +505,108 @@ def _build_admin_dashboard(
     )
     return DashboardResponse(role=role_str, data=admin_data)
 
+def _legacy_teacher_assignment_row(teacher: Teacher) -> dict[str, Any]:
+    return {
+        "class_id": int(teacher.class_id),  # type: ignore[arg-type]
+        "class_division_id": int(teacher.class_division_id),  # type: ignore[arg-type]
+        "subject_id": None,
+        "subject_name": None,
+    }
+
+
+def _fetch_teacher_assignment_rows(
+    db: Session,
+    tenant_id: int,
+    teacher_id: int,
+) -> list[dict[str, Any]]:
+    from app.services.teacher_assignment_service import _ensure_teacher_assignments_table
+
+    rows: list[dict[str, Any]] = []
+    try:
+        _ensure_teacher_assignments_table(db)
+        db_rows = db.execute(
+            text(
+                """
+                SELECT
+                    ta.class_id,
+                    ta.class_division_id,
+                    ta.subject_id,
+                    s.name AS subject_name
+                FROM teacher_assignments ta
+                LEFT JOIN subjects s ON s.id = ta.subject_id AND s.is_deleted = 0
+                WHERE ta.teacher_id = :tid
+                  AND ta.tenant_id = :ten
+                  AND ta.is_active = 1
+                  AND ta.class_id IS NOT NULL
+                  AND ta.class_division_id IS NOT NULL
+                ORDER BY ta.class_id, ta.class_division_id, ta.subject_id
+                """
+            ),
+            {"tid": teacher_id, "ten": tenant_id},
+        ).mappings().all()
+        rows = [dict(row) for row in db_rows]
+    except Exception as e:
+        logger.warning(f"Dynamic assignments error: {e}")
+    return rows
+
+
+def _build_teacher_assigned_infos(
+    db: Session,
+    tenant_id: int,
+    today: date,
+    assignment_rows: list[dict[str, Any]],
+) -> list[AssignedClassInfo]:
+    assigned_infos: list[AssignedClassInfo] = []
+    seen_keys: set[tuple] = set()
+
+    for row in assignment_rows:
+        cid = int(row["class_id"])
+        did = int(row["class_division_id"])
+        subject_raw = row.get("subject_id")
+        subject_id = int(subject_raw) if subject_raw is not None else None
+        slot_key = (cid, did, subject_id)
+        if slot_key in seen_keys:
+            continue
+        seen_keys.add(slot_key)
+
+        cls = db.query(SchoolClass).filter(SchoolClass.id == cid).first()
+        div = db.query(ClassDivision).filter(ClassDivision.id == did).first()
+        if not (cls and div):
+            continue
+
+        stu_count = (
+            db.query(func.count(Student.id))
+            .filter(Student.tenant_id == tenant_id)
+            .filter(Student.class_id == cid)
+            .filter(Student.class_division_id == did)
+            .filter(Student.is_active == True)
+            .scalar()
+            or 0
+        )
+        boys, girls, new_month = _class_gender_counts(db, tenant_id, cid, did, today)
+        designation = "Class Teacher" if subject_id is None else "Subject Teacher"
+        subject_name = row.get("subject_name")
+        if subject_id is not None and subject_name is not None:
+            subject_name = str(subject_name)
+
+        assigned_infos.append(
+            AssignedClassInfo(
+                class_id=cid,
+                class_name=str(cls.name) if cls.name is not None else "Unknown",
+                division_id=did,
+                division_name=str(div.division_name) if div.division_name is not None else "Unknown",
+                student_count=stu_count,
+                boys_count=boys,
+                girls_count=girls,
+                new_this_month=new_month,
+                designation=designation,
+                subject_id=subject_id,
+                subject_name=subject_name if subject_id is not None else None,
+            )
+        )
+    return assigned_infos
+
+
 def _build_teacher_dashboard(
     db: Session,
     tenant_id: int,
@@ -528,66 +632,45 @@ def _build_teacher_dashboard(
                 absentees_list=[],
                 weekly_trend=[WeeklyTrendPoint(date="Mon", present_rate=100.0)],
                 recent_notices=_fetch_recent_notices(db, tenant_id),
+                dashboard_mode="subject_focused",
+                can_mark_attendance=False,
             ),
         )
 
-    # Gather assigned class-division pairs
-    assigned_pairs = []
-    if teacher.class_id is not None and teacher.class_division_id is not None:
-        assigned_pairs.append((teacher.class_id, teacher.class_division_id))
+    teacher_id = int(teacher.id)  # type: ignore[arg-type]
+    assignment_rows = list(_fetch_teacher_assignment_rows(db, tenant_id, teacher_id))
 
-    from app.services.teacher_assignment_service import _ensure_teacher_assignments_table
-    try:
-        _ensure_teacher_assignments_table(db)
-        dyn = db.execute(
-            text("""
-                SELECT class_id, class_division_id
-                FROM teacher_assignments
-                WHERE teacher_id = :tid AND tenant_id = :ten AND is_active = 1
-            """),
-            {"tid": teacher.id, "ten": tenant_id},
-        ).fetchall()
-        for row in dyn:
-            assigned_pairs.append((row[0], row[1]))
-    except Exception as e:
-        logger.warning(f"Dynamic assignments error: {e}")
+    # Legacy fallback when no rows in teacher_assignments
+    if not assignment_rows and teacher.class_id is not None and teacher.class_division_id is not None:
+        assignment_rows.append(_legacy_teacher_assignment_row(teacher))
 
-    assigned_pairs = list(set(assigned_pairs))
+    class_teacher_pairs: set[tuple[int, int]] = set()
+    all_division_pairs: set[tuple[int, int]] = set()
+    for row in assignment_rows:
+        cid = int(row["class_id"])
+        did = int(row["class_division_id"])
+        all_division_pairs.add((cid, did))
+        if row.get("subject_id") is None:
+            class_teacher_pairs.add((cid, did))
 
-    # Build assigned class info list with gender + new-enrolment counts
-    assigned_infos = []
-    for cid, did in assigned_pairs:
-        cls = db.query(SchoolClass).filter(SchoolClass.id == cid).first()
-        div = db.query(ClassDivision).filter(ClassDivision.id == did).first()
-        if not (cls and div):
-            continue
-        stu_count = (
-            db.query(func.count(Student.id))
-            .filter(Student.tenant_id == tenant_id)
-            .filter(Student.class_id == cid)
-            .filter(Student.class_division_id == did)
-            .filter(Student.is_active == True)
-            .scalar() or 0
-        )
-        boys, girls, new_month = _class_gender_counts(db, tenant_id, cid, did, today)
-        assigned_infos.append(AssignedClassInfo(
-            class_id=cid,
-            class_name=str(cls.name) if cls.name is not None else "Unknown",
-            division_id=did,
-            division_name=str(div.division_name) if div.division_name is not None else "Unknown",
-            student_count=stu_count,
-            boys_count=boys,
-            girls_count=girls,
-            new_this_month=new_month,
-        ))
+    has_class_teacher_role = len(class_teacher_pairs) > 0
+    dashboard_mode = "full" if has_class_teacher_role else "subject_focused"
+    can_mark_attendance = has_class_teacher_role
+
+    assigned_infos = _build_teacher_assigned_infos(db, tenant_id, today, assignment_rows)
+    class_teacher_slot_count = sum(1 for i in assigned_infos if i.designation == "Class Teacher")
+    subject_teacher_slot_count = sum(1 for i in assigned_infos if i.designation == "Subject Teacher")
+
+    # Attendance: class teachers use homeroom divisions; subject-only teachers see their divisions (read-only)
+    attendance_pairs = list(class_teacher_pairs) if class_teacher_pairs else list(all_division_pairs)
 
     # Attendance for assigned classes — section-specific date range
     att_counts = []
     absentees = []
-    if assigned_pairs:
+    if attendance_pairs:
         clauses = [
             and_(StudentAttendance.class_id == cid, StudentAttendance.class_division_id == did)
-            for cid, did in assigned_pairs
+            for cid, did in attendance_pairs
         ]
         base_att = (
             db.query(StudentAttendance.status, func.count(StudentAttendance.id))
@@ -657,10 +740,10 @@ def _build_teacher_dashboard(
     weekly_points = []
     for i in range(4, -1, -1):
         day = today - timedelta(days=i)
-        if assigned_pairs:
+        if attendance_pairs:
             clauses = [
                 and_(StudentAttendance.class_id == cid, StudentAttendance.class_division_id == did)
-                for cid, did in assigned_pairs
+                for cid, did in attendance_pairs
             ]
             row = (
                 db.query(
@@ -682,18 +765,23 @@ def _build_teacher_dashboard(
             rate = 0.0
         weekly_points.append(WeeklyTrendPoint(date=day.strftime("%a"), present_rate=round(rate, 1)))
 
-    # Recent homework assigned by this teacher (latest 8, any status except deleted)
+    # Homework visible to teacher (class teacher = all subjects; subject teacher = their subjects)
     hw_items: list[TeacherHomeworkItem] = []
     try:
-        hw_rows = (
+        hw_scopes = resolve_teacher_assignment_scopes(
+            db, tenant_id=tenant_id, teacher_id=teacher_id
+        )
+        hw_query = (
             db.query(Homework)
-            .filter(Homework.teacher_id == teacher.id)
             .filter(Homework.tenant_id == tenant_id)
             .filter(Homework.is_deleted == False)
-            .order_by(Homework.assigned_date.desc())
-            .limit(8)
-            .all()
         )
+        if hw_scopes:
+            hw_query = hw_query.filter(_build_class_division_scope_filter(hw_scopes))
+        else:
+            hw_query = hw_query.filter(Homework.teacher_id == teacher_id)
+
+        hw_rows = hw_query.order_by(Homework.assigned_date.desc()).limit(8).all()
         for hw in hw_rows:
             hw_id = typing_cast(int, hw.id)
             hw_title = typing_cast(str, hw.title)
@@ -720,6 +808,10 @@ def _build_teacher_dashboard(
         weekly_trend=weekly_points,
         recent_notices=_fetch_recent_notices(db, tenant_id, limit=5),
         recent_homework=hw_items,
+        dashboard_mode=dashboard_mode,
+        class_teacher_slot_count=class_teacher_slot_count,
+        subject_teacher_slot_count=subject_teacher_slot_count,
+        can_mark_attendance=can_mark_attendance,
     )
     return DashboardResponse(role=role_str, data=teacher_data)
 

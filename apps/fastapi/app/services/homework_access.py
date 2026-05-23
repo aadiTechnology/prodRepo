@@ -67,7 +67,7 @@ def is_admin_like(db: Session, user_id: int, legacy_role: object, tenant_id: int
     return bool(_role_tokens(db, user_id, legacy_role) & ADMIN_ROLE_TOKENS)
 
 
-def _resolve_teacher_assignment_scopes(
+def resolve_teacher_assignment_scopes(
     db: Session,
     *,
     tenant_id: int,
@@ -249,7 +249,7 @@ def resolve_homework_viewer_context(
     teacher_id: Optional[int],
 ) -> HomeworkViewerContext:
     if teacher_id is not None:
-        scopes = _resolve_teacher_assignment_scopes(
+        scopes = resolve_teacher_assignment_scopes(
             db, tenant_id=tenant_id, teacher_id=teacher_id
         )
         return HomeworkViewerContext(kind="teacher", scopes=scopes, published_only=False)

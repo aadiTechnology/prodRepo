@@ -1,6 +1,7 @@
 """Dashboard response schemas."""
+from typing import Annotated, List, Literal, Optional, Union
+
 from pydantic import BaseModel, Field
-from typing import Optional, List, Union
 
 class AttendanceOverview(BaseModel):
     """Attendance statistics overview."""
@@ -45,6 +46,7 @@ class RecentNoticeItem(BaseModel):
 
 class AdminDashboardResponse(BaseModel):
     """Unified dashboard data for SYSTEM_ADMIN and TENANT_ADMIN."""
+    kind: Literal["admin"] = "admin"
     attendance_overview: AttendanceOverview
     lead_pipeline: List[LeadStatusCount] = Field(default_factory=list)
     fee_collection: FeeCollectionSummary
@@ -61,6 +63,9 @@ class AssignedClassInfo(BaseModel):
     boys_count: int = Field(default=0)
     girls_count: int = Field(default=0)
     new_this_month: int = Field(default=0)
+    designation: str = "Class Teacher"
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
 
 class AbsenteeDetail(BaseModel):
     """Detail of a student who is marked absent today."""
@@ -88,12 +93,18 @@ class TeacherHomeworkItem(BaseModel):
 
 class TeacherDashboardResponse(BaseModel):
     """Dashboard statistics and action lists tailored for teachers."""
+    kind: Literal["teacher"] = "teacher"
     assigned_classes: List[AssignedClassInfo] = Field(default_factory=list)
     today_attendance: AttendanceOverview
     absentees_list: List[AbsenteeDetail] = Field(default_factory=list)
     weekly_trend: List[WeeklyTrendPoint] = Field(default_factory=list)
     recent_notices: List[RecentNoticeItem] = Field(default_factory=list)
     recent_homework: List[TeacherHomeworkItem] = Field(default_factory=list)
+    # full = at least one class-teacher assignment; subject_focused = subject-teacher only
+    dashboard_mode: str = "full"
+    class_teacher_slot_count: int = 0
+    subject_teacher_slot_count: int = 0
+    can_mark_attendance: bool = True
 
 class StudentProfileInfo(BaseModel):
     """Student identity profile info."""
@@ -131,6 +142,7 @@ class StudentHomeworkSummary(BaseModel):
 
 class StudentDashboardResponse(BaseModel):
     """Unified profile, academic, and financial dashboard for students."""
+    kind: Literal["student"] = "student"
     profile: StudentProfileInfo
     attendance: StudentAttendanceSummary
     fee_status: StudentFeeStatus
@@ -138,7 +150,13 @@ class StudentDashboardResponse(BaseModel):
     homework: StudentHomeworkSummary = Field(default_factory=StudentHomeworkSummary)
     recent_notices: List[RecentNoticeItem] = Field(default_factory=list)
 
+DashboardDataUnion = Annotated[
+    Union[AdminDashboardResponse, TeacherDashboardResponse, StudentDashboardResponse],
+    Field(discriminator="kind"),
+]
+
+
 class DashboardResponse(BaseModel):
     """Wrapper response model from GET /api/dashboard/me."""
     role: str  # "SYSTEM_ADMIN", "TENANT_ADMIN", "TEACHER", "STUDENT"
-    data: Union[AdminDashboardResponse, TeacherDashboardResponse, StudentDashboardResponse, None] = None
+    data: DashboardDataUnion | None = None
