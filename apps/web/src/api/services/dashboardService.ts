@@ -36,6 +36,7 @@ export interface RecentNoticeItem {
   id: number;
   title: string;
   notice_type: string;
+  item_type?: string;  // "notice" | "holiday"
   published_at: string | null;
   priority: string | null;
 }

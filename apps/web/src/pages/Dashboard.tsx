@@ -360,10 +360,23 @@ const Sparkline: React.FC<{ color: string; delay?: number }> = ({ color, delay =
 // ─── Notice type legend components (reusable) ────────────────────────────────
 const NOTICE_TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
   holiday:      { label: "Holiday",      color: "#D97706", bg: "rgba(217,119,6,0.1)"      },
+  general:      { label: "General",      color: C.blue,    bg: C.blueGlass                },
   notice:       { label: "Notice",       color: C.blue,    bg: C.blueGlass                },
-  announcement: { label: "Announcement", color: C.purple,  bg: C.purpleGlass              },
+  announcement: { label: "Announcement", color: C.blue,    bg: C.blueGlass                },
   event:        { label: "Event",        color: C.green,   bg: C.greenGlass               },
+  exam:         { label: "Exam",         color: C.purple,  bg: C.purpleGlass              },
+  fee:          { label: "Fee",          color: C.red,     bg: C.redGlass                 },
 };
+
+// Filter definitions for the notices card
+const NOTICE_FILTER_TABS: Array<{ key: string; label: string }> = [
+  { key: "all",     label: "All"     },
+  { key: "holiday", label: "Holiday" },
+  { key: "event",   label: "Event"   },
+  { key: "exam",    label: "Exam"    },
+  { key: "fee",     label: "Fee"     },
+  { key: "general", label: "General" },
+];
 
 const NoticeTypeBadge: React.FC<{ type: string }> = ({ type }) => {
   const key = (type || "notice").toLowerCase();
@@ -441,7 +454,7 @@ const NoticesTable: React.FC<{ notices: RecentNoticeItem[]; navigate: ReturnType
         </TableHead>
         <TableBody>
           {notices.map((n) => (
-            <TableRow key={n.id} sx={{ "& td": { borderBottom: `1px solid ${C.border}`, py: 1.2 }, "&:last-child td": { borderBottom: 0 } }}>
+            <TableRow key={`${n.item_type ?? "notice"}_${n.id}`} sx={{ "& td": { borderBottom: `1px solid ${C.border}`, py: 1.2 }, "&:last-child td": { borderBottom: 0 } }}>
               <TableCell>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: C.slateText, maxWidth: 200 }} noWrap>
                   {n.title}
@@ -473,6 +486,71 @@ const NoticesTable: React.FC<{ notices: RecentNoticeItem[]; navigate: ReturnType
           ))}
         </TableBody>
       </Table>
+    </>
+  );
+};
+
+// ─── Notices card content with type filter (reusable across all role views) ──
+const NoticesCardContent: React.FC<{
+  notices: RecentNoticeItem[];
+  navigate: ReturnType<typeof useNavigate>;
+}> = ({ notices, navigate }) => {
+  const [activeFilter, setActiveFilter] = React.useState("all");
+
+  // Only show tabs for types that actually exist in the data, plus "All"
+  const presentTypes = React.useMemo(
+    () => new Set(notices.map((n) => (n.notice_type || "general").toLowerCase())),
+    [notices]
+  );
+  const visibleTabs = NOTICE_FILTER_TABS.filter(
+    (t) => t.key === "all" || presentTypes.has(t.key)
+  );
+
+  const filtered =
+    activeFilter === "all"
+      ? notices
+      : notices.filter((n) => (n.notice_type || "general").toLowerCase() === activeFilter);
+
+  return (
+    <>
+      {/* Type filter chips */}
+      {visibleTabs.length > 1 && (
+        <Box sx={{ display: "flex", gap: 0.75, mb: 2, flexWrap: "wrap" }}>
+          {visibleTabs.map((tab) => {
+            const meta = NOTICE_TYPE_META[tab.key];
+            const isActive = activeFilter === tab.key;
+            const activeColor = meta?.color ?? C.blue;
+            return (
+              <Chip
+                key={tab.key}
+                label={tab.key === "holiday" ? `🏖 ${tab.label}` : tab.label}
+                size="small"
+                onClick={() => setActiveFilter(tab.key)}
+                sx={{
+                  height: 24,
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  borderRadius: "7px",
+                  cursor: "pointer",
+                  bgcolor: isActive ? activeColor : "transparent",
+                  color: isActive ? "#fff" : C.muted,
+                  border: `1.5px solid ${isActive ? activeColor : C.border}`,
+                  transition: "all 0.2s",
+                  "&:hover": {
+                    bgcolor: isActive ? activeColor : meta?.bg ?? C.blueGlass,
+                    color: isActive ? "#fff" : meta?.color ?? C.blue,
+                    borderColor: meta?.color ?? C.blue,
+                  },
+                }}
+              />
+            );
+          })}
+          <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600, alignSelf: "center", ml: 0.5 }}>
+            {filtered.length} item{filtered.length !== 1 ? "s" : ""}
+          </Typography>
+        </Box>
+      )}
+      <NoticesTable notices={filtered} navigate={navigate} />
     </>
   );
 };
@@ -915,7 +993,7 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
                 </Button>
               }
             />
-            <NoticesTable notices={data.recent_notices} navigate={navigate} />
+            <NoticesCardContent notices={data.recent_notices} navigate={navigate} />
           </CardContent>
         </GCard>
       </Grid>
@@ -1663,7 +1741,7 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
                 </Button>
               }
             />
-            <NoticesTable notices={data.recent_notices} navigate={navigate} />
+            <NoticesCardContent notices={data.recent_notices} navigate={navigate} />
           </CardContent>
         </GCard>
       </Grid>
@@ -1921,7 +1999,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
                 </Button>
               }
             />
-            <NoticesTable notices={recent_notices} navigate={navigate} />
+            <NoticesCardContent notices={recent_notices} navigate={navigate} />
           </CardContent>
         </GCard>
       </Grid>

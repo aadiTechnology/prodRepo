@@ -35,10 +35,11 @@ class StudentSnapshot(BaseModel):
     class_breakdown: List[ClassStudentCount] = Field(default_factory=list)
 
 class RecentNoticeItem(BaseModel):
-    """A single notice summary for dashboard display."""
+    """A single notice/holiday summary for dashboard display."""
     id: int
     title: str
     notice_type: str
+    item_type: str = "notice"  # "notice" | "holiday"
     published_at: Optional[str] = None
     priority: Optional[str] = None
 

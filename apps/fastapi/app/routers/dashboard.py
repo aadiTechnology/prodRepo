@@ -15,6 +15,7 @@ from app.models.teacher import Teacher
 from app.models.student_attendance import StudentAttendance
 from app.models.student_invoice import StudentInvoice
 from app.models.notice import Notice
+from app.models.holiday import Holiday
 from app.models.homework import Homework
 from app.models.lead import Lead, LeadStatus
 from app.models.academic import SchoolClass, ClassDivision
@@ -44,9 +45,21 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
 
-# ─── Helper: fetch recent published notices ───────────────────────────────────
-def _fetch_recent_notices(db: Session, tenant_id: int, limit: int = 5) -> List[RecentNoticeItem]:
-    """Fetch the most recent published notices for a tenant."""
+# ─── Helper: fetch recent published notices + upcoming holidays ───────────────
+def _fetch_recent_notices(db: Session, tenant_id: int, limit: int = 10) -> List[RecentNoticeItem]:
+    """Fetch the most recent published notices AND upcoming/recent holidays for a tenant."""
+
+    def _priority(notice_type: str) -> str:
+        nt = (notice_type or "").upper()
+        if any(k in nt for k in ("URGENT", "EMERGENCY", "ALERT")):
+            return "High"
+        if any(k in nt for k in ("ACADEMIC", "EXAM", "TEST")):
+            return "Medium"
+        return "Normal"
+
+    result: List[RecentNoticeItem] = []
+
+    # ── Notices ──────────────────────────────────────────────────────────────
     try:
         records = (
             db.query(Notice)
@@ -57,31 +70,61 @@ def _fetch_recent_notices(db: Session, tenant_id: int, limit: int = 5) -> List[R
             .limit(limit)
             .all()
         )
-
-        def _priority(notice_type: str) -> str:
-            nt = (notice_type or "").upper()
-            if any(k in nt for k in ("URGENT", "EMERGENCY", "ALERT")):
-                return "High"
-            if any(k in nt for k in ("ACADEMIC", "EXAM", "TEST")):
-                return "Medium"
-            return "Normal"
-
-        result = []
         for n in records:
             published_at = n.published_at  # type: ignore[assignment]
             result.append(RecentNoticeItem(
                 id=n.id,  # type: ignore[arg-type]
                 title=n.title,  # type: ignore[arg-type]
                 notice_type=n.notice_type,  # type: ignore[arg-type]
+                item_type="notice",
                 published_at=(
                     published_at.strftime("%d %b %Y") if published_at is not None else None
                 ),
                 priority=_priority(n.notice_type),  # type: ignore[arg-type]
             ))
-        return result
     except Exception as e:
         logger.warning(f"Could not fetch recent notices: {e}")
-        return []
+
+    # ── Holidays (recent 30 days + upcoming 60 days) ──────────────────────────
+    try:
+        today = date.today()
+        window_start = today - timedelta(days=30)
+        window_end = today + timedelta(days=60)
+        holidays = (
+            db.query(Holiday)
+            .filter(Holiday.tenant_id == tenant_id)
+            .filter(Holiday.is_active == True)
+            .filter(Holiday.start_date >= window_start)
+            .filter(Holiday.start_date <= window_end)
+            .order_by(Holiday.start_date.desc())
+            .limit(limit)
+            .all()
+        )
+        for h in holidays:
+            result.append(RecentNoticeItem(
+                id=h.id,  # type: ignore[arg-type]
+                title=h.holiday_name,  # type: ignore[arg-type]
+                notice_type="HOLIDAY",
+                item_type="holiday",
+                published_at=(
+                    h.start_date.strftime("%d %b %Y") if h.start_date is not None else None
+                ),
+                priority="Normal",
+            ))
+    except Exception as e:
+        logger.warning(f"Could not fetch holidays for dashboard: {e}")
+
+    # ── Merge: sort by date desc, most recent first ───────────────────────────
+    def _sort_key(item: RecentNoticeItem) -> date:
+        if item.published_at:
+            try:
+                return datetime.strptime(item.published_at, "%d %b %Y").date()
+            except Exception:
+                pass
+        return date.min
+
+    result.sort(key=_sort_key, reverse=True)
+    return result[:limit]
 
 
 # ─── Per-class gender + new-enrollment counts ─────────────────────────────────
