@@ -73,12 +73,24 @@ export interface WeeklyTrendPoint {
   present_rate: number;
 }
 
+export interface TeacherHomeworkItem {
+  id: number;
+  title: string;
+  subject_name: string | null;
+  class_name: string | null;
+  division_name: string | null;
+  assigned_date: string | null;
+  submission_date: string | null;
+  status: string;
+}
+
 export interface TeacherDashboardData {
   assigned_classes: AssignedClassInfo[];
   today_attendance: AttendanceOverview;
   absentees_list: AbsenteeDetail[];
   weekly_trend: WeeklyTrendPoint[];
   recent_notices: RecentNoticeItem[];
+  recent_homework: TeacherHomeworkItem[];
 }
 
 export interface StudentProfileInfo {

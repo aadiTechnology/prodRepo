@@ -130,7 +130,7 @@ function useSectionOrder(storageKey: string, defaultOrder: string[]): [string[],
   return [order, save];
 }
 
-const SortableSection: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
+const SortableSection: React.FC<{ id: string; children: React.ReactNode; sx?: object }> = ({ id, children, sx }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   return (
     <Box
@@ -141,6 +141,7 @@ const SortableSection: React.FC<{ id: string; children: React.ReactNode }> = ({ 
         opacity: isDragging ? 0.55 : 1,
         position: "relative",
         "&:hover .drag-handle": { opacity: 1 },
+        ...sx,
       }}
     >
       {/* Drag handle — visible on hover */}
@@ -1340,7 +1341,7 @@ interface TeacherViewProps {
 }
 
 const TEACHER_KPI_DEFAULT   = ["kpi_students", "kpi_att", "kpi_classes", "kpi_new"];
-const TEACHER_CARDS_DEFAULT = ["card_att", "card_classes", "card_notices"];
+const TEACHER_CARDS_DEFAULT = ["card_att", "card_classes", "card_homework", "card_notices"];
 
 const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   data,
@@ -1433,171 +1434,250 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
     }
   };
 
-  // ── Main card renderer ──────────────────────────────────────────────────────
-  const renderCard = (id: string) => {
+  // ── Card content renderer (SortableSection is applied in the return loop) ──
+  const renderCardContent = (id: string) => {
     switch (id) {
 
-      // ── Attendance ─────────────────────────────────────────────────────────
+      // ── Attendance (compact) ───────────────────────────────────────────────
       case "card_att":
         return (
-          <SortableSection key={id} id={id}>
-            <GCard>
-              <CardContent sx={{ p: 3 }}>
-                <CardHeader
-                  title="Today's Attendance"
-                  icon={<AttendanceIcon color="primary" sx={{ fontSize: 20 }} />}
-                  action={
-                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/attendance/mark")}
-                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
-                      Mark Attendance
-                    </Button>
-                  }
-                  dateFilter={
-                    <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                      <CardDateFilter value={attFilter} onChange={onAttFilterChange}
-                        presets={[
-                          { key: "today",  label: "Today"  },
-                          { key: "week",   label: "7 Days" },
-                          { key: "custom", label: "Custom" },
-                        ]}
-                      />
-                      {classes.length > 0 && (
-                        <TextField select size="small" value={selectedClassId}
-                          onChange={(e) => onClassChange(e.target.value as number | "")}
-                          SelectProps={{ displayEmpty: true }}
-                          sx={{
-                            minWidth: 110,
-                            "& .MuiOutlinedInput-root": {
-                              height: 24, fontSize: "10px", fontWeight: 700, borderRadius: "6px",
-                              bgcolor: C.blueGlass, color: C.slateText,
-                              "& fieldset": { borderColor: "rgba(37,99,235,0.18)" },
-                              "&:hover fieldset": { borderColor: C.blue },
-                            },
-                          }}>
-                          <MenuItem value="" sx={{ fontSize: "11px" }}>All Classes</MenuItem>
-                          {classes.map((c) => <MenuItem key={c.id} value={c.id} sx={{ fontSize: "11px" }}>{c.name}</MenuItem>)}
-                        </TextField>
-                      )}
-                    </Box>
-                  }
-                />
-
-                {attCardLoading ? (
-                  <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
-                    <Box sx={{ width: 32, height: 32, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
-                  </Box>
-                ) : totalAtt === 0 ? (
-                  <Box sx={{ textAlign: "center", py: 5 }}>
-                    <AttendanceIcon sx={{ fontSize: 48, color: C.muted, mb: 1.5 }} />
-                    <Typography variant="body1" sx={{ color: C.muted, fontWeight: 600, mb: 2 }}>
-                      Attendance not marked yet for today.
-                    </Typography>
-                    <Button variant="contained" onClick={() => navigate("/attendance/mark")}
-                      sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 700, bgcolor: C.blue, boxShadow: "none" }}>
-                      Mark Now
-                    </Button>
-                  </Box>
-                ) : (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-                    <AttRing pct={attPct} size={140} color={attPct >= 80 ? C.green : C.amber} gradId="teacherAttRing" />
-                    <Grid container spacing={1.5} sx={{ flex: 1, minWidth: 160 }}>
-                      {[
-                        { label: "Present",  value: present,  color: C.green, bg: C.greenGlass },
-                        { label: "Absent",   value: absent,   color: C.red,   bg: C.redGlass   },
-                        { label: "Half Day", value: half_day, color: C.amber, bg: C.amberGlass },
-                        { label: "On Leave", value: leave,    color: C.blue,  bg: C.blueGlass  },
-                      ].map((s) => (
-                        <Grid item xs={6} key={s.label}>
-                          <Box sx={{ p: 1.5, bgcolor: s.bg, borderRadius: "12px", borderLeft: `3px solid ${s.color}` }}>
-                            <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, textTransform: "uppercase", display: "block", fontSize: "10px" }}>
-                              {s.label}
-                            </Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 900, color: s.color, mt: 0.3 }}>{s.value}</Typography>
-                          </Box>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </Box>
-                )}
-              </CardContent>
-            </GCard>
-          </SortableSection>
-        );
-
-      // ── My Classes ─────────────────────────────────────────────────────────
-      case "card_classes":
-        return (
-          <SortableSection key={id} id={id}>
-            <GCard>
-              <CardContent sx={{ p: 3 }}>
-                <CardHeader
-                  title="My Assigned Classes"
-                  icon={<ClassIcon color="primary" sx={{ fontSize: 20 }} />}
-                  action={
-                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/students")}
-                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
-                      View Students
-                    </Button>
-                  }
-                />
-                {data.assigned_classes.length === 0 ? (
-                  <Box sx={{ textAlign: "center", py: 5 }}>
-                    <SchoolIcon sx={{ fontSize: 48, color: C.muted, mb: 1.5 }} />
-                    <Typography variant="body1" sx={{ color: C.muted, fontWeight: 600 }}>No classes assigned yet.</Typography>
-                  </Box>
-                ) : (
-                  <Grid container spacing={2} sx={{ mt: 0.5 }}>
-                    {data.assigned_classes.map((cls, i) => (
-                      <Grid item xs={12} sm={6} md={4} key={i}>
-                        <Box onClick={() => navigate("/students")} sx={{
-                          display: "flex", alignItems: "center", gap: 2, p: 2,
-                          borderRadius: "14px", border: `1px solid ${C.border}`, cursor: "pointer",
-                          transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
-                          "&:hover": { bgcolor: C.blueGlass, borderColor: C.blue + "35", transform: "translateX(3px)", boxShadow: `0 4px 14px ${C.blue}12` },
+          <GCard sx={{ height: "100%" }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <CardHeader
+                title="Today's Attendance"
+                icon={<AttendanceIcon color="primary" sx={{ fontSize: 18 }} />}
+                action={
+                  <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/attendance/mark")}
+                    sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 11 }}>
+                    Mark
+                  </Button>
+                }
+                dateFilter={
+                  <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                    <CardDateFilter value={attFilter} onChange={onAttFilterChange}
+                      presets={[
+                        { key: "today",  label: "Today"  },
+                        { key: "week",   label: "7 Days" },
+                        { key: "custom", label: "Custom" },
+                      ]}
+                    />
+                    {classes.length > 0 && (
+                      <TextField select size="small" value={selectedClassId}
+                        onChange={(e) => onClassChange(e.target.value as number | "")}
+                        SelectProps={{ displayEmpty: true }}
+                        sx={{
+                          minWidth: 105,
+                          "& .MuiOutlinedInput-root": {
+                            height: 24, fontSize: "10px", fontWeight: 700, borderRadius: "6px",
+                            bgcolor: C.blueGlass, color: C.slateText,
+                            "& fieldset": { borderColor: "rgba(37,99,235,0.18)" },
+                            "&:hover fieldset": { borderColor: C.blue },
+                          },
                         }}>
-                          <Avatar sx={{ bgcolor: C.blueGlass, color: C.blue, width: 44, height: 44, borderRadius: "12px", flexShrink: 0 }}>
-                            <SchoolIcon />
-                          </Avatar>
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 800, color: C.slateText, lineHeight: 1.3 }}>
-                              {cls.class_name} — {cls.division_name}
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: C.muted, lineHeight: 1.3, display: "block" }}>
-                              {cls.student_count} students &nbsp;·&nbsp; ♂{cls.boys_count} ♀{cls.girls_count}
-                              {cls.new_this_month > 0 && ` · +${cls.new_this_month} new`}
-                            </Typography>
-                          </Box>
-                          <ArrowIcon sx={{ color: C.muted, fontSize: 18, flexShrink: 0 }} />
+                        <MenuItem value="" sx={{ fontSize: "11px" }}>All Classes</MenuItem>
+                        {classes.map((c) => <MenuItem key={c.id} value={c.id} sx={{ fontSize: "11px" }}>{c.name}</MenuItem>)}
+                      </TextField>
+                    )}
+                  </Box>
+                }
+              />
+              {attCardLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                  <Box sx={{ width: 28, height: 28, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
+                </Box>
+              ) : totalAtt === 0 ? (
+                <Box sx={{ textAlign: "center", py: 3 }}>
+                  <AttendanceIcon sx={{ fontSize: 36, color: C.muted, mb: 1 }} />
+                  <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600, mb: 1.5, fontSize: "12px" }}>
+                    Not marked yet.
+                  </Typography>
+                  <Button variant="contained" size="small" onClick={() => navigate("/attendance/mark")}
+                    sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 700, bgcolor: C.blue, boxShadow: "none", fontSize: "11px" }}>
+                    Mark Now
+                  </Button>
+                </Box>
+              ) : (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2.5, mt: 1 }}>
+                  <AttRing pct={attPct} size={96} color={attPct >= 80 ? C.green : C.amber} gradId="teacherAttRing" />
+                  <Grid container spacing={1} sx={{ flex: 1 }}>
+                    {[
+                      { label: "Present",  value: present,  color: C.green, bg: C.greenGlass },
+                      { label: "Absent",   value: absent,   color: C.red,   bg: C.redGlass   },
+                      { label: "Half Day", value: half_day, color: C.amber, bg: C.amberGlass },
+                      { label: "On Leave", value: leave,    color: C.blue,  bg: C.blueGlass  },
+                    ].map((s) => (
+                      <Grid item xs={6} key={s.label}>
+                        <Box sx={{ p: 1, bgcolor: s.bg, borderRadius: "10px", borderLeft: `3px solid ${s.color}` }}>
+                          <Typography sx={{ fontSize: "9px", color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                            {s.label}
+                          </Typography>
+                          <Typography sx={{ fontWeight: 900, color: s.color, fontSize: "1.2rem", lineHeight: 1.2 }}>{s.value}</Typography>
                         </Box>
                       </Grid>
                     ))}
                   </Grid>
-                )}
-              </CardContent>
-            </GCard>
-          </SortableSection>
+                </Box>
+              )}
+            </CardContent>
+          </GCard>
         );
 
-      // ── Notices & Holidays ─────────────────────────────────────────────────
-      case "card_notices":
+      // ── My Classes (compact) ───────────────────────────────────────────────
+      case "card_classes":
         return (
-          <SortableSection key={id} id={id}>
-            <GCard>
-              <CardContent sx={{ p: 3 }}>
-                <CardHeader
-                  title="Recent Notices & Holidays"
-                  icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
-                  action={
-                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/communication/notices")}
-                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+          <GCard sx={{ height: "100%" }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <CardHeader
+                title="My Classes"
+                icon={<ClassIcon color="primary" sx={{ fontSize: 18 }} />}
+                action={
+                  <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/students")}
+                    sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 11 }}>
+                    Students
+                  </Button>
+                }
+              />
+              {data.assigned_classes.length === 0 ? (
+                <Box sx={{ textAlign: "center", py: 3 }}>
+                  <SchoolIcon sx={{ fontSize: 36, color: C.muted, mb: 1 }} />
+                  <Typography variant="body2" sx={{ color: C.muted, fontSize: "12px", fontWeight: 600 }}>No classes assigned.</Typography>
+                </Box>
+              ) : (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 1 }}>
+                  {data.assigned_classes.map((cls, i) => (
+                    <Box key={i} onClick={() => navigate("/students")} sx={{
+                      display: "flex", alignItems: "center", gap: 1.5, p: 1.25,
+                      borderRadius: "12px", border: `1px solid ${C.border}`, cursor: "pointer",
+                      transition: "all 0.2s",
+                      "&:hover": { bgcolor: C.blueGlass, borderColor: C.blue + "35", transform: "translateX(2px)" },
+                    }}>
+                      <Avatar sx={{ bgcolor: C.blueGlass, color: C.blue, width: 36, height: 36, borderRadius: "10px", flexShrink: 0 }}>
+                        <SchoolIcon sx={{ fontSize: 16 }} />
+                      </Avatar>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontWeight: 800, color: C.slateText, fontSize: "12px", lineHeight: 1.3 }}>
+                          {cls.class_name} — {cls.division_name}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: C.muted, fontSize: "10px" }}>
+                          {cls.student_count} students · ♂{cls.boys_count} ♀{cls.girls_count}
+                          {cls.new_this_month > 0 && ` · +${cls.new_this_month} new`}
+                        </Typography>
+                      </Box>
+                      <ArrowIcon sx={{ color: C.muted, fontSize: 15, flexShrink: 0 }} />
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </CardContent>
+          </GCard>
+        );
+
+      // ── Homework list ──────────────────────────────────────────────────────
+      case "card_homework": {
+        const hw = data.recent_homework ?? [];
+        return (
+          <GCard>
+            <CardContent sx={{ p: 3 }}>
+              <CardHeader
+                title="Homework"
+                icon={<HomeworkIcon color="primary" sx={{ fontSize: 20 }} />}
+                action={
+                  <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/homework/assign")}
+                    sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                    + Assign
+                  </Button>
+                }
+              />
+              {hw.length === 0 ? (
+                <Box sx={{ textAlign: "center", py: 4 }}>
+                  <HomeworkIcon sx={{ fontSize: 44, color: C.muted, mb: 1 }} />
+                  <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600, mb: 2 }}>
+                    No homework assigned yet.
+                  </Typography>
+                  <Button variant="contained" size="small" onClick={() => navigate("/homework/assign")}
+                    sx={{ borderRadius: "9px", textTransform: "none", fontWeight: 700, bgcolor: C.blue, boxShadow: "none" }}>
+                    Assign Now
+                  </Button>
+                </Box>
+              ) : (
+                <Box sx={{ mt: 1 }}>
+                  {/* Header row */}
+                  <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 80px", gap: 1, px: 1.5, mb: 0.75 }}>
+                    {["Title / Subject", "Class", "Due Date", "Status"].map((h) => (
+                      <Typography key={h} sx={{ fontSize: "10px", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                        {h}
+                      </Typography>
+                    ))}
+                  </Box>
+                  {/* Rows */}
+                  {hw.map((item, i) => {
+                    const isDraft = item.status?.toLowerCase() === "draft";
+                    return (
+                      <Box key={item.id} onClick={() => navigate("/homework")} sx={{
+                        display: "grid", gridTemplateColumns: "2fr 1fr 1fr 80px", gap: 1,
+                        px: 1.5, py: 1.2, borderRadius: "10px", cursor: "pointer", alignItems: "center",
+                        borderBottom: i < hw.length - 1 ? `1px solid ${C.border}` : "none",
+                        "&:hover": { bgcolor: C.blueGlass },
+                      }}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 700, color: C.slateText, fontSize: "13px" }} noWrap>
+                            {item.title}
+                          </Typography>
+                          {item.subject_name && (
+                            <Typography variant="caption" sx={{ color: C.muted, fontSize: "11px" }}>
+                              {item.subject_name}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Typography sx={{ fontSize: "12px", color: C.slateText, fontWeight: 600 }} noWrap>
+                          {item.class_name}{item.division_name ? ` — ${item.division_name}` : ""}
+                        </Typography>
+                        <Typography sx={{ fontSize: "12px", color: C.muted }}>
+                          {item.submission_date ?? "—"}
+                        </Typography>
+                        <Chip
+                          label={item.status}
+                          size="small"
+                          sx={{
+                            bgcolor: isDraft ? C.amberGlass : C.greenGlass,
+                            color: isDraft ? C.amber : C.green,
+                            fontWeight: 700, fontSize: "10px", borderRadius: "6px", height: 20,
+                          }}
+                        />
+                      </Box>
+                    );
+                  })}
+                  <Box sx={{ mt: 1.5, display: "flex", justifyContent: "flex-end" }}>
+                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/homework")}
+                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 11 }}>
                       View All
                     </Button>
-                  }
-                />
-                <NoticesCardContent notices={data.recent_notices} navigate={navigate} />
-              </CardContent>
-            </GCard>
-          </SortableSection>
+                  </Box>
+                </Box>
+              )}
+            </CardContent>
+          </GCard>
+        );
+      }
+
+      // ── Notices & Holidays (full-width) ───────────────────────────────────
+      case "card_notices":
+        return (
+          <GCard>
+            <CardContent sx={{ p: 3 }}>
+              <CardHeader
+                title="Recent Notices & Holidays"
+                icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
+                action={
+                  <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/communication/notices")}
+                    sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                    View All
+                  </Button>
+                }
+              />
+              <NoticesCardContent notices={data.recent_notices} navigate={navigate} />
+            </CardContent>
+          </GCard>
         );
 
       default:
@@ -1622,12 +1702,20 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
         </DndContext>
       </Grid>
 
-      {/* ── Main cards — each individually draggable ── */}
+      {/* ── Main cards — 2-column grid, each individually draggable ── */}
       <Grid item xs={12}>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCardDrag}>
-          <SortableContext items={cardOrder} strategy={verticalListSortingStrategy}>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              {cardOrder.map((id) => renderCard(id))}
+          <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 3 }}>
+              {cardOrder.map((id) => (
+                <SortableSection
+                  key={id}
+                  id={id}
+                  sx={{ gridColumn: (id === "card_notices" || id === "card_homework") ? "1 / -1" : "auto" }}
+                >
+                  {renderCardContent(id)}
+                </SortableSection>
+              ))}
             </Box>
           </SortableContext>
         </DndContext>

@@ -38,6 +38,7 @@ from app.schemas.dashboard import (
     StudentAttendanceSummary,
     StudentFeeStatus,
     StudentHomeworkSummary,
+    TeacherHomeworkItem,
 )
 
 logger = get_logger(__name__)
@@ -681,12 +682,39 @@ def _build_teacher_dashboard(
             rate = 0.0
         weekly_points.append(WeeklyTrendPoint(date=day.strftime("%a"), present_rate=round(rate, 1)))
 
+    # Recent homework assigned by this teacher (latest 8, any status except deleted)
+    hw_items: list[TeacherHomeworkItem] = []
+    try:
+        hw_rows = (
+            db.query(Homework)
+            .filter(Homework.teacher_id == teacher.id)
+            .filter(Homework.tenant_id == tenant_id)
+            .filter(Homework.is_deleted == False)
+            .order_by(Homework.assigned_date.desc())
+            .limit(8)
+            .all()
+        )
+        for hw in hw_rows:
+            hw_items.append(TeacherHomeworkItem(
+                id=hw.id,
+                title=hw.title,
+                subject_name=hw.subject.name if hw.subject else None,
+                class_name=hw.class_model.name if hw.class_model else None,
+                division_name=hw.division.division_name if hw.division else None,
+                assigned_date=hw.assigned_date.strftime("%d %b %Y") if hw.assigned_date else None,
+                submission_date=hw.submission_date.strftime("%d %b %Y") if hw.submission_date else None,
+                status=hw.status or "Published",
+            ))
+    except Exception as e:
+        logger.warning(f"Homework fetch error: {e}")
+
     teacher_data = TeacherDashboardResponse(
         assigned_classes=assigned_infos,
         today_attendance=overview,
         absentees_list=absentees,
         weekly_trend=weekly_points,
         recent_notices=_fetch_recent_notices(db, tenant_id, limit=5),
+        recent_homework=hw_items,
     )
     return DashboardResponse(role=role_str, data=teacher_data)
 
