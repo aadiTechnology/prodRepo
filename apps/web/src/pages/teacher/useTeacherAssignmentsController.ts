@@ -99,7 +99,7 @@ export function useTeacherAssignmentsController() {
       const response = await teacherAssignmentApi.unassignTeacher(rowToDelete.id);
       await refetch();
       setSnackbarSeverity("success");
-      setSnackbar(response.message || "Teacher assignment deleted successfully.");
+      setSnackbar("Teacher assignment deleted successfully.");
       closeDeleteConfirm();
     } catch {
       setSnackbarSeverity("error");

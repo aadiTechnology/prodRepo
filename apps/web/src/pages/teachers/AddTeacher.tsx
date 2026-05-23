@@ -283,6 +283,7 @@ export default function AddTeacher() {
   const formConfig = useMemo(
     () =>
       addTeacherFormConfig({
+        isEditMode,
         classOptions,
         divisionOptions,
         disableAssignmentFields: isEditMode,
@@ -326,7 +327,7 @@ export default function AddTeacher() {
         class_id: parsedClassId,
         class_division_id: parsedDivisionId,
         photo_url: values.photo_url || null,
-        is_active: values.is_active,
+        is_active: isEditMode ? values.is_active : true,
         address: values.address,
         city: values.city,
         state: values.state,

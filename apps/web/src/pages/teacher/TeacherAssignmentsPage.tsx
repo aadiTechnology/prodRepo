@@ -1,11 +1,6 @@
 import { useMemo } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Snackbar,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Typography } from "@mui/material";
+import { Alert, Snackbar } from "../../components/primitives";
 import {
   EntityTableSection,
   ListPageLayout,
@@ -224,7 +219,8 @@ export default function TeacherAssignmentsPage() {
         <Alert
           onClose={() => setSnackbar(null)}
           severity={snackbarSeverity}
-          sx={{ width: "100%" }}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: "12px" }}
         >
           {snackbar}
         </Alert>
@@ -234,7 +230,7 @@ export default function TeacherAssignmentsPage() {
         open={confirmDialogOpen}
         title="Please Confirm"
         message={`Are you sure you want to delete teacher ${rowToDelete?.teacherName || ""}?`}
-        confirmLabel={deleteLoading ? "Deleting..." : "Confirm"}
+        confirmLabel={deleteLoading ? "Deleting…" : "Confirm"}
         onConfirm={confirmDelete}
         onClose={closeDeleteConfirm}
         loading={deleteLoading}

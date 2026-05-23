@@ -26,6 +26,7 @@ export type AddTeacherFormData = {
 };
 
 type AddTeacherFormConfigFactoryArgs = {
+  isEditMode: boolean;
   classOptions: SelectItemOption[];
   divisionOptions: SelectItemOption[];
   disableAssignmentFields?: boolean;
@@ -46,6 +47,7 @@ type AddTeacherFormConfigFactoryArgs = {
 
 
 export function addTeacherFormConfig({
+  isEditMode,
   classOptions,
   divisionOptions,
   disableAssignmentFields = false,
@@ -56,6 +58,7 @@ export function addTeacherFormConfig({
   handleRemoveMediaItem,
   icons,
 }: AddTeacherFormConfigFactoryArgs): FormConfig<AddTeacherFormData> {
+  const assignmentFieldGrid = isEditMode ? { xs: 12, sm: 4 } : { xs: 12, sm: 6 };
 
 
   return {
@@ -145,8 +148,9 @@ export function addTeacherFormConfig({
       
       is_active: {
         name: "is_active",
-        label: "Is Active",
+        label: "Status",
         type: "switch",
+        conditionalRender: () => isEditMode,
       },
 
       // Address Details
@@ -364,24 +368,28 @@ export function addTeacherFormConfig({
 
       {
         kind: "section",
-        title: "Assignment & Status",
+        title: isEditMode ? "Assignment & Status" : "Assignment",
         icon: icons?.assignment,
       },
       {
         kind: "fields",
-        grid: { xs: 12, sm: 4 },
+        grid: assignmentFieldGrid,
         fieldNames: ["class_id"],
       },
       {
         kind: "fields",
-        grid: { xs: 12, sm: 4 },
+        grid: assignmentFieldGrid,
         fieldNames: ["class_division_id"],
       },
-      {
-        kind: "fields",
-        grid: { xs: 12, sm: 4 },
-        fieldNames: ["is_active"],
-      },
+      ...(isEditMode
+        ? [
+            {
+              kind: "fields" as const,
+              grid: { xs: 12, sm: 4 },
+              fieldNames: ["is_active" as keyof AddTeacherFormData],
+            },
+          ]
+        : []),
 
       {
         kind: "section",

@@ -7,7 +7,7 @@ import {
   EntityTableSection,
 } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
-import { Box, Typography } from "../../components/primitives";
+import { Alert, Box, Snackbar, Typography } from "../../components/primitives";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import teacherService, { type TeacherResponse } from "../../api/services/teacherService";
 import { createTeacherListConfig, renderTeacherRowActions } from "./TeacherList.listConfig";
@@ -38,6 +38,7 @@ export default function TeacherList() {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<TeacherResponse | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchClasses = async () => {
@@ -132,8 +133,10 @@ export default function TeacherList() {
       await teacherService.delete(teacherToDelete.id);
       await fetchTeachers();
       closeDeleteConfirm();
+      setSnackbar("Teacher deleted successfully.");
     } catch (err: unknown) {
       console.error("Failed to delete teacher:", err);
+      setError("Failed to delete teacher.");
     } finally {
       setDeleteLoading(false);
     }
@@ -256,13 +259,29 @@ export default function TeacherList() {
 
       <ConfirmDialog
         open={confirmDialogOpen}
-        title="Confirm Delete"
-        message={`Are you sure you want to delete teacher ${teacherToDelete?.full_name}?`}
-        confirmLabel={deleteLoading ? "Deleting..." : "Delete"}
+        title="Please Confirm"
+        message="Are you sure you want to delete this teacher?"
+        confirmLabel={deleteLoading ? "Deleting…" : "Confirm"}
         onConfirm={confirmDelete}
         onClose={closeDeleteConfirm}
         loading={deleteLoading}
       />
+
+      <Snackbar
+        open={!!snackbar}
+        autoHideDuration={3000}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        onClose={() => setSnackbar(null)}
+      >
+        <Alert
+          onClose={() => setSnackbar(null)}
+          severity="success"
+          variant="filled"
+          sx={{ width: "100%", borderRadius: "12px" }}
+        >
+          {snackbar}
+        </Alert>
+      </Snackbar>
     </ListPageLayout>
   );
 }

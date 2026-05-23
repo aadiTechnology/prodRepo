@@ -21,6 +21,16 @@ const emptyFormValues = (): AssignTeacherFormData => ({
   subject_id: null,
 });
 
+const resolveCurrentAcademicYearId = (
+  years: { id: number; is_current?: boolean | number; is_active?: boolean | number }[]
+): number | null => {
+  const current =
+    years.find((y) => y.is_current === true || y.is_current === 1) ??
+    years.find((y) => y.is_active === true || y.is_active === 1) ??
+    years[0];
+  return current?.id ?? null;
+};
+
 export function useAssignTeacherController() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -173,6 +183,38 @@ export function useAssignTeacherController() {
     queryKey: ["assign-teacher", "academic-years"],
     queryFn: teacherAssignmentApi.getAcademicYears,
   });
+
+  const hasQueryPrefill = useMemo(() => {
+    return (
+      !!searchParams.get("academicYearId") ||
+      !!searchParams.get("academic_year_id") ||
+      !!searchParams.get("assignmentId")
+    );
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (isEditMode && hasQueryPrefill) return;
+    if (assignmentId) return;
+    if (academicYearsLoading || academicYears.length === 0) return;
+    if (formData.academic_year_id != null) return;
+
+    const currentYearId = resolveCurrentAcademicYearId(academicYears);
+    if (currentYearId == null) return;
+
+    skipNextAcademicCascadeResetRef.current = true;
+    setFormData((prev) => ({
+      ...prev,
+      academic_year_id: currentYearId,
+    }));
+  }, [
+    academicYears,
+    academicYearsLoading,
+    assignmentId,
+    formData.academic_year_id,
+    hasQueryPrefill,
+    isEditMode,
+    setFormData,
+  ]);
 
   useEffect(() => {
     const resolveMissingIdsByName = async () => {

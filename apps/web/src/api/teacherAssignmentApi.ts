@@ -5,6 +5,8 @@ export type TeacherAssignmentStatus = "ASSIGNED" | "NOT_ASSIGNED";
 export interface AcademicYearOption {
   id: number;
   name: string;
+  is_current?: boolean | number;
+  is_active?: boolean | number;
 }
 
 export interface ClassOption {
