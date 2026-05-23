@@ -17,18 +17,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { MenuNode } from "../../types/menu";
 import MenuIcon from "./MenuIcon";
 import SubMenuItem from "./SubMenuItem";
-
-// SECURITY: Route validation to prevent open redirect attacks
-const isValidRoute = (path: string | null | undefined): boolean => {
-  if (!path || typeof path !== 'string') return false;
-  if (!path.startsWith('/')) return false;
-  return true;
-};
+import { normalizeMenuPath, hasMenuChildren } from "../../utils/menuNavigation";
 
 // SECURITY: Sanitize menu names to prevent XSS
 const sanitizeText = (text: string | undefined): string => {
-  if (!text || typeof text !== 'string') return '';
-  return text.trim().substring(0, 100).replace(/[<>'\"]/g, '');
+  if (!text || typeof text !== "string") return "";
+  return text.trim().substring(0, 100).replace(/[<>'"]/g, "");
 };
 
 interface MenuGroupProps {
@@ -43,18 +37,24 @@ function MenuGroupComponent({ menu, defaultExpanded = false, collapsed = false, 
   const location = useLocation();
   const [expanded, setExpanded] = useState(defaultExpanded);
 
-  const hasChildren = menu.children && menu.children.length > 0;
-  const isActive = menu.path ? location.pathname === menu.path : false;
+  const hasChildren = hasMenuChildren(menu.children);
+  const menuPath = normalizeMenuPath(menu.path);
+  const isActive = menuPath ? location.pathname === menuPath : false;
   const hasActiveChild = menu.children?.some(
-    (child) => child.path && location.pathname === child.path
+    (child) => {
+      const childPath = normalizeMenuPath(child.path);
+      return childPath ? location.pathname === childPath : false;
+    }
   );
 
   const handleClick = () => {
     if (collapsed) return;
+    if (menuPath) {
+      navigate(menuPath);
+      return;
+    }
     if (hasChildren) {
       setExpanded(!expanded);
-    } else if (isValidRoute(menu.path)) {
-      navigate(menu.path as string);
     }
   };
 

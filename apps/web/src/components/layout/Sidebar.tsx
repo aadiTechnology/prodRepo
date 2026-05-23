@@ -34,6 +34,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
 import { colorTokens } from "../../tokens/colors";
+import { normalizeMenuPath, hasMenuChildren } from "../../utils/menuNavigation";
 import { toRoleLabel } from "../../utils/formatters";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -351,13 +352,15 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         id: node.id.toString(),
         label: node.name,
         icon: icon,
-        path: node.path || undefined,
+        path: normalizeMenuPath(node.path) ?? undefined,
         color: color,
-        children: node.children?.map(child => ({
-          id: child.id.toString(),
-          label: child.name,
-          path: child.path || ""
-        }))
+        children: hasMenuChildren(node.children)
+          ? node.children!.map(child => ({
+              id: child.id.toString(),
+              label: child.name,
+              path: normalizeMenuPath(child.path) ?? "",
+            }))
+          : undefined,
       };
     });
   }, [menus, user, rbacRoles]);
@@ -471,11 +474,14 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                   <NavItem
                     collapsed={collapsed}
                     onClick={() => {
-                      if (item.children) {
+                      const route = normalizeMenuPath(item.path);
+                      if (route) {
+                        handleMenuNavigate(route);
+                        return;
+                      }
+                      if (hasMenuChildren(item.children)) {
                         if (collapsed) onToggleCollapse();
                         toggleSection(item.id);
-                      } else if (item.path) {
-                        handleMenuNavigate(item.path);
                       }
                     }}
                     active={isActive}
@@ -490,7 +496,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                           primary={item.label}
                           primaryTypographyProps={{ fontSize: "0.9rem", fontWeight: isActive ? 800 : 600 }}
                         />
-                        {item.children && (
+                        {hasMenuChildren(item.children) && (
                           <ExpandMoreIcon
                             sx={{
                               fontSize: 18,
@@ -505,15 +511,18 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                   </NavItem>
                 </Tooltip>
 
-                {item.children && (
+                {hasMenuChildren(item.children) && (
                   <Collapse in={isSectionExpanded && !collapsed} timeout="auto" unmountOnExit>
                     <List component="div" disablePadding>
-                      {item.children.map((child) => {
+                      {item.children!.map((child) => {
                         const isChildActive = location.pathname === child.path;
                         return (
                           <SubNavItem
                             key={child.id}
-                            onClick={() => handleMenuNavigate(child.path)}
+                            onClick={() => {
+                              const route = normalizeMenuPath(child.path);
+                              if (route) handleMenuNavigate(route);
+                            }}
                             active={isChildActive}
                           >
                             <ListItemText

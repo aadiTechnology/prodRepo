@@ -20,6 +20,7 @@ import {
   createAddMenuFormConfig,
   type AddMenuFormData,
 } from "./AddMenuPage.formConfig";
+import { normalizeMenuPath } from "../../utils/menuNavigation";
 
 // ── Default / empty form ──────────────────────────────────────────────────────
 
@@ -149,11 +150,12 @@ export default function AddMenuPage() {
     try {
       const level = formData.menu_type === "page" ? 2 : 1;
       const sortOrder = parseInt(formData.sort_order, 10);
+      const normalizedPath = normalizeMenuPath(formData.path);
 
       if (isEditMode && id) {
         await menuService.updateMenu(Number(id), {
           name: formData.name.trim(),
-          path: formData.path.trim() || null,
+          path: normalizedPath,
           icon: formData.icon.trim() || null,
           sort_order: isNaN(sortOrder) ? 0 : sortOrder,
           is_active: formData.is_active,
@@ -162,7 +164,7 @@ export default function AddMenuPage() {
       } else {
         await menuService.createMenu({
           name: formData.name.trim(),
-          path: formData.path.trim() || null,
+          path: normalizedPath,
           icon: formData.icon.trim() || null,
           sort_order: isNaN(sortOrder) ? 0 : sortOrder,
           level,

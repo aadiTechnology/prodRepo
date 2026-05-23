@@ -8,16 +8,12 @@ import { memo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MenuNode } from "../../types/menu";
 import MenuIcon from "./MenuIcon";
+import { normalizeMenuPath } from "../../utils/menuNavigation";
 
-const isValidRoute = (path: string | null | undefined): boolean => {
-  if (!path || typeof path !== 'string') return false;
-  if (!path.startsWith('/')) return false;
-  return true;
-};
-
+// SECURITY: Sanitize menu names to prevent XSS
 const sanitizeText = (text: string | undefined): string => {
-  if (!text || typeof text !== 'string') return '';
-  return text.trim().substring(0, 100).replace(/[<>'"]/g, '');
+  if (!text || typeof text !== "string") return "";
+  return text.trim().substring(0, 100).replace(/[<>'"]/g, "");
 };
 
 interface SubMenuItemProps {
@@ -29,11 +25,12 @@ function SubMenuItemComponent({ menu, onClick }: SubMenuItemProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isActive = menu.path ? location.pathname === menu.path : false;
+  const menuPath = normalizeMenuPath(menu.path);
+  const isActive = menuPath ? location.pathname === menuPath : false;
 
   const handleClick = () => {
-    if (isValidRoute(menu.path)) {
-      navigate(menu.path as string);
+    if (menuPath) {
+      navigate(menuPath);
     }
     onClick?.();
   };

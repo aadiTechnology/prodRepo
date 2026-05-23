@@ -93,7 +93,7 @@ export function createAddMenuFormConfig({
         type: "text",
         placeholder: "e.g. /users",
         props: { htmlInput: { maxLength: 300 } },
-        helperText: "Frontend route shown in the browser address bar.",
+        helperText: "Frontend route (e.g. / for Dashboard, /users for Users). Must start with /.",
       },
 
       icon: {
