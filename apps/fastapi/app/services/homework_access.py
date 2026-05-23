@@ -26,6 +26,8 @@ ADMIN_ROLE_TOKENS = frozenset({
 class ClassDivisionScope:
     class_id: int
     class_division_id: Optional[int]
+    # None = all subjects (class teacher or student/parent). Non-empty = subject teacher only.
+    allowed_subject_ids: Optional[frozenset[int]] = None
 
 
 @dataclass(frozen=True)
@@ -73,7 +75,7 @@ def _resolve_teacher_assignment_scopes(
 ) -> Tuple[ClassDivisionScope, ...]:
     sql = text(
         """
-        SELECT DISTINCT ta.class_id, ta.class_division_id
+        SELECT ta.class_id, ta.class_division_id, ta.subject_id
         FROM teacher_assignments ta
         WHERE ta.tenant_id = :tenant_id
           AND ta.teacher_id = :teacher_id
@@ -84,17 +86,45 @@ def _resolve_teacher_assignment_scopes(
     rows = db.execute(
         sql, {"tenant_id": tenant_id, "teacher_id": teacher_id}
     ).mappings().all()
-    seen: set[tuple[int, int | None]] = set()
-    scopes: list[ClassDivisionScope] = []
+
+    # Group by class + division. Class teacher row (subject_id NULL) => see all subjects.
+    grouped: dict[tuple[int, int | None], set[int]] = {}
+    class_teacher_keys: set[tuple[int, int | None]] = set()
+
     for row in rows:
         class_id = int(row["class_id"])
         div_raw = row["class_division_id"]
         div_id = int(div_raw) if div_raw is not None else None
         key = (class_id, div_id)
-        if key in seen:
-            continue
-        seen.add(key)
-        scopes.append(ClassDivisionScope(class_id=class_id, class_division_id=div_id))
+        subject_raw = row.get("subject_id")
+        if subject_raw is None:
+            class_teacher_keys.add(key)
+            grouped[key] = set()
+        else:
+            grouped.setdefault(key, set()).add(int(subject_raw))
+
+    scopes: list[ClassDivisionScope] = []
+    for key in sorted(grouped.keys() | class_teacher_keys):
+        class_id, div_id = key
+        if key in class_teacher_keys:
+            scopes.append(
+                ClassDivisionScope(
+                    class_id=class_id,
+                    class_division_id=div_id,
+                    allowed_subject_ids=None,
+                )
+            )
+        else:
+            subject_ids = grouped.get(key) or set()
+            if not subject_ids:
+                continue
+            scopes.append(
+                ClassDivisionScope(
+                    class_id=class_id,
+                    class_division_id=div_id,
+                    allowed_subject_ids=frozenset(subject_ids),
+                )
+            )
     return tuple(scopes)
 
 
@@ -245,6 +275,21 @@ def resolve_homework_viewer_context(
     return HomeworkViewerContext(kind="admin", scopes=(), published_only=False)
 
 
+def _homework_matches_scope(hw: Homework, scope: ClassDivisionScope) -> bool:
+    if hw.class_id != scope.class_id:
+        return False
+    if scope.class_division_id is None:
+        if hw.class_division_id is not None:
+            return False
+    elif hw.class_division_id is None or hw.class_division_id != scope.class_division_id:
+        return False
+    if scope.allowed_subject_ids is None:
+        return True
+    if hw.subject_id is None:
+        return False
+    return int(hw.subject_id) in scope.allowed_subject_ids
+
+
 def homework_visible_to_viewer(hw: Homework, ctx: HomeworkViewerContext) -> bool:
     if ctx.kind == "admin":
         return True
@@ -252,12 +297,4 @@ def homework_visible_to_viewer(hw: Homework, ctx: HomeworkViewerContext) -> bool
         return False
     if not ctx.scopes:
         return False
-    for scope in ctx.scopes:
-        if hw.class_id != scope.class_id:
-            continue
-        if scope.class_division_id is None:
-            if hw.class_division_id is None:
-                return True
-        elif hw.class_division_id is None or hw.class_division_id == scope.class_division_id:
-            return True
-    return False
+    return any(_homework_matches_scope(hw, scope) for scope in ctx.scopes)

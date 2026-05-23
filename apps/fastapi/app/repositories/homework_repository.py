@@ -38,7 +38,7 @@ def _resolve_teacher_id(db: Session, tenant_id: int, user_id: int) -> Optional[i
 # ---------------------------------------------------------------------------
 
 def _build_class_division_scope_filter(scopes: tuple):
-    """Match homework assigned to any of the viewer's class/division scopes."""
+    """Match homework for viewer scopes (class teacher = all subjects; subject teacher = assigned subjects)."""
     if not scopes:
         return Homework.id == -1
 
@@ -48,6 +48,8 @@ def _build_class_division_scope_filter(scopes: tuple):
         division_id = (
             scope.class_division_id if hasattr(scope, "class_division_id") else scope[1]
         )
+        allowed_subject_ids = getattr(scope, "allowed_subject_ids", None)
+
         class_match = Homework.class_id == class_id
         if division_id is None:
             division_match = Homework.class_division_id.is_(None)
@@ -56,7 +58,19 @@ def _build_class_division_scope_filter(scopes: tuple):
                 Homework.class_division_id.is_(None),
                 Homework.class_division_id == division_id,
             )
-        clauses.append(and_(class_match, division_match))
+
+        if allowed_subject_ids is None:
+            clauses.append(and_(class_match, division_match))
+        else:
+            subject_ids = list(allowed_subject_ids)
+            if not subject_ids:
+                continue
+            clauses.append(
+                and_(class_match, division_match, Homework.subject_id.in_(subject_ids))
+            )
+
+    if not clauses:
+        return Homework.id == -1
     return or_(*clauses)
 
 
@@ -387,23 +401,44 @@ def get_subjects_for_teacher_class(
         year_clause = "AND ta.academic_year_id = :academic_year_id"
         params["academic_year_id"] = academic_year_id
 
-    sql = text(
+    class_teacher_sql = text(
+        f"""
+        SELECT TOP 1 1 AS ok
+        FROM teacher_assignments ta
+        WHERE ta.tenant_id = :tenant_id
+          AND ta.teacher_id = :teacher_id
+          AND ta.class_id = :class_id
+          AND ta.subject_id IS NULL
+          AND ta.is_active = 1
+          {year_clause}
+        """
+    )
+    is_class_teacher = (
+        db.execute(class_teacher_sql, params).mappings().first() is not None
+    )
+    if is_class_teacher:
+        fallback_rows = db.execute(
+            fallback_sql, {"tenant_id": tenant_id, "class_id": class_id}
+        ).mappings().all()
+        return [SubjectOption(id=r["id"], name=r["name"], code=r["code"]) for r in fallback_rows]
+
+    subject_teacher_sql = text(
         f"""
         SELECT DISTINCT s.id, s.name, s.code
         FROM teacher_assignments ta
         INNER JOIN subjects s ON s.id = ta.subject_id
         WHERE ta.tenant_id = :tenant_id
           AND ta.teacher_id = :teacher_id
-          AND ta.class_id   = :class_id
-          AND ta.is_active  = 1
-          AND s.is_active   = 1
-          AND s.is_deleted  = 0
+          AND ta.class_id = :class_id
+          AND ta.subject_id IS NOT NULL
+          AND ta.is_active = 1
+          AND s.is_active = 1
+          AND s.is_deleted = 0
           {year_clause}
         ORDER BY s.name
         """
     )
-    rows = db.execute(sql, params).mappings().all()
-
+    rows = db.execute(subject_teacher_sql, params).mappings().all()
     if rows:
         return [SubjectOption(id=r["id"], name=r["name"], code=r["code"]) for r in rows]
 
