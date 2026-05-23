@@ -17,6 +17,8 @@ export default function AssignTeacher() {
     assignmentCheck,
     assignmentChecking,
     canShowAssignmentHint,
+    assignmentHintLabel,
+    isClassTeacherMode,
     handleConfirmSubmit,
     assignTeacherPending,
     isEditMode,
@@ -96,20 +98,32 @@ export default function AssignTeacher() {
               }}
             />
             <Typography variant="body2" sx={{ fontSize: "0.83rem", color: "text.primary", fontWeight: 400 }}>
-              Already Assigned class/ division
+              Already assigned class teacher for class/division
             </Typography>
           </Box>
         </Box>
       }
       formTopSlot={
-        <Box sx={{ px: 1, py: 0.5, display: "flex", flexDirection: "column", gap: 0.5 }}>
+        <Box sx={{ px: 1, py: 0.5, display: "flex", flexDirection: "column", gap: 1 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.85rem", lineHeight: 1.5 }}>
+            One teacher can be class teacher and subject teacher at the same time. Save each role separately.
+            Subject teachers need one division per save; you can assign the same teacher to different class/division/subject
+            combinations (e.g. Nursery EVS, then Std 2 Div B Math).
+          </Typography>
           {canShowAssignmentHint && assignmentCheck?.is_assigned ? (
             <Typography
               variant="body2"
               sx={{ color: "success.main", fontWeight: 600, fontSize: "0.9rem" }}
             >
-              {"● Already assigned class teacher"}
+              {`● ${assignmentHintLabel}`}
               {assignmentChecking ? "..." : assignmentCheck.teacher_name ? `: ${assignmentCheck.teacher_name}` : ""}
+            </Typography>
+          ) : null}
+          {canShowAssignmentHint && !assignmentCheck?.is_assigned ? (
+            <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.85rem" }}>
+              {isClassTeacherMode
+                ? "No class teacher assigned yet for this division."
+                : "No subject teacher assigned yet for this division and subject."}
             </Typography>
           ) : null}
         </Box>

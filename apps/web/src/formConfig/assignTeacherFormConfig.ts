@@ -101,10 +101,12 @@ export function assignTeacherFormConfig({
         label: "Subject",
         type: "select",
         required: false,
+        helperText:
+          "Leave blank for Class Teacher (one per division). Select a subject for Subject Teacher. The same teacher can hold both roles and many assignments across classes/divisions (e.g. Nursery EVS and Std 2 Math).",
         props: {
           options: subjectOptions,
           loading: subjectsLoading,
-          emptyOptionLabel: "Subject (optional)",
+          emptyOptionLabel: "Class Teacher (no subject)",
           disabled: disableSubject,
           coerceToNumber: true,
         },

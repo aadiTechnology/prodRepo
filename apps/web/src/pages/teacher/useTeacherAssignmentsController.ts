@@ -18,6 +18,7 @@ export type TeacherAssignmentRow = {
   teacherName: string | null;
   subjectId: number | null;
   subjectName: string | null;
+  designation: string;
   status: "ASSIGNED" | "NOT_ASSIGNED";
 };
 
@@ -75,6 +76,7 @@ export function useTeacherAssignmentsController() {
         teacherName: item.teacher_name,
         subjectId: item.subject_id ?? null,
         subjectName: item.subject_name ?? "-",
+        designation: item.designation || (item.subject_id != null ? "Subject Teacher" : "Class Teacher"),
         status: item.status,
       })),
     [data]

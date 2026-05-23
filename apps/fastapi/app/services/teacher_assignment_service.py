@@ -140,6 +140,32 @@ def get_teachers(db: Session, tenant_id: Optional[int]) -> list[dict]:
         return []
 
 
+def _designation_from_subject_id(subject_id: Optional[int]) -> str:
+    return "Subject Teacher" if subject_id is not None else "Class Teacher"
+
+
+def _assignment_list_merge_key(row: dict) -> tuple:
+    """
+    Class-teacher rows: merge multiple divisions assigned in one save (same class/year).
+    Subject-teacher rows: one list row per division+subject (same teacher may teach many classes).
+    """
+    if row.get("subject_id") is None:
+        return (
+            "class_teacher",
+            row["teacher_id"],
+            row["class_id"],
+            row["academic_year_id"],
+        )
+    return (
+        "subject_teacher",
+        row["teacher_id"],
+        row["class_id"],
+        row["academic_year_id"],
+        row["subject_id"],
+        row["class_division_id"],
+    )
+
+
 def get_assigned_map(
     db: Session,
     tenant_id: Optional[int],
@@ -152,6 +178,7 @@ def get_assigned_map(
             ta.class_division_id
         FROM teacher_assignments ta
         WHERE ta.is_active = 1
+          AND ta.subject_id IS NULL
           AND ta.academic_year_id = :academic_year_id
           AND (:tenant_id IS NULL OR ta.tenant_id = :tenant_id)
         """
@@ -378,23 +405,44 @@ def check_assignment(
     class_id: int,
     division_id: int,
     academic_year_id: int,
+    subject_id: Optional[int] = None,
 ) -> dict:
-    query = text(
-        """
-        SELECT TOP 1
-            ta.teacher_id,
-            NULLIF(LTRIM(RTRIM(t.full_name)), '') AS teacher_name
-        FROM teacher_assignments ta
-        LEFT JOIN teachers t ON t.id = ta.teacher_id
-                         AND t.is_deleted = 0
-        WHERE ta.tenant_id = :tenant_id
-          AND ta.class_id = :class_id
-          AND ta.class_division_id = :division_id
-          AND ta.academic_year_id = :academic_year_id
-          AND ta.is_active = 1
-        ORDER BY ta.updated_at DESC, ta.id DESC
-        """
-    )
+    if subject_id is not None:
+        query = text(
+            """
+            SELECT TOP 1
+                ta.teacher_id,
+                NULLIF(LTRIM(RTRIM(t.full_name)), '') AS teacher_name
+            FROM teacher_assignments ta
+            LEFT JOIN teachers t ON t.id = ta.teacher_id
+                             AND t.is_deleted = 0
+            WHERE ta.tenant_id = :tenant_id
+              AND ta.class_id = :class_id
+              AND ta.class_division_id = :division_id
+              AND ta.academic_year_id = :academic_year_id
+              AND ta.subject_id = :subject_id
+              AND ta.is_active = 1
+            ORDER BY ta.updated_at DESC, ta.id DESC
+            """
+        )
+    else:
+        query = text(
+            """
+            SELECT TOP 1
+                ta.teacher_id,
+                NULLIF(LTRIM(RTRIM(t.full_name)), '') AS teacher_name
+            FROM teacher_assignments ta
+            LEFT JOIN teachers t ON t.id = ta.teacher_id
+                             AND t.is_deleted = 0
+            WHERE ta.tenant_id = :tenant_id
+              AND ta.class_id = :class_id
+              AND ta.class_division_id = :division_id
+              AND ta.academic_year_id = :academic_year_id
+              AND ta.subject_id IS NULL
+              AND ta.is_active = 1
+            ORDER BY ta.updated_at DESC, ta.id DESC
+            """
+        )
     fallback_query = text(
         """
         SELECT TOP 1
@@ -417,17 +465,21 @@ def check_assignment(
 
     try:
         _ensure_teacher_assignments_table(db)
-        row = db.execute(
-            query,
-            {
-                "tenant_id": tenant_id,
-                "class_id": class_id,
-                "division_id": division_id,
-                "academic_year_id": academic_year_id,
-            },
-        ).mappings().first()
+        query_params = {
+            "tenant_id": tenant_id,
+            "class_id": class_id,
+            "division_id": division_id,
+            "academic_year_id": academic_year_id,
+        }
+        if subject_id is not None:
+            query_params["subject_id"] = subject_id
+
+        row = db.execute(query, query_params).mappings().first()
         if row and row["teacher_id"] is not None:
             return {"is_assigned": True, "teacher_name": row["teacher_name"]}
+
+        if subject_id is not None:
+            return {"is_assigned": False, "teacher_name": None}
 
         fallback_row = db.execute(
             fallback_query,
@@ -469,9 +521,9 @@ def get_teacher_assignments(
         except SQLAlchemyError:
             legacy_rows = []
 
-        merged_by_key: dict[tuple[int | None, int | None, int | None, int | None], dict] = {}
+        merged_by_key: dict[tuple, dict] = {}
         for row in assignment_rows:
-            key = (row["teacher_id"], row["class_id"], row["academic_year_id"], row.get("subject_id"))
+            key = _assignment_list_merge_key(row)
             if key not in merged_by_key:
                 merged_by_key[key] = {
                     "id": row["id"],
@@ -485,6 +537,7 @@ def get_teacher_assignments(
                     "teacher_name": row["teacher_name"],
                     "subject_id": row.get("subject_id"),
                     "subject_name": row.get("subject_name"),
+                    "designation": _designation_from_subject_id(row.get("subject_id")),
                     "status": row["status"],
                 }
             else:
@@ -497,7 +550,7 @@ def get_teacher_assignments(
                     merged_by_key[key]["division_name"] = ", ".join(existing_names)
 
         for row in legacy_rows:
-            key = (row["teacher_id"], row["class_id"], row["academic_year_id"], row.get("subject_id"))
+            key = _assignment_list_merge_key({**row, "subject_id": row.get("subject_id")})
             if key not in merged_by_key:
                 merged_by_key[key] = {
                     "id": row["id"],
@@ -511,6 +564,7 @@ def get_teacher_assignments(
                     "teacher_name": row["teacher_name"],
                     "subject_id": row.get("subject_id"),
                     "subject_name": row.get("subject_name"),
+                    "designation": _designation_from_subject_id(row.get("subject_id")),
                     "status": row["status"],
                 }
             else:

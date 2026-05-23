@@ -160,6 +160,7 @@ def check_teacher_assignment(
     class_id: int = Query(..., ge=1),
     division_id: int = Query(..., ge=1),
     academic_year_id: int = Query(..., ge=1),
+    subject_id: int | None = Query(default=None, ge=1),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ):
@@ -172,6 +173,7 @@ def check_teacher_assignment(
         class_id=class_id,
         division_id=division_id,
         academic_year_id=academic_year_id,
+        subject_id=subject_id,
     )
     return TeacherAssignmentCheckResponse(**result)
 

@@ -63,7 +63,24 @@ export default function TeacherAssignmentsPage() {
         },
         { id: "class", label: "Class", field: "class" },
         { id: "division", label: "Division", field: "division" },
-        { id: "subjectName", label: "Subject", field: "subjectName" },
+        {
+          id: "designation",
+          label: "Designation",
+          render: (row: TeacherAssignmentRow) => (
+            <Typography variant="body2" sx={{ fontWeight: 500, color: "text.primary", fontSize: "0.9rem" }}>
+              {row.designation}
+            </Typography>
+          ),
+        },
+        {
+          id: "subjectName",
+          label: "Subject",
+          render: (row: TeacherAssignmentRow) => (
+            <Typography variant="body2" sx={{ fontWeight: 400, color: "text.primary", fontSize: "0.9rem" }}>
+              {row.designation === "Class Teacher" ? "-" : row.subjectName || "-"}
+            </Typography>
+          ),
+        },
         {
           id: "status",
           label: "Status",
@@ -154,7 +171,7 @@ export default function TeacherAssignmentsPage() {
               <ListPageToolbar
                 searchValue={search}
                 onSearchChange={setSearch}
-                searchPlaceholder="Search by class, division, or teacher name"
+                searchPlaceholder="Search by class, division, teacher, or subject"
                 onAddClick={() => navigate("/teacher-assignments/assign")}
                 addLabel="Assign New Teacher"
               />

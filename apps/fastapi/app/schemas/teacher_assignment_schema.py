@@ -77,6 +77,7 @@ class TeacherAssignmentItem(BaseModel):
     teacher_name: Optional[str] = None
     subject_id: Optional[int] = None
     subject_name: Optional[str] = None
+    designation: str
     status: str
 
 

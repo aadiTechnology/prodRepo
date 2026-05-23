@@ -44,6 +44,7 @@ export interface TeacherAssignmentApiItem {
   teacher_name: string | null;
   subject_id?: number | null;
   subject_name?: string | null;
+  designation: string;
   status: TeacherAssignmentStatus;
 }
 
@@ -84,6 +85,7 @@ export interface CheckAssignmentParams {
   class_id: number;
   division_id: number;
   academic_year_id: number;
+  subject_id?: number | null;
 }
 
 export interface CheckAssignmentResponse {

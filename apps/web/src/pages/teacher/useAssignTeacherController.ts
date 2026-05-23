@@ -299,18 +299,22 @@ export function useAssignTeacherController() {
       formData.class_id,
       formData.class_division_ids,
       formData.academic_year_id,
+      formData.subject_id,
     ],
     queryFn: () =>
       teacherAssignmentApi.checkAssignment({
         class_id: formData.class_id as number,
         division_id: formData.class_division_ids[0] as number,
         academic_year_id: formData.academic_year_id as number,
+        ...(formData.subject_id != null ? { subject_id: formData.subject_id } : {}),
       }),
     enabled:
       !!formData.class_id &&
       (formData.class_division_ids?.length || 0) === 1 &&
       !!formData.academic_year_id,
   });
+
+  const isClassTeacherMode = formData.subject_id == null;
 
   useEffect(() => {
     if (skipNextAcademicCascadeResetRef.current) {
@@ -377,14 +381,15 @@ export function useAssignTeacherController() {
         id: String(item.id),
         value: String(item.id),
         label:
-          assignedMap?.class_ids?.includes(item.id)
+          isClassTeacherMode && assignedMap?.class_ids?.includes(item.id)
             ? `${item.name} (Already assigned)`
             : item.name,
         textColor: undefined,
         fontWeight: undefined,
-        backgroundColor: assignedMap?.class_ids?.includes(item.id) ? "#d6f0ff" : undefined,
+        backgroundColor:
+          isClassTeacherMode && assignedMap?.class_ids?.includes(item.id) ? "#d6f0ff" : undefined,
       })),
-    [classes, assignedMap?.class_ids]
+    [classes, assignedMap?.class_ids, isClassTeacherMode]
   );
 
   const divisionOptions = useMemo<SelectItemOption[]>(
@@ -393,14 +398,17 @@ export function useAssignTeacherController() {
         id: String(item.id),
         value: String(item.id),
         label:
-          assignedMap?.class_division_ids?.includes(item.id)
+          isClassTeacherMode && assignedMap?.class_division_ids?.includes(item.id)
             ? `${item.division_name} (Already assigned)`
             : item.division_name,
         textColor: undefined,
         fontWeight: undefined,
-        backgroundColor: assignedMap?.class_division_ids?.includes(item.id) ? "#d6f0ff" : undefined,
+        backgroundColor:
+          isClassTeacherMode && assignedMap?.class_division_ids?.includes(item.id)
+            ? "#d6f0ff"
+            : undefined,
       })),
-    [divisions, assignedMap?.class_division_ids]
+    [divisions, assignedMap?.class_division_ids, isClassTeacherMode]
   );
 
   const teacherOptions = useMemo<SelectItemOption[]>(
@@ -455,7 +463,9 @@ export function useAssignTeacherController() {
       formData.academic_year_id,
       formData.class_id,
       formData.class_division_ids,
+      formData.subject_id,
       effectiveTenantId,
+      isClassTeacherMode,
     ]
   );
 
@@ -466,6 +476,12 @@ export function useAssignTeacherController() {
       (formData.class_division_ids?.length || 0) === 0 ||
       !formData.teacher_id
     ) {
+      return;
+    }
+
+    if (formData.subject_id != null && (formData.class_division_ids?.length || 0) !== 1) {
+      setError("Subject teacher assignment requires exactly one division.");
+      setSnackbar("Subject teacher assignment requires exactly one division.");
       return;
     }
 
@@ -504,6 +520,10 @@ export function useAssignTeacherController() {
     !!formData.class_id &&
     (formData.class_division_ids?.length || 0) === 1;
 
+  const assignmentHintLabel = isClassTeacherMode
+    ? "Already assigned class teacher"
+    : "Already assigned subject teacher";
+
   return {
     formData,
     setFormData,
@@ -516,6 +536,8 @@ export function useAssignTeacherController() {
     assignmentCheck,
     assignmentChecking,
     canShowAssignmentHint,
+    assignmentHintLabel,
+    isClassTeacherMode,
     handleConfirmSubmit,
     assignTeacherPending: assignTeacherMutation.isPending,
     hasAssignedLegend:
