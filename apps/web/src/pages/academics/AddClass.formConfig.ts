@@ -42,7 +42,7 @@ export const createAddClassFormConfig = (options: {
     },
     is_active: {
       name: "is_active",
-      label: "Class Status",
+      label: "Status",
       type: "switch",
       helperText: "Control system access for this entire class",
     },

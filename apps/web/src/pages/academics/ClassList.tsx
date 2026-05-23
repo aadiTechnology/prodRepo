@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Alert, Snackbar } from "@mui/material";
+import { Alert, Snackbar } from "../../components/primitives";
 import { Add as AddIcon } from "@mui/icons-material";
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout, ListPageToolbar, EntityTableSection } from "../../components/reusable";
@@ -70,9 +70,9 @@ export default function ClassList() {
 
             <ConfirmDialog
                 open={controller.deleteDialogOpen}
-                title="Delete Class?"
-                message={`Are you sure you want to delete ${controller.selectedClass?.name}?`}
-                confirmText={controller.deleteLoading ? "Deleting..." : "Delete"}
+                title="Please Confirm"
+                message="Are you sure you want to delete this class?"
+                confirmText={controller.deleteLoading ? "Deleting…" : "Confirm"}
                 onConfirm={controller.handleConfirmDelete}
                 onCancel={() => controller.setDeleteDialogOpen(false)}
                 loading={controller.deleteLoading}
@@ -84,7 +84,12 @@ export default function ClassList() {
                 anchorOrigin={{ vertical: "top", horizontal: "center" }}
                 onClose={() => controller.setSuccess(null)}
             >
-                <Alert onClose={() => controller.setSuccess(null)} severity="success" sx={{ width: "100%" }}>
+                <Alert
+                    onClose={() => controller.setSuccess(null)}
+                    severity="success"
+                    variant="filled"
+                    sx={{ width: "100%", borderRadius: "12px" }}
+                >
                     {controller.success}
                 </Alert>
             </Snackbar>

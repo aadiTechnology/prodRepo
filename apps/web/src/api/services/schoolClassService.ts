@@ -4,6 +4,7 @@
  * Supports searching and filtering by academic year
  */
 
+import axios from "axios";
 import apiClient from "../client";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -37,6 +38,12 @@ export interface SchoolClass {
   deleted_by?: number | null;
 }
 
+export type SchoolClassDivisionInput = {
+  division_name: string;
+  capacity?: number;
+  is_active?: boolean;
+};
+
 export interface SchoolClassCreate {
   name: string;
   academic_year_id: number;
@@ -45,7 +52,7 @@ export interface SchoolClassCreate {
   description?: string;
   capacity?: number;
   is_active: boolean;
-  divisions?: string[]; // Nested division names for creation
+  divisions?: SchoolClassDivisionInput[];
 }
 
 export interface SchoolClassUpdate extends Partial<Omit<SchoolClassCreate, 'divisions'>> {
@@ -74,8 +81,31 @@ const schoolClassService = {
   },
 
   create: async (data: SchoolClassCreate): Promise<SchoolClass> => {
-    const response = await apiClient.post(BASE_URL, data);
-    return response.data;
+    try {
+      const response = await apiClient.post(BASE_URL, data);
+      return response.data;
+    } catch (err: unknown) {
+      // Back-compat: older API builds expect divisions as string[] + class-level capacity
+      if (
+        axios.isAxiosError(err) &&
+        err.response?.status === 422 &&
+        data.divisions?.length
+      ) {
+        const legacyPayload = {
+          name: data.name,
+          academic_year_id: data.academic_year_id,
+          is_active: data.is_active,
+          section: data.section,
+          code: data.code,
+          description: data.description,
+          capacity: data.divisions[0]?.capacity,
+          divisions: data.divisions.map((d) => d.division_name),
+        };
+        const response = await apiClient.post(BASE_URL, legacyPayload);
+        return response.data;
+      }
+      throw err;
+    }
   },
 
   update: async (id: number, data: SchoolClassUpdate): Promise<SchoolClass> => {

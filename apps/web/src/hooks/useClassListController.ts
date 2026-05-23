@@ -2,6 +2,16 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import schoolClassService, { type SchoolClass } from "../api/services/schoolClassService";
 import academicYearService from "../api/services/academicYearService";
 
+const resolveCurrentAcademicYearId = (
+  years: { id: number; is_current?: boolean | number; is_active?: boolean | number }[]
+): string => {
+  const current =
+    years.find((y) => y.is_current === true || y.is_current === 1) ??
+    years.find((y) => y.is_active === true || y.is_active === 1) ??
+    years[0];
+  return current?.id != null ? String(current.id) : "";
+};
+
 export function useClassListController() {
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,8 +30,10 @@ export function useClassListController() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [academicYearFilter, setAcademicYearFilter] = useState("");
   const [academicYearOptions, setAcademicYearOptions] = useState<{ label: string; value: string }[]>([]);
+  const [academicYearFilterReady, setAcademicYearFilterReady] = useState(false);
 
   const fetchData = useCallback(async () => {
+    if (!academicYearFilterReady) return;
     try {
       setLoading(true);
       setError(null);
@@ -34,7 +46,7 @@ export function useClassListController() {
     } finally {
       setLoading(false);
     }
-  }, [academicYearFilter]);
+  }, [academicYearFilter, academicYearFilterReady]);
 
   useEffect(() => {
     fetchData();
@@ -43,17 +55,28 @@ export function useClassListController() {
   useEffect(() => {
     academicYearService
       .getAll()
-      .then((data: any) => {
-        const items = data?.data || data || [];
+      .then((data: unknown) => {
+        const items = (Array.isArray(data) ? data : (data as { data?: unknown[] })?.data) || [];
+        const years = items as {
+          id: number;
+          name?: string;
+          code?: string;
+          is_current?: boolean | number;
+          is_active?: boolean | number;
+        }[];
         setAcademicYearOptions(
-          items.map((year: any) => ({
+          years.map((year) => ({
             label: year.name || year.code || String(year.id),
             value: String(year.id),
           }))
         );
+        setAcademicYearFilter((prev) => prev || resolveCurrentAcademicYearId(years));
       })
       .catch(() => {
         setAcademicYearOptions([]);
+      })
+      .finally(() => {
+        setAcademicYearFilterReady(true);
       });
   }, []);
 
@@ -75,9 +98,8 @@ export function useClassListController() {
       await schoolClassService.softDelete(selectedClass.id);
       setDeleteDialogOpen(false);
       setSelectedClass(null);
-      setSuccess("Class deleted successfully!");
+      setSuccess("Class deleted successfully.");
       await fetchData();
-      setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
       setError(err?.message || "Failed to delete class.");
     } finally {

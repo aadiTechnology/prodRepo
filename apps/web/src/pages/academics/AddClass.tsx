@@ -15,6 +15,16 @@ import LayersIcon from "@mui/icons-material/Layers";
 import { colorTokens } from "../../tokens/colors";
 import { alpha } from "@mui/material/styles";
 
+const resolveCurrentAcademicYearId = (
+    years: { id: number; is_current?: boolean | number; is_active?: boolean | number }[]
+): string => {
+    const current =
+        years.find((y) => y.is_current === true || y.is_current === 1) ??
+        years.find((y) => y.is_active === true || y.is_active === 1) ??
+        years[0];
+    return current?.id != null ? String(current.id) : "";
+};
+
 export default function AddClass() {
     const navigate = useNavigate();
     const { id } = useParams<{ id?: string }>();
@@ -32,7 +42,7 @@ export default function AddClass() {
         name: "",
         academic_year_id: "",
         is_active: true,
-        divisions: [{ division_name: "", capacity: "30", is_active: true }],
+        divisions: [{ division_name: "", capacity: "", is_active: true }],
     }), []);
 
     const validationConfig = useMemo<FormValidationConfig<AddClassFormData>>(() => ({
@@ -123,10 +133,17 @@ export default function AddClass() {
                         return (
                             <TextFieldInput
                                 label=""
-                                placeholder="30"
-                                type="number"
+                                placeholder="Enter capacity (e.g. 50)"
+                                type="text"
                                 value={row.capacity}
-                                onChange={(e) => handleDivisionChange(index, "capacity", e.target.value)}
+                                htmlInput={{ inputMode: "numeric", pattern: "[0-9]*" }}
+                                onChange={(e) =>
+                                    handleDivisionChange(
+                                        index,
+                                        "capacity",
+                                        e.target.value.replace(/\D/g, "")
+                                    )
+                                }
                                 sx={tableInputSx}
                                 fullWidth
                                 size="small"
@@ -224,7 +241,7 @@ export default function AddClass() {
     );
 
     const handleAddDivision = () => {
-        const newDivs = [...formData.divisions, { division_name: "", capacity: "30", is_active: true }];
+        const newDivs = [...formData.divisions, { division_name: "", capacity: "", is_active: true }];
         handleFieldValueChange("divisions", newDivs);
     };
 
@@ -243,20 +260,33 @@ export default function AddClass() {
     useEffect(() => {
         academicYearService
             .getAll()
-            .then((data: any) => {
-                const items = data?.data || data || [];
+            .then((data: unknown) => {
+                const items = (Array.isArray(data) ? data : (data as { data?: unknown[] })?.data) || [];
+                const years = items as {
+                    id: number;
+                    name?: string;
+                    code?: string;
+                    is_current?: boolean | number;
+                    is_active?: boolean | number;
+                }[];
                 setAcademicYearOptions(
-                    items.map((year: any) => ({
+                    years.map((year) => ({
                         id: String(year.id),
                         label: year.name || year.code || String(year.id),
                         value: String(year.id),
                     }))
                 );
+                if (!isEditMode) {
+                    const currentYearId = resolveCurrentAcademicYearId(years);
+                    if (currentYearId) {
+                        setFormData((prev) => ({ ...prev, academic_year_id: currentYearId }));
+                    }
+                }
             })
             .catch(() => {
                 setAcademicYearOptions([]);
             });
-    }, []);
+    }, [isEditMode, setFormData]);
 
     const fetchClass = useCallback(async () => {
         if (!id || id === "new") return;
@@ -319,11 +349,16 @@ export default function AddClass() {
                 await schoolClassService.update(Number(id), payload);
                 setSnackbar("Class and its divisions updated successfully.");
             } else {
-                const createPayload = {
-                    ...payload,
-                    divisions: formData.divisions.map(d => d.division_name.trim())
-                };
-                await schoolClassService.create(createPayload);
+                await schoolClassService.create({
+                    name: payload.name,
+                    academic_year_id: payload.academic_year_id,
+                    is_active: payload.is_active,
+                    divisions: payload.divisions.map((d) => ({
+                        division_name: d.division_name,
+                        capacity: d.capacity,
+                        is_active: d.is_active,
+                    })),
+                });
                 setSnackbar("Class created successfully.");
             }
             setTimeout(() => navigate("/classes"), 1000);

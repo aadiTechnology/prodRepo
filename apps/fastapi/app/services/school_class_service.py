@@ -134,15 +134,15 @@ def create_class(
         
         # Handle multiple divisions during creation if provided
         if data.divisions:
-            for div_name in data.divisions:
-                norm_div_name = _normalize_text(div_name)
+            for div in data.divisions:
+                norm_div_name = _normalize_text(div.division_name)
                 if norm_div_name and not _division_exists(existing_class, norm_div_name):
                     db.add(
                         ClassDivision(
                             class_id=existing_class.id,
                             division_name=norm_div_name,
-                            capacity=data.capacity,
-                            is_active=data.is_active,
+                            capacity=div.capacity if div.capacity is not None else data.capacity,
+                            is_active=div.is_active,
                         )
                     )
         db.commit()
@@ -178,15 +178,15 @@ def create_class(
     
     # Create extra divisions if provided
     if data.divisions:
-        for div_name in data.divisions:
-            norm_div_name = _normalize_text(div_name)
+        for div in data.divisions:
+            norm_div_name = _normalize_text(div.division_name)
             if norm_div_name and norm_div_name != normalized_section:
                 db.add(
                     ClassDivision(
                         class_id=db_obj.id,
                         division_name=norm_div_name,
-                        capacity=data.capacity,
-                        is_active=data.is_active
+                        capacity=div.capacity if div.capacity is not None else data.capacity,
+                        is_active=div.is_active,
                     )
                 )
 

@@ -14,11 +14,6 @@ export const createClassListConfig = ({
 }: ClassListConfigArgs): ListConfig<SchoolClass> => ({
   columns: [
     {
-      id: "academic_year",
-      label: "Academic Year",
-      render: (row: SchoolClass) => row.academic_year_name ?? "-",
-    },
-    {
       id: "name",
       label: "Class",
       field: "name",
