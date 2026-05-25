@@ -113,6 +113,8 @@ export default function AddHomework() {
     [],
   );
 
+  const clearError = useCallback(() => setError(null), []);
+
   const {
     formData,
     setFormData,
@@ -124,7 +126,7 @@ export default function AddHomework() {
   } = useFormManager<AddHomeworkFormData>({
     initialValues,
     validationConfig,
-    onClearError: () => setError(null),
+    onClearError: clearError,
   });
 
   // Load dropdown options on mount — classes are scoped to the teacher's assignments
@@ -149,7 +151,8 @@ export default function AddHomework() {
         }
       })
       .catch(() => {});
-  }, [isEditMode, handleFieldValueChange]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode]);
 
   // When academic year changes — reset class, division, and subject dropdowns
   useEffect(() => {
@@ -169,6 +172,9 @@ export default function AddHomework() {
       return;
     }
 
+    // Skip API calls during initial data load in edit mode
+    if (!isDataLoadedRef.current) return;
+
     // Load divisions via homework-specific endpoint (accessible to teachers)
     homeworkService
       .getDivisionsForClass(Number(classId))
@@ -187,8 +193,6 @@ export default function AddHomework() {
         ),
       )
       .catch(() => setSubjectOptions([]));
-
-    if (!isDataLoadedRef.current) return;
 
     // Reset dependent dropdowns only when the user manually picks a different class.
     handleFieldValueChange("class_division_id", "");

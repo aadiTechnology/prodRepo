@@ -197,7 +197,7 @@ export default function HomeworkDetails() {
         <PageHeader
           links={[
             { title: "Homework", path: "/homework" },
-            { title: hw.title, path: "#" },
+            { title: "Homework Details", path: "#" },
           ]}
           homePath="/"
         />
