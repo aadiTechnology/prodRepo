@@ -51,8 +51,8 @@ export default function EntityTableSection<T extends object>({
 }: EntityTableSectionProps<T>) {
   const rangeStart = totalRows > 0 ? Math.min(page * rowsPerPage + 1, totalRows) : 0;
   const rangeEnd = Math.min((page + 1) * rowsPerPage, totalRows);
-  const shouldShowInfoBar = showInfoBar ?? (!loading && totalRows > 0);
-  const shouldShowPagination = showPagination ?? (!loading && totalRows > 0);
+  const shouldShowInfoBar = showInfoBar ?? totalRows > 0;
+  const shouldShowPagination = showPagination ?? totalRows > rowsPerPage;
 
   const resolvedRowActions: DataTableProps<T>["renderRowActions"] =
     renderRowActions ??

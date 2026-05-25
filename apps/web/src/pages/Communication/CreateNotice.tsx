@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Typography, Box, FormHeaderIconAction } from "../../components/primitives";
+import { Autocomplete, Button, TextField, Typography, Box, FormHeaderIconAction } from "../../components/primitives";
+import { useNoticePermissions } from "../../hooks/useNoticePermissions";
 import ApplicableToClassSelector from "../../components/reusable/ApplicableToClassSelector";
 import BaseForm from "../../components/reusable/BaseForm";
 import { useFormManager } from "../../hooks/useFormManager";
@@ -13,7 +14,9 @@ import type { Notice, NoticeAudienceType, NoticeCreateAttachment, NoticeCreateTa
 import { audienceTypeLabel, noticeTypeLabel } from "../../utils/noticeLabels";
 
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
+const MAX_TITLE_LENGTH = 255;
 const ALLOWED_FILE_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
+const UPLOAD_FILE_HINT = "Allowed: PDF, JPG, PNG. Maximum size 5 MB.";
 
 type AttachmentState = {
   file_name: string;
@@ -82,10 +85,13 @@ export default function CreateNotice() {
   const { id: editIdParam } = useParams<{ id?: string }>();
   const editId = editIdParam ? Number(editIdParam) : NaN;
   const isEditMode = Number.isFinite(editId);
+  const perms = useNoticePermissions();
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [loading, setLoading] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
+  const [loadedStatus, setLoadedStatus] = useState<string | null>(null);
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [applicableToError, setApplicableToError] = useState<string | null>(null);
@@ -101,7 +107,17 @@ export default function CreateNotice() {
   const initialValues = useMemo(() => emptyForm(), []);
   const validationConfig = useMemo<FormValidationConfig<CreateNoticeFormData>>(
     () => ({
-      title: [{ type: "required", message: "Please enter notice title" }],
+      title: [
+        { type: "required", message: "Please enter notice title" },
+        {
+          type: "custom",
+          validate: (data) => {
+            const len = String(data.title ?? "").trim().length;
+            if (len > MAX_TITLE_LENGTH) return `Title must be at most ${MAX_TITLE_LENGTH} characters`;
+            return "";
+          },
+        },
+      ],
       description: [{ type: "required", message: "Please enter description" }],
       publish_date: [{ type: "required", message: "Publish date is required" }],
       notice_type: [{ type: "required", message: "Notice type is required" }],
@@ -221,6 +237,7 @@ export default function CreateNotice() {
           return;
         }
         resetForm(noticeToForm(notice));
+        setLoadedStatus(notice.status);
         if (notice.attachments?.[0]) {
           const a = notice.attachments[0];
           setAttachment({
@@ -411,6 +428,29 @@ export default function CreateNotice() {
     }
   }, [formData.audience_type, setFormData]);
 
+  const handleResetForm = useCallback(() => {
+    resetForm(emptyForm());
+    setAttachment(null);
+    setLoadedStatus(null);
+    setApplicableToError(null);
+    setFieldErrors({});
+    setError(null);
+  }, [resetForm, setFieldErrors]);
+
+  const handleUnpublish = useCallback(async () => {
+    if (!isEditMode || !Number.isFinite(editId)) return;
+    try {
+      setPublishLoading(true);
+      const res = await noticeService.unpublish(editId);
+      setLoadedStatus(res.notice.status);
+      setSnackbar(res.message);
+    } catch {
+      setError("Action not allowed in current state");
+    } finally {
+      setPublishLoading(false);
+    }
+  }, [editId, isEditMode]);
+
   const submitNotice = useCallback(
     async (isDraft: boolean) => {
       const schemaErrors = validateForm(validationConfig, formData);
@@ -423,7 +463,11 @@ export default function CreateNotice() {
       setApplicableToError(null);
       if (Object.keys(schemaErrors).length > 0) return;
 
-      setLoading(true);
+      if (isDraft) {
+        setLoading(true);
+      } else {
+        setPublishLoading(true);
+      }
       setError(null);
       try {
         const targets = buildTargets();
@@ -442,23 +486,31 @@ export default function CreateNotice() {
         };
 
         if (isEditMode) {
-          await noticeService.update(editId, basePayload);
-          setSnackbar(isDraft ? "Notice updated successfully" : "Notice published successfully");
+          const updated = await noticeService.update(editId, basePayload);
+          setLoadedStatus(updated.status);
+          setSnackbar(isDraft ? "Notice updated successfully." : "Notice published successfully.");
           setTimeout(() => navigate(`/communication/notices/${editId}`), 800);
         } else {
           await noticeService.create(basePayload);
-          setSnackbar(isDraft ? "Notice saved as draft successfully" : "Notice published successfully");
+          setSnackbar(isDraft ? "Notice saved as draft successfully." : "Notice published successfully.");
           setTimeout(() => navigate("/communication/notices"), 800);
         }
       } catch (err: unknown) {
         const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
         setFieldErrors((prev) => ({ ...prev, ...apiFieldErrors }));
-        setError(message || (isDraft ? "Unable to save notice" : "Failed to publish notice"));
+        const fallback = isDraft ? "Unable to save notice" : "Failed to publish notice";
+        const attachmentHint =
+          attachment && String(err instanceof Error ? err.message : "").includes("Network")
+            ? "Unable to upload attachment. Check file type (PDF, JPG, PNG) and size (max 5 MB)."
+            : null;
+        setError(attachmentHint || message || fallback);
       } finally {
         setLoading(false);
+        setPublishLoading(false);
       }
     },
     [
+      attachment,
       buildAttachments,
       buildTargets,
       editId,
@@ -477,7 +529,7 @@ export default function CreateNotice() {
       return;
     }
     if (!ALLOWED_FILE_TYPES.includes(file.type.toLowerCase()) || file.size > MAX_ATTACHMENT_SIZE) {
-      setError("Invalid file format or size exceeded");
+      setError(`Invalid file format or size exceeded. ${UPLOAD_FILE_HINT}`);
       return;
     }
     try {
@@ -523,6 +575,9 @@ export default function CreateNotice() {
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           Attachment (PDF/Image)
         </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {UPLOAD_FILE_HINT}
+        </Typography>
         <input
           ref={fileInputRef}
           type="file"
@@ -565,14 +620,70 @@ export default function CreateNotice() {
     ]
   );
 
+  const audienceTypeRenderer = useMemo(
+    () => (
+      <Autocomplete<SelectOption, false, false, false>
+        options={dropdownAudienceTypes}
+        value={dropdownAudienceTypes.find((o) => o.value === formData.audience_type) ?? null}
+        onChange={(_, option) => {
+          handleFieldValueChange("audience_type", (option?.value ?? "STUDENT") as NoticeAudienceType);
+        }}
+        getOptionLabel={(option) => option.label}
+        isOptionEqualToValue={(a, b) => a.value === b.value}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Audience"
+            required
+            error={Boolean(fieldErrors.audience_type)}
+            helperText={fieldErrors.audience_type}
+          />
+        )}
+      />
+    ),
+    [dropdownAudienceTypes, fieldErrors.audience_type, formData.audience_type, handleFieldValueChange]
+  );
+
+  const noticeTypeRenderer = useMemo(
+    () => (
+      <Autocomplete<SelectOption, false, false, false>
+        options={dropdownNoticeTypes}
+        value={dropdownNoticeTypes.find((o) => o.value === formData.notice_type) ?? null}
+        onChange={(_, option) => {
+          handleFieldValueChange("notice_type", option?.value ?? "GENERAL");
+        }}
+        getOptionLabel={(option) => option.label}
+        isOptionEqualToValue={(a, b) => a.value === b.value}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Notice Type"
+            required
+            error={Boolean(fieldErrors.notice_type)}
+            helperText={fieldErrors.notice_type}
+          />
+        )}
+      />
+    ),
+    [dropdownNoticeTypes, fieldErrors.notice_type, formData.notice_type, handleFieldValueChange]
+  );
+
   const formConfig = useMemo(
     () =>
       createNoticeFormConfig({
         audienceOptions: dropdownAudienceTypes,
         noticeTypeOptions: dropdownNoticeTypes,
         applicableSelectionRenderer,
+        audienceTypeRenderer,
+        noticeTypeRenderer,
       }),
-    [applicableSelectionRenderer, dropdownAudienceTypes, dropdownNoticeTypes]
+    [
+      applicableSelectionRenderer,
+      audienceTypeRenderer,
+      dropdownAudienceTypes,
+      dropdownNoticeTypes,
+      noticeTypeRenderer,
+    ]
   );
 
   const handleConfirmSubmit = async () => {
@@ -608,19 +719,37 @@ export default function CreateNotice() {
         saveTooltipEdit: "Save changes",
       }}
       onCancelNavigate={() => navigate("/communication/notices")}
+      onFooterCancel={handleResetForm}
       confirmMessage={
         isEditMode ? "Are you sure you want to save changes to this notice?" : "Are you sure you want to save this notice as draft?"
       }
       submitLabelCreate="Save Draft"
       submitLabelEdit="Save"
+      canSubmit={perms.canCreate || perms.canEdit}
       extraHeaderActions={
-        <FormHeaderIconAction
-          variant="save"
-          tooltipTitle={isEditMode ? "Publish notice" : "Publish Notice"}
-          onClick={() => void submitNotice(false)}
-          disabled={loading || fetchLoading}
-          loading={loading}
-        />
+        <>
+          {isEditMode && loadedStatus === "PUBLISHED" && perms.canEdit ? (
+            <Button
+              variant="outlined"
+              color="warning"
+              size="small"
+              onClick={() => void handleUnpublish()}
+              disabled={publishLoading || loading || fetchLoading}
+              sx={{ mr: 0.5 }}
+            >
+              Unpublish
+            </Button>
+          ) : null}
+          {(perms.canCreate || perms.canEdit) ? (
+            <FormHeaderIconAction
+              variant="publish"
+              tooltipTitle={isEditMode ? "Publish notice" : "Publish Notice"}
+              onClick={() => void submitNotice(false)}
+              disabled={loading || fetchLoading}
+              loading={publishLoading}
+            />
+          ) : null}
+        </>
       }
     />
   );

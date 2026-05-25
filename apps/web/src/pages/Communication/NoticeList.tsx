@@ -6,21 +6,62 @@ import { EntityTableSection, ListPageLayout, ListPageToolbar } from "../../compo
 import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import { useNoticeListController } from "../../hooks/useNoticeListController";
+import { useNoticePermissions } from "../../hooks/useNoticePermissions";
 import { createNoticeListConfig, renderNoticeRowActions } from "./NoticeList.listConfig";
 import type { Notice } from "../../types/notice";
 
 export default function NoticeList() {
   const navigate = useNavigate();
   const c = useNoticeListController();
+  const perms = useNoticePermissions();
 
   const listConfig = useMemo(
     () =>
       createNoticeListConfig({
         navigate,
         onDeleteClick: c.openDeleteConfirm,
+        canEdit: perms.canEdit,
+        canDelete: perms.canDelete,
       }),
-    [c.openDeleteConfirm, navigate]
+    [c.openDeleteConfirm, navigate, perms.canDelete, perms.canEdit]
   );
+
+  const toolbarFilters = useMemo(() => {
+    const filters = [
+      {
+        label: "Status",
+        value: c.status,
+        onChange: c.setStatus,
+        options: c.statusFilterOptions,
+      },
+      {
+        label: "Type",
+        value: c.noticeType,
+        onChange: c.setNoticeType,
+        options: c.noticeTypeFilterOptions,
+      },
+    ];
+    if (!c.readOnlyAudience) {
+      filters.splice(1, 0, {
+        label: "Audience",
+        value: c.audienceType,
+        onChange: c.setAudienceType,
+        options: c.audienceFilterOptions,
+      });
+    }
+    return filters;
+  }, [
+    c.audienceFilterOptions,
+    c.audienceType,
+    c.noticeType,
+    c.noticeTypeFilterOptions,
+    c.readOnlyAudience,
+    c.setAudienceType,
+    c.setNoticeType,
+    c.setStatus,
+    c.status,
+    c.statusFilterOptions,
+  ]);
 
   return (
     <ListPageLayout
@@ -33,30 +74,11 @@ export default function NoticeList() {
               <ListPageToolbar
                 searchValue={c.search}
                 onSearchChange={c.setSearch}
-                searchPlaceholder="Search by title or keyword…"
-                onAddClick={() => navigate("/communication/notices/new")}
+                searchPlaceholder="Search by title…"
+                onAddClick={perms.canCreate ? () => navigate("/communication/notices/new") : undefined}
                 addLabel="Create Notice"
                 addIcon={<AddIcon sx={{ fontSize: 24 }} />}
-                filters={[
-                  {
-                    label: "Status",
-                    value: c.status,
-                    onChange: c.setStatus,
-                    options: c.statusFilterOptions,
-                  },
-                  {
-                    label: "Type",
-                    value: c.noticeType,
-                    onChange: c.setNoticeType,
-                    options: c.noticeTypeFilterOptions,
-                  },
-                  {
-                    label: "Audience",
-                    value: c.audienceType,
-                    onChange: c.setAudienceType,
-                    options: c.audienceFilterOptions,
-                  },
-                ]}
+                filters={toolbarFilters}
               />
             }
           />

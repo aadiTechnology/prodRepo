@@ -28,6 +28,15 @@ async def list_notices(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_permission("Create Notices", "view")),
 ):
+    can_manage = notice_service.user_can_manage_notices(db, current_user)
+    viewer_context = notice_service.get_viewer_context(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+        manage=can_manage,
+    )
     return notice_service.list_notices(
         db,
         tenant_id=current_user.tenant_id,
@@ -38,6 +47,7 @@ async def list_notices(
         audience_type=audience_type.upper() if audience_type else None,
         notice_type=notice_type.upper() if notice_type else None,
         is_published=is_published,
+        viewer_context=viewer_context,
     )
 
 
@@ -55,7 +65,21 @@ async def get_notice(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_permission("Create Notices", "view")),
 ):
-    return notice_service.get_notice(db, tenant_id=current_user.tenant_id, notice_id=notice_id)
+    can_manage = notice_service.user_can_manage_notices(db, current_user)
+    viewer_context = notice_service.get_viewer_context(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+        manage=can_manage,
+    )
+    return notice_service.get_notice(
+        db,
+        tenant_id=current_user.tenant_id,
+        notice_id=notice_id,
+        viewer_context=viewer_context,
+    )
 
 
 @router.post("", response_model=NoticeResponse, status_code=status.HTTP_201_CREATED)

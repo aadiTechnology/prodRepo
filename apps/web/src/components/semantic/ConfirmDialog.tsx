@@ -53,16 +53,11 @@ export default function ConfirmDialog({
       PaperProps={{
         sx: {
           borderRadius: 3,
-          maxWidth: 600,
-          width: "100%",
+          maxWidth: 420,
+          width: "calc(100% - 32px)",
           p: 0,
-          position: "absolute",
-          top: "5%",
-          left: "50%",
-          transform: "translate(-50%, 0)",
-          height: "30%",
-          minHeight: "20px",
-          overflowY: "auto",
+          m: 2,
+          overflow: "hidden",
         },
       }}
     >
@@ -107,19 +102,18 @@ export default function ConfirmDialog({
         <Box sx={{ display: "flex", alignItems: "center", mb: 0.25 }}>
           <CheckIcon
             sx={(theme) => ({
-              fontSize: 50,
+              fontSize: 32,
               color: theme.palette.success.main,
-              mr: 2,
+              mr: 1.5,
               p: 0,
             })}
           />
           <Typography
+            variant="h6"
             sx={(theme) => ({
-              fontWeight: 175,
-              fontSize: "1.9rem",
+              fontWeight: 700,
               color: theme.palette.text.primary,
-              letterSpacing: "-1px",
-              lineHeight: 1.1,
+              lineHeight: 1.25,
             })}
           >
             {title}
@@ -127,18 +121,16 @@ export default function ConfirmDialog({
         </Box>
         {message && typeof message === "string" && (
           <Typography
+            variant="body1"
             sx={(theme) => ({
-              fontSize: "1.05rem",
               textAlign: "center",
-              mb: 5,
-              color: theme.palette.text.primary,
-              fontWeight: 125,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              mb: 3,
+              mt: 1,
+              color: theme.palette.text.secondary,
+              px: 1,
             })}
           >
-           {message}
+            {message}
           </Typography>
         )}
         {message && typeof message !== "string" && (

@@ -1,4 +1,4 @@
-import { Box, Chip, Typography } from "@mui/material";
+import { Box, Chip, Tooltip, Typography } from "@mui/material";
 import type { NavigateFunction } from "react-router-dom";
 import type { Notice, NoticeStatus } from "../../types/notice";
 import type { ListConfig } from "../../components/reusable/listFramework.types";
@@ -26,15 +26,38 @@ function statusChipColor(status: NoticeStatus): "default" | "success" | "error" 
 type NoticeListConfigArgs = {
   navigate: NavigateFunction;
   onDeleteClick: (row: Notice) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 };
 
 export function createNoticeListConfig({
   navigate,
   onDeleteClick,
+  canEdit = true,
+  canDelete = true,
 }: NoticeListConfigArgs): ListConfig<Notice, NoticeListSortBy> {
   return {
     columns: [
-      { id: "title", label: "Title", field: "title" },
+      {
+        id: "title",
+        label: "Title",
+        render: (row) => (
+          <Tooltip title={row.title}>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 600,
+                maxWidth: 280,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {row.title}
+            </Typography>
+          </Tooltip>
+        ),
+      },
       {
         id: "notice_type",
         label: "Type",
@@ -84,10 +107,11 @@ export function createNoticeListConfig({
       rowActions: (row) => ({
         onView: () => navigate(`/communication/notices/${row.id}`),
         onEdit:
-          row.status === "EXPIRED"
-            ? undefined
-            : () => navigate(`/communication/notices/${row.id}/edit`),
-        onDelete: row.status === "EXPIRED" ? undefined : () => onDeleteClick(row),
+          canEdit && row.status !== "EXPIRED"
+            ? () => navigate(`/communication/notices/${row.id}/edit`)
+            : undefined,
+        onDelete:
+          canDelete && row.status !== "EXPIRED" ? () => onDeleteClick(row) : undefined,
       }),
     },
   };

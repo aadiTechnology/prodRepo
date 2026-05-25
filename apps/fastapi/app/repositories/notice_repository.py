@@ -1,9 +1,60 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.notice import Notice, NoticeAttachment, NoticeTarget
+from app.services.notice_access import NoticeViewerContext, is_notice_consumer
+
+
+def _apply_consumer_visibility(
+    where_sql: list[str],
+    params: dict,
+    viewer_context: NoticeViewerContext | None,
+) -> None:
+    if not viewer_context or not is_notice_consumer(viewer_context):
+        return
+
+    now = datetime.utcnow()
+    params["viewer_now"] = now
+    where_sql.append("n.status = 'PUBLISHED'")
+    where_sql.append("n.is_published = 1")
+    where_sql.append("(n.expiry_date IS NULL OR n.expiry_date >= :viewer_now)")
+
+    if viewer_context.kind == "teacher":
+        where_sql.append("n.audience_type IN ('TEACHER', 'ALL')")
+    elif viewer_context.kind in ("student", "parent"):
+        where_sql.append("n.audience_type IN ('STUDENT', 'ALL')")
+        scopes = viewer_context.scopes
+        if not scopes:
+            where_sql.append("1 = 0")
+            return
+        scope_clauses: list[str] = []
+        for idx, scope in enumerate(scopes):
+            params[f"vc_{idx}_class"] = scope.class_id
+            if scope.class_division_id is not None:
+                params[f"vc_{idx}_div"] = scope.class_division_id
+                scope_clauses.append(
+                    f"""EXISTS (
+                      SELECT 1 FROM communication_notice_targets t
+                      WHERE t.notice_id = n.id AND t.is_deleted = 0
+                      AND (
+                        t.division_id = :vc_{idx}_div
+                        OR (t.class_id = :vc_{idx}_class AND t.division_id IS NULL)
+                      )
+                    )"""
+                )
+            else:
+                scope_clauses.append(
+                    f"""EXISTS (
+                      SELECT 1 FROM communication_notice_targets t
+                      WHERE t.notice_id = n.id AND t.is_deleted = 0
+                      AND t.class_id = :vc_{idx}_class
+                    )"""
+                )
+        where_sql.append(f"({' OR '.join(scope_clauses)})")
 
 
 def list_notices(
@@ -17,12 +68,15 @@ def list_notices(
     is_published: bool | None,
     page: int,
     size: int,
+    viewer_context: NoticeViewerContext | None = None,
 ) -> tuple[list[dict], int]:
     where_sql = ["n.tenant_id = :tenant_id", "n.is_deleted = 0"]
     params: dict = {"tenant_id": tenant_id}
 
+    _apply_consumer_visibility(where_sql, params, viewer_context)
+
     if search:
-        where_sql.append("(n.title LIKE :search OR n.description LIKE :search)")
+        where_sql.append("n.title LIKE :search")
         params["search"] = f"%{search.strip()}%"
     if audience_type:
         where_sql.append("n.audience_type = :audience_type")

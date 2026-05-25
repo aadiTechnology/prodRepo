@@ -214,6 +214,10 @@ export default function Login() {
         ...(tenantIdFromQuery !== undefined ? { tenant_id: tenantIdFromQuery } : {}),
       });
       setRBACData({ roles: response.roles, menus: response.menus, permissions: response.permissions });
+      const statePath = (location.state as { from?: Location })?.from?.pathname;
+      const from =
+        statePath && statePath.startsWith("/") && !statePath.includes("http") ? statePath : "/";
+      navigate(from, { replace: true });
     } catch (err) {
       const apiErr = err as ApiError;
       const status = apiErr.response?.status;
@@ -235,7 +239,13 @@ export default function Login() {
   };
 
   const isButtonDisabled = !formData.email.trim() || !formData.password || isSubmitting;
-  if (isAuthenticated) return null;
+  if (isAuthenticated) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   const tenantTheme = schoolPreview ? deriveThemePropsFromTenant(schoolPreview) : null;
 

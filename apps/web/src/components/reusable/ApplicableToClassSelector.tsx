@@ -125,12 +125,6 @@ export default function ApplicableToClassSelector({
               onChange={(e) => onClassSelectAll(e.target.checked)}
             />
           </Box>
-          <Box sx={{ bgcolor: "#d9d9d9", px: 1, py: 0.45, mb: 0.8, borderRadius: 0.5 }}>
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              Associated Class(es)
-            </Typography>
-          </Box>
-
           <Box
             sx={{
               display: "flex",

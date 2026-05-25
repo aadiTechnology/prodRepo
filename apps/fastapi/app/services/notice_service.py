@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ValidationException
 from app.repositories import notice_repository
+from app.services.homework_access import HomeworkViewerContext
+from app.services.notice_access import NoticeViewerContext, is_notice_consumer, resolve_notice_viewer_context
+from app.services.notice_attachment_storage import persist_notice_attachment_path
 from app.schemas.notice import (
     NoticeAttachmentResponse,
     NoticeCreateRequest,
@@ -72,6 +75,104 @@ def _derive_status_from_timeline(*, publish_date: datetime, expiry_date: datetim
     return "PUBLISHED"
 
 
+def _effective_notice_status(row: dict) -> str:
+    stored = str(row.get("status") or "DRAFT")
+    expiry_date = row.get("expiry_date")
+    now = datetime.utcnow()
+    if expiry_date and expiry_date < now:
+        return "EXPIRED"
+    if stored in {"DRAFT", "UNPUBLISHED", "EXPIRED"}:
+        return stored
+    publish_date = row.get("publish_date")
+    if publish_date and publish_date > now:
+        return "UNPUBLISHED"
+    return stored
+
+
+def user_can_manage_notices(db: Session, current_user: object) -> bool:
+    from app.core.dependencies import get_rbac_role_codes
+    from app.models.menu import Menu
+    from app.models.role import user_roles as user_roles_table
+    from app.models.role_menu_permission import RoleMenuPermission
+    from app.models.user import UserRole
+
+    role = getattr(current_user, "role", None)
+    if role in (UserRole.SUPER_ADMIN, UserRole.ADMIN) and getattr(current_user, "tenant_id", None) is None:
+        return True
+    if role == UserRole.SUPER_ADMIN:
+        return True
+
+    rbac_roles = get_rbac_role_codes(db, int(current_user.id))
+    if "system_admin" in {r.lower() for r in rbac_roles}:
+        return True
+
+    role_id_rows = (
+        db.query(user_roles_table.c.role_id)
+        .filter(user_roles_table.c.user_id == current_user.id)
+        .all()
+    )
+    role_ids = [r[0] for r in role_id_rows]
+    if not role_ids:
+        return False
+
+    perm = (
+        db.query(RoleMenuPermission)
+        .join(Menu, RoleMenuPermission.menu_id == Menu.id)
+        .filter(
+            RoleMenuPermission.role_id.in_(role_ids),
+            Menu.name == "Create Notices",
+            Menu.is_active == True,
+            Menu.is_deleted == False,
+        )
+        .first()
+    )
+    if not perm:
+        return False
+    return bool(perm.can_edit or perm.can_create)
+
+
+def get_viewer_context(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    email: str,
+    legacy_role: object,
+    manage: bool = False,
+) -> NoticeViewerContext:
+    if manage:
+        return HomeworkViewerContext(kind="admin", scopes=(), published_only=False)
+    return resolve_notice_viewer_context(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        email=email,
+        legacy_role=legacy_role,
+    )
+
+
+def _normalize_attachments(
+    *,
+    tenant_id: int,
+    notice_id: int,
+    attachments: list[dict],
+) -> list[dict]:
+    normalized: list[dict] = []
+    for item in attachments:
+        file_path = item.get("file_path") or ""
+        if not file_path:
+            continue
+        stored_path = persist_notice_attachment_path(
+            tenant_id=tenant_id,
+            notice_id=notice_id,
+            file_name=str(item.get("file_name") or "attachment"),
+            file_path=str(file_path),
+            file_type=str(item.get("file_type") or "application/octet-stream"),
+        )
+        normalized.append({**item, "file_path": stored_path})
+    return normalized
+
+
 def _to_notice_response(db: Session, row: dict) -> NoticeResponse:
     targets = notice_repository.get_notice_targets(db, notice_id=int(row["id"]))
     attachments = notice_repository.get_notice_attachments(db, notice_id=int(row["id"]))
@@ -82,7 +183,7 @@ def _to_notice_response(db: Session, row: dict) -> NoticeResponse:
         description=str(row["description"]),
         notice_type=str(row["notice_type"]),
         audience_type=str(row["audience_type"]),
-        status=str(row["status"]),
+        status=_effective_notice_status(row),
         publish_date=row["publish_date"],
         expiry_date=row.get("expiry_date"),
         is_draft=str(row["status"]) == "DRAFT",
@@ -111,7 +212,12 @@ def list_notices(
     audience_type: str | None = None,
     notice_type: str | None = None,
     is_published: bool | None = None,
+    viewer_context: NoticeViewerContext | None = None,
 ) -> NoticeListResponse:
+    if viewer_context and is_notice_consumer(viewer_context):
+        status = None
+        is_published = None
+
     rows, total = notice_repository.list_notices(
         db,
         tenant_id=tenant_id,
@@ -122,6 +228,7 @@ def list_notices(
         is_published=is_published,
         page=page,
         size=size,
+        viewer_context=viewer_context,
     )
     return NoticeListResponse(
         items=[_to_notice_response(db, row) for row in rows],
@@ -131,10 +238,63 @@ def list_notices(
     )
 
 
-def get_notice(db: Session, *, tenant_id: int, notice_id: int) -> NoticeResponse:
+def _consumer_can_view_notice(
+    row: dict,
+    targets: list[dict],
+    viewer_context: NoticeViewerContext,
+) -> bool:
+    if _effective_notice_status(row) != "PUBLISHED" or not bool(row.get("is_published")):
+        return False
+    audience = str(row.get("audience_type") or "")
+    if viewer_context.kind == "teacher":
+        return audience in {"TEACHER", "ALL"}
+    if viewer_context.kind in ("student", "parent"):
+        if audience not in {"STUDENT", "ALL"}:
+            return False
+        if not viewer_context.scopes:
+            return False
+        for scope in viewer_context.scopes:
+            for target in targets:
+                div_id = target.get("division_id")
+                class_id = target.get("class_id")
+                if div_id is not None and scope.class_division_id == div_id:
+                    return True
+                if class_id is not None and scope.class_id == class_id and div_id is None:
+                    return True
+        return False
+    return True
+
+
+def _assert_notice_visible(
+    db: Session,
+    *,
+    tenant_id: int,
+    notice_id: int,
+    viewer_context: NoticeViewerContext | None,
+) -> dict:
     row = notice_repository.get_notice_by_id(db, tenant_id=tenant_id, notice_id=notice_id)
     if not row:
         raise NotFoundException("Notice", notice_id)
+    if viewer_context and is_notice_consumer(viewer_context):
+        targets = notice_repository.get_notice_targets(db, notice_id=notice_id)
+        if not _consumer_can_view_notice(row, targets, viewer_context):
+            raise NotFoundException("Notice", notice_id)
+    return row
+
+
+def get_notice(
+    db: Session,
+    *,
+    tenant_id: int,
+    notice_id: int,
+    viewer_context: NoticeViewerContext | None = None,
+) -> NoticeResponse:
+    row = _assert_notice_visible(
+        db,
+        tenant_id=tenant_id,
+        notice_id=notice_id,
+        viewer_context=viewer_context,
+    )
     return _to_notice_response(db, row)
 
 
@@ -198,12 +358,17 @@ def create_notice(
         user_id=user_id,
         targets=targets if audience_type in AUDIENCE_WITH_CLASS_TARGETS else [],
     )
+    stored_attachments = _normalize_attachments(
+        tenant_id=tenant_id,
+        notice_id=notice_id,
+        attachments=attachments,
+    )
     notice_repository.replace_notice_attachments(
         db,
         tenant_id=tenant_id,
         notice_id=notice_id,
         user_id=user_id,
-        attachments=attachments,
+        attachments=stored_attachments,
     )
     db.commit()
     return get_notice(db, tenant_id=tenant_id, notice_id=notice_id)
@@ -291,12 +456,17 @@ def update_notice(
             targets=normalized_targets if next_audience_type in AUDIENCE_WITH_CLASS_TARGETS else [],
         )
     if normalized_attachments is not None:
+        stored_attachments = _normalize_attachments(
+            tenant_id=tenant_id,
+            notice_id=notice_id,
+            attachments=normalized_attachments,
+        )
         notice_repository.replace_notice_attachments(
             db,
             tenant_id=tenant_id,
             notice_id=notice_id,
             user_id=user_id,
-            attachments=normalized_attachments,
+            attachments=stored_attachments,
         )
     db.commit()
     return get_notice(db, tenant_id=tenant_id, notice_id=notice_id)

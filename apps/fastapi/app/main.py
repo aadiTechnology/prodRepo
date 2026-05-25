@@ -150,6 +150,8 @@ os.makedirs("static/enrollment-documents", exist_ok=True)
 app.mount("/enrollment-documents", StaticFiles(directory="static/enrollment-documents"), name="enrollment-documents")
 os.makedirs("static/homework-attachments", exist_ok=True)
 app.mount("/homework-attachments", StaticFiles(directory="static/homework-attachments"), name="homework-attachments")
+os.makedirs("static/notice-attachments", exist_ok=True)
+app.mount("/notice-attachments", StaticFiles(directory="static/notice-attachments"), name="notice-attachments")
 
 @app.on_event("startup")
 async def startup_event():
