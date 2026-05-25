@@ -92,6 +92,9 @@ const viewModeFieldSx = {
 
 const sectionTitleSx = { mt: 1.25 } as const;
 
+const MAX_ENROLLMENT_DOCUMENT_BYTES = 5 * 1024 * 1024;
+const ENROLLMENT_DOCUMENT_SIZE_HINT = "Document should be 5MB or less.";
+
 const resolveCurrentAcademicYearId = (
   years: { id?: number | string; is_current?: boolean | number }[]
 ): string => {
@@ -490,9 +493,8 @@ export default function EnrollmentPage() {
     file: File,
     documentType: "birth_certificate" | "photo"
   ) => {
-    const maxSizeBytes = 5 * 1024 * 1024;
-    if (file.size > maxSizeBytes) {
-      setError("File size must be 5MB or less");
+    if (file.size > MAX_ENROLLMENT_DOCUMENT_BYTES) {
+      setError(ENROLLMENT_DOCUMENT_SIZE_HINT);
       return;
     }
 
@@ -1078,7 +1080,10 @@ export default function EnrollmentPage() {
                 >
                   {uploadingBirthCert ? "Uploading birth certificate..." : "Upload Birth Certificate"}
                 </Button>
-                <Box sx={{ display: "flex", alignItems: "center", mt: 0.75, minHeight: 24, gap: 0.25 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
+                  {ENROLLMENT_DOCUMENT_SIZE_HINT}
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, minHeight: 24, gap: 0.25 }}>
                   <Typography
                     variant="caption"
                     color="text.secondary"
@@ -1125,7 +1130,10 @@ export default function EnrollmentPage() {
                 >
                   {uploadingPhoto ? "Uploading photo..." : "Upload Student Photo"}
                 </Button>
-                <Box sx={{ display: "flex", alignItems: "center", mt: 0.75, minHeight: 24, gap: 0.25 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
+                  {ENROLLMENT_DOCUMENT_SIZE_HINT}
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, minHeight: 24, gap: 0.25 }}>
                   <Typography
                     variant="caption"
                     color="text.secondary"
