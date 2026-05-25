@@ -8,17 +8,21 @@ function money(v: number): string {
 
 type InvoiceListConfigArgs = {
   onViewInvoice: (invoice: InvoiceItem) => void;
-  onEditInvoice: (invoice: InvoiceItem) => void;
+  onEditInvoice?: (invoice: InvoiceItem) => void;
+  showStudentName?: boolean;
 };
 
 export function createInvoiceListConfig({
   onViewInvoice,
   onEditInvoice,
+  showStudentName = true,
 }: InvoiceListConfigArgs): ListConfig<InvoiceItem, "invoice_no" | "due_date" | "student_name"> {
   return {
     columns: [
       { id: "invoice_no", label: "Invoice No", render: (r: InvoiceItem) => r.invoice_no },
-      { id: "student_name", label: "Student Name", render: (r: InvoiceItem) => r.student_name },
+      ...(showStudentName
+        ? [{ id: "student_name" as const, label: "Student Name", render: (r: InvoiceItem) => r.student_name }]
+        : []),
       { id: "class_name", label: "Class", render: (r: InvoiceItem) => r.class_name || "-" },
       { id: "installment", label: "Installment", render: (r: InvoiceItem) => r.installment || "-" },
       {
@@ -55,7 +59,7 @@ export function createInvoiceListConfig({
     actions: {
       rowActions: (invoice: InvoiceItem) => ({
         onView: () => onViewInvoice(invoice),
-        onEdit: () => onEditInvoice(invoice),
+        onEdit: onEditInvoice ? () => onEditInvoice(invoice) : undefined,
       }),
     },
   };

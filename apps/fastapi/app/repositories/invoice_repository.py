@@ -24,11 +24,20 @@ def list_invoices(
     search: str | None,
     page: int,
     size: int,
+    student_ids: list[int] | None = None,
 ) -> tuple[list[dict], int]:
     where_sql = [
         "si.tenant_id = :tenant_id",
     ]
     params: dict = {"tenant_id": tenant_id}
+
+    if student_ids is not None:
+        if not student_ids:
+            return [], 0
+        placeholders = ", ".join(f":student_id_{idx}" for idx in range(len(student_ids)))
+        where_sql.append(f"si.student_id IN ({placeholders})")
+        for idx, student_id in enumerate(student_ids):
+            params[f"student_id_{idx}"] = int(student_id)
 
     if academic_year_id is not None:
         where_sql.append("si.academic_year_id = :academic_year_id")

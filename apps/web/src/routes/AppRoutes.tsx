@@ -233,7 +233,7 @@ export default function AppRoutes() {
           <Route path="/fees/setup/:id/edit" element={<ProtectedRoute requiredPermissions="FEE_MGMT:edit"><FeeStructureForm /></ProtectedRoute>} />
           <Route
             path="/fees/collect-payment"
-            element={<ProtectedRoute requiredPermissions="FEE_MGMT:create"><CollectPaymentPage /></ProtectedRoute>}
+            element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><CollectPaymentPage /></ProtectedRoute>}
           />
           <Route
             path="/fees/invoices"

@@ -5,18 +5,23 @@ import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
 import { EntityTableSection, ListPageLayout, ListPageToolbar } from "../../components/reusable";
 import { useInvoiceListController } from "../../hooks/useInvoiceListController";
+import { useInvoicePermissions } from "../../hooks/useInvoicePermissions";
 import { createInvoiceListConfig } from "./InvoiceList.listConfig";
 
 export default function InvoiceList() {
   const navigate = useNavigate();
   const controller = useInvoiceListController();
+  const perms = useInvoicePermissions();
   const config = useMemo(
     () =>
       createInvoiceListConfig({
         onViewInvoice: (invoice) => navigate(`/fees/invoices/${invoice.id}/detail`),
-        onEditInvoice: (invoice) => navigate(`/fees/invoices/${invoice.id}/edit`),
+        onEditInvoice: perms.canEditInvoices
+          ? (invoice) => navigate(`/fees/invoices/${invoice.id}/edit`)
+          : undefined,
+        showStudentName: perms.showStudentColumn,
       }),
-    [navigate]
+    [navigate, perms.canEditInvoices, perms.showStudentColumn]
   );
 
   return (
@@ -30,11 +35,20 @@ export default function InvoiceList() {
               <ListPageToolbar
                 searchValue={controller.search}
                 onSearchChange={controller.setSearch}
-                searchPlaceholder="Search by student name / invoice ID..."
-                onAddClick={() => navigate("/fees/generate-invoice")}
+                searchPlaceholder={
+                  perms.readOnlyAudience
+                    ? "Search by invoice ID..."
+                    : "Search by student name / invoice ID..."
+                }
+                onAddClick={
+                  perms.canCreateInvoices
+                    ? () => navigate("/fees/generate-invoice")
+                    : undefined
+                }
                 addLabel="Generate Invoice"
                 addIcon={<AddIcon sx={{ fontSize: 24 }} />}
                 renderActions={
+                  perms.readOnlyAudience ? undefined : (
                   <>
                     <Select
                       value={controller.classId}
@@ -91,6 +105,7 @@ export default function InvoiceList() {
                       ))}
                     </Select>
                   </>
+                  )
                 }
               />
             }

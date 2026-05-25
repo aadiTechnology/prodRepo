@@ -43,6 +43,9 @@ async def list_student_invoices(
         installment=installment,
         status=status_filter,
         search=search,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
     )
 
 
@@ -52,7 +55,14 @@ async def get_student_invoice(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_installment_tracking_access),
 ):
-    return invoice_service.get_invoice(db, tenant_id=current_user.tenant_id, invoice_id=invoice_id)
+    return invoice_service.get_invoice(
+        db,
+        tenant_id=current_user.tenant_id,
+        invoice_id=invoice_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+    )
 
 
 @router.get("/{invoice_id}/detail", response_model=InvoiceDetailResponse)
@@ -65,6 +75,9 @@ async def get_student_invoice_detail(
         db,
         tenant_id=current_user.tenant_id,
         invoice_id=invoice_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
     )
 
 
@@ -74,7 +87,14 @@ async def create_student_invoice(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_installment_tracking_access),
 ):
-    return invoice_service.create_invoice(db, tenant_id=current_user.tenant_id, payload=payload)
+    return invoice_service.create_invoice(
+        db,
+        tenant_id=current_user.tenant_id,
+        payload=payload,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+    )
 
 
 @router.put("/{invoice_id}", response_model=InvoiceResponse)
@@ -89,6 +109,9 @@ async def update_student_invoice(
         tenant_id=current_user.tenant_id,
         invoice_id=invoice_id,
         payload=payload,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
     )
 
 
@@ -98,7 +121,14 @@ async def delete_student_invoice(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_installment_tracking_access),
 ):
-    invoice_service.delete_invoice(db, tenant_id=current_user.tenant_id, invoice_id=invoice_id)
+    invoice_service.delete_invoice(
+        db,
+        tenant_id=current_user.tenant_id,
+        invoice_id=invoice_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+    )
     return None
 
 
@@ -133,6 +163,9 @@ async def get_students_for_invoice(
         division_id=division_id,
         academic_year_id=academic_year_id,
         installment_name=installment_name,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
     )
 
 
@@ -146,4 +179,7 @@ async def generate_invoices(
         db,
         tenant_id=current_user.tenant_id,
         payload=payload,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
     )

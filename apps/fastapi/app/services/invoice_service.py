@@ -12,6 +12,11 @@ from app.models.fee import FeeStructure
 from app.models.student import Student
 from app.models.student_fee_assignment import StudentFeeAssignment, StudentFeeDetail
 from app.repositories import invoice_repository
+from app.services.invoice_access import (
+    assert_invoice_row_access,
+    assert_invoice_staff_access,
+    get_invoice_scope_student_ids,
+)
 from app.schemas.invoice import (
     FeePlanResponse,
     GenerateInvoiceRequest,
@@ -123,7 +128,20 @@ def list_invoices(
     installment: str | None = None,
     status: str | None = None,
     search: str | None = None,
+    user_id: int | None = None,
+    email: str | None = None,
+    legacy_role: object | None = None,
 ) -> InvoiceListResponse:
+    scoped_student_ids = None
+    if user_id is not None and email is not None:
+        scoped_student_ids = get_invoice_scope_student_ids(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+        )
+
     rows, total = invoice_repository.list_invoices(
         db,
         tenant_id=tenant_id,
@@ -134,6 +152,7 @@ def list_invoices(
         search=search,
         page=page,
         size=size,
+        student_ids=scoped_student_ids,
     )
     return InvoiceListResponse(
         items=[_to_invoice_response(row) for row in rows],
@@ -143,10 +162,27 @@ def list_invoices(
     )
 
 
-def get_invoice(db: Session, *, tenant_id: int, invoice_id: int) -> InvoiceResponse:
+def get_invoice(
+    db: Session,
+    *,
+    tenant_id: int,
+    invoice_id: int,
+    user_id: int | None = None,
+    email: str | None = None,
+    legacy_role: object | None = None,
+) -> InvoiceResponse:
     row = invoice_repository.get_invoice_by_id(db, tenant_id=tenant_id, invoice_id=invoice_id)
     if not row:
         raise NotFoundException("StudentInvoice", invoice_id)
+    if user_id is not None and email is not None:
+        assert_invoice_row_access(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+            student_id=int(row["student_id"]),
+        )
     return _to_invoice_response(row)
 
 
@@ -155,10 +191,31 @@ def get_invoice_detail(
     *,
     tenant_id: int,
     invoice_id: int,
+    user_id: int | None = None,
+    email: str | None = None,
+    legacy_role: object | None = None,
 ) -> InvoiceDetailResponse:
     invoice_row = invoice_repository.get_invoice_by_id(db, tenant_id=tenant_id, invoice_id=invoice_id)
     if not invoice_row:
         raise NotFoundException("StudentInvoice", invoice_id)
+
+    scoped_student_ids = None
+    if user_id is not None and email is not None:
+        scoped_student_ids = get_invoice_scope_student_ids(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+        )
+        assert_invoice_row_access(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+            student_id=int(invoice_row["student_id"]),
+        )
 
     student_info_row = invoice_repository.get_invoice_student_info(
         db, tenant_id=tenant_id, invoice_id=invoice_id
@@ -211,7 +268,10 @@ def get_invoice_detail(
     due_amount = float(invoice_row["due_amount"] or 0)
     available_actions: list[str] = ["download_invoice", "print_invoice", "back"]
     if due_amount > 0:
-        available_actions.extend(["pay_now", "collect_payment"])
+        if scoped_student_ids is not None:
+            available_actions.append("pay_now")
+        else:
+            available_actions.extend(["pay_now", "collect_payment"])
 
     # Calculate paid ratio based on NET amount (amount - discount)
     net_breakdown_total = sum(
@@ -284,7 +344,18 @@ def create_invoice(
     *,
     tenant_id: int,
     payload: InvoiceCreateRequest,
+    user_id: int | None = None,
+    email: str | None = None,
+    legacy_role: object | None = None,
 ) -> InvoiceResponse:
+    if user_id is not None and email is not None:
+        assert_invoice_staff_access(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+        )
     _validate_relations(
         db,
         tenant_id=tenant_id,
@@ -336,7 +407,18 @@ def update_invoice(
     tenant_id: int,
     invoice_id: int,
     payload: InvoiceUpdateRequest,
+    user_id: int | None = None,
+    email: str | None = None,
+    legacy_role: object | None = None,
 ) -> InvoiceResponse:
+    if user_id is not None and email is not None:
+        assert_invoice_staff_access(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+        )
     existing = invoice_repository.get_invoice_by_id(db, tenant_id=tenant_id, invoice_id=invoice_id)
     if not existing:
         raise NotFoundException("StudentInvoice", invoice_id)
@@ -411,7 +493,23 @@ def update_invoice(
     return get_invoice(db, tenant_id=tenant_id, invoice_id=invoice_id)
 
 
-def delete_invoice(db: Session, *, tenant_id: int, invoice_id: int) -> None:
+def delete_invoice(
+    db: Session,
+    *,
+    tenant_id: int,
+    invoice_id: int,
+    user_id: int | None = None,
+    email: str | None = None,
+    legacy_role: object | None = None,
+) -> None:
+    if user_id is not None and email is not None:
+        assert_invoice_staff_access(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+        )
     existing = invoice_repository.get_invoice_by_id(db, tenant_id=tenant_id, invoice_id=invoice_id)
     if not existing:
         raise NotFoundException("StudentInvoice", invoice_id)
@@ -476,7 +574,18 @@ def get_students_for_invoice(
     division_id: int,
     academic_year_id: int,
     installment_name: str | None = None,
+    user_id: int | None = None,
+    email: str | None = None,
+    legacy_role: object | None = None,
 ) -> list[InvoiceStudentItem]:
+    if user_id is not None and email is not None:
+        assert_invoice_staff_access(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+        )
     students = (
         db.query(
             Student.id,
@@ -588,7 +697,18 @@ def generate_invoices(
     *,
     tenant_id: int,
     payload: GenerateInvoiceRequest,
+    user_id: int | None = None,
+    email: str | None = None,
+    legacy_role: object | None = None,
 ) -> GenerateInvoiceResponse:
+    if user_id is not None and email is not None:
+        assert_invoice_staff_access(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+        )
     if not payload.student_ids:
         return GenerateInvoiceResponse(
             created_count=0,

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, get_current_user, get_rbac_role_codes
 from app.core.exceptions import ForbiddenException
+from app.services.homework_access import is_parent_user, is_student_user
 from app.models.student import Student
 from app.models.academic import SchoolClass
 
@@ -37,6 +38,11 @@ def require_installment_tracking_access(
 
     codes = set(get_rbac_role_codes(db, current_user.id))
     if codes & ALLOWED_ROLE_CODES:
+        return current_user
+
+    if is_student_user(db, current_user.id, current_user.role):
+        return current_user
+    if is_parent_user(db, current_user.id, current_user.role):
         return current_user
 
     raise ForbiddenException("Insufficient permissions")

@@ -14,6 +14,7 @@ from app.models.student_invoice import StudentInvoice
 from app.models.student_fee_ledger import FeeLedger
 from app.models.user import User
 from app.repositories import invoice_repository
+from app.services.invoice_access import assert_invoice_row_access
 from app.schemas.fee_collection import (
     FeeReceiptDetailResponse,
     FeeReceiptFeeDetailItem,
@@ -268,6 +269,8 @@ def collect_invoice_payment(
     tenant_id: int,
     user_id: int | None,
     req: InvoicePaymentCollectRequest,
+    email: str | None = None,
+    legacy_role: object | None = None,
 ) -> FeePaymentCollectResponse:
     payment_method, reference_no = _validate_payment_metadata(
         req.payment_method, req.reference_no
@@ -281,6 +284,16 @@ def collect_invoice_payment(
     )
     if not invoice:
         raise NotFoundException("Invoice", req.invoice_id)
+
+    if user_id is not None and email is not None:
+        assert_invoice_row_access(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+            student_id=int(invoice.student_id),
+        )
 
     # 2. Validate: no overpayment
     due_amount = Decimal(str(invoice.due_amount))
@@ -401,6 +414,9 @@ def get_receipt_detail(
     *,
     tenant_id: int,
     payment_id: int,
+    user_id: int | None = None,
+    email: str | None = None,
+    legacy_role: object | None = None,
 ) -> FeeReceiptDetailResponse:
     payment = (
         db.query(FeePayment)
@@ -409,6 +425,16 @@ def get_receipt_detail(
     )
     if not payment:
         raise NotFoundException("Receipt", payment_id)
+
+    if user_id is not None and email is not None:
+        assert_invoice_row_access(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+            student_id=int(payment.student_id),
+        )
 
     student = (
         db.query(Student)
@@ -548,6 +574,9 @@ def get_invoice_receipt_detail(
     *,
     tenant_id: int,
     invoice_id: int,
+    user_id: int | None = None,
+    email: str | None = None,
+    legacy_role: object | None = None,
 ) -> FeeReceiptDetailResponse:
     invoice = (
         db.query(StudentInvoice)
@@ -556,6 +585,16 @@ def get_invoice_receipt_detail(
     )
     if not invoice:
         raise NotFoundException("Invoice", invoice_id)
+
+    if user_id is not None and email is not None:
+        assert_invoice_row_access(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+            student_id=int(invoice.student_id),
+        )
 
     student = (
         db.query(Student)

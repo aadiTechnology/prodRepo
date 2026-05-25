@@ -58,6 +58,8 @@ async def collect_invoice_fee_payment(
         tenant_id=effective_tenant_id,
         user_id=current_user.id,
         req=payload,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
     )
 
 
@@ -71,6 +73,9 @@ async def get_fee_receipt_detail(
         db,
         tenant_id=current_user.tenant_id,
         payment_id=payment_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
     )
 
 
@@ -84,5 +89,8 @@ async def get_invoice_fee_receipt_detail(
         db,
         tenant_id=current_user.tenant_id,
         invoice_id=invoice_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
     )
 
