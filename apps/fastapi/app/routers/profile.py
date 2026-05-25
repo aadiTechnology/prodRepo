@@ -34,16 +34,29 @@ async def get_profile(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> ProfileResponse:
-    """Fetch the logged-in user's full profile including is_active and image."""
-    # Always query the full User row so we get is_active
+    """Fetch the logged-in user's full profile including is_active and image.
+    
+    ✓ Each user sees ONLY their own profile (user_id enforced)
+    """
+    # Validate current_user has valid ID
+    if not current_user or not current_user.id:
+        logger.error(f"Invalid current_user: {current_user}")
+        raise HTTPException(status_code=401, detail="Invalid user session")
+
+    # Query User with explicit user_id filter
     db_user = db.query(User).filter(User.id == current_user.id).first()
     if not db_user:
+        logger.warning(f"User not found for ID: {current_user.id}")
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Get UserProfile for THIS user only (user_id enforced)
     profile = db.query(UserProfile).filter(UserProfile.UserId == current_user.id).first()
     image_path = profile.ProfileImagePath if profile else None
 
-    logger.info(f"Profile fetched for user {current_user.id} ({db_user.email})")
+    logger.info(
+        f"✓ Profile fetched for user {current_user.id} ({db_user.email}) | "
+        f"Image: {image_path or 'None'}"
+    )
     return _build_response(db_user, image_path)
 
 
@@ -53,25 +66,39 @@ async def update_profile(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> ProfileResponse:
-    """Update the logged-in user's full name."""
+    """Update the logged-in user's full name.
+    
+    ✓ Each user can ONLY update their own profile (user_id enforced)
+    """
+    if not current_user or not current_user.id:
+        logger.error(f"Invalid current_user: {current_user}")
+        raise HTTPException(status_code=401, detail="Invalid user session")
+
     if len(payload.full_name.strip()) < 2:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Please enter Full Name (minimum 2 characters).",
         )
 
+    # Query User with explicit user_id filter
     db_user = db.query(User).filter(User.id == current_user.id).first()
     if not db_user:
+        logger.warning(f"User not found for ID: {current_user.id}")
         raise HTTPException(status_code=404, detail="User not found")
 
+    old_name = db_user.full_name
     db_user.full_name = payload.full_name.strip()
     db.commit()
     db.refresh(db_user)
 
+    # Get UserProfile for THIS user only
     profile = db.query(UserProfile).filter(UserProfile.UserId == current_user.id).first()
     image_path = profile.ProfileImagePath if profile else None
 
-    logger.info(f"Profile name updated for user {current_user.id}")
+    logger.info(
+        f"✓ Profile name updated for user {current_user.id} ({db_user.email}) | "
+        f"'{old_name}' → '{db_user.full_name}'"
+    )
     return _build_response(db_user, image_path)
 
 
@@ -81,7 +108,16 @@ async def upload_profile_image(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> ProfileResponse:
-    """Upload a profile image. Saves to static/profile-images/{userId}.{ext}."""
+    """Upload a profile image. Saves to static/profile-images/{userId}.{ext}
+    
+    ✓ Each user's image is stored with THEIR user_id as filename
+    ✓ Prevents image sharing between users
+    """
+    if not current_user or not current_user.id:
+        logger.error(f"Invalid current_user: {current_user}")
+        raise HTTPException(status_code=401, detail="Invalid user session")
+
+    # Validate file extension
     extension = os.path.splitext(file.filename or "")[1].lower()
     if extension not in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
         raise HTTPException(
@@ -89,42 +125,60 @@ async def upload_profile_image(
             detail="Invalid file type. Allowed: jpg, jpeg, png, gif, webp.",
         )
 
+    # Create filename with USER_ID to ensure uniqueness
     filename = f"{current_user.id}{extension}"
     file_path = os.path.join(UPLOAD_DIR, filename)
 
+    logger.info(
+        f"[UPLOAD] User {current_user.id} ({current_user.email}) uploading image: {filename}"
+    )
+
+    # Save file to disk
     try:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
+        logger.info(f"[DISK] File saved: {file_path}")
     except Exception as e:
-        logger.error(f"Failed to save profile image for user {current_user.id}: {e}")
+        logger.error(f"[DISK ERROR] Failed to save profile image for user {current_user.id}: {e}")
         raise HTTPException(status_code=500, detail="Unable to save image. Please try again.")
 
     public_path = f"/profile-images/{filename}"
 
-    # Upsert into UserProfile table
+    # Upsert into UserProfile table (user_id enforced)
     try:
         profile = db.query(UserProfile).filter(UserProfile.UserId == current_user.id).first()
         if profile:
+            old_path = profile.ProfileImagePath
             profile.ProfileImagePath = public_path
-            logger.info(f"Updating existing profile for user {current_user.id}")
+            logger.info(
+                f"[DB] Updating existing UserProfile for user {current_user.id} | "
+                f"{old_path} → {public_path}"
+            )
         else:
             profile = UserProfile(UserId=current_user.id, ProfileImagePath=public_path)
             db.add(profile)
-            logger.info(f"Creating new profile for user {current_user.id}")
-        
+            logger.info(
+                f"[DB] Creating new UserProfile for user {current_user.id} | {public_path}"
+            )
+
         db.commit()
         db.refresh(profile)
-        logger.info(f"✓ Profile image committed to database for user {current_user.id}: {public_path}")
+        logger.info(
+            f"✓ Profile image committed to DB for user {current_user.id}: {public_path}"
+        )
     except Exception as e:
         db.rollback()
-        logger.error(f"✗ Failed to save profile to database: {type(e).__name__}: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Database error: {str(e)}"
+        logger.error(
+            f"✗ Database error for user {current_user.id}: {type(e).__name__}: {str(e)}"
         )
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+    # Get updated User record
     db_user = db.query(User).filter(User.id == current_user.id).first()
-    logger.info(f"Profile image updated for user {current_user.id}: {public_path}")
+    logger.info(
+        f"✓ Profile image upload complete for user {current_user.id} ({db_user.email}) "
+        f"→ {public_path}"
+    )
     return _build_response(db_user, profile.ProfileImagePath)
 
 
@@ -133,7 +187,17 @@ async def delete_profile_image(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> ProfileResponse:
-    """Remove the user's profile image from disk and clear the DB path."""
+    """Remove the user's profile image from disk and clear the DB path.
+    
+    ✓ Each user can ONLY delete their own image (user_id enforced)
+    """
+    if not current_user or not current_user.id:
+        logger.error(f"Invalid current_user: {current_user}")
+        raise HTTPException(status_code=401, detail="Invalid user session")
+
+    logger.info(f"[DELETE] User {current_user.id} ({current_user.email}) deleting profile image")
+
+    # Get UserProfile for THIS user only
     profile = db.query(UserProfile).filter(UserProfile.UserId == current_user.id).first()
 
     if profile and profile.ProfileImagePath:
@@ -143,24 +207,31 @@ async def delete_profile_image(
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
-                logger.info(f"Deleted image file: {file_path}")
+                logger.info(f"[DISK] File deleted: {file_path}")
         except Exception as e:
-            logger.warning(f"Could not delete image file {file_path}: {e}")
+            logger.warning(f"[DISK WARN] Could not delete image file {file_path}: {e}")
 
         # Update database
         try:
+            old_path = profile.ProfileImagePath
             profile.ProfileImagePath = None
             db.commit()
             db.refresh(profile)
-            logger.info(f"✓ Profile image deleted from database for user {current_user.id}")
+            logger.info(
+                f"✓ Profile image deleted from DB for user {current_user.id} | "
+                f"Removed: {old_path}"
+            )
         except Exception as e:
             db.rollback()
-            logger.error(f"✗ Failed to delete profile from database: {type(e).__name__}: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Database error: {str(e)}"
+            logger.error(
+                f"✗ Database error deleting profile for user {current_user.id}: "
+                f"{type(e).__name__}: {str(e)}"
             )
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    else:
+        logger.info(f"[DELETE] No image found for user {current_user.id} to delete")
 
+    # Get updated User record
     db_user = db.query(User).filter(User.id == current_user.id).first()
-    logger.info(f"Profile image deleted for user {current_user.id}")
+    logger.info(f"✓ Profile image deletion complete for user {current_user.id} ({db_user.email})")
     return _build_response(db_user, None)

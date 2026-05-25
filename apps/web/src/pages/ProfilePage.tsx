@@ -3,7 +3,7 @@ import {
     Box,
     Typography,
     Avatar,
-    Paper,
+    Card,
     CircularProgress,
     Snackbar,
     Alert,
@@ -14,25 +14,28 @@ import {
     Menu,
     MenuItem,
     ListItemIcon,
+    Grid,
+    alpha,
 } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
 import { Button, TextField } from "../components/primitives";
-import { SaveButton, EmailInput } from "../components/semantic";
 import {
     PhotoCamera as PhotoCameraIcon,
-    AddAPhoto as AddAPhotoIcon,
+    Edit as EditIcon,
     Delete as DeleteIcon,
     Home as HomeIcon,
-    Save as SaveIcon,
-    Person as PersonIcon,
+    Phone as PhoneIcon,
     Email as EmailIcon,
-    Badge as BadgeIcon,
-    VerifiedUser as VerifiedUserIcon,
+    CalendarMonth as CalendarMonthIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { PageHeader } from "../components/common";
+import { PageHeader, PageLayout } from "../components/layout";
+import PrimaryActionButton from "../components/reusable/PrimaryActionButton";
+import { DetailFieldRow } from "../components/reusable";
 import profileService, { ProfileResponse } from "../api/services/profileService";
 import { apiBaseUrl } from "../config";
+import { colorTokens } from "../tokens/colors";
+import { formatShortDate } from "../utils/formatters";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -59,60 +62,40 @@ const formatRole = (role: string): string =>
         .replace(/_/g, " ")
         .replace(/\b\w/g, (c) => c.toUpperCase());
 
-// ─── reusable label ───────────────────────────────────────────────────────────
+// ─── Section Header ───────────────────────────────────────────────────────────
 
-const FieldLabel = ({ children, required }: { children: React.ReactNode; required?: boolean }) => (
-    <Typography
-        sx={(theme) => ({
-            fontSize: "0.78rem",
-            fontWeight: 700,
-            color: theme.palette.text.secondary,
-            mb: 0.8,
-            textTransform: "uppercase",
-            letterSpacing: "0.4px",
-            display: "flex",
-            alignItems: "center",
-            gap: 0.4,
-        })}
-    >
-        {children}
-        {required && (
-            <Typography component="span" sx={(theme) => ({ color: theme.palette.error.main, fontSize: "0.85rem", lineHeight: 1 })}>
-                *
+function SectionHeader({ title, icon }: { title: string; icon: React.ReactNode }) {
+    return (
+        <Box
+            sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                px: 2,
+                py: 1.25,
+                bgcolor: colorTokens.surface.card,
+                borderBottom: "1px solid",
+                borderColor: colorTokens.border.default,
+            }}
+        >
+            <Box sx={{ color: colorTokens.text.primary, display: "flex", alignItems: "center" }}>
+                {icon}
+            </Box>
+            <Typography
+                variant="subtitle2"
+                sx={{
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                    color: colorTokens.text.secondary,
+                    fontSize: "0.82rem",
+                }}
+            >
+                {title}
             </Typography>
-        )}
-    </Typography>
-);
-
-// ─── shared TextField sx ──────────────────────────────────────────────────────
-
-const editableSx = (theme: Theme) => ({
-    "& .MuiOutlinedInput-root": {
-        bgcolor: theme.palette.background.paper,
-        borderRadius: 1.25,
-        fontSize: "0.9rem",
-        fontWeight: 500,
-        "& fieldset": { borderColor: theme.palette.divider, borderWidth: "1.2px" },
-        "&:hover fieldset": { borderColor: theme.palette.grey[400] },
-        "&.Mui-focused": {
-            boxShadow: theme.shadows[2],
-            "& fieldset": { borderColor: theme.palette.primary.main, borderWidth: "1.8px" },
-        },
-        "&.Mui-error fieldset": { borderColor: theme.palette.error.main },
-    },
-    "& .MuiFormHelperText-root": { fontSize: "0.74rem", mt: 0.5 },
-});
-
-const readonlySx = (theme: Theme) => ({
-    "& .MuiOutlinedInput-root": {
-        borderRadius: 1.25,
-        bgcolor: theme.palette.grey[50],
-        fontSize: "0.9rem",
-        fontWeight: 500,
-        "& fieldset": { borderColor: theme.palette.divider },
-        "& .MuiInputBase-input.Mui-disabled": { WebkitTextFillColor: theme.palette.grey[600] },
-    },
-});
+        </Box>
+    );
+}
 
 // ─── ProfilePage ──────────────────────────────────────────────────────────────
 
@@ -145,7 +128,9 @@ const ProfilePage = () => {
         }
     }, []);
 
-    useEffect(() => { fetchProfile(); }, [fetchProfile]);
+    useEffect(() => {
+        fetchProfile();
+    }, [fetchProfile]);
 
     useEffect(() => {
         return () => {
@@ -249,9 +234,19 @@ const ProfilePage = () => {
     // ── loading ────────────────────────────────────────────────────────────
     if (loading) {
         return (
-            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
-                <CircularProgress sx={(theme) => ({ color: theme.palette.primary.main })} />
-            </Box>
+            <PageLayout pageBackground maxWidth="lg">
+                <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+                    <CircularProgress sx={(theme) => ({ color: theme.palette.primary.main })} />
+                </Box>
+            </PageLayout>
+        );
+    }
+
+    if (!profile) {
+        return (
+            <PageLayout pageBackground maxWidth="lg">
+                <Alert severity="error">Unable to load profile. Please try again.</Alert>
+            </PageLayout>
         );
     }
 
@@ -265,372 +260,396 @@ const ProfilePage = () => {
     const isPhotoLoading = uploading || deleting;
 
     return (
-        <Box sx={{ px: { xs: 1.5, sm: 2, md: 4 }, pb: 2, display: "flex", flexDirection: "column" }}>
-            {/* ── Page Header ── */}
-            <PageHeader
-                title="My Profile"
-                onBack={() => navigate("/")}
-                backIcon={<HomeIcon sx={{ color: "white", fontSize: 24 }} />}
-                actions={
-                    <Tooltip title="Save Profile Changes">
-                        <span>
-                            <IconButton
-                                onClick={handleSave}
-                                disabled={!isModified || saving}
-                                sx={(theme) => ({
-                                    backgroundColor: "#10b981",
-                                    color: "white",
-                                    borderRadius: 1.2,
-                                    width: 44,
-                                    height: 44,
-                                    boxShadow: (!isModified || saving) ? "none" : theme.shadows[4],
-                                    "&:hover": {
-                                        backgroundColor: "success.dark",
-                                        transform: (!isModified || saving) ? "none" : "translateY(-1px)",
-                                    },
-                                    "&.Mui-disabled": { backgroundColor: "grey.400", color: "white" },
-                                })}
-                            >
-                                {saving ? <CircularProgress size={22} color="inherit" /> : <SaveIcon sx={{ fontSize: 22 }} />}
-                            </IconButton>
-                        </span>
-                    </Tooltip>
-                }
-            />
-
-            {/* ── Single unified Paper ── */}
-            <Paper
-                elevation={0}
-                sx={(theme) => ({
-                    mt: 1,
-                    borderRadius: 1.5,
-                    border: `1px solid ${theme.palette.divider}`,
-                    bgcolor: theme.palette.background.paper,
-                    overflow: "hidden",
-                    boxShadow: theme.shadows[1],
-                    display: "flex",
-                    flexDirection: "column",
-                })}
-            >
-                {/* ── Dark header bar (matches TenantList) ── */}
-                <Box
-                    sx={{
-                        py: 1.2,
-                        px: 3,
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        bgcolor: "#1a1a2e",
-                    }}
-                >
-                    <Typography
+        <PageLayout
+            pageBackground
+            maxWidth="lg"
+            header={
+                <PageHeader
+                    links={[
+                        { title: "Dashboard", path: "/" },
+                        { title: "My Profile", path: "#" },
+                    ]}
+                    homePath="/"
+                />
+            }
+        >
+            <Grid container spacing={2.5} alignItems="stretch">
+                {/* ── Left Sidebar: Avatar & Quick Info ── */}
+                <Grid item xs={12} md={4} sx={{ display: "flex" }}>
+                    <Card
+                        variant="outlined"
                         sx={{
-                            fontSize: "0.78rem",
-                            color: "rgba(255,255,255,0.7)",
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px",
+                            flex: 1,
+                            height: "100%",
+                            display: "flex",
+                            flexDirection: "column",
+                            borderRadius: 2,
+                            borderColor: colorTokens.border.strong,
+                            overflow: "hidden",
+                            boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
+                            bgcolor: colorTokens.surface.card,
                         }}
                     >
-                        Profile Information
-                    </Typography>
-                    <Typography sx={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", fontWeight: 500 }}>
-                        Only Full Name can be edited
-                    </Typography>
-                </Box>
-
-                {/* ── Avatar + identity row ── */}
-                <Box
-                    sx={(theme) => ({
-                        px: { xs: 2.5, md: 4 },
-                        py: 3,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 3,
-                        borderBottom: `1px solid ${theme.palette.divider}`,
-                        flexWrap: "wrap",
-                    })}
-                >
-                    {/* Avatar with camera overlay */}
-                    <Box sx={{ position: "relative", flexShrink: 0 }}>
-                        <Avatar
-                            src={avatarSrc}
-                            sx={(theme) => ({
-                                width: 90,
-                                height: 90,
-                                fontSize: 30,
-                                fontWeight: 700,
-                                bgcolor: theme.palette.grey[300],
-                                color: theme.palette.text.primary,
-                                border: `3px solid ${theme.palette.grey[200]}`,
-                                boxShadow: theme.shadows[2],
-                            })}
-                        >
-                            {!avatarSrc && initials}
-                        </Avatar>
-
-                        {/* Active status dot */}
+                        {/* Avatar Section */}
                         <Box
                             sx={{
-                                position: "absolute",
-                                bottom: 5,
-                                right: 5,
-                                width: 16,
-                                height: 16,
-                                borderRadius: "50%",
-                                bgcolor: profile?.is_active ? "#10b981" : "#ef4444",
-                                border: "2.5px solid white",
-                                boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+                                px: 2,
+                                py: 2.5,
+                                textAlign: "center",
+                                background: `linear-gradient(135deg, ${alpha(colorTokens.primary.main, 0.14)} 0%, ${alpha("#10b981", 0.16)} 100%)`,
+                                borderBottom: `1px solid ${colorTokens.border.default}`,
                             }}
-                        />
+                        >
+                            {/* Avatar with Camera Overlay */}
+                            <Box sx={{ position: "relative", display: "inline-block", mb: 1.5 }}>
+                                <Avatar
+                                    src={avatarSrc}
+                                    sx={{
+                                        width: 112,
+                                        height: 112,
+                                        fontSize: 40,
+                                        fontWeight: 700,
+                                        bgcolor: colorTokens.gray[300],
+                                        color: colorTokens.text.primary,
+                                        border: "3px solid",
+                                        borderColor: "common.white",
+                                        boxShadow: 2,
+                                    }}
+                                >
+                                    {!avatarSrc && initials}
+                                </Avatar>
 
-                        {/* Camera hover overlay */}
-                        <Tooltip title={profile?.profile_image_path ? "Change or remove photo" : "Upload photo"}>
-                            <Box
-                                onClick={isPhotoLoading ? undefined : handlePhotoButtonClick}
-                                sx={{
-                                    position: "absolute",
-                                    top: 0, left: 0, right: 0, bottom: 0,
-                                    borderRadius: "50%",
-                                    bgcolor: "rgba(0,0,0,0.45)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    opacity: 0,
-                                    transition: "opacity 0.2s ease",
-                                    cursor: isPhotoLoading ? "default" : "pointer",
-                                    "&:hover": { opacity: 1 },
-                                }}
-                            >
-                                {isPhotoLoading
-                                    ? <CircularProgress size={20} sx={{ color: "white" }} />
-                                    : <PhotoCameraIcon sx={{ color: "white", fontSize: 20 }} />}
+                                {/* Active status dot */}
+                                <Box
+                                    sx={{
+                                        position: "absolute",
+                                        bottom: 5,
+                                        right: 5,
+                                        width: 18,
+                                        height: 18,
+                                        borderRadius: "50%",
+                                        bgcolor: profile?.is_active ? "#10b981" : "#ef4444",
+                                        border: "3px solid white",
+                                        boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                                    }}
+                                />
+
+                                {/* Camera hover overlay */}
+                                <Tooltip title={profile?.profile_image_path ? "Change or remove photo" : "Upload photo"}>
+                                    <Box
+                                        onClick={isPhotoLoading ? undefined : handlePhotoButtonClick}
+                                        sx={{
+                                            position: "absolute",
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            borderRadius: "50%",
+                                            bgcolor: "rgba(0,0,0,0.45)",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            opacity: 0,
+                                            transition: "opacity 0.2s ease",
+                                            cursor: isPhotoLoading ? "default" : "pointer",
+                                            "&:hover": { opacity: 1 },
+                                        }}
+                                    >
+                                        {isPhotoLoading
+                                            ? <CircularProgress size={24} sx={{ color: "white" }} />
+                                            : <PhotoCameraIcon sx={{ color: "white", fontSize: 24 }} />}
+                                    </Box>
+                                </Tooltip>
                             </Box>
-                        </Tooltip>
-                    </Box>
 
-                    {/* Name / email / badges */}
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={(theme) => ({ fontWeight: 700, fontSize: "1.1rem", color: theme.palette.text.primary, mb: 0.3 })}>
-                            {profile?.full_name ?? "—"}
-                        </Typography>
-                        <Typography sx={(theme) => ({ fontSize: "0.85rem", color: theme.palette.text.secondary, mb: 1.2, fontWeight: 500 })}>
-                            {profile?.email ?? "—"}
-                        </Typography>
-                        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
-                            <Chip
-                                label={formatRole(profile?.role ?? "")}
-                                size="small"
-                                sx={{
-                                    bgcolor: "rgba(26,26,46,0.08)",
-                                    color: "#1a1a2e",
-                                    fontWeight: 700,
-                                    fontSize: "0.7rem",
-                                    letterSpacing: "0.3px",
-                                    textTransform: "uppercase",
-                                    border: "1px solid rgba(26,26,46,0.15)",
-                                    borderRadius: "6px",
-                                    height: 22,
-                                }}
-                            />
-                            <Box
-                                sx={(theme) => ({
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 0.7,
-                                    px: 1.2,
-                                    py: 0.3,
-                                    borderRadius: "20px",
-                                    bgcolor: profile?.is_active ? theme.palette.success.light : theme.palette.error.light,
-                                    color: profile?.is_active ? theme.palette.success.dark : theme.palette.error.dark,
-                                    border: `1px solid ${profile?.is_active ? theme.palette.success.main : theme.palette.error.main}`,
-                                })}
-                            >
-                                <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "currentColor" }} />
-                                <Typography sx={{ fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                    {profile?.is_active ? "Active" : "Inactive"}
+                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.4, lineHeight: 1.2, color: colorTokens.text.primary }}>
+                                {profile?.full_name}
+                            </Typography>
+                            <Typography variant="caption" sx={{ display: "block", mb: 1.2, color: colorTokens.text.secondary }}>
+                                {profile?.email}
+                            </Typography>
+                            <Box sx={{ display: "flex", gap: 1, justifyContent: "center", flexWrap: "wrap" }}>
+                                <Chip
+                                    label={formatRole(profile?.role ?? "")}
+                                    size="small"
+                                    sx={{
+                                        bgcolor: "rgba(26,26,46,0.08)",
+                                        color: "#1a1a2e",
+                                        fontWeight: 700,
+                                        fontSize: "0.7rem",
+                                        letterSpacing: "0.3px",
+                                        textTransform: "uppercase",
+                                        border: "1px solid rgba(26,26,46,0.15)",
+                                    }}
+                                />
+                                <Chip
+                                    label={profile?.is_active ? "Active" : "Inactive"}
+                                    size="small"
+                                    sx={{
+                                        bgcolor: profile?.is_active ? "#d1fae5" : "#fee2e2",
+                                        color: profile?.is_active ? "#065f46" : "#7f1d1d",
+                                        fontWeight: 700,
+                                        fontSize: "0.7rem",
+                                    }}
+                                />
+                            </Box>
+                        </Box>
+
+                        {/* Quick Info Section */}
+                        <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.8 }}>
+                                <EmailIcon sx={{ fontSize: 18, color: colorTokens.text.secondary }} />
+                                <Typography variant="body2" sx={{ color: colorTokens.text.primary, wordBreak: "break-word" }}>
+                                    {profile?.email}
                                 </Typography>
                             </Box>
+                            <Divider sx={{ borderColor: colorTokens.border.default }} />
+                            <Box sx={{ display: "flex", gap: 1.2, pt: 1 }}>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={isPhotoLoading ? <CircularProgress size={13} color="inherit" /> : <PhotoCameraIcon />}
+                                    onClick={isPhotoLoading ? undefined : handlePhotoButtonClick}
+                                    disabled={isPhotoLoading}
+                                    fullWidth
+                                    sx={{
+                                        borderRadius: 1,
+                                        textTransform: "none",
+                                        fontWeight: 600,
+                                        fontSize: "0.75rem",
+                                    }}
+                                >
+                                    {uploading ? "Uploading…" : "Upload"}
+                                </Button>
+                                {profile?.profile_image_path && (
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        color="error"
+                                        startIcon={deleting ? <CircularProgress size={13} color="inherit" /> : <DeleteIcon />}
+                                        onClick={isPhotoLoading ? undefined : handleDeletePhoto}
+                                        disabled={isPhotoLoading}
+                                        sx={{
+                                            borderRadius: 1,
+                                            textTransform: "none",
+                                            fontWeight: 600,
+                                            fontSize: "0.75rem",
+                                        }}
+                                    >
+                                        {deleting ? "Removing…" : "Remove"}
+                                    </Button>
+                                )}
+                            </Box>
                         </Box>
-                    </Box>
+                    </Card>
+                </Grid>
 
-                    {/* Photo action buttons */}
-                    <Box sx={{ display: "flex", gap: 1.2, flexWrap: "wrap", alignItems: "center" }}>
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={isPhotoLoading ? <CircularProgress size={13} color="inherit" /> : <PhotoCameraIcon />}
-                            onClick={isPhotoLoading ? undefined : handlePhotoButtonClick}
-                            disabled={isPhotoLoading}
-                            sx={(theme) => ({
-                                borderRadius: 1,
-                                textTransform: "none",
-                                fontWeight: 600,
-                                fontSize: "0.82rem",
-                                borderColor: theme.palette.primary.main,
-                                color: theme.palette.text.primary,
-                                px: 2,
-                                "&:hover": { borderColor: theme.palette.primary.main, bgcolor: theme.palette.action.hover },
-                            })}
+                {/* ── Right Content: Edit Form ── */}
+                <Grid item xs={12} md={8} sx={{ display: "flex" }}>
+                    <Card
+                        variant="outlined"
+                        sx={{
+                            flex: 1,
+                            borderRadius: 2,
+                            borderColor: colorTokens.border.strong,
+                            overflow: "hidden",
+                            boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
+                            bgcolor: colorTokens.surface.card,
+                            height: "100%",
+                            display: "flex",
+                            flexDirection: "column",
+                        }}
+                    >
+                        {/* Profile Section */}
+                        <SectionHeader title="Profile Information" icon={<EmailIcon fontSize="small" />} />
+
+                        <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2 }}>
+                            {/* Full Name - Editable */}
+                            <Box>
+                                <Typography
+                                    sx={{
+                                        fontSize: "0.78rem",
+                                        fontWeight: 700,
+                                        color: colorTokens.text.secondary,
+                                        mb: 0.8,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.4px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 0.4,
+                                    }}
+                                >
+                                    Full Name <span style={{ color: colorTokens.error.main }}>*</span>
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    value={fullName}
+                                    onChange={handleNameChange}
+                                    error={Boolean(nameError)}
+                                    helperText={nameError || " "}
+                                    placeholder="Enter your full name"
+                                    inputProps={{ maxLength: 150 }}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            bgcolor: colorTokens.background.paper,
+                                            borderRadius: 1.25,
+                                            fontSize: "0.9rem",
+                                            fontWeight: 500,
+                                        },
+                                    }}
+                                />
+                            </Box>
+
+                            {/* Email - Read Only */}
+                            <Box>
+                                <Typography
+                                    sx={{
+                                        fontSize: "0.78rem",
+                                        fontWeight: 700,
+                                        color: colorTokens.text.secondary,
+                                        mb: 0.8,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.4px",
+                                    }}
+                                >
+                                    Email Address
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    value={profile?.email ?? ""}
+                                    disabled
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            bgcolor: colorTokens.gray[50],
+                                            borderRadius: 1.25,
+                                            fontSize: "0.9rem",
+                                        },
+                                    }}
+                                />
+                                <Typography sx={{ fontSize: "0.72rem", color: colorTokens.text.secondary, mt: 0.5, fontWeight: 500 }}>
+                                    Email is your unique identifier and cannot be changed
+                                </Typography>
+                            </Box>
+
+                            {/* Role - Read Only */}
+                            <Box>
+                                <Typography
+                                    sx={{
+                                        fontSize: "0.78rem",
+                                        fontWeight: 700,
+                                        color: colorTokens.text.secondary,
+                                        mb: 0.8,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.4px",
+                                    }}
+                                >
+                                    Role
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    value={formatRole(profile?.role ?? "")}
+                                    disabled
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            bgcolor: colorTokens.gray[50],
+                                            borderRadius: 1.25,
+                                            fontSize: "0.9rem",
+                                        },
+                                    }}
+                                />
+                                <Typography sx={{ fontSize: "0.72rem", color: colorTokens.text.secondary, mt: 0.5, fontWeight: 500 }}>
+                                    Your role is assigned by administrator
+                                </Typography>
+                            </Box>
+
+                            {/* Account Status - Read Only */}
+                            <Box>
+                                <Typography
+                                    sx={{
+                                        fontSize: "0.78rem",
+                                        fontWeight: 700,
+                                        color: colorTokens.text.secondary,
+                                        mb: 0.8,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.4px",
+                                    }}
+                                >
+                                    Account Status
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        height: 40,
+                                        borderRadius: 1.25,
+                                        bgcolor: colorTokens.gray[50],
+                                        border: `1.2px solid ${colorTokens.border.default}`,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        px: 1.5,
+                                        gap: 1,
+                                    }}
+                                >
+                                    <Box
+                                        sx={{
+                                            width: 8,
+                                            height: 8,
+                                            borderRadius: "50%",
+                                            bgcolor: profile?.is_active ? "#10b981" : "#ef4444",
+                                            flexShrink: 0,
+                                        }}
+                                    />
+                                    <Typography sx={{ fontSize: "0.88rem", fontWeight: 600, color: colorTokens.text.primary }}>
+                                        {profile?.is_active ? "Active" : "Inactive"}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </Box>
+
+                        {/* Footer: Save Button */}
+                        <Divider sx={{ borderColor: colorTokens.border.default }} />
+                        <Box
+                            sx={{
+                                px: 2.5,
+                                py: 2,
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                gap: 1,
+                                bgcolor: colorTokens.gray[50],
+                            }}
                         >
-                            {uploading ? "Uploading…" : "Upload Photo"}
-                        </Button>
-
-                        {profile?.profile_image_path && (
                             <Button
-                                size="small"
                                 variant="outlined"
-                                color="error"
-                                startIcon={deleting ? <CircularProgress size={13} color="inherit" /> : <DeleteIcon />}
-                                onClick={isPhotoLoading ? undefined : handleDeletePhoto}
-                                disabled={isPhotoLoading}
+                                size="small"
+                                onClick={() => {
+                                    setFullName(profile?.full_name ?? "");
+                                    setIsModified(false);
+                                    setNameError("");
+                                }}
+                                disabled={!isModified}
+                                sx={{ borderRadius: 1 }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="contained"
+                                size="small"
+                                onClick={handleSave}
+                                disabled={!isModified || saving}
                                 sx={{
-                                    borderRadius: "8px",
-                                    textTransform: "none",
-                                    fontWeight: 600,
-                                    fontSize: "0.82rem",
-                                    px: 2,
+                                    borderRadius: 1,
+                                    bgcolor: colorTokens.success.main,
+                                    "&:hover": { bgcolor: colorTokens.success.dark },
                                 }}
                             >
-                                {deleting ? "Removing…" : "Remove Photo"}
+                                {saving ? <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} /> : null}
+                                {saving ? "Saving…" : "Save Changes"}
                             </Button>
-                        )}
-                    </Box>
-                </Box>
-
-                {/* ── Form fields ── */}
-                <Box
-                    sx={{
-                        px: { xs: 2.5, md: 4 },
-                        py: 3,
-                        display: "grid",
-                        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-                        gap: { xs: 2.5, sm: 3 },
-                    }}
-                >
-                    {/* Full Name — editable */}
-                    <Box>
-                        <FieldLabel required>Full Name</FieldLabel>
-                        <TextField
-                            fullWidth
-                            size="small"
-                            value={fullName}
-                            onChange={handleNameChange}
-                            error={Boolean(nameError)}
-                            helperText={nameError || " "}
-                            placeholder="Enter your full name"
-                            inputProps={{ maxLength: 255 }}
-                            sx={editableSx}
-                        />
-                    </Box>
-
-                    {/* Email — read only */}
-                    <Box>
-                        <FieldLabel>Email Address</FieldLabel>
-                        <EmailInput
-                            fullWidth
-                            size="small"
-                            value={profile?.email ?? ""}
-                            disabled
-                            sx={readonlySx}
-                        />
-                        <Typography sx={(theme) => ({ fontSize: "0.72rem", color: theme.palette.text.secondary, mt: 0.5, fontWeight: 500 })}>
-                            Email cannot be changed
-                        </Typography>
-                    </Box>
-
-                    {/* Role — read only */}
-                    <Box>
-                        <FieldLabel>Role</FieldLabel>
-                        <TextField
-                            fullWidth
-                            size="small"
-                            value={formatRole(profile?.role ?? "")}
-                            disabled
-                            sx={readonlySx}
-                        />
-                        <Typography sx={(theme) => ({ fontSize: "0.72rem", color: theme.palette.text.secondary, mt: 0.5, fontWeight: 500 })}>
-                            Role is assigned by admin
-                        </Typography>
-                    </Box>
-
-                    {/* Account Status — read only styled field */}
-                    <Box>
-                        <FieldLabel>Account Status</FieldLabel>
-                        <Box
-                            sx={(theme) => ({
-                                height: 37,
-                                borderRadius: 1.25,
-                                bgcolor: theme.palette.grey[50],
-                                border: `1.2px solid ${theme.palette.divider}`,
-                                display: "flex",
-                                alignItems: "center",
-                                px: 1.5,
-                                gap: 1,
-                            })}
-                        >
-                            <Box
-                                sx={(theme) => ({
-                                    width: 7,
-                                    height: 7,
-                                    borderRadius: "50%",
-                                    bgcolor: profile?.is_active ? theme.palette.success.main : theme.palette.error.main,
-                                    flexShrink: 0,
-                                })}
-                            />
-                            <Typography
-                                sx={(theme) => ({
-                                    fontSize: "0.88rem",
-                                    fontWeight: 600,
-                                    color: profile?.is_active ? theme.palette.success.dark : theme.palette.error.dark,
-                                })}
-                            >
-                                {profile?.is_active ? "Active" : "Inactive"}
-                            </Typography>
                         </Box>
-                    </Box>
-                </Box>
-
-                {/* ── Footer hint bar ── */}
-                <Box
-                    sx={(theme) => ({
-                        px: { xs: 2.5, md: 4 },
-                        py: 1.5,
-                        borderTop: `1px solid ${theme.palette.divider}`,
-                        bgcolor: theme.palette.grey[50],
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                        gap: 1,
-                    })}
-                >
-                    <Typography sx={(theme) => ({ fontSize: "0.77rem", color: theme.palette.text.secondary, fontWeight: 500 })}>
-                        JPG, PNG, GIF or WebP · max 5 MB · Click avatar to change photo
-                    </Typography>
-                    <SaveButton
-                        variant="contained"
-                        size="small"
-                        onClick={handleSave}
-                        disabled={!isModified || saving}
-                        loading={saving}
-                        sx={(theme) => ({
-                            bgcolor: theme.palette.success.main,
-                            color: theme.palette.success.contrastText,
-                            borderRadius: 1,
-                            textTransform: "none",
-                            fontWeight: 700,
-                            fontSize: "0.85rem",
-                            px: 2.5,
-                            boxShadow: "none",
-                            "&:hover": { bgcolor: theme.palette.success.dark, boxShadow: "none" },
-                            "&.Mui-disabled": { bgcolor: theme.palette.grey[300], color: theme.palette.text.secondary },
-                        })}
-                    >
-                        {saving ? "Saving…" : "Save Changes"}
-                    </SaveButton>
-                </Box>
-            </Paper>
+                    </Card>
+                </Grid>
+            </Grid>
 
             {/* ── Hidden file input ── */}
             <input
@@ -648,21 +667,12 @@ const ProfilePage = () => {
                 onClose={handlePhotoMenuClose}
                 anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
                 transformOrigin={{ vertical: "top", horizontal: "center" }}
-                PaperProps={{
-                    sx: (theme) => ({
-                        mt: 1,
-                        borderRadius: 1.25,
-                        border: `1px solid ${theme.palette.divider}`,
-                        boxShadow: theme.shadows[4],
-                        minWidth: 170,
-                    }),
-                }}
             >
                 <MenuItem onClick={handleChangePhoto} sx={{ fontSize: "0.875rem", py: 1.2, fontWeight: 600 }}>
-                    <ListItemIcon><AddAPhotoIcon fontSize="small" sx={(theme) => ({ color: theme.palette.text.primary })} /></ListItemIcon>
+                    <ListItemIcon><PhotoCameraIcon fontSize="small" /></ListItemIcon>
                     Change Photo
                 </MenuItem>
-                <MenuItem onClick={handleDeletePhoto} sx={{ color: "error.main", fontSize: "0.875rem", py: 1.2, fontWeight: 600 }}>
+                <MenuItem onClick={handleDeletePhoto} sx={{ color: colorTokens.error.main, fontSize: "0.875rem", py: 1.2, fontWeight: 600 }}>
                     <ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>
                     Remove Photo
                 </MenuItem>
@@ -679,17 +689,16 @@ const ProfilePage = () => {
                     onClose={() => setSnack(null)}
                     severity={snack?.severity ?? "info"}
                     variant="filled"
-                    sx={(theme) => ({
+                    sx={{
                         width: "100%",
                         borderRadius: 1.25,
-                        boxShadow: theme.shadows[4],
                         fontWeight: 600,
-                    })}
+                    }}
                 >
                     {snack?.msg}
                 </Alert>
             </Snackbar>
-        </Box>
+        </PageLayout>
     );
 };
 
