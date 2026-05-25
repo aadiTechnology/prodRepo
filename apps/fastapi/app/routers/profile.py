@@ -6,6 +6,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user, CurrentUser
 from app.models.user import User
 from app.models.user_profile import UserProfile
+from app.models.teacher import Teacher
 from app.schemas.profile import ProfileResponse, ProfileUpdate
 from app.core.logging_config import get_logger
 
@@ -17,15 +18,33 @@ UPLOAD_DIR = "static/profile-images"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-def _build_response(db_user: User, profile_image_path: str | None) -> ProfileResponse:
+def _build_response(db_user: User, profile_image_path: str | None, db: Session | None = None) -> ProfileResponse:
     """Build a ProfileResponse from a User ORM object."""
-    role_str = db_user.role.value if hasattr(db_user.role, "value") else str(db_user.role)
+    # Use RBAC roles first (source of truth), fall back to legacy role column
+    if db_user.roles:
+        role_str = db_user.roles[0].code
+    else:
+        role_str = db_user.role.value if hasattr(db_user.role, "value") else str(db_user.role)
+    tenant_name = db_user.tenant.name if db_user.tenant else None
+    phone_number = db_user.phone_number
+    created_at = db_user.created_at
+    # Fall back to Teacher.mobile_number if User.phone_number is not set
+    if not phone_number and db:
+        teacher = db.query(Teacher).filter(
+            Teacher.user_id == db_user.id,
+            Teacher.is_deleted == False
+        ).first()
+        if teacher and teacher.mobile_number:
+            phone_number = teacher.mobile_number
     return ProfileResponse(
         full_name=db_user.full_name,
         email=db_user.email,
         role=role_str,
         is_active=db_user.is_active,
         profile_image_path=profile_image_path,
+        phone_number=phone_number,
+        created_at=created_at,
+        tenant_name=tenant_name,
     )
 
 
@@ -57,7 +76,7 @@ async def get_profile(
         f"✓ Profile fetched for user {current_user.id} ({db_user.email}) | "
         f"Image: {image_path or 'None'}"
     )
-    return _build_response(db_user, image_path)
+    return _build_response(db_user, image_path, db)
 
 
 @router.put("", response_model=ProfileResponse)
@@ -99,7 +118,7 @@ async def update_profile(
         f"✓ Profile name updated for user {current_user.id} ({db_user.email}) | "
         f"'{old_name}' → '{db_user.full_name}'"
     )
-    return _build_response(db_user, image_path)
+    return _build_response(db_user, image_path, db)
 
 
 @router.post("/upload-image", response_model=ProfileResponse)
@@ -179,7 +198,7 @@ async def upload_profile_image(
         f"✓ Profile image upload complete for user {current_user.id} ({db_user.email}) "
         f"→ {public_path}"
     )
-    return _build_response(db_user, profile.ProfileImagePath)
+    return _build_response(db_user, profile.ProfileImagePath, db)
 
 
 @router.delete("/image", response_model=ProfileResponse)
@@ -234,4 +253,4 @@ async def delete_profile_image(
     # Get updated User record
     db_user = db.query(User).filter(User.id == current_user.id).first()
     logger.info(f"✓ Profile image deletion complete for user {current_user.id} ({db_user.email})")
-    return _build_response(db_user, None)
+    return _build_response(db_user, None, db)

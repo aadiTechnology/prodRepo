@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, EmailStr
 
@@ -8,6 +9,9 @@ class ProfileResponse(BaseModel):
     role: str
     is_active: bool
     profile_image_path: Optional[str] = None
+    phone_number: Optional[str] = None
+    created_at: Optional[datetime] = None
+    tenant_name: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -322,7 +322,8 @@ def create_teacher(db: Session, payload: TeacherCreate, created_by: int, tenant_
                 full_name=payload.full_name,
                 password="Teacher@123",
                 role="TEACHER",
-                tenant_id=tenant_id
+                tenant_id=tenant_id,
+                phone_number=payload.mobile_number,
             )
             try:
                  new_user = user_service.create_user(db, user_data, created_by=created_by, tenant_id=tenant_id)

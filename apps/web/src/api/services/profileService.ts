@@ -6,6 +6,9 @@ export interface ProfileResponse {
     role: string;
     is_active: boolean;
     profile_image_path?: string;
+    phone_number?: string | null;
+    created_at?: string | null;
+    tenant_name?: string | null;
 }
 
 export interface ProfileUpdate {

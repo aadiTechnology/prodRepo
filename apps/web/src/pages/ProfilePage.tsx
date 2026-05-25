@@ -27,6 +27,8 @@ import {
     Phone as PhoneIcon,
     Email as EmailIcon,
     CalendarMonth as CalendarMonthIcon,
+    Business as BusinessIcon,
+    Badge as BadgeIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { PageHeader, PageLayout } from "../components/layout";
@@ -397,12 +399,40 @@ const ProfilePage = () => {
 
                         {/* Quick Info Section */}
                         <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1 }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.8 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
+                                <PhoneIcon sx={{ fontSize: 18, color: colorTokens.text.secondary }} />
+                                <Typography variant="body2" sx={{ color: colorTokens.text.primary, wordBreak: "break-word" }}>
+                                    {profile?.phone_number || "—"}
+                                </Typography>
+                            </Box>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
                                 <EmailIcon sx={{ fontSize: 18, color: colorTokens.text.secondary }} />
                                 <Typography variant="body2" sx={{ color: colorTokens.text.primary, wordBreak: "break-word" }}>
                                     {profile?.email}
                                 </Typography>
                             </Box>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
+                                <BadgeIcon sx={{ fontSize: 18, color: colorTokens.text.secondary }} />
+                                <Typography variant="body2" sx={{ color: colorTokens.text.primary, wordBreak: "break-word" }}>
+                                    {formatRole(profile?.role ?? "")}
+                                </Typography>
+                            </Box>
+                            {profile?.tenant_name && (
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
+                                    <BusinessIcon sx={{ fontSize: 18, color: colorTokens.text.secondary }} />
+                                    <Typography variant="body2" sx={{ color: colorTokens.text.primary, wordBreak: "break-word" }}>
+                                        {profile?.tenant_name}
+                                    </Typography>
+                                </Box>
+                            )}
+                            {profile?.created_at && (
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
+                                    <CalendarMonthIcon sx={{ fontSize: 18, color: colorTokens.text.secondary }} />
+                                    <Typography variant="body2" sx={{ color: colorTokens.text.primary, wordBreak: "break-word" }}>
+                                        Member since {formatShortDate(profile.created_at)}
+                                    </Typography>
+                                </Box>
+                            )}
                             <Divider sx={{ borderColor: colorTokens.border.default }} />
                             <Box sx={{ display: "flex", gap: 1.2, pt: 1 }}>
                                 <Button

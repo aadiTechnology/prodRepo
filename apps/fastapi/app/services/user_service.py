@@ -59,6 +59,7 @@ def create_user(
             is_active=True,
             created_by=created_by,
             tenant_id=tenant_id,
+            phone_number=user.phone_number,
         )
         db.add(db_user)
         db.commit()
