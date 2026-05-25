@@ -74,5 +74,5 @@ jobs:
         with:
           app-name: 'PreschoolProductAPI'
           slot-name: 'Production'
-          package: apps/fastapi
+          package: .
           
