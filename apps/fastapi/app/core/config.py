@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     # CORS - comma-separated string in .env (parsed to list via CORS_ORIGINS property)
     CORS_ORIGINS_STR: str = Field(
         env="CORS_ORIGINS",
-        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://erpui.aaditechnology.com",
+        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://erpui.aaditechnology.com,https://erpui.aaditechnology.com",
     )
     CORS_CREDENTIALS: bool = True
     CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]

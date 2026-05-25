@@ -52,7 +52,7 @@ DB_USER=aaditechadmin
 DB_PASSWORD=AadiTech@123
 DB_DRIVER=ODBC Driver 18 for SQL Server
 DB_ECHO=false
-CORS_ORIGINS=http://erpui.aaditechnology.com
+CORS_ORIGINS=https://erpui.aaditechnology.com
 ```
 
 ### apps/web/.env.development
