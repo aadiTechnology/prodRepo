@@ -68,6 +68,7 @@ export default function AddHomework() {
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
   // Prevents the class_id watcher from resetting subject/division when edit data loads.
   const isDataLoadedRef = useRef(!isEditMode);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
 
@@ -377,6 +378,7 @@ export default function AddHomework() {
   const handlePublish = useCallback(
     (e: React.FormEvent | React.MouseEvent) => {
       e.preventDefault();
+      setHasAttemptedSubmit(true);
       baseHandleSubmit(e as React.FormEvent, () => submitHomework("Published"));
     },
     [baseHandleSubmit, submitHomework],
@@ -386,6 +388,7 @@ export default function AddHomework() {
   const handleSaveDraft = useCallback(
     async (e: React.MouseEvent) => {
       e.preventDefault();
+      setHasAttemptedSubmit(true);
       // Minimal validation: only require class and title at minimum
       const draftErrors: Partial<Record<keyof AddHomeworkFormData, string>> = {};
       if (!formData.academic_year_id) draftErrors.academic_year_id = "Please select academic year";
@@ -433,6 +436,12 @@ export default function AddHomework() {
       formData.academic_year_id,
       formData.class_id,
     ],
+  );
+
+  // Only show field errors after user attempts to submit
+  const displayFieldErrors = useMemo(
+    () => (hasAttemptedSubmit ? fieldErrors : {}),
+    [hasAttemptedSubmit, fieldErrors],
   );
 
   // ---------------------------------------------------------------------------
@@ -609,7 +618,7 @@ export default function AddHomework() {
       formConfig={formConfig}
       formData={formData}
       setFormData={setFormData}
-      fieldErrors={fieldErrors}
+      fieldErrors={displayFieldErrors}
       handleChange={handleChange}
       handleFieldValueChange={handleFieldValueChange}
       handleSubmit={handlePublish}
