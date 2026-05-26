@@ -1,53 +1,49 @@
 import apiClient from "../client";
-import { User, UserCreate, UserUpdate, ApiError } from "../../types/user";
+import { User, UserCreate, UserUpdate } from "../../types/user";
+
+/** Matches FastAPI `APIRouter(prefix="/api/account")` in app/routers/user.py */
+const ACCOUNT_BASE_URL = "/api/account";
 
 export const userService = {
-  /**
-   * Get all users
-   */
   getAllUsers: async (): Promise<User[]> => {
-    const response = await apiClient.get<User[]>("/api/account");
+    const response = await apiClient.get<User[]>(`${ACCOUNT_BASE_URL}/`);
     return response.data;
   },
 
-  /**
-   * Get a single user by ID
-   */
   getUserById: async (id: number): Promise<User> => {
-    const response = await apiClient.get<User>(`/api/account/${id}`);
+    const response = await apiClient.get<User>(`${ACCOUNT_BASE_URL}/${id}`);
     return response.data;
   },
 
-  /**
-   * Create a new user
-   */
   createUser: async (userData: UserCreate): Promise<User> => {
-    const response = await apiClient.post<User>("/api/account/", userData);
+    const response = await apiClient.post<User>(`${ACCOUNT_BASE_URL}/`, userData);
     return response.data;
   },
 
-  /**
-   * Update an existing user
-   */
   updateUser: async (id: number, userData: UserUpdate): Promise<User> => {
-    const response = await apiClient.put<User>(`/api/account/${id}`, userData);
+    const response = await apiClient.put<User>(`${ACCOUNT_BASE_URL}/${id}`, userData);
     return response.data;
   },
 
-  /**
-   * Delete a user
-   */
   deleteUser: async (id: number): Promise<void> => {
-    await apiClient.delete(`/api/account/${id}`);
+    await apiClient.delete(`${ACCOUNT_BASE_URL}/${id}`);
   },
 
-  /**
-   * Change a user's password (admin-only)
-   */
   changePassword: async (id: number, newPassword: string): Promise<void> => {
-    await apiClient.put(`/users/${id}/password`, {
-    new_password: newPassword,
+    await apiClient.put(`${ACCOUNT_BASE_URL}/${id}/password`, {
+      new_password: newPassword,
     });
+  },
+
+  changeOwnPassword: async (payload: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<{ success: boolean; message?: string }> => {
+    const response = await apiClient.post<{ success: boolean; message?: string }>(
+      `${ACCOUNT_BASE_URL}/change-password`,
+      payload,
+    );
+    return response.data;
   },
 };
 
