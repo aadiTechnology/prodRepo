@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import ValidationException
 from app.models.academic import AcademicYear
 from app.models.holiday import Holiday
+from app.services.homework_access import resolve_homework_viewer_context
 from app.schemas.academic_calendar import (
     AcademicCalendarDayItem,
     AcademicCalendarResponse,
@@ -82,10 +83,44 @@ def _validate_calendar_year_month(year: int, month: int) -> None:
         raise ValidationException("Invalid year/month combination") from exc
 
 
+def _holiday_visible_for_viewer(
+    *,
+    audience_type: str,
+    class_ids: list[int],
+    division_ids: list[int],
+    viewer_kind: str,
+    viewer_scopes: set[tuple[int, int | None]],
+) -> bool:
+    if viewer_kind == "admin":
+        return True
+
+    # Students/parents should not see staff-only holidays.
+    if audience_type in {"TEACHER", "ADMIN"}:
+        return False
+
+    if not viewer_scopes:
+        return False
+
+    # For student-targeted audiences, match class/division targeting.
+    if audience_type in {"STUDENT", "ALL"}:
+        for class_id, div_id in viewer_scopes:
+            if div_id is not None and div_id in division_ids:
+                return True
+            if class_id in class_ids:
+                return True
+        return False
+
+    # Unknown/legacy audience values are hidden for non-admin viewers.
+    return False
+
+
 def get_academic_calendar(
     db: Session,
     *,
     tenant_id: int | None,
+    user_id: int,
+    user_email: str,
+    user_role: object,
     year: int,
     month: int,
     academic_year_id: int,
@@ -118,11 +153,35 @@ def get_academic_calendar(
         .all()
     )
 
+    viewer_context = resolve_homework_viewer_context(
+        db,
+        tenant_id=tid,
+        user_id=user_id,
+        email=user_email,
+        legacy_role=user_role,
+        teacher_id=None,
+    )
+    viewer_scopes = {
+        (int(scope.class_id), int(scope.class_division_id) if scope.class_division_id is not None else None)
+        for scope in viewer_context.scopes
+    }
+
     by_day: dict[date, dict] = defaultdict(
         lambda: {"names": [], "types": [], "any_active": False, "ids": set()}
     )
 
     for h in rows:
+        aud, class_ids, division_ids, _, _ = unpack_holiday_description(getattr(h, "description", None))
+        audience_type = (aud or "STUDENT").strip().upper()
+        if not _holiday_visible_for_viewer(
+            audience_type=audience_type,
+            class_ids=class_ids,
+            division_ids=division_ids,
+            viewer_kind=viewer_context.kind,
+            viewer_scopes=viewer_scopes,
+        ):
+            continue
+
         h_end = h.end_date or h.start_date
         seg_start = max(h.start_date, month_start)
         seg_end = min(h_end, month_end)

@@ -48,6 +48,9 @@ def get_academic_calendar(
     return academic_calendar_service.get_academic_calendar(
         db,
         tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        user_role=current_user.role,
         year=year,
         month=month,
         academic_year_id=academic_year_id,
