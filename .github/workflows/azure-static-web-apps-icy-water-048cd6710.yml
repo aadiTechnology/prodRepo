@@ -3,7 +3,11 @@ name: Azure Static Web Apps CI/CD
 on:
   push:
     branches:
-      - development
+      - development 
+  schedule:
+      # Every 1 hour from 9:30 AM IST to 7:30 PM IST
+      # Monday to Saturday only
+      - cron: '0 4-14 * * 1-6'
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches:
