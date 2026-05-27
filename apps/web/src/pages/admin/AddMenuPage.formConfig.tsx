@@ -158,7 +158,7 @@ export function createAddMenuFormConfig({
                 onChange={(e) =>
                   ctx.handleFieldValueChange("parent_id", e.target.value)
                 }
-                disabled={isEditMode}
+                disabled={false}
               >
                 {modules.length === 0 && (
                   <MenuItem disabled value="">
@@ -178,7 +178,7 @@ export function createAddMenuFormConfig({
               )}
               {!parentIdError && isEditMode && (
                 <FormHelperText>
-                  Parent module cannot be changed after creation.
+                  You can move this page to a different module.
                 </FormHelperText>
               )}
             </FormControl>
