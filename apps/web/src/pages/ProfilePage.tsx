@@ -113,6 +113,7 @@ const ProfilePage = () => {
     const [snack, setSnack] = useState<{ msg: string; severity: "success" | "error" } | null>(null);
     const [isModified, setIsModified] = useState(false);
     const [photoMenuAnchor, setPhotoMenuAnchor] = useState<null | HTMLElement>(null);
+    const [fileInputKey, setFileInputKey] = useState<number>(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // ── fetch ──────────────────────────────────────────────────────────────
@@ -191,16 +192,19 @@ const ProfilePage = () => {
         const allowedMimeTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
         if (!allowedMimeTypes.includes(file.type)) {
             setSnack({ msg: "Please select a valid image file (JPEG, PNG, GIF, or WebP).", severity: "error" });
+            setFileInputKey(prev => prev + 1); // Reset input
             return;
         }
         const fileName = file.name.toLowerCase();
         const allowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
         if (!allowedExtensions.some(ext => fileName.endsWith(ext))) {
             setSnack({ msg: "Invalid file extension. Use JPEG, PNG, GIF, or WebP.", severity: "error" });
+            setFileInputKey(prev => prev + 1); // Reset input
             return;
         }
         if (file.size > 5 * 1024 * 1024) {
             setSnack({ msg: "Image must be smaller than 5 MB.", severity: "error" });
+            setFileInputKey(prev => prev + 1); // Reset input
             return;
         }
         setUploading(true);
@@ -209,11 +213,12 @@ const ProfilePage = () => {
             setProfile(updated);
             setSnack({ msg: "Profile photo updated successfully.", severity: "success" });
             window.dispatchEvent(new Event("profile-image-updated"));
+            setFileInputKey(prev => prev + 1); // Reset input to allow re-uploading
         } catch {
             setSnack({ msg: "Unable to upload image. Please try again.", severity: "error" });
+            setFileInputKey(prev => prev + 1); // Reset input
         } finally {
             setUploading(false);
-            if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
 
@@ -226,6 +231,7 @@ const ProfilePage = () => {
             setProfile(updated);
             setSnack({ msg: "Profile photo removed.", severity: "success" });
             window.dispatchEvent(new Event("profile-image-updated"));
+            setFileInputKey(prev => prev + 1); // Reset input to allow fresh upload
         } catch {
             setSnack({ msg: "Unable to remove photo. Please try again.", severity: "error" });
         } finally {
@@ -683,6 +689,7 @@ const ProfilePage = () => {
 
             {/* ── Hidden file input ── */}
             <input
+                key={fileInputKey}
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
