@@ -15,10 +15,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import BaseForm from "../../components/reusable/BaseForm";
 import { useFormManager } from "../../hooks/useFormManager";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
-import menuService, {
-  type MenuRecord,
-  type MenuUpdatePayload,
-} from "../../api/services/menuService";
+import menuService, { type MenuRecord } from "../../api/services/menuService";
 import {
   createAddMenuFormConfig,
   type AddMenuFormData,
@@ -156,18 +153,13 @@ export default function AddMenuPage() {
       const normalizedPath = normalizeMenuPath(formData.path);
 
       if (isEditMode && id) {
-        const updatePayload: MenuUpdatePayload = {
+        await menuService.updateMenu(Number(id), {
           name: formData.name.trim(),
           path: normalizedPath,
           icon: formData.icon.trim() || null,
           sort_order: isNaN(sortOrder) ? 0 : sortOrder,
           is_active: formData.is_active,
-          parent_id:
-            formData.menu_type === "page" && formData.parent_id
-              ? parseInt(formData.parent_id, 10)
-              : undefined,
-        };
-        await menuService.updateMenu(Number(id), updatePayload);
+        });
         setSnackbar(`${level === 1 ? "Module" : "Page"} updated successfully.`);
       } else {
         await menuService.createMenu({
@@ -185,10 +177,7 @@ export default function AddMenuPage() {
         setSnackbar(`${level === 1 ? "Module" : "Page"} created successfully.`);
       }
 
-      setTimeout(
-        () => navigate("/admin/permission-management", { state: { fromEdit: true } }),
-        600
-      );
+      setTimeout(() => navigate("/admin/permission-management"), 1200);
     } catch (err: unknown) {
       const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
       if (apiFieldErrors) {

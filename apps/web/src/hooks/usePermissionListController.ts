@@ -4,8 +4,7 @@
  * Handles data fetching, permission toggles, tree state, and pagination.
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import permissionService, {
   MenuTreeNode,
   Role,
@@ -15,9 +14,6 @@ import tenantService from "../api/services/tenantService";
 import type { Tenant } from "../types/tenant";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
-
-// Cache last selected role across page remounts
-let cachedRoleId: number | null = null;
 
 export interface PermissionTableRow {
   id: number;
@@ -33,8 +29,6 @@ export interface PermissionTableRow {
 export const usePermissionListController = () => {
   const { user } = useAuth();
   const { hasPermission: rbacPerm, refreshRBAC } = useRBAC();
-  const location = useLocation();
-  const restoredRef = useRef(false);
 
   // ── Authorization ────────────────────────────────────────────────────────
   const isSuperAdmin =
@@ -175,27 +169,6 @@ export const usePermissionListController = () => {
     },
     [roles]
   );
-
-  // Auto-restore previously selected role after roles load
-  useEffect(() => {
-    if (roles.length === 0 || restoredRef.current) return;
-    const cachedId = cachedRoleId;
-    if (cachedId != null) {
-      const role = roles.find((r) => r.id === cachedId);
-      if (role) {
-        restoredRef.current = true;
-        handleRoleChange(role.id);
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roles]);
-
-  // Cache selected role for page revisit
-  useEffect(() => {
-    if (selectedRole) {
-      cachedRoleId = selectedRole.id;
-    }
-  }, [selectedRole]);
 
   // ── Handle Tenant Change ──────────────────────────────────────────────────
   const handleTenantChange = useCallback((tenantId: string) => {
