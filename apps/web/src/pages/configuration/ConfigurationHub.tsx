@@ -115,17 +115,17 @@ const CONFIG_SECTIONS: ConfigSection[] = [
 
 export default function ConfigurationHub() {
   const navigate = useNavigate();
-  const { grantedMenuPaths, isLoading } = useRBAC();
+  const { grantedMenuPaths, isInitialized } = useRBAC();
 
   const visibleSections = useMemo(() => {
-    if (isLoading) return [];
+    if (!isInitialized) return [];
     return CONFIG_SECTIONS.map((section) => ({
       ...section,
       features: section.features.filter((feature) =>
         grantedMenuPaths.has(feature.menuPath)
       ),
     })).filter((section) => section.features.length > 0);
-  }, [grantedMenuPaths, isLoading]);
+  }, [grantedMenuPaths, isInitialized]);
 
   const [selectedSectionId, setSelectedSectionId] = useState<string>(visibleSections[0]?.id ?? "");
 
@@ -145,7 +145,7 @@ export default function ConfigurationHub() {
     [visibleSections, selectedSectionId]
   );
 
-  if (isLoading) {
+  if (!isInitialized) {
     return (
       <ListPageLayout
         pageBackground
