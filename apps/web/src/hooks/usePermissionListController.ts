@@ -26,9 +26,12 @@ export interface PermissionTableRow {
   parent_id?: number;
 }
 
+const hasAnyMenuAccess = (perm: RoleMenuPermission): boolean =>
+  perm.can_view || perm.can_create || perm.can_edit || perm.can_delete;
+
 export const usePermissionListController = () => {
   const { user } = useAuth();
-  const { hasPermission: rbacPerm, refreshRBAC } = useRBAC();
+  const { hasPermission: rbacPerm, refreshRBAC, menus: rbacMenus } = useRBAC();
 
   // ── Authorization ────────────────────────────────────────────────────────
   const isSuperAdmin =
@@ -221,11 +224,53 @@ export const usePermissionListController = () => {
     return rows;
   }, [menuTree, permissions, expandedModuleIds, searchQuery]);
 
+  const displayRows = useMemo(() => {
+    if (isSystemAdmin) return allRows;
+
+    const allowedMenuIds = new Set<number>();
+    const collectAllowedIds = (nodes: typeof rbacMenus) => {
+      nodes.forEach((node) => {
+        allowedMenuIds.add(node.id);
+        if (node.children?.length) collectAllowedIds(node.children);
+      });
+    };
+    collectAllowedIds(rbacMenus);
+
+    // Tenant admins can manage only the features they currently have.
+    const inScopeRows = allRows.filter((row) => {
+      if (allowedMenuIds.has(row.id)) return true;
+      if (row.level === 1) {
+        return allRows.some(
+          (childRow) =>
+            childRow.level === 2 &&
+            childRow.parent_id === row.id &&
+            allowedMenuIds.has(childRow.id)
+        );
+      }
+      return false;
+    });
+
+    if (canEdit) return inScopeRows;
+
+    return inScopeRows.filter((row) => {
+      const perm = permissions.get(row.id);
+      if (row.level === 1 && row.parent_id == null) {
+        const childHasAccess = inScopeRows.some((childRow) => {
+          if (childRow.level !== 2 || childRow.parent_id !== row.id) return false;
+          const childPerm = permissions.get(childRow.id);
+          return !!childPerm && hasAnyMenuAccess(childPerm);
+        });
+        return (!!perm && hasAnyMenuAccess(perm)) || childHasAccess;
+      }
+      return !!perm && hasAnyMenuAccess(perm);
+    });
+  }, [allRows, isSystemAdmin, canEdit, permissions, rbacMenus]);
+
   const paginatedRows = useMemo(() => {
     const start = page * rowsPerPage;
     const end = start + rowsPerPage;
-    return allRows.slice(start, end);
-  }, [allRows, page, rowsPerPage]);
+    return displayRows.slice(start, end);
+  }, [displayRows, page, rowsPerPage]);
 
   // ── Permission Change Handlers ──────────────────────────────────────────
   const handlePermChange = useCallback(
@@ -304,9 +349,10 @@ export const usePermissionListController = () => {
   const handleSelectAllModules = useCallback((checked: boolean) => {
     setPermissions((prev) => {
       const map = new Map(prev);
+      const rowSource = isSystemAdmin ? allRows : displayRows;
       const allModules = Array.from(permissions.keys())
         .filter((id) => {
-          const row = allRows.find((r) => r.id === id);
+          const row = rowSource.find((r) => r.id === id);
           return row && row.level === 1;
         });
       
@@ -322,7 +368,7 @@ export const usePermissionListController = () => {
           });
         }
         
-        allRows
+        rowSource
           .filter((r) => r.parent_id === moduleId)
           .forEach((child) => {
             const childPerm = map.get(child.id);
@@ -340,7 +386,7 @@ export const usePermissionListController = () => {
       
       return map;
     });
-  }, [allRows, permissions]);
+  }, [allRows, displayRows, isSystemAdmin, permissions]);
 
   // ── Has Changes ────────────────────────────────────────────────────────
   const hasChanges = useMemo(() => {
@@ -371,9 +417,14 @@ export const usePermissionListController = () => {
     try {
       setLoadingSave(true);
       setError(null);
+      const payloadPermissions = isSystemAdmin
+        ? Array.from(permissions.values())
+        : displayRows
+            .map((row) => permissions.get(row.id))
+            .filter((perm): perm is RoleMenuPermission => !!perm);
       await permissionService.updateRolePermissions(
         selectedRole.id,
-        Array.from(permissions.values())
+        payloadPermissions
       );
       await refreshRBAC();
       setSuccess("Permissions updated successfully!");
@@ -384,7 +435,7 @@ export const usePermissionListController = () => {
     } finally {
       setLoadingSave(false);
     }
-  }, [selectedRole, permissions, hasChanges, refreshRBAC]);
+  }, [selectedRole, permissions, hasChanges, refreshRBAC, isSystemAdmin, displayRows]);
 
   // ── Reset Changes ────────────────────────────────────────────────────────
   const handleReset = useCallback(() => {
@@ -441,6 +492,7 @@ export const usePermissionListController = () => {
     handleRoleChange,
     handleTenantChange,
     allRows,
+    displayRows,
     paginatedRows,
     handlePermChange,
     handleMasterToggle,

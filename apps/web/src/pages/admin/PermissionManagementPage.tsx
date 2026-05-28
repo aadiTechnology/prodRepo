@@ -75,7 +75,7 @@ const PermissionManagementPage = () => {
       createPermissionListConfig({
         canEdit: controller.canEdit,
         selectedRole: controller.selectedRole,
-        allRows: controller.allRows,
+        allRows: controller.displayRows,
         expandedModuleIds: controller.expandedModuleIds,
         permissions: controller.permissions,
         onPermChange: controller.handlePermChange,
@@ -86,7 +86,7 @@ const PermissionManagementPage = () => {
     [
       controller.canEdit,
       controller.selectedRole,
-      controller.allRows,
+      controller.displayRows,
       controller.expandedModuleIds,
       controller.permissions,
       controller.handlePermChange,
@@ -185,7 +185,7 @@ const PermissionManagementPage = () => {
       {/* Permission table */}
       <EntityTableSection<PermissionTableRow>
         label="Permission Directory"
-        totalRows={controller.allRows.length}
+        totalRows={controller.displayRows.length}
         page={controller.page}
         rowsPerPage={controller.rowsPerPage}
         onPageChange={controller.handlePageChange}

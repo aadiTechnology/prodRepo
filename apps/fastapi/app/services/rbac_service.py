@@ -1,5 +1,6 @@
 """Service helpers for RBAC assignments and login context."""
 
+from collections import defaultdict
 from enum import Enum
 from typing import List, Tuple, Dict, Any, Optional
 
@@ -28,6 +29,36 @@ class RoleScope(str, Enum):
     PLATFORM = "PLATFORM"
     TENANT = "TENANT"
     BOTH = "BOTH"
+
+
+def _prune_empty_module_nodes(nodes: List[MenuNode]) -> List[MenuNode]:
+    """Drop module nodes that have no route and no visible child pages."""
+    pruned: List[MenuNode] = []
+    for node in nodes:
+        children = _prune_empty_module_nodes(node.children) if node.children else []
+        if children or (node.path or "").strip():
+            pruned.append(
+                MenuNode(
+                    id=node.id,
+                    name=node.name,
+                    path=node.path,
+                    icon=node.icon,
+                    children=children,
+                )
+            )
+    return pruned
+
+
+def _level1_module_has_visible_child(
+    module_id: int,
+    menus_with_view: set[int],
+    children_by_parent: Dict[int, List[int]],
+) -> bool:
+    """True when the module is a leaf or at least one child menu has can_view."""
+    child_ids = children_by_parent.get(module_id, [])
+    if not child_ids:
+        return True
+    return any(cid in menus_with_view for cid in child_ids)
 
 
 def _include_menu_with_parents_from_cache(
@@ -108,6 +139,43 @@ def get_user_roles(db: Session, user_id: int) -> List[Role]:
         .filter(user_roles.c.user_id == user_id, Role.is_deleted == False)  # noqa: E712
         .all()
     )
+
+
+def _resolve_effective_role_ids(
+    db: Session,
+    user: User,
+    roles: List[Role],
+) -> list[int]:
+    """
+    Return effective role IDs used for menu/permission resolution.
+
+    Tenant non-admin users inherit their tenant ADMIN role grants so that
+    teacher/student users automatically receive tenant-level enabled features
+    without needing duplicate per-role assignment.
+    """
+    effective_role_ids = [int(r.id) for r in roles]  # type: ignore
+    if user.tenant_id is None:
+        return effective_role_ids
+
+    assigned_codes = {str(r.code).upper() for r in roles}
+    if "ADMIN" in assigned_codes or "TENANT_ADMIN" in assigned_codes:
+        return effective_role_ids
+
+    tenant_admin_role = (
+        db.query(Role)
+        .filter(
+            Role.tenant_id == user.tenant_id,
+            Role.code == "ADMIN",
+            Role.is_deleted == False,  # noqa: E712
+            Role.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
+    if tenant_admin_role:
+        tenant_admin_id = int(tenant_admin_role.id)  # type: ignore
+        if tenant_admin_id not in effective_role_ids:
+            effective_role_ids.append(tenant_admin_id)
+    return effective_role_ids
 
 
 def _validate_role_scope(role: Role, user: User, action: str) -> None:
@@ -256,7 +324,7 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
     
     # Query 1: Get user roles
     roles = get_user_roles(db, int(user.id))  # type: ignore
-    role_ids = [int(r.id) for r in roles]  # type: ignore
+    role_ids = _resolve_effective_role_ids(db, user, roles)
     role_codes = [r.code.lower() for r in roles]
     
     # Check if user is SUPER_ADMIN
@@ -312,12 +380,35 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
             .all()
         )
 
-        # Build permission codes (all related data already in memory — no lazy loads)
+        # Build permission codes and menu list (all related data in memory — no lazy loads)
         seen_menu_ids: set[int] = set()
-        menus_to_include = []
+        menus_to_include: List[Menu] = []
+
+        all_menus_query = db.query(Menu).filter(
+            Menu.is_active == True,  # noqa: E712
+            Menu.is_deleted == False,  # noqa: E712
+        ).all()
+        menu_cache = {int(m.id): m for m in all_menus_query}  # type: ignore
+        children_by_parent: Dict[int, List[int]] = defaultdict(list)
+        for m in all_menus_query:
+            if m.parent_id is not None:
+                children_by_parent[int(m.parent_id)].append(int(m.id))  # type: ignore
+
+        menus_with_view = {int(p.menu_id) for p in perms if p.can_view}  # type: ignore
 
         for p in perms:
             m = p.menu
+            if not p.can_view:  # type: ignore
+                continue
+            if m.tenant_id is not None and m.tenant_id != user.tenant_id:  # type: ignore
+                continue
+
+            menu_id = int(m.id)  # type: ignore
+            if m.level == 1 and not _level1_module_has_visible_child(
+                menu_id, menus_with_view, children_by_parent
+            ):
+                continue
+
             if m.feature_id and m.feature:
                 f_code = m.feature.code
                 if p.can_view:  # type: ignore
@@ -329,25 +420,15 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
                 if p.can_delete:  # type: ignore
                     permission_codes.add(f"{f_code}:delete")
 
-            if p.can_view and (m.tenant_id is None or m.tenant_id == user.tenant_id):  # type: ignore
-                menus_to_include.append(m)
-
-        # One extra query to fetch the full menu catalog for parent-chain resolution
-        menu_cache: Dict[int, Menu] = {}
-        if menus_to_include:
-            all_menus_query = db.query(Menu).filter(
-                Menu.is_active == True,  # noqa: E712
-                Menu.is_deleted == False,  # noqa: E712
-            ).all()
-            menu_cache = {int(m.id): m for m in all_menus_query}  # type: ignore
+            menus_to_include.append(m)
 
         for m in menus_to_include:
             _include_menu_with_parents_from_cache(m, menu_rows, seen_menu_ids, menu_cache)
 
-    
     logger.info(f"[RBAC] Resolved {len(permission_codes)} permission codes and {len(menu_rows)} menu rows (optimized)")
-    
+
     menu_tree = menu_service.build_menu_tree(menu_rows) if menu_rows else []
+    menu_tree = _prune_empty_module_nodes(menu_tree)
     return list(permission_codes), menu_tree
 
 
@@ -360,7 +441,8 @@ def compute_rbac_version(db: Session, user: User) -> str:
     replace local state (driving "live" sidebar updates).
     """
     user_id = int(user.id)  # type: ignore
-    role_ids = [r.id for r in get_user_roles(db, user_id)]
+    roles = get_user_roles(db, user_id)
+    role_ids = _resolve_effective_role_ids(db, user, roles)
 
     # Latest change across this user's RoleMenuPermission rows.
     perms_ts = None
@@ -506,7 +588,14 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
                 f"Cannot assign tenant-specific menu '{menu.name}' to a platform role."
             )
     
-    # Delegation Validation: Ensure acting user has the permissions they are trying to assign
+    # Snapshot existing role permissions before replacement so delegation checks can
+    # distinguish "newly granted now" vs "already existed on the role".
+    existing_perms_map: dict[int, RoleMenuPermission] = {
+        int(row.menu_id): row
+        for row in db.query(RoleMenuPermission).filter(RoleMenuPermission.role_id == role.id).all()
+    }
+
+    # Delegation Validation: Ensure acting user has permissions for NEW grants only.
     if acting_user_id:
         acting_user = db.query(User).get(acting_user_id)
         if acting_user:
@@ -529,15 +618,32 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
                         continue
                         
                     f_code = menu.feature.code
+                    existing = existing_perms_map.get(int(p.menu_id))
                     
-                    # If they are trying to grant a permission, they must have it themselves
-                    if p.can_view and f"{f_code}:view" not in user_perms:
+                    # Only validate when permission is newly enabled in this request.
+                    if (
+                        p.can_view
+                        and not (existing.can_view if existing else False)
+                        and f"{f_code}:view" not in user_perms
+                    ):
                         raise ForbiddenException(f"You cannot grant 'view' access to '{menu.name}' because you don't have it.")
-                    if p.can_create and f"{f_code}:create" not in user_perms:
+                    if (
+                        p.can_create
+                        and not (existing.can_create if existing else False)
+                        and f"{f_code}:create" not in user_perms
+                    ):
                         raise ForbiddenException(f"You cannot grant 'create' access to '{menu.name}' because you don't have it.")
-                    if p.can_edit and f"{f_code}:edit" not in user_perms:
+                    if (
+                        p.can_edit
+                        and not (existing.can_edit if existing else False)
+                        and f"{f_code}:edit" not in user_perms
+                    ):
                         raise ForbiddenException(f"You cannot grant 'edit' access to '{menu.name}' because you don't have it.")
-                    if p.can_delete and f"{f_code}:delete" not in user_perms:
+                    if (
+                        p.can_delete
+                        and not (existing.can_delete if existing else False)
+                        and f"{f_code}:delete" not in user_perms
+                    ):
                         raise ForbiddenException(f"You cannot grant 'delete' access to '{menu.name}' because you don't have it.")
 
     try:
