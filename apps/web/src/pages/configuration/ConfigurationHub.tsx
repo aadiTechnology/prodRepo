@@ -222,7 +222,7 @@ export default function ConfigurationHub() {
               {selectedSection?.features.map((feature) => (
                 <ListItemButton
                   key={feature.id}
-                  onClick={() => navigate(feature.path)}
+                  onClick={() => navigate(feature.path, { state: { fromConfigHub: true } })}
                   sx={{
                     px: 1.5,
                     py: 0.6,

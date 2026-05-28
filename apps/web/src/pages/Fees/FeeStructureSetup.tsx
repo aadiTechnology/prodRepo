@@ -7,7 +7,7 @@ import {
   Alert,
   Snackbar,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { PageHeader } from "../../components/layout";
 import {
@@ -23,7 +23,17 @@ import { createFeeStructureListConfig } from "./FeeStructureList.listConfig";
 
 const FeeStructureSetup = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const controller = useFeeStructureListController();
+
+  const fromConfigHub = location.state?.fromConfigHub;
+
+  const breadcrumbLinks = fromConfigHub
+    ? [
+        { title: "Basic Configuration", path: "/configuration" },
+        { title: "Fee Structure Setup", path: "#" },
+      ]
+    : [{ title: "Fee Structure Setup", path: "#" }];
 
   const config = createFeeStructureListConfig({
     navigate,
@@ -43,7 +53,7 @@ const FeeStructureSetup = () => {
     <ListPageLayout
       header={
         <PageHeader
-          links={[{ title: "Fee Structure Setup", path: "#" }]}
+          links={breadcrumbLinks}
           homePath="/"
           actions={
             <ListPageToolbar

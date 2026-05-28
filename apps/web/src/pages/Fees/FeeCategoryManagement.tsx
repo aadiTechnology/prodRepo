@@ -1,6 +1,6 @@
 import React from "react";
 import { Alert, Snackbar, Select, MenuItem, Typography } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { PageHeader } from "../../components/layout";
 import {
@@ -16,7 +16,17 @@ import { createFeeCategoryListConfig } from "./FeeCategoryList.listConfig";
 
 const FeeCategoryManagement = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const controller = useFeeCategoryListController();
+
+  const fromConfigHub = location.state?.fromConfigHub;
+
+  const breadcrumbLinks = fromConfigHub
+    ? [
+        { title: "Basic Configuration", path: "/configuration" },
+        { title: "Fee Category Management", path: "#" },
+      ]
+    : [{ title: "Fee Category Management", path: "#" }];
 
   const config = createFeeCategoryListConfig({
     navigate,
@@ -37,7 +47,7 @@ const FeeCategoryManagement = () => {
       header={
         <>
           <PageHeader
-            links={[{ title: "Fee Category Management", path: "#" }]}
+            links={breadcrumbLinks}
             homePath="/"
             actions={
               <ListPageToolbar

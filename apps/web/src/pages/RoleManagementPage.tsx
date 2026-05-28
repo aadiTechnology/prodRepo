@@ -6,7 +6,7 @@
 
 import { Alert, Snackbar } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ListPageLayout, ListPageToolbar, EntityTableSection } from "../components/reusable";
 import { PageHeader } from "../components/layout";
 import ConfirmDialog from "../components/common/ConfirmDialog";
@@ -17,7 +17,17 @@ import { type Role } from "../types/role.types";
 
 const RoleManagementPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { hasPermission } = useRBAC();
+
+  const fromConfigHub = location.state?.fromConfigHub;
+
+  const breadcrumbLinks = fromConfigHub
+    ? [
+        { title: "Basic Configuration", path: "/configuration" },
+        { title: "Role Management", path: "#" },
+      ]
+    : [{ title: "Role Management", path: "#" }];
 
   // Restore permission logic and config creation to component
   const canCreateRole = hasPermission("ADMIN_MGMT:create");
@@ -38,7 +48,7 @@ const RoleManagementPage = () => {
       contentPaddingSize="none"
       header={
         <PageHeader
-          links={[{ title: "Role Management", path: "#" }]}
+          links={breadcrumbLinks}
           homePath="/"
           actions={
             canCreateRole ? (

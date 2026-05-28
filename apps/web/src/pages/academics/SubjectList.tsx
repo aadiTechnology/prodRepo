@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Alert, Snackbar } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import { PageHeader } from "../../components/layout";
@@ -10,7 +10,17 @@ import { createSubjectListConfig, type SubjectClassRow } from "./SubjectList.lis
 
 export default function SubjectList() {
     const navigate = useNavigate();
+    const location = useLocation();
     const controller = useSubjectListController();
+
+    const fromConfigHub = location.state?.fromConfigHub;
+
+    const breadcrumbLinks = fromConfigHub
+        ? [
+            { title: "Basic Configuration", path: "/configuration" },
+            { title: "Subjects", path: "#" },
+          ]
+        : [{ title: "Subjects", path: "#" }];
 
     const listConfig = createSubjectListConfig({
         navigate,
@@ -23,7 +33,7 @@ export default function SubjectList() {
             contentPaddingSize="none"
             header={
                 <PageHeader
-                    links={[{ title: "Subjects", path: "#" }]}
+                    links={breadcrumbLinks}
                     homePath="/"
                     actions={
                         <ListPageToolbar

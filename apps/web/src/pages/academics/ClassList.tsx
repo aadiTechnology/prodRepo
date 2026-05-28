@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Alert, Snackbar } from "../../components/primitives";
 import { Add as AddIcon } from "@mui/icons-material";
 import { PageHeader } from "../../components/layout";
@@ -10,7 +10,17 @@ import { createClassListConfig } from "./ClassList.listConfig";
 
 export default function ClassList() {
     const navigate = useNavigate();
+    const location = useLocation();
     const controller = useClassListController();
+
+    const fromConfigHub = location.state?.fromConfigHub;
+
+    const breadcrumbLinks = fromConfigHub
+        ? [
+            { title: "Basic Configuration", path: "/configuration" },
+            { title: "Classes", path: "#" },
+          ]
+        : [{ title: "Classes", path: "#" }];
 
     const listConfig = createClassListConfig({
         navigate,
@@ -23,7 +33,7 @@ export default function ClassList() {
             contentPaddingSize="none"
             header={
                 <PageHeader
-                    links={[{ title: "Classes", path: "#" }]}
+                    links={breadcrumbLinks}
                     homePath="/"
                     actions={
                         <ListPageToolbar

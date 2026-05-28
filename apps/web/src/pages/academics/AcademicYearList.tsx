@@ -6,7 +6,7 @@
 
 import { Alert, Snackbar } from "../../components/primitives";
 import { Add as AddIcon } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout, ListPageToolbar, EntityTableSection } from "../../components/reusable";
 import TableRowActions from "../../components/reusable/TableRowActions";
@@ -17,7 +17,17 @@ import { createAcademicYearListConfig } from "./AcademicYearList.listConfig";
 
 const AcademicYearList = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const controller = useAcademicYearListController();
+
+  const fromConfigHub = location.state?.fromConfigHub;
+
+  const breadcrumbLinks = fromConfigHub
+    ? [
+        { title: "Basic Configuration", path: "/configuration" },
+        { title: "Academic Years", path: "#" },
+      ]
+    : [{ title: "Academic Years", path: "#" }];
 
   const listConfig = createAcademicYearListConfig({
     navigate,
@@ -30,7 +40,7 @@ const AcademicYearList = () => {
       contentPaddingSize="none"
       header={
         <PageHeader
-          links={[{ title: "Academic Years", path: "#" }]}
+          links={breadcrumbLinks}
           homePath="/"
           actions={
             <ListPageToolbar

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Select, MenuItem } from "@mui/material";
 import {
   ListPageLayout,
@@ -15,6 +15,16 @@ import schoolClassService, { type SchoolClass } from "../../api/services/schoolC
 
 export default function TeacherList() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const fromConfigHub = location.state?.fromConfigHub;
+
+  const breadcrumbLinks = fromConfigHub
+    ? [
+        { title: "Basic Configuration", path: "/configuration" },
+        { title: "Teacher Management", path: "#" },
+      ]
+    : [{ title: "Teacher Management", path: "#" }];
 
   // State
   const [teachers, setTeachers] = useState<TeacherResponse[]>([]);
@@ -157,7 +167,7 @@ export default function TeacherList() {
     <ListPageLayout
       header={
         <PageHeader
-          links={[{ title: "Teacher Management", path: "#" }]}
+          links={breadcrumbLinks}
           homePath="/"
           actions={
             <ListPageToolbar

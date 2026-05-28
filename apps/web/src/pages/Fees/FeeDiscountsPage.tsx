@@ -10,7 +10,7 @@ import {
     Alert,
     Snackbar,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
     ListPageLayout,
     ListPageToolbar,
@@ -31,9 +31,19 @@ import CreateDiscountDialog from "./CreateDiscountDialog";
 // ═══════════════════════════════════════════════════════════════════════════
 const FeeDiscountsPage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [discounts, setDiscounts] = useState<FeeDiscount[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const fromConfigHub = location.state?.fromConfigHub;
+
+    const breadcrumbLinks = fromConfigHub
+        ? [
+            { title: "Basic Configuration", path: "/configuration" },
+            { title: "Fee Discounts", path: "#" },
+          ]
+        : [{ title: "Fee Discounts", path: "#" }];
 
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(0);
@@ -129,7 +139,7 @@ const FeeDiscountsPage = () => {
             header={
                 <>
                     <PageHeader
-                        links={[{ title: "Fee Discounts", path: "#" }]}
+                        links={breadcrumbLinks}
                         homePath="/"
                         actions={
                             <ListPageToolbar

@@ -8,7 +8,7 @@ import {
   MenuItem,
   Button,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   ListPageLayout,
   ListPageToolbar,
@@ -21,6 +21,16 @@ import { createStudentListConfig, renderStudentRowActions } from "./StudentList.
 
 const StudentList = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const fromConfigHub = location.state?.fromConfigHub;
+
+  const breadcrumbLinks = fromConfigHub
+    ? [
+        { title: "Basic Configuration", path: "/configuration" },
+        { title: "Student Management", path: "#" },
+      ]
+    : [{ title: "Student Management", path: "#" }];
   // Fetch all class options from backend (schoolClassService)
   const [classOptions, setClassOptions] = useState([{ value: '', label: 'All' }]);
   useEffect(() => {
@@ -99,7 +109,7 @@ const StudentList = () => {
         <>
           {/* Filters and Toolbar Row */}
           <PageHeader
-            links={[{ title: "Student Management", path: "#" }]}
+            links={breadcrumbLinks}
             homePath="/"
             actions={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
