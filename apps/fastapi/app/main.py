@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy.exc import SQLAlchemyError
+from typing import Any, cast
 from app.core.database import Base, engine, DATABASE_URL
 from app.core.config import settings
 from app.core.logging_config import setup_logging, get_logger
@@ -31,6 +32,7 @@ from app.models import (  # noqa: F401
     Holiday,
     Homework,
     HomeworkAttachment,
+    DemoVideo,
 )
 # Import FeePayment + FeePaymentAllocation so create_all creates fee_payment_allocations
 from app.models.fee_payment import FeePayment, FeePaymentAllocation  # noqa: F401
@@ -43,7 +45,7 @@ from app.models.pt_timesheet import (  # noqa: F401
     pt_timesheets,
 )
 
-from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, academic_year, academic_calendar, class_fee_structure_assignment, class_router,student_fee_assignment, fee_structure, reports, sprint, task_effort, teacher_router,teacher_assignment,notice, holiday
+from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, academic_year, academic_calendar, class_fee_structure_assignment, class_router,student_fee_assignment, fee_structure, reports, sprint, task_effort, teacher_router,teacher_assignment,notice, holiday, demo_video
 
 
 
@@ -88,9 +90,9 @@ app.add_middleware(
 )
 
 # Register exception handlers
-app.add_exception_handler(AppException, app_exception_handler)
-app.add_exception_handler(RequestValidationError, validation_exception_handler)
-app.add_exception_handler(SQLAlchemyError, sqlalchemy_exception_handler)
+app.add_exception_handler(AppException, cast(Any, app_exception_handler))
+app.add_exception_handler(RequestValidationError, cast(Any, validation_exception_handler))
+app.add_exception_handler(SQLAlchemyError, cast(Any, sqlalchemy_exception_handler))
 app.add_exception_handler(Exception, generic_exception_handler)
 
 # Include routers
@@ -138,6 +140,7 @@ app.include_router(academic_calendar.router)
 from app.routers import homework_router
 app.include_router(homework_router.router)
 app.include_router(holiday.configuration_router)
+app.include_router(demo_video.router)
 
 
 
