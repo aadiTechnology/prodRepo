@@ -82,6 +82,13 @@ const CONFIG_SECTIONS: ConfigSection[] = [
         permission: "ADMIN_MGMT:view",
         menuPath: "/students",
       },
+      {
+        id: "user Permission ",
+        label: "User Permission ",
+        path: "/admin/permission-management",
+        permission: "ADMIN_MGMT:view",
+        menuPath: "/admin/permission-management",
+      },
     ],
   },
   {
