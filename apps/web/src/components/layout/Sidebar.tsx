@@ -285,6 +285,16 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
   }
 ];
 
+/**
+ * These level-1 modules are accessible only inside ConfigurationHub (/configuration).
+ * They must NOT appear as standalone sidebar items.
+ * Filtered by name since level-1 modules have parent_id=NULL by DB constraint design.
+ */
+const HUB_CHILD_MODULE_NAMES = new Set([
+  "User Related",
+  "Academics",
+  "Fees Related",
+]);
 
 export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggleCollapse }: SidebarProps) {
   const navigate = useNavigate();
@@ -326,7 +336,13 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
     }
 
     if (!menus || menus.length === 0) return [];
-    return menus.map(node => {
+
+    // Exclude modules that belong inside ConfigurationHub only
+    const sidebarMenus = menus.filter(
+      node => !HUB_CHILD_MODULE_NAMES.has(node.name)
+    );
+
+    return sidebarMenus.map(node => {
       const path = (node.path || "").toLowerCase();
       const name = (node.name || "").toLowerCase();
       

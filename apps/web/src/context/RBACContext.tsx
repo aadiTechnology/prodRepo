@@ -38,6 +38,9 @@ interface RBACContextType extends RBACState {
 
   /** Version string reported by backend; changes whenever effective RBAC changes. */
   rbacVersion: string | null;
+  grantedMenuPaths: Set<string>;
+  /** True once RBAC data has been initialized from storage or backend. */
+  isInitialized: boolean;
 }
 
 const RBACContext = createContext<RBACContextType | undefined>(undefined);
@@ -118,6 +121,16 @@ const extractPermissions = (menus: MenuNode[]): string[] => {
   return Array.from(permissions);
 };
 
+const extractMenuPaths = (menus: MenuNode[]): Set<string> => {
+  const paths = new Set<string>();
+  const traverse = (node: MenuNode) => {
+    if (node.path) paths.add(node.path);
+    if (node.children) node.children.forEach(traverse);
+  };
+  menus.forEach(traverse);
+  return paths;
+};
+
 interface RBACProviderProps {
   children: ReactNode;
 }
@@ -137,6 +150,12 @@ export function RBACProvider({ children }: RBACProviderProps) {
       return null;
     }
   });
+  const [isInitialized, setIsInitialized] = useState<boolean>(Boolean(storedData));
+
+  const grantedMenuPaths = useMemo(
+    () => extractMenuPaths(menus),
+    [menus]
+  );
 
   // Latest version seen by polling; ref so the interval closure always sees it.
   const rbacVersionRef = useRef<string | null>(rbacVersion);
@@ -173,6 +192,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
           // non-fatal
         }
       }
+      setIsInitialized(true);
       setError(null);
     },
     []
@@ -226,6 +246,7 @@ export function RBACProvider({ children }: RBACProviderProps) {
         setPermissions(effectivePermissions);
         saveRBACData({ roles: normalized, menus: data.menus, permissions: effectivePermissions });
         setRbacVersion(nextVersion);
+        setIsInitialized(true);
         try {
           if (nextVersion) localStorage.setItem(RBAC_VERSION_STORAGE_KEY, nextVersion);
           else localStorage.removeItem(RBAC_VERSION_STORAGE_KEY);
@@ -452,8 +473,10 @@ export function RBACProvider({ children }: RBACProviderProps) {
       isLoading,
       error,
       rbacVersion,
+      grantedMenuPaths,
+      isInitialized,
     }),
-    [roles, permissions, menus, isLoading, error, rbacVersion]
+    [roles, permissions, menus, isLoading, error, rbacVersion, grantedMenuPaths, isInitialized]
   );
 
   const value: RBACContextType = useMemo(

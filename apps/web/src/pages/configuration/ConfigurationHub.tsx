@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
+  CircularProgress,
   List,
   ListItemButton,
   ListItemText,
@@ -17,8 +18,9 @@ import { ListPageLayout } from "../../components/reusable";
 type ConfigFeature = {
   id: string;
   label: string;
-  path: string;
-  permission: string;
+  path: string;        // used for navigate()
+  permission: string;  // kept for route-guard fallback
+  menuPath: string;    // matches MenuNode.path in RBAC menus tree
 };
 
 type ConfigSection = {
@@ -37,18 +39,21 @@ const CONFIG_SECTIONS: ConfigSection[] = [
         label: "Academic Year",
         path: "/academics/academic-years",
         permission: "ACADEMIC_MGMT:view",
+        menuPath: "/academics/academic-years",
       },
       {
         id: "class-div-setup",
         label: "Class-Div Setup",
         path: "/academics/classes",
         permission: "ACADEMIC_MGMT:view",
+        menuPath: "/academics/classes",
       },
       {
         id: "subjects",
         label: "Subjects",
         path: "/academics/subjects",
         permission: "ACADEMIC_MGMT:view",
+        menuPath: "/academics/subjects",
       },
     ],
   },
@@ -61,18 +66,21 @@ const CONFIG_SECTIONS: ConfigSection[] = [
         label: "Role Management",
         path: "/roles",
         permission: "ADMIN_MGMT:view",
+        menuPath: "/roles",
       },
       {
         id: "teacher-creation",
         label: "Teacher Creation",
         path: "/teachers",
         permission: "TEACHER_MGMT:view",
+        menuPath: "/teachers",
       },
       {
         id: "student-creation",
         label: "Student Creation",
         path: "/students",
         permission: "ADMIN_MGMT:view",
+        menuPath: "/students",
       },
     ],
   },
@@ -85,18 +93,21 @@ const CONFIG_SECTIONS: ConfigSection[] = [
         label: "Fee Category",
         path: "/fees/categories",
         permission: "FEE_MGMT:view",
+        menuPath: "/fees/categories",
       },
       {
         id: "fee-structure",
         label: "Fee Structure",
         path: "/fees/setup",
         permission: "FEE_MGMT:view",
+        menuPath: "/fees/setup",
       },
       {
         id: "discount-management",
         label: "Discount Management",
         path: "/fees/discounts",
         permission: "FEE_MGMT:view",
+        menuPath: "/fees/discounts",
       },
     ],
   },
@@ -104,14 +115,17 @@ const CONFIG_SECTIONS: ConfigSection[] = [
 
 export default function ConfigurationHub() {
   const navigate = useNavigate();
-  const { hasPermission } = useRBAC();
+  const { grantedMenuPaths, isLoading } = useRBAC();
 
   const visibleSections = useMemo(() => {
+    if (isLoading) return [];
     return CONFIG_SECTIONS.map((section) => ({
       ...section,
-      features: section.features.filter((feature) => hasPermission(feature.permission)),
+      features: section.features.filter((feature) =>
+        grantedMenuPaths.has(feature.menuPath)
+      ),
     })).filter((section) => section.features.length > 0);
-  }, [hasPermission]);
+  }, [grantedMenuPaths, isLoading]);
 
   const [selectedSectionId, setSelectedSectionId] = useState<string>(visibleSections[0]?.id ?? "");
 
@@ -130,6 +144,19 @@ export default function ConfigurationHub() {
     () => visibleSections.find((section) => section.id === selectedSectionId) ?? visibleSections[0] ?? null,
     [visibleSections, selectedSectionId]
   );
+
+  if (isLoading) {
+    return (
+      <ListPageLayout
+        pageBackground
+        header={<PageHeader links={[{ title: "Basic Configuration", path: "#" }]} homePath="/" />}
+      >
+        <Paper sx={{ p: 3, borderRadius: 3, minHeight: 240, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <CircularProgress />
+        </Paper>
+      </ListPageLayout>
+    );
+  }
 
   if (!selectedSection && visibleSections.length === 0) {
     return (
