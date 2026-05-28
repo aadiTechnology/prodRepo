@@ -112,8 +112,8 @@ const NavItem = styled(ListItemButton, {
   shouldForwardProp: (prop) => prop !== "active" && prop !== "collapsed" && prop !== "itemColor",
 })<{ active?: boolean; collapsed?: boolean; itemColor?: string }>(({ theme, active, collapsed, itemColor }) => ({
   borderRadius: "20px",
-  margin: "4px 16px",
-  padding: collapsed ? "12px" : "12px 16px",
+  margin: "2px 4px",
+  padding: collapsed ? "2px" : "3px 6px",
   justifyContent: collapsed ? "center" : "flex-start",
   transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
   backgroundColor: active ? alpha(itemColor || colorTokens.preschool.turquoise.main, 0.12) : "transparent",

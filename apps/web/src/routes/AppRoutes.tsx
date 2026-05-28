@@ -77,6 +77,9 @@ const HomeworkList = lazy(() => import("../pages/academics/HomeworkList"));
 const AddHomework = lazy(() => import("../pages/academics/AddHomework"));
 const HomeworkDetails = lazy(() => import("../pages/academics/HomeworkDetails"));
 const AcademicCalendar = lazy(() => import("../pages/calendar/AcademicCalendar"));
+const ConfigurationHub = lazy(() =>
+  import("../pages/configuration").then((module) => ({ default: module.ConfigurationHub }))
+);
 // Loading fallback component
 const PageLoader = () => (
   <Box
@@ -368,6 +371,21 @@ export default function AppRoutes() {
             element={
               <ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view">
                 <AcademicCalendar />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/configuration"
+            element={
+              <ProtectedRoute
+                requiredPermissions={[
+                  "ACADEMIC_MGMT:view",
+                  "ADMIN_MGMT:view",
+                  "TEACHER_MGMT:view",
+                  "FEE_MGMT:view",
+                ]}
+              >
+                <ConfigurationHub />
               </ProtectedRoute>
             }
           />
