@@ -280,7 +280,8 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
       { id: "sprint-performance", label: "Sprint Performance", path: "/reports/sprint-performance" },
       { id: "sprintwise-performance", label: "Sprintwise Performance", path: "/reports/sprintwise-performance" },
       { id: "my-tasks-effort", label: "My Tasks — Effort Entry", path: "/my-tasks/effort-entry" },
-      { id: "sprints", label: "Sprints", path: "/sprints" }
+      { id: "sprints", label: "Sprints", path: "/sprints" },
+      { id: "demo-setup-videos", label: "Demo Setup Videos", path: "/demo-setup-videos" }
     ]
   }
 ];

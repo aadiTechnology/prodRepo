@@ -128,9 +128,7 @@ export default function ConfigurationHub() {
     if (!isInitialized) return [];
     return CONFIG_SECTIONS.map((section) => ({
       ...section,
-      features: section.features.filter((feature) =>
-        grantedMenuPaths.has(feature.menuPath)
-      ),
+      features: section.features.filter((feature) => grantedMenuPaths.has(feature.menuPath)),
     })).filter((section) => section.features.length > 0);
   }, [grantedMenuPaths, isInitialized]);
 

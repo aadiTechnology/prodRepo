@@ -80,6 +80,9 @@ const AcademicCalendar = lazy(() => import("../pages/calendar/AcademicCalendar")
 const ConfigurationHub = lazy(() =>
   import("../pages/configuration").then((module) => ({ default: module.ConfigurationHub }))
 );
+const DemoSetupVideosPage = lazy(() => import("../pages/configuration/DemoSetupVideosPage"));
+const DemoSetupVideoFormPage = lazy(() => import("../pages/configuration/DemoSetupVideoFormPage"));
+const DemoSetupVideoDetail = lazy(() => import("../pages/configuration/DemoSetupVideoDetail"));
 // Loading fallback component
 const PageLoader = () => (
   <Box
@@ -386,6 +389,38 @@ export default function AppRoutes() {
                 ]}
               >
                 <ConfigurationHub />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/demo-setup-videos"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN", "ADMIN"]}>
+                <DemoSetupVideosPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/demo-setup-videos/:id"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN", "ADMIN"]}>
+                <DemoSetupVideoDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/demo-setup-videos/new"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN", "ADMIN"]}>
+                <DemoSetupVideoFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/demo-setup-videos/:id/edit"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN", "ADMIN"]}>
+                <DemoSetupVideoFormPage />
               </ProtectedRoute>
             }
           />
