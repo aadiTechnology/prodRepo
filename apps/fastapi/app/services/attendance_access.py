@@ -49,19 +49,20 @@ def assert_teacher_class_division_access(
     if not teacher:
         raise HTTPException(status_code=403, detail="Teacher profile not found")
 
+    teacher_id = int(teacher.id)  # type: ignore[arg-type]
     pairs = teacher_service.get_teacher_class_division_pairs(
         db,
         current_user.tenant_id,
-        teacher.id,
+        teacher_id,
         academic_year_id,
     )
     if not pairs:
         raise HTTPException(
             status_code=403,
-            detail="No class assignment found for this teacher",
+            detail="Only class teachers can mark attendance. No class-teacher assignment found.",
         )
     if (class_id, division_id) not in pairs:
         raise HTTPException(
             status_code=403,
-            detail="You are not assigned to this class and division",
+            detail="You are not assigned as class teacher for this class and division",
         )

@@ -228,6 +228,7 @@ class AttendanceService:
                     WHERE ta.tenant_id = :tenant_id
                       AND ta.teacher_id = :teacher_id
                       AND ta.is_active = 1
+                      AND ta.subject_id IS NULL
                       AND c.is_deleted = 0
                       AND (:academic_year_id IS NULL OR ta.academic_year_id = :academic_year_id)
                     ORDER BY c.name ASC, cd.division_name ASC

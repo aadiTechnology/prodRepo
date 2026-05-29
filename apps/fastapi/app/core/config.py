@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, Field, computed_field
 from typing import List
 import os
@@ -11,7 +11,13 @@ class Settings(BaseSettings):
     Centralized application settings with environment variable support.
     Includes validation for production readiness.
     """
-    
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
     # Application
     APP_NAME: str = "FastAPI SQL Server CRUD"
     APP_VERSION: str = "1.0.0"
@@ -26,11 +32,13 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = ""
     DB_DRIVER: str = "ODBC Driver 18 for SQL Server"
     DB_ECHO: bool = False
-    
+    # Skip create_all on startup (slow on remote Azure erpdb). Use Alembic for schema changes.
+    DB_SCHEMA_SYNC_ON_STARTUP: bool = False
+
     # CORS - comma-separated string in .env (parsed to list via CORS_ORIGINS property)
     CORS_ORIGINS_STR: str = Field(
-        env="CORS_ORIGINS",
         default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://erpui.aaditechnology.com,https://erpui.aaditechnology.com,http://erpui1.aaditechnology.com",
+        validation_alias="CORS_ORIGINS",
     )
     CORS_CREDENTIALS: bool = True
     CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
@@ -113,10 +121,6 @@ class Settings(BaseSettings):
                 errors.append("CORS_ORIGINS should not contain '*' in production")
         
         return errors
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 # Create settings instance
 settings = Settings()

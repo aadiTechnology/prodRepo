@@ -432,7 +432,10 @@ def get_teacher_class_division_pairs(
     teacher_id: int,
     academic_year_id: Optional[int] = None,
 ) -> list[tuple[int, int]]:
-    """Active class/division pairs for a teacher from teacher_assignments, with legacy fallback."""
+    """
+    Class-teacher homeroom slots only (subject_id IS NULL) for attendance mark/report.
+    Supports multiple class/division pairs per teacher. Legacy fallback when no CT rows exist.
+    """
     pairs: set[tuple[int, int]] = set()
     try:
         rows = db.execute(
@@ -443,6 +446,7 @@ def get_teacher_class_division_pairs(
                 WHERE ta.tenant_id = :tenant_id
                   AND ta.teacher_id = :teacher_id
                   AND ta.is_active = 1
+                  AND ta.subject_id IS NULL
                   AND (:academic_year_id IS NULL OR ta.academic_year_id = :academic_year_id)
                 """
             ),

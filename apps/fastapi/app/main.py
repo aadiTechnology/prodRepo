@@ -164,23 +164,32 @@ async def startup_event():
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     logger.info(f"Debug mode: {settings.DEBUG}")
 
-    # Run create_all in a thread pool so it never blocks the async event loop.
-    # SQL Server schema introspection can be slow on first boot; running it in
-    # a background thread keeps the server responsive immediately.
+    if not settings.DB_SCHEMA_SYNC_ON_STARTUP:
+        logger.info(
+            "Skipping startup schema sync (DB_SCHEMA_SYNC_ON_STARTUP=false). "
+            "API uses the existing database; set DB_SCHEMA_SYNC_ON_STARTUP=true only for a new local DB."
+        )
+        return
+
+    # create_all compares every SQLAlchemy model to the server over the network.
+    # On remote Azure SQL (large erpdb) this often takes 60+ seconds and is unnecessary.
     try:
-        logger.info("Connecting to database...")
+        logger.info("Running startup schema sync (create_all)...")
         loop = asyncio.get_event_loop()
         await asyncio.wait_for(
             loop.run_in_executor(None, lambda: Base.metadata.create_all(bind=engine)),
-            timeout=60,  # Abort if schema sync takes longer than 60 s
+            timeout=60,
         )
         logger.info("[OK] Database tables initialized successfully")
     except asyncio.TimeoutError:
         logger.error("✗ Database schema sync timed out (>60 s) — server will continue")
         conn_info = DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL
         logger.info(f"  Connection target: {conn_info}")
+        logger.info(
+            "  Tip: set DB_SCHEMA_SYNC_ON_STARTUP=false in .env when using a remote or existing database."
+        )
     except Exception as e:
-        logger.error(f"✗ Failed to initialize database tables")
+        logger.error("✗ Failed to initialize database tables")
         logger.error(f"  Error: {str(e)}")
         logger.warning("  Application will continue, but database operations may fail")
         logger.info("  To fix:")
