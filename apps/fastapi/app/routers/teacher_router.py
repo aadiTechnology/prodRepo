@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, CurrentUser, require_admin
 from app.schemas.teacher_schema import TeacherCreate, TeacherUpdate, TeacherResponse, TeacherListResponse
+from app.schemas.attendance_schema import AttendanceTeacherScopeResponse
 from app.services import teacher_service
+from app.services.attendance_service import AttendanceService
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -98,6 +100,22 @@ async def list_teachers(
         items=[map_db_model_to_response(t) for t in db_teachers],
         total=total
     )
+
+@router.get("/me/attendance-scope", response_model=AttendanceTeacherScopeResponse)
+async def get_my_attendance_scope(
+    academic_year_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Assigned classes/divisions for the logged-in teacher (attendance UI)."""
+    service = AttendanceService(db)
+    return service.get_teacher_attendance_scope(
+        current_user.tenant_id,
+        current_user.id,
+        current_user.email,
+        academic_year_id,
+    )
+
 
 @router.get("/{teacher_id}", response_model=TeacherResponse)
 async def get_teacher(

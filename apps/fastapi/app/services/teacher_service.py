@@ -41,9 +41,21 @@ def get_teacher_assignment_rows(db: Session, tenant_id: int, teacher_id: int) ->
                 "class_id": row["class_id"],
                 "class_name": row["class_name"],
                 "division_names": [],
+                "divisions": [],
             }
-        if row["division_name"] and row["division_name"] not in grouped[key]["division_names"]:
-            grouped[key]["division_names"].append(row["division_name"])
+        division_name = row["division_name"]
+        division_id = row["class_division_id"]
+        if division_name and division_name not in grouped[key]["division_names"]:
+            grouped[key]["division_names"].append(division_name)
+        if division_id is not None:
+            existing_ids = {d["id"] for d in grouped[key]["divisions"]}
+            if int(division_id) not in existing_ids:
+                grouped[key]["divisions"].append(
+                    {
+                        "id": int(division_id),
+                        "division_name": division_name or "",
+                    }
+                )
 
     return list(grouped.values())
 

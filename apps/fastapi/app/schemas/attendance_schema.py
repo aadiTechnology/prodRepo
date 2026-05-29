@@ -52,3 +52,21 @@ class AttendanceReportResponse(BaseModel):
     records: List[AttendanceReportItem]
     summary: AttendanceReportSummary
     total_count: int
+
+
+class AttendanceScopeDivision(BaseModel):
+    id: int
+    division_name: str
+
+
+class AttendanceScopeClass(BaseModel):
+    id: int
+    name: str
+    academic_year_id: Optional[int] = None
+    divisions: List[AttendanceScopeDivision] = []
+
+
+class AttendanceTeacherScopeResponse(BaseModel):
+    teacher_id: int
+    teacher_name: str
+    classes: List[AttendanceScopeClass] = []

@@ -17,6 +17,7 @@ from app.schemas.attendance_schema import (
     AttendanceListResponse,
     AttendanceReportResponse,
     AttendanceReportSummary,
+    AttendanceTeacherScopeResponse,
 )
 from app.models.student import Student
 
@@ -109,6 +110,30 @@ def _apply_teacher_report_scope(
         return pairs[0][0], pairs[0][1]
 
     return class_id, division_id
+
+
+@router.get("/my-scope", response_model=AttendanceTeacherScopeResponse)
+def get_my_attendance_scope(
+    academic_year_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Assigned classes/divisions for the logged-in teacher (attendance screens)."""
+    try:
+        service = AttendanceService(db)
+        return service.get_teacher_attendance_scope(
+            current_user.tenant_id,
+            current_user.id,
+            getattr(current_user, "email", None),
+            academic_year_id,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to load teacher attendance scope")
 
 
 @router.get("", response_model=AttendanceListResponse)

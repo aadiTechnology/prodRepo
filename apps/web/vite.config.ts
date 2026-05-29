@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:8022',
+      '/attendance': 'http://localhost:8022',
     },
   },
   build: {

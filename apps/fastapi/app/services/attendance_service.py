@@ -1,13 +1,22 @@
 
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, text
+from sqlalchemy.exc import SQLAlchemyError
 from datetime import date, datetime
 from fastapi import HTTPException
 from app.models.academic import AcademicYear
 from app.models.student import Student
 from app.models.student_attendance import StudentAttendance
-from app.schemas.attendance_schema import MarkAttendanceRequest, AttendanceListResponse, AttendanceResponse
+from app.schemas.attendance_schema import (
+    MarkAttendanceRequest,
+    AttendanceListResponse,
+    AttendanceResponse,
+    AttendanceTeacherScopeResponse,
+    AttendanceScopeClass,
+    AttendanceScopeDivision,
+)
+from app.services import teacher_service
 
 class AttendanceService:
     def __init__(self, db: Session):
@@ -187,4 +196,113 @@ class AttendanceService:
             records=records,
             summary=summary,
             total_count=total_count
+        )
+
+    def get_teacher_attendance_scope(
+        self,
+        tenant_id: int,
+        user_id: int,
+        user_email: Optional[str],
+        academic_year_id: Optional[int] = None,
+    ) -> AttendanceTeacherScopeResponse:
+        teacher = teacher_service.resolve_teacher_for_user(
+            self.db, tenant_id, user_id, user_email
+        )
+        if not teacher:
+            raise HTTPException(status_code=404, detail="Teacher profile not found")
+
+        classes_by_id: dict[int, dict] = {}
+        try:
+            rows = self.db.execute(
+                text(
+                    """
+                    SELECT
+                        c.id AS class_id,
+                        c.name AS class_name,
+                        c.academic_year_id,
+                        cd.id AS division_id,
+                        cd.division_name
+                    FROM teacher_assignments ta
+                    INNER JOIN classes c ON c.id = ta.class_id
+                    INNER JOIN class_divisions cd ON cd.id = ta.class_division_id
+                    WHERE ta.tenant_id = :tenant_id
+                      AND ta.teacher_id = :teacher_id
+                      AND ta.is_active = 1
+                      AND c.is_deleted = 0
+                      AND (:academic_year_id IS NULL OR ta.academic_year_id = :academic_year_id)
+                    ORDER BY c.name ASC, cd.division_name ASC
+                    """
+                ),
+                {
+                    "tenant_id": tenant_id,
+                    "teacher_id": teacher.id,
+                    "academic_year_id": academic_year_id,
+                },
+            ).mappings().all()
+
+            for row in rows:
+                cid = int(row["class_id"])
+                if cid not in classes_by_id:
+                    classes_by_id[cid] = {
+                        "id": cid,
+                        "name": row["class_name"],
+                        "academic_year_id": row["academic_year_id"],
+                        "divisions": [],
+                    }
+                div = {"id": int(row["division_id"]), "division_name": row["division_name"]}
+                if div not in classes_by_id[cid]["divisions"]:
+                    classes_by_id[cid]["divisions"].append(div)
+        except SQLAlchemyError:
+            pass
+
+        if not classes_by_id and teacher.class_id and teacher.class_division_id:
+            try:
+                legacy = self.db.execute(
+                    text(
+                        """
+                        SELECT
+                            c.id AS class_id,
+                            c.name AS class_name,
+                            c.academic_year_id,
+                            cd.id AS division_id,
+                            cd.division_name
+                        FROM teachers t
+                        INNER JOIN classes c ON c.id = t.class_id
+                        INNER JOIN class_divisions cd ON cd.id = t.class_division_id
+                        WHERE t.id = :teacher_id
+                          AND t.tenant_id = :tenant_id
+                        """
+                    ),
+                    {"teacher_id": teacher.id, "tenant_id": tenant_id},
+                ).mappings().first()
+                if legacy:
+                    cid = int(legacy["class_id"])
+                    classes_by_id[cid] = {
+                        "id": cid,
+                        "name": legacy["class_name"],
+                        "academic_year_id": legacy["academic_year_id"],
+                        "divisions": [
+                            {
+                                "id": int(legacy["division_id"]),
+                                "division_name": legacy["division_name"],
+                            }
+                        ],
+                    }
+            except SQLAlchemyError:
+                pass
+
+        scope_classes = [
+            AttendanceScopeClass(
+                id=item["id"],
+                name=item["name"],
+                academic_year_id=item["academic_year_id"],
+                divisions=[AttendanceScopeDivision(**d) for d in item["divisions"]],
+            )
+            for item in sorted(classes_by_id.values(), key=lambda x: (x["name"] or "").upper())
+        ]
+
+        return AttendanceTeacherScopeResponse(
+            teacher_id=teacher.id,
+            teacher_name=teacher.full_name,
+            classes=scope_classes,
         )
