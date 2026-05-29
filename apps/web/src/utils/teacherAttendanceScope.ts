@@ -94,6 +94,20 @@ export function assignmentMatchesAcademicYear(
   return assignment.academic_year_id === academicYearId || assignment.academic_year_id === null;
 }
 
+/** Class teacher slot: no subject on assignment (Assign Teacher with subject blank). */
+export function isClassTeacherAssignment(assignment: TeacherAssignmentApiItem): boolean {
+  if (assignment.subject_id != null) return false;
+  const designation = (assignment.designation || "").trim().toLowerCase();
+  if (designation === "subject teacher") return false;
+  return designation === "class teacher" || designation === "" || designation === "assigned";
+}
+
+export function filterClassTeacherAssignments(
+  assignmentMappings: TeacherAssignmentApiItem[]
+): TeacherAssignmentApiItem[] {
+  return assignmentMappings.filter(isClassTeacherAssignment);
+}
+
 export function getTeacherScopedMappings(
   assignmentMappings: TeacherAssignmentApiItem[],
   teacherId: number,
@@ -107,12 +121,27 @@ export function getTeacherScopedMappings(
   );
 }
 
+/** Attendance mark/report: class-teacher assignments only (supports multi class/division). */
+export function getTeacherAttendanceScopedMappings(
+  assignmentMappings: TeacherAssignmentApiItem[],
+  teacherId: number,
+  academicYearId: number
+): TeacherAssignmentApiItem[] {
+  return filterClassTeacherAssignments(
+    getTeacherScopedMappings(assignmentMappings, teacherId, academicYearId)
+  );
+}
+
 export function getAssignedTeacherIds(
   assignmentMappings: TeacherAssignmentApiItem[],
-  academicYearId: number
+  academicYearId: number,
+  classTeacherOnly = false
 ): Set<number> {
   const ids = new Set<number>();
-  for (const a of assignmentMappings) {
+  const source = classTeacherOnly
+    ? filterClassTeacherAssignments(assignmentMappings)
+    : assignmentMappings;
+  for (const a of source) {
     if (!a.teacher_id || a.status !== "ASSIGNED") continue;
     if (!assignmentMatchesAcademicYear(a, academicYearId)) continue;
     if (a.class_id) ids.add(a.teacher_id);
@@ -126,6 +155,15 @@ export function filterTeachersWithAssignments(
   academicYearId: number
 ): TeacherResponse[] {
   const assignedIds = getAssignedTeacherIds(assignmentMappings, academicYearId);
+  return teachers.filter((t) => assignedIds.has(t.id));
+}
+
+export function filterTeachersWithClassTeacherAssignments(
+  teachers: TeacherResponse[],
+  assignmentMappings: TeacherAssignmentApiItem[],
+  academicYearId: number
+): TeacherResponse[] {
+  const assignedIds = getAssignedTeacherIds(assignmentMappings, academicYearId, true);
   return teachers.filter((t) => assignedIds.has(t.id));
 }
 
@@ -257,6 +295,46 @@ export function resolveTeacherForUser(
 }
 
 /** Build class list from GET /api/teachers/{id} assignment_rows (no classes API needed). */
+/** Mark attendance: build class/division list from class-teacher assignments only (not subject slots). */
+export function buildSchoolClassesFromClassTeacherMappings(
+  mappings: TeacherAssignmentApiItem[],
+  academicYearId: number,
+  tenantId = 0
+): SchoolClass[] {
+  const byClassId = new Map<number, SchoolClass>();
+
+  for (const mapping of mappings) {
+    if (!mapping.class_id || !isClassTeacherAssignment(mapping)) continue;
+    if (!byClassId.has(mapping.class_id)) {
+      byClassId.set(mapping.class_id, {
+        id: mapping.class_id,
+        tenant_id: tenantId,
+        academic_year_id: mapping.academic_year_id ?? academicYearId,
+        name: mapping.class_name || "",
+        code: mapping.class_name || "",
+        is_active: true,
+        divisions: [],
+      });
+    }
+    const schoolClass = byClassId.get(mapping.class_id)!;
+    for (const divId of getAssignmentDivisionIds(mapping)) {
+      if (divId <= 0 || schoolClass.divisions.some((d) => d.id === divId)) continue;
+      const names = mapping.division_name
+        ? mapping.division_name.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+      const nameIndex = getAssignmentDivisionIds(mapping).indexOf(divId);
+      schoolClass.divisions.push({
+        id: divId,
+        class_id: mapping.class_id,
+        division_name: names[nameIndex] || names[0] || "Division",
+        is_active: true,
+      });
+    }
+  }
+
+  return Array.from(byClassId.values());
+}
+
 export function buildSchoolClassesFromAssignmentRows(
   teacher: TeacherResponse,
   academicYearId: number,
@@ -375,11 +453,17 @@ export function buildMappingsFromAttendanceScope(
       division_name: cls.divisions.map((d) => d.division_name).join(", "),
       teacher_id: scope.teacher_id,
       teacher_name: scope.teacher_name,
-      designation: "",
+      designation: "Class Teacher",
       status: "ASSIGNED",
     });
   }
   return items;
+}
+
+export function countTeacherAttendanceClassDivisionPairs(
+  teacherScopedMappings: TeacherAssignmentApiItem[]
+): number {
+  return getTeacherClassDivisionPairs(teacherScopedMappings).length;
 }
 
 export function getTeacherClassDivisionPairs(

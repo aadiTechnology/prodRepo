@@ -168,6 +168,8 @@ const MarkAttendance = () => {
     lockClassFilter,
     lockDivisionFilter,
     disableClassUntilTeacherSelected,
+    hasClassTeacherAttendanceScope,
+    classTeacherAttendancePairCount,
   } = controller;
 
   const allRowsPresent = students.length > 0 && students.every((s) => s.status === "Present");
@@ -566,6 +568,19 @@ const MarkAttendance = () => {
         />
       }
     >
+      {isTeacher && !hasClassTeacherAttendanceScope ? (
+        <Alert severity="info" sx={{ mb: 2, borderRadius: "12px" }}>
+          You are assigned as a subject teacher only. Only class teachers can mark attendance.
+          Contact your admin to assign you as class teacher for a division (leave subject blank on
+          Assign Teacher).
+        </Alert>
+      ) : null}
+      {isTeacher && hasClassTeacherAttendanceScope && classTeacherAttendancePairCount > 1 ? (
+        <Alert severity="info" sx={{ mb: 2, borderRadius: "12px" }}>
+          You are class teacher for multiple classes or divisions. Select class and division above,
+          then mark attendance for each separately.
+        </Alert>
+      ) : null}
       {filterCard}
       {tableCard}
 

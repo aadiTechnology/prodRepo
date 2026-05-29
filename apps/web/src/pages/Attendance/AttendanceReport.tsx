@@ -36,13 +36,11 @@ import { useAuth } from "../../context/AuthContext";
 import { useAttendanceReportRole } from "../../hooks/useAttendanceReportRole";
 import {
   buildMappingsFromAttendanceScope,
-  buildMappingsFromTeacherDetail,
-  buildSchoolClassesFromAssignmentRows,
   fetchAllTeacherAssignments,
   getFilteredClassesForTeacher,
   getFilteredDivisionsForTeacher,
   getTeacherClassDivisionPairs,
-  getTeacherScopedMappings,
+  getTeacherAttendanceScopedMappings,
   resolveTeacherForUser,
   scopeToSchoolClasses,
 } from "../../utils/teacherAttendanceScope";
@@ -215,39 +213,11 @@ const AttendanceReport = () => {
         const activeYearId = activeYear?.id ?? 0;
 
         if (isTeacher && user?.id) {
-          let classList: SchoolClass[] = [];
-          let mappings: TeacherAssignmentApiItem[] = [];
-          let teacherId = 0;
-          let teacherName = "";
-
-          try {
-            const scope = await attendanceService.getMyScope(activeYearId || undefined);
-            classList = scopeToSchoolClasses(scope, user.tenant_id ?? 0);
-            mappings = buildMappingsFromAttendanceScope(scope, activeYearId);
-            teacherId = scope.teacher_id;
-            teacherName = scope.teacher_name;
-          } catch (scopeError) {
-            console.warn(
-              "Attendance my-scope unavailable, using teacher profile fallback",
-              scopeError
-            );
-            const teacherList = await teacherService.list({ limit: 1000 });
-            const me = resolveTeacherForUser(teacherList.items, user.id, user.email);
-            if (!me) return;
-            const teacherDetail = await teacherService.getById(me.id);
-            teacherId = teacherDetail.id;
-            teacherName = teacherDetail.full_name;
-            classList = buildSchoolClassesFromAssignmentRows(
-              teacherDetail,
-              activeYearId,
-              user.tenant_id ?? 0
-            );
-            mappings = buildMappingsFromTeacherDetail(
-              teacherDetail,
-              classList,
-              activeYearId
-            );
-          }
+          const scope = await attendanceService.getMyScope(activeYearId || undefined);
+          const teacherId = scope.teacher_id;
+          const teacherName = scope.teacher_name;
+          const mappings = buildMappingsFromAttendanceScope(scope, activeYearId);
+          const classList = scopeToSchoolClasses(scope, user.tenant_id ?? 0);
 
           setClasses(classList);
           setAssignmentMappings(mappings);
@@ -263,7 +233,7 @@ const AttendanceReport = () => {
             },
           ]);
 
-          const scoped = getTeacherScopedMappings(mappings, teacherId, activeYearId);
+          const scoped = getTeacherAttendanceScopedMappings(mappings, teacherId, activeYearId);
           const firstPair = getTeacherClassDivisionPairs(scoped)[0];
 
           setFilters((prev) => ({
@@ -342,7 +312,7 @@ const AttendanceReport = () => {
 
   const teacherScopedMappings = useMemo(() => {
     if (!isTeacher || !myTeacherId) return [];
-    return getTeacherScopedMappings(
+    return getTeacherAttendanceScopedMappings(
       assignmentMappings,
       myTeacherId,
       filters.academic_year_id
@@ -614,7 +584,7 @@ const AttendanceReport = () => {
     let classId = 0;
     let divisionId = 0;
     if (isTeacher && myTeacherId) {
-      const scoped = getTeacherScopedMappings(
+      const scoped = getTeacherAttendanceScopedMappings(
         assignmentMappings,
         myTeacherId,
         academicYears.find((y) => y.is_active)?.id || 0

@@ -8,15 +8,12 @@ import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 import {
   buildMappingsFromAttendanceScope,
-  buildMappingsFromTeacherDetail,
-  buildSchoolClassesFromAssignmentRows,
-  enrichClassListWithMappingDivisions,
   fetchAllTeacherAssignments,
-  filterTeachersWithAssignments,
+  filterTeachersWithClassTeacherAssignments,
   getFilteredClassesForTeacher,
   getFilteredDivisionsForTeacher,
   getTeacherClassDivisionPairs,
-  getTeacherScopedMappings,
+  getTeacherAttendanceScopedMappings,
   resolveTeacherForUser,
   scopeToSchoolClasses,
 } from "../utils/teacherAttendanceScope";
@@ -53,6 +50,8 @@ export interface UseMarkAttendanceControllerResult {
   lockClassFilter: boolean;
   lockDivisionFilter: boolean;
   disableClassUntilTeacherSelected: boolean;
+  hasClassTeacherAttendanceScope: boolean;
+  classTeacherAttendancePairCount: number;
 }
 
 export function useMarkAttendanceController(): UseMarkAttendanceControllerResult {
@@ -110,65 +109,40 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         const activeYearId = activeYear?.id ?? 0;
 
         if (isTeacher && user?.id) {
-          let classList: SchoolClass[] = [];
-          let assignmentList: TeacherAssignmentApiItem[] = [];
-          let teacherId = 0;
-          let teacherDetail: TeacherResponse | null = null;
+          // Teacher-safe source: /attendance/my-scope (already class-teacher scoped in backend).
+          const scope = await attendanceService.getMyScope(activeYearId || undefined);
+          const teacherId = scope.teacher_id;
+          const assignmentList = buildMappingsFromAttendanceScope(scope, activeYearId);
+          const classList = scopeToSchoolClasses(scope, user.tenant_id ?? 0);
 
+          let teacherDetail: TeacherResponse | null = null;
           try {
-            const scope = await attendanceService.getMyScope(activeYearId || undefined);
-            classList = scopeToSchoolClasses(scope, user.tenant_id ?? 0);
-            assignmentList = buildMappingsFromAttendanceScope(scope, activeYearId);
-            teacherId = scope.teacher_id;
-          } catch (scopeError) {
-            console.warn(
-              "Attendance my-scope unavailable, using teacher profile fallback",
-              scopeError
-            );
+            teacherDetail = await teacherService.getById(teacherId);
+          } catch {
             const teacherList = await teacherService.list({ limit: 1000 });
             const me = resolveTeacherForUser(teacherList.items, user.id, user.email);
-            if (!me) {
-              console.error("Teacher profile not found for logged-in user");
-              return;
-            }
-            teacherDetail = await teacherService.getById(me.id);
-            teacherId = teacherDetail.id;
-            classList = buildSchoolClassesFromAssignmentRows(
-              teacherDetail,
-              activeYearId,
-              user.tenant_id ?? 0
-            );
-            assignmentList = buildMappingsFromTeacherDetail(
-              teacherDetail,
-              classList,
-              activeYearId
-            );
+            if (me) teacherDetail = me;
           }
-
           if (!teacherDetail) {
-            try {
-              teacherDetail = await teacherService.getById(teacherId);
-            } catch {
-              teacherDetail = {
-                id: teacherId,
-                full_name: user.full_name || "Teacher",
-                tenant_id: user.tenant_id ?? 0,
-                mobile_number: "",
-                is_active: true,
-                created_at: new Date().toISOString(),
-              } as TeacherResponse;
-            }
+            teacherDetail = {
+              id: teacherId,
+              full_name: scope.teacher_name || user.full_name || "Teacher",
+              tenant_id: user.tenant_id ?? 0,
+              mobile_number: "",
+              is_active: true,
+              created_at: new Date().toISOString(),
+            } as TeacherResponse;
           }
 
-          const enrichedClasses = enrichClassListWithMappingDivisions(
-            classList,
-            assignmentList
-          );
-          setClasses(enrichedClasses);
+          setClasses(classList);
           setAssignmentMappings(assignmentList);
           setAllTeachers([teacherDetail]);
 
-          const scoped = getTeacherScopedMappings(assignmentList, teacherId, activeYearId);
+          const scoped = getTeacherAttendanceScopedMappings(
+            assignmentList,
+            teacherId,
+            activeYearId
+          );
           const firstPair = getTeacherClassDivisionPairs(scoped)[0];
 
           setFilters((prev) => ({
@@ -224,7 +198,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
       const me = resolveTeacherForUser(allTeachers, user?.id, user?.email);
       return me ? [me] : [];
     }
-    return filterTeachersWithAssignments(
+    return filterTeachersWithClassTeacherAssignments(
       allTeachers,
       assignmentMappings,
       filters.academic_year_id
@@ -241,7 +215,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
 
   const teacherScopedMappings = useMemo(
     () =>
-      getTeacherScopedMappings(
+      getTeacherAttendanceScopedMappings(
         assignmentMappings,
         filters.teacher_id,
         filters.academic_year_id
@@ -272,9 +246,33 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     [classes, allTeachers, teacherScopedMappings, filters.teacher_id, filters.class_id]
   );
 
-  const lockClassFilter = isTeacher && filteredClasses.length === 1;
+  const teacherClassTeacherClassCount = useMemo(() => {
+    if (!isTeacher || !filters.teacher_id) return 0;
+    const scoped = getTeacherAttendanceScopedMappings(
+      assignmentMappings,
+      filters.teacher_id,
+      filters.academic_year_id
+    );
+    return new Set(scoped.map((m) => m.class_id).filter(Boolean)).size;
+  }, [isTeacher, assignmentMappings, filters.teacher_id, filters.academic_year_id]);
+
+  const lockClassFilter = isTeacher && teacherClassTeacherClassCount === 1;
   const lockDivisionFilter = isTeacher && filteredDivisions.length === 1;
   const disableClassUntilTeacherSelected = !isTeacher && !filters.teacher_id;
+
+  const classTeacherAttendancePairCount = useMemo(() => {
+    if (!isTeacher) return 0;
+    return getTeacherClassDivisionPairs(
+      getTeacherAttendanceScopedMappings(
+        assignmentMappings,
+        filters.teacher_id,
+        filters.academic_year_id
+      )
+    ).length;
+  }, [isTeacher, assignmentMappings, filters.teacher_id, filters.academic_year_id]);
+
+  const hasClassTeacherAttendanceScope =
+    !isTeacher || classTeacherAttendancePairCount > 0;
 
   useEffect(() => {
     if (isTeacher) return;
@@ -497,7 +495,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         attendance_date: today,
       }));
     } else {
-      const scoped = getTeacherScopedMappings(
+      const scoped = getTeacherAttendanceScopedMappings(
         assignmentMappings,
         filters.teacher_id,
         filters.academic_year_id
@@ -537,5 +535,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     lockClassFilter,
     lockDivisionFilter,
     disableClassUntilTeacherSelected,
+    hasClassTeacherAttendanceScope,
+    classTeacherAttendancePairCount,
   };
 }
