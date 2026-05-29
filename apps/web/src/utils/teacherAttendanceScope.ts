@@ -1,6 +1,9 @@
 import teacherAssignmentApi, { TeacherAssignmentApiItem } from "../api/teacherAssignmentApi";
 import { TeacherResponse } from "../api/services/teacherService";
 import { SchoolClass, ClassDivision } from "../api/services/schoolClassService";
+import {
+  AttendanceTeacherScopeResponse,
+} from "../api/services/attendanceService";
 
 export async function fetchAllTeacherAssignments(): Promise<TeacherAssignmentApiItem[]> {
   const pageSize = 100;
@@ -32,14 +35,18 @@ export function buildTeacherFallbackMappings(
   classList: SchoolClass[]
 ): TeacherAssignmentApiItem[] {
   const rows = teacher.assignment_rows || [];
-  const mappingsFromRows: TeacherAssignmentApiItem[] = rows.flatMap((row, index) => {
-    if (!row.class_name || !row.division_names?.length) return [];
-    const matchedClass = classList.find((c) => c.name === row.class_name);
-    if (!matchedClass) return [];
-    const matchedDivisionIds = matchedClass.divisions
-      .filter((d) => row.division_names.includes(d.division_name))
-      .map((d) => d.id);
-    if (!matchedDivisionIds.length) return [];
+      const mappingsFromRows: TeacherAssignmentApiItem[] = rows.flatMap((row, index) => {
+        if (!row.class_id && (!row.class_name || !row.division_names?.length)) return [];
+        const matchedClass = row.class_id
+          ? classList.find((c) => c.id === row.class_id)
+          : classList.find((c) => c.name === row.class_name);
+        if (!matchedClass) return [];
+        const matchedDivisionIds =
+          row.divisions?.map((d) => d.id).filter((id) => id > 0) ||
+          matchedClass.divisions
+            .filter((d) => (row.division_names || []).includes(d.division_name))
+            .map((d) => d.id);
+        if (!matchedDivisionIds.length) return [];
     return [
       {
         id: -(index + 1),
@@ -167,14 +174,71 @@ export function getFilteredDivisionsForTeacher(
   ) as number[];
 
   if (assignedDivisionIds.length > 0) {
-    return allDivisions.filter((d) => assignedDivisionIds.includes(d.id));
+    const matched = allDivisions.filter((d) => assignedDivisionIds.includes(d.id));
+    if (matched.length > 0) return matched;
+
+    // Class list may lack division rows when built from assignment_rows without division ids.
+    return assignedDivisionIds.map((divId) => {
+      const mapping = teacherScopedMappings.find(
+        (a) => a.class_id === classId && getAssignmentDivisionIds(a).includes(divId)
+      );
+      const names = mapping?.division_name
+        ? mapping.division_name.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+      const nameIndex = mapping
+        ? getAssignmentDivisionIds(mapping).indexOf(divId)
+        : 0;
+      return {
+        id: divId,
+        class_id: classId,
+        division_name: names[nameIndex] || names[0] || "Division",
+        is_active: true,
+      };
+    });
   }
 
   const selectedTeacher = teachers.find((t) => t.id === teacherId && t.class_id === classId);
   if (selectedTeacher?.class_division_id) {
-    return allDivisions.filter((d) => d.id === selectedTeacher.class_division_id);
+    const matched = allDivisions.filter((d) => d.id === selectedTeacher.class_division_id);
+    if (matched.length > 0) return matched;
+    return [
+      {
+        id: selectedTeacher.class_division_id,
+        class_id: classId,
+        division_name: selectedTeacher.division_name || "Division",
+        is_active: true,
+      },
+    ];
   }
   return [];
+}
+
+/** Ensure each class carries division ids from assignment mappings (for teacher fallback path). */
+export function enrichClassListWithMappingDivisions(
+  classList: SchoolClass[],
+  assignmentMappings: TeacherAssignmentApiItem[]
+): SchoolClass[] {
+  return classList.map((cls) => {
+    const mappings = assignmentMappings.filter((a) => a.class_id === cls.id);
+    const divisions = [...cls.divisions];
+    for (const mapping of mappings) {
+      const divisionIds = getAssignmentDivisionIds(mapping);
+      const names = mapping.division_name
+        ? mapping.division_name.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+      divisionIds.forEach((divId, index) => {
+        if (divId > 0 && !divisions.some((d) => d.id === divId)) {
+          divisions.push({
+            id: divId,
+            class_id: cls.id,
+            division_name: names[index] || names[0] || "Division",
+            is_active: true,
+          });
+        }
+      });
+    }
+    return { ...cls, divisions };
+  });
 }
 
 export function resolveTeacherForUser(
@@ -190,6 +254,132 @@ export function resolveTeacherForUser(
     match = teachers.find((t) => t.email?.toLowerCase() === userEmail.toLowerCase());
   }
   return match;
+}
+
+/** Build class list from GET /api/teachers/{id} assignment_rows (no classes API needed). */
+export function buildSchoolClassesFromAssignmentRows(
+  teacher: TeacherResponse,
+  academicYearId: number,
+  tenantId = 0
+): SchoolClass[] {
+  const byClassId = new Map<number, SchoolClass>();
+
+  for (const row of teacher.assignment_rows || []) {
+    if (!row.class_id) continue;
+    if (!byClassId.has(row.class_id)) {
+      byClassId.set(row.class_id, {
+        id: row.class_id,
+        tenant_id: tenantId,
+        academic_year_id: academicYearId,
+        name: row.class_name || "",
+        code: row.class_name || "",
+        is_active: true,
+        divisions: [],
+      });
+    }
+    const schoolClass = byClassId.get(row.class_id)!;
+    const divisionEntries =
+      row.divisions?.length
+        ? row.divisions
+        : (row.division_names || []).map((name, index) => ({
+            id: -(index + 1),
+            division_name: name,
+          }));
+
+    for (const div of divisionEntries) {
+      if (div.id > 0 && !schoolClass.divisions.some((d) => d.id === div.id)) {
+        schoolClass.divisions.push({
+          id: div.id,
+          class_id: row.class_id,
+          division_name: div.division_name,
+          is_active: true,
+        });
+      }
+    }
+  }
+
+  if (
+    byClassId.size === 0 &&
+    teacher.class_id &&
+    teacher.class_division_id
+  ) {
+    byClassId.set(teacher.class_id, {
+      id: teacher.class_id,
+      tenant_id: tenantId,
+      academic_year_id: academicYearId,
+      name: teacher.class_name || "",
+      code: teacher.class_name || "",
+      is_active: true,
+      divisions: [
+        {
+          id: teacher.class_division_id,
+          class_id: teacher.class_id,
+          division_name: teacher.division_name || "",
+          is_active: true,
+        },
+      ],
+    });
+  }
+
+  return Array.from(byClassId.values());
+}
+
+export function buildMappingsFromTeacherDetail(
+  teacher: TeacherResponse,
+  classList: SchoolClass[],
+  academicYearId: number
+): TeacherAssignmentApiItem[] {
+  const fromRows = buildTeacherFallbackMappings(teacher, classList).map((m) => ({
+    ...m,
+    academic_year_id: m.academic_year_id ?? academicYearId,
+  }));
+  return fromRows;
+}
+
+export function scopeToSchoolClasses(
+  scope: AttendanceTeacherScopeResponse,
+  tenantId = 0
+): SchoolClass[] {
+  return scope.classes.map((c) => ({
+    id: c.id,
+    tenant_id: tenantId,
+    academic_year_id: c.academic_year_id ?? null,
+    name: c.name,
+    code: c.name,
+    is_active: true,
+    divisions: c.divisions.map((d) => ({
+      id: d.id,
+      class_id: c.id,
+      division_name: d.division_name,
+      is_active: true,
+    })),
+  }));
+}
+
+export function buildMappingsFromAttendanceScope(
+  scope: AttendanceTeacherScopeResponse,
+  academicYearId: number
+): TeacherAssignmentApiItem[] {
+  const items: TeacherAssignmentApiItem[] = [];
+  let syntheticId = -1;
+  for (const cls of scope.classes) {
+    const divisionIds = cls.divisions.map((d) => d.id);
+    if (!divisionIds.length) continue;
+    items.push({
+      id: syntheticId--,
+      academic_year_id: cls.academic_year_id ?? academicYearId,
+      class_id: cls.id,
+      class_division_id: divisionIds[0],
+      class_division_ids: divisionIds,
+      class_name: cls.name,
+      division_name: cls.divisions.map((d) => d.division_name).join(", "),
+      teacher_id: scope.teacher_id,
+      teacher_name: scope.teacher_name,
+      designation: "",
+      status: "ASSIGNED",
+    });
+  }
+  return items;
 }
 
 export function getTeacherClassDivisionPairs(

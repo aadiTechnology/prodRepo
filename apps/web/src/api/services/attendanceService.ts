@@ -52,7 +52,44 @@ export interface AttendanceReportResponse {
   total_count: number;
 }
 
+export interface AttendanceScopeDivision {
+  id: number;
+  division_name: string;
+}
+
+export interface AttendanceScopeClass {
+  id: number;
+  name: string;
+  academic_year_id?: number | null;
+  divisions: AttendanceScopeDivision[];
+}
+
+export interface AttendanceTeacherScopeResponse {
+  teacher_id: number;
+  teacher_name: string;
+  classes: AttendanceScopeClass[];
+}
+
 const attendanceService = {
+  async getMyScope(academicYearId?: number) {
+    const params = academicYearId ? { academic_year_id: academicYearId } : undefined;
+    try {
+      const { data } = await axiosInstance.get<AttendanceTeacherScopeResponse>(
+        "/attendance/my-scope",
+        { params }
+      );
+      return data;
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status !== 404) throw err;
+      const { data } = await axiosInstance.get<AttendanceTeacherScopeResponse>(
+        "/api/teachers/me/attendance-scope",
+        { params }
+      );
+      return data;
+    }
+  },
+
   async getAttendance(params: {
     attendance_date: string;
     class_id: number;

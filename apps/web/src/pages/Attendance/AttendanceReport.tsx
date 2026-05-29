@@ -31,17 +31,20 @@ import academicYearService, { AcademicYear } from "../../api/services/academicYe
 import attendanceService, { AttendanceReportResponse } from "../../api/services/attendanceService";
 import studentService from "../../api/services/studentService";
 import teacherService, { TeacherResponse } from "../../api/services/teacherService";
-import { TeacherAssignmentApiItem } from "../../api/teacherAssignmentApi";
+import type { TeacherAssignmentApiItem } from "../../api/teacherAssignmentApi";
 import { useAuth } from "../../context/AuthContext";
 import { useAttendanceReportRole } from "../../hooks/useAttendanceReportRole";
 import {
-  buildTeacherFallbackMappings,
+  buildMappingsFromAttendanceScope,
+  buildMappingsFromTeacherDetail,
+  buildSchoolClassesFromAssignmentRows,
   fetchAllTeacherAssignments,
   getFilteredClassesForTeacher,
   getFilteredDivisionsForTeacher,
   getTeacherClassDivisionPairs,
   getTeacherScopedMappings,
   resolveTeacherForUser,
+  scopeToSchoolClasses,
 } from "../../utils/teacherAttendanceScope";
 import {
   AttendanceMonthCalendar,
@@ -206,53 +209,84 @@ const AttendanceReport = () => {
 
     const loadInitialData = async () => {
       try {
-        const [years, classList, teacherList, assignmentList] = await Promise.all([
-          academicYearService.getAll(),
+        const years = await academicYearService.getAll();
+        setAcademicYears(years);
+        const activeYear = years.find((y) => y.is_active);
+        const activeYearId = activeYear?.id ?? 0;
+
+        if (isTeacher && user?.id) {
+          let classList: SchoolClass[] = [];
+          let mappings: TeacherAssignmentApiItem[] = [];
+          let teacherId = 0;
+          let teacherName = "";
+
+          try {
+            const scope = await attendanceService.getMyScope(activeYearId || undefined);
+            classList = scopeToSchoolClasses(scope, user.tenant_id ?? 0);
+            mappings = buildMappingsFromAttendanceScope(scope, activeYearId);
+            teacherId = scope.teacher_id;
+            teacherName = scope.teacher_name;
+          } catch (scopeError) {
+            console.warn(
+              "Attendance my-scope unavailable, using teacher profile fallback",
+              scopeError
+            );
+            const teacherList = await teacherService.list({ limit: 1000 });
+            const me = resolveTeacherForUser(teacherList.items, user.id, user.email);
+            if (!me) return;
+            const teacherDetail = await teacherService.getById(me.id);
+            teacherId = teacherDetail.id;
+            teacherName = teacherDetail.full_name;
+            classList = buildSchoolClassesFromAssignmentRows(
+              teacherDetail,
+              activeYearId,
+              user.tenant_id ?? 0
+            );
+            mappings = buildMappingsFromTeacherDetail(
+              teacherDetail,
+              classList,
+              activeYearId
+            );
+          }
+
+          setClasses(classList);
+          setAssignmentMappings(mappings);
+          setMyTeacherId(teacherId);
+          setTeachers([
+            {
+              id: teacherId,
+              full_name: teacherName,
+              tenant_id: user.tenant_id ?? 0,
+              mobile_number: "",
+              is_active: true,
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+          const scoped = getTeacherScopedMappings(mappings, teacherId, activeYearId);
+          const firstPair = getTeacherClassDivisionPairs(scoped)[0];
+
+          setFilters((prev) => ({
+            ...prev,
+            academic_year_id: activeYearId || prev.academic_year_id,
+            class_id: firstPair?.class_id ?? 0,
+            division_id: firstPair?.division_id ?? 0,
+            student_id: 0,
+          }));
+          return;
+        }
+
+        const [classList, teacherList, assignmentList] = await Promise.all([
           schoolClassService.getAll(),
           teacherService.list({ limit: 1000 }),
           fetchAllTeacherAssignments(),
         ]);
 
-        setAcademicYears(years);
         setClasses(classList);
         setTeachers(teacherList.items);
         setAssignmentMappings(assignmentList);
 
-        const activeYear = years.find((y) => y.is_active);
-        const activeYearId = activeYear?.id ?? 0;
-
-        if (isTeacher && user?.id) {
-          let myTeacher = resolveTeacherForUser(teacherList.items, user.id, user.email);
-          if (myTeacher) {
-            let teacherRecord = myTeacher;
-            try {
-              teacherRecord = await teacherService.getById(myTeacher.id);
-            } catch {
-              /* use list row */
-            }
-            setMyTeacherId(teacherRecord.id);
-
-            let mappings = assignmentList.filter((a) => a.teacher_id === teacherRecord.id);
-            if (mappings.length === 0) {
-              mappings = buildTeacherFallbackMappings(teacherRecord, classList);
-              setAssignmentMappings([...assignmentList, ...mappings]);
-            }
-
-            const scoped = getTeacherScopedMappings(mappings, teacherRecord.id, activeYearId);
-            const pairs = getTeacherClassDivisionPairs(scoped);
-            const firstPair = pairs[0];
-
-            setFilters((prev) => ({
-              ...prev,
-              academic_year_id: activeYearId || prev.academic_year_id,
-              class_id: firstPair?.class_id ?? teacherRecord.class_id ?? 0,
-              division_id: firstPair?.division_id ?? teacherRecord.class_division_id ?? 0,
-              student_id: 0,
-            }));
-          } else if (activeYear) {
-            setFilters((prev) => ({ ...prev, academic_year_id: activeYear.id }));
-          }
-        } else if (activeYear) {
+        if (activeYear) {
           setFilters((prev) => ({ ...prev, academic_year_id: activeYear.id }));
         }
       } catch (err) {
@@ -260,7 +294,7 @@ const AttendanceReport = () => {
       }
     };
     loadInitialData();
-  }, [isStudent, isTeacher, user?.id, user?.email]);
+  }, [isStudent, isTeacher, user?.id, user?.email, user?.tenant_id]);
 
   // Active academic year + holidays for student calendar
   useEffect(() => {

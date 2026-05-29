@@ -429,6 +429,7 @@ const MarkAttendance = () => {
           displayEmpty
           size="small"
           disabled={
+            !filters.class_id ||
             !filteredDivisions.length ||
             lockDivisionFilter ||
             disableClassUntilTeacherSelected

@@ -7,7 +7,10 @@ import { TeacherAssignmentApiItem } from "../api/teacherAssignmentApi";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 import {
-  buildTeacherFallbackMappings,
+  buildMappingsFromAttendanceScope,
+  buildMappingsFromTeacherDetail,
+  buildSchoolClassesFromAssignmentRows,
+  enrichClassListWithMappingDivisions,
   fetchAllTeacherAssignments,
   filterTeachersWithAssignments,
   getFilteredClassesForTeacher,
@@ -15,6 +18,7 @@ import {
   getTeacherClassDivisionPairs,
   getTeacherScopedMappings,
   resolveTeacherForUser,
+  scopeToSchoolClasses,
 } from "../utils/teacherAttendanceScope";
 
 export interface AttendanceFilters {
@@ -100,91 +104,116 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const [yearsResult, teacherListResult, classListResult, assignmentResult] =
+        const years = await academicYearService.getAll();
+        setAcademicYears(years);
+        const activeYear = years.find((y) => y.is_active);
+        const activeYearId = activeYear?.id ?? 0;
+
+        if (isTeacher && user?.id) {
+          let classList: SchoolClass[] = [];
+          let assignmentList: TeacherAssignmentApiItem[] = [];
+          let teacherId = 0;
+          let teacherDetail: TeacherResponse | null = null;
+
+          try {
+            const scope = await attendanceService.getMyScope(activeYearId || undefined);
+            classList = scopeToSchoolClasses(scope, user.tenant_id ?? 0);
+            assignmentList = buildMappingsFromAttendanceScope(scope, activeYearId);
+            teacherId = scope.teacher_id;
+          } catch (scopeError) {
+            console.warn(
+              "Attendance my-scope unavailable, using teacher profile fallback",
+              scopeError
+            );
+            const teacherList = await teacherService.list({ limit: 1000 });
+            const me = resolveTeacherForUser(teacherList.items, user.id, user.email);
+            if (!me) {
+              console.error("Teacher profile not found for logged-in user");
+              return;
+            }
+            teacherDetail = await teacherService.getById(me.id);
+            teacherId = teacherDetail.id;
+            classList = buildSchoolClassesFromAssignmentRows(
+              teacherDetail,
+              activeYearId,
+              user.tenant_id ?? 0
+            );
+            assignmentList = buildMappingsFromTeacherDetail(
+              teacherDetail,
+              classList,
+              activeYearId
+            );
+          }
+
+          if (!teacherDetail) {
+            try {
+              teacherDetail = await teacherService.getById(teacherId);
+            } catch {
+              teacherDetail = {
+                id: teacherId,
+                full_name: user.full_name || "Teacher",
+                tenant_id: user.tenant_id ?? 0,
+                mobile_number: "",
+                is_active: true,
+                created_at: new Date().toISOString(),
+              } as TeacherResponse;
+            }
+          }
+
+          const enrichedClasses = enrichClassListWithMappingDivisions(
+            classList,
+            assignmentList
+          );
+          setClasses(enrichedClasses);
+          setAssignmentMappings(assignmentList);
+          setAllTeachers([teacherDetail]);
+
+          const scoped = getTeacherScopedMappings(assignmentList, teacherId, activeYearId);
+          const firstPair = getTeacherClassDivisionPairs(scoped)[0];
+
+          setFilters((prev) => ({
+            ...prev,
+            academic_year_id: activeYearId || prev.academic_year_id,
+            teacher_id: teacherId,
+            class_id: firstPair?.class_id ?? teacherDetail!.class_id ?? 0,
+            division_id: firstPair?.division_id ?? teacherDetail!.class_division_id ?? 0,
+          }));
+          return;
+        }
+
+        const [teacherListResult, classListResult, assignmentResult] =
           await Promise.allSettled([
-            academicYearService.getAll(),
             teacherService.list({ limit: 1000 }),
             schoolClassService.getAll(),
             fetchAllTeacherAssignments(),
           ]);
 
-        const years = yearsResult.status === "fulfilled" ? yearsResult.value : [];
         const teacherList =
           teacherListResult.status === "fulfilled"
             ? teacherListResult.value
             : { items: [], total: 0 };
         const classList = classListResult.status === "fulfilled" ? classListResult.value : [];
-        let assignmentList =
+        const assignmentList =
           assignmentResult.status === "fulfilled" ? assignmentResult.value : [];
 
-        setAcademicYears(years);
         setClasses(classList);
+        setAssignmentMappings(assignmentList);
 
         const uniqueTeachersById = new Map<number, TeacherResponse>();
         teacherList.items.forEach((t) => {
           if (!uniqueTeachersById.has(t.id)) uniqueTeachersById.set(t.id, t);
         });
-        const uniqueTeachers = Array.from(uniqueTeachersById.values());
-        setAllTeachers(uniqueTeachers);
+        setAllTeachers(Array.from(uniqueTeachersById.values()));
 
-        const activeYear = years.find((y) => y.is_active);
-        const activeYearId = activeYear?.id ?? 0;
-
-        if (isTeacher && user?.id) {
-          let myTeacher = resolveTeacherForUser(uniqueTeachers, user.id, user.email);
-          if (myTeacher) {
-            let teacherDetail = myTeacher;
-            try {
-              teacherDetail = await teacherService.getById(myTeacher.id);
-            } catch (detailError) {
-              console.warn("Failed to fetch teacher detail for assignments", detailError);
-            }
-
-            const ownMappings = assignmentList.filter((a) => a.teacher_id === teacherDetail.id);
-            if (ownMappings.length === 0) {
-              assignmentList = [
-                ...assignmentList,
-                ...buildTeacherFallbackMappings(teacherDetail, classList),
-              ];
-            }
-            setAssignmentMappings(assignmentList);
-            setAllTeachers(
-              uniqueTeachers.map((t) => (t.id === teacherDetail.id ? teacherDetail : t))
-            );
-
-            const scoped = getTeacherScopedMappings(
-              assignmentList,
-              teacherDetail.id,
-              activeYearId
-            );
-            const pairs = getTeacherClassDivisionPairs(scoped);
-            const firstPair = pairs[0];
-
-            setFilters((prev) => ({
-              ...prev,
-              academic_year_id: activeYearId || prev.academic_year_id,
-              teacher_id: teacherDetail.id,
-              class_id: firstPair?.class_id ?? teacherDetail.class_id ?? 0,
-              division_id: firstPair?.division_id ?? teacherDetail.class_division_id ?? 0,
-            }));
-          } else {
-            setAssignmentMappings(assignmentList);
-            if (activeYear) {
-              setFilters((prev) => ({ ...prev, academic_year_id: activeYear.id }));
-            }
-          }
-        } else {
-          setAssignmentMappings(assignmentList);
-          if (activeYear) {
-            setFilters((prev) => ({ ...prev, academic_year_id: activeYear.id }));
-          }
+        if (activeYear) {
+          setFilters((prev) => ({ ...prev, academic_year_id: activeYear.id }));
         }
       } catch (err) {
         console.error("Failed to load metadata", err);
       }
     };
     loadInitialData();
-  }, [isTeacher, user?.id, user?.email]);
+  }, [isTeacher, user?.id, user?.email, user?.tenant_id]);
 
   const teachers = useMemo(() => {
     if (isTeacher) {
@@ -264,27 +293,59 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
 
   useEffect(() => {
     setDivisions(filteredDivisions);
-    if (filteredDivisions.length > 0) {
-      const isCurrentDivInFiltered = filteredDivisions.some((d) => d.id === filters.division_id);
-      if (!isCurrentDivInFiltered) {
-        setFilters((prev) => ({ ...prev, division_id: filteredDivisions[0].id }));
+    if (!filters.class_id || filteredDivisions.length === 0) {
+      if (filteredDivisions.length === 0 && filters.division_id !== 0) {
+        setFilters((prev) => ({ ...prev, division_id: 0 }));
       }
-    } else {
-      setFilters((prev) => ({ ...prev, division_id: 0 }));
+      return;
+    }
+    const isCurrentDivInFiltered = filteredDivisions.some((d) => d.id === filters.division_id);
+    if (!isCurrentDivInFiltered) {
+      setFilters((prev) => ({ ...prev, division_id: filteredDivisions[0].id }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredDivisions]);
+  }, [filteredDivisions, filters.class_id]);
 
   useEffect(() => {
-    if (filters.class_id && filteredClasses.length > 0) {
-      const isCurrentClassInFiltered = filteredClasses.some((c) => c.id === filters.class_id);
-      if (!isCurrentClassInFiltered) {
-        setFilters((prev) => ({ ...prev, class_id: filteredClasses[0].id }));
+    if (filteredClasses.length === 0) {
+      if (filters.class_id !== 0) {
+        setFilters((prev) => ({ ...prev, class_id: 0, division_id: 0 }));
       }
-    } else if (!filters.class_id && filteredClasses.length > 0) {
-      setFilters((prev) => ({ ...prev, class_id: filteredClasses[0].id }));
-    } else if (filteredClasses.length === 0 && filters.class_id !== 0) {
-      setFilters((prev) => ({ ...prev, class_id: 0 }));
+      return;
+    }
+
+    const isCurrentClassInFiltered = filteredClasses.some((c) => c.id === filters.class_id);
+    if (!isCurrentClassInFiltered) {
+      const nextClassId = filteredClasses[0].id;
+      const nextDivisions = getFilteredDivisionsForTeacher(
+        classes,
+        allTeachers,
+        teacherScopedMappings,
+        filters.teacher_id,
+        nextClassId
+      );
+      setFilters((prev) => ({
+        ...prev,
+        class_id: nextClassId,
+        division_id: nextDivisions[0]?.id ?? 0,
+      }));
+      return;
+    }
+
+    if (!filters.class_id) {
+      const nextClassId = filteredClasses[0].id;
+      const nextDivisions = getFilteredDivisionsForTeacher(
+        classes,
+        allTeachers,
+        teacherScopedMappings,
+        filters.teacher_id,
+        nextClassId
+      );
+      setFilters((prev) => ({
+        ...prev,
+        class_id: nextClassId,
+        division_id: nextDivisions[0]?.id ?? 0,
+      }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredClasses]);
