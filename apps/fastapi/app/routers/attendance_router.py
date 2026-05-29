@@ -4,34 +4,30 @@ from datetime import date
 from typing import Optional
 from sqlalchemy import or_
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, get_rbac_role_codes, SYSTEM_ADMIN_ROLE_CODE
+from app.core.dependencies import get_current_user
 from app.services.attendance_service import AttendanceService
+from app.services.attendance_access import (
+    assert_teacher_class_division_access,
+    is_admin_like,
+    is_teacher_like,
+)
+from app.services import teacher_service
 from app.schemas.attendance_schema import (
     MarkAttendanceRequest,
     AttendanceListResponse,
     AttendanceReportResponse,
     AttendanceReportSummary,
 )
-from app.models.teacher import Teacher
 from app.models.student import Student
-from app.models.user import UserRole
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
 STUDENT_REPORT_MAX_LIMIT = 500
 
 
-def _is_admin_like(current_user, db: Session) -> bool:
-    if current_user.role in [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.TENANT_ADMIN]:
-        return True
-    role_codes = get_rbac_role_codes(db, current_user.id)
-    return any(
-        code in role_codes
-        for code in ["admin", "tenant_admin", SYSTEM_ADMIN_ROLE_CODE.lower()]
-    )
-
-
 def _is_student_role(current_user, db: Session) -> bool:
+    from app.core.dependencies import get_rbac_role_codes
+
     role_codes = get_rbac_role_codes(db, current_user.id)
     if "student" in role_codes:
         return True
@@ -75,33 +71,96 @@ def _resolve_student_for_user(db: Session, current_user) -> Optional[Student]:
     return None
 
 
+def _apply_teacher_report_scope(
+    db: Session,
+    current_user,
+    class_id: Optional[int],
+    division_id: Optional[int],
+    academic_year_id: Optional[int] = None,
+) -> tuple[Optional[int], Optional[int]]:
+    """Validate or default class/division for teacher report requests."""
+    teacher = teacher_service.resolve_teacher_for_user(
+        db,
+        current_user.tenant_id,
+        current_user.id,
+        getattr(current_user, "email", None),
+    )
+    if not teacher:
+        return class_id, division_id
+
+    pairs = teacher_service.get_teacher_class_division_pairs(
+        db,
+        current_user.tenant_id,
+        teacher.id,
+        academic_year_id,
+    )
+    if not pairs:
+        return None, None
+
+    if class_id and division_id:
+        if (class_id, division_id) not in pairs:
+            raise HTTPException(
+                status_code=403,
+                detail="You are not assigned to this class and division",
+            )
+        return class_id, division_id
+
+    if len(pairs) == 1:
+        return pairs[0][0], pairs[0][1]
+
+    return class_id, division_id
+
+
 @router.get("", response_model=AttendanceListResponse)
 def get_attendance(
     attendance_date: date,
     class_id: int,
     division_id: int,
+    academic_year_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     try:
+        assert_teacher_class_division_access(
+            db, current_user, class_id, division_id, academic_year_id
+        )
         service = AttendanceService(db)
-        return service.get_attendance_grid(attendance_date, class_id, division_id, current_user.tenant_id)
-    except Exception as e:
-        import traceback; traceback.print_exc()
+        return service.get_attendance_grid(
+            attendance_date, class_id, division_id, current_user.tenant_id
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to fetch attendance data")
+
 
 @router.post("/mark")
 def mark_attendance(
     req: MarkAttendanceRequest,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     try:
+        assert_teacher_class_division_access(
+            db,
+            current_user,
+            req.class_id,
+            req.class_division_id,
+            req.academic_year_id,
+        )
         service = AttendanceService(db)
         return service.mark_attendance(req, current_user)
-    except Exception as e:
-        import traceback; traceback.print_exc()
+    except HTTPException:
+        raise
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to save attendance records")
+
 
 @router.get("/report", response_model=AttendanceReportResponse)
 def get_attendance_report(
@@ -110,10 +169,11 @@ def get_attendance_report(
     class_id: Optional[int] = Query(None),
     division_id: Optional[int] = Query(None),
     student_id: Optional[int] = Query(None),
+    academic_year_id: Optional[int] = Query(None),
     limit: int = Query(100),
     offset: int = Query(0),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     try:
         if _is_student_role(current_user, db):
@@ -128,37 +188,21 @@ def get_attendance_report(
             division_id = student.class_division_id
             limit = min(max(limit, 1), STUDENT_REPORT_MAX_LIMIT)
             offset = 0
-        elif not _is_admin_like(current_user, db):
-            teacher = (
-                db.query(Teacher)
-                .filter(
-                    Teacher.tenant_id == current_user.tenant_id,
-                    Teacher.is_deleted == False,
-                    Teacher.is_active == True,
-                )
-                .filter(
-                    or_(
-                        Teacher.user_id == current_user.id,
-                        Teacher.email == current_user.email,
-                    )
-                )
-                .first()
+        elif is_teacher_like(current_user, db) and not is_admin_like(current_user, db):
+            class_id, division_id = _apply_teacher_report_scope(
+                db, current_user, class_id, division_id, academic_year_id
             )
-
-            if teacher:
-                if not teacher.class_id or not teacher.class_division_id:
-                    return AttendanceReportResponse(
-                        records=[],
-                        summary=AttendanceReportSummary(
-                            total_present=0,
-                            total_absent=0,
-                            total_half_day=0,
-                            total_leave=0,
-                        ),
-                        total_count=0,
-                    )
-                class_id = teacher.class_id
-                division_id = teacher.class_division_id
+            if not class_id or not division_id:
+                return AttendanceReportResponse(
+                    records=[],
+                    summary=AttendanceReportSummary(
+                        total_present=0,
+                        total_absent=0,
+                        total_half_day=0,
+                        total_leave=0,
+                    ),
+                    total_count=0,
+                )
 
         service = AttendanceService(db)
         return service.get_attendance_report(
@@ -169,8 +213,12 @@ def get_attendance_report(
             division_id,
             student_id,
             limit,
-            offset
+            offset,
         )
-    except Exception as e:
-        import traceback; traceback.print_exc()
+    except HTTPException:
+        raise
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to generate attendance report")

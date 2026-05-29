@@ -412,3 +412,81 @@ def soft_delete_teacher(db: Session, teacher_id: int, deleted_by: int, tenant_id
         )
         
     db.commit()
+
+
+def get_teacher_class_division_pairs(
+    db: Session,
+    tenant_id: int,
+    teacher_id: int,
+    academic_year_id: Optional[int] = None,
+) -> list[tuple[int, int]]:
+    """Active class/division pairs for a teacher from teacher_assignments, with legacy fallback."""
+    pairs: set[tuple[int, int]] = set()
+    try:
+        rows = db.execute(
+            text(
+                """
+                SELECT ta.class_id, ta.class_division_id
+                FROM teacher_assignments ta
+                WHERE ta.tenant_id = :tenant_id
+                  AND ta.teacher_id = :teacher_id
+                  AND ta.is_active = 1
+                  AND (:academic_year_id IS NULL OR ta.academic_year_id = :academic_year_id)
+                """
+            ),
+            {
+                "tenant_id": tenant_id,
+                "teacher_id": teacher_id,
+                "academic_year_id": academic_year_id,
+            },
+        ).mappings().all()
+        for row in rows:
+            if row["class_id"] and row["class_division_id"]:
+                pairs.add((int(row["class_id"]), int(row["class_division_id"])))
+    except SQLAlchemyError:
+        pass
+
+    if pairs:
+        return sorted(pairs)
+
+    teacher = (
+        db.query(Teacher)
+        .filter(
+            Teacher.id == teacher_id,
+            Teacher.tenant_id == tenant_id,
+            Teacher.is_deleted == False,
+        )
+        .first()
+    )
+    if teacher and teacher.class_id and teacher.class_division_id:
+        return [(int(teacher.class_id), int(teacher.class_division_id))]
+    return []
+
+
+def resolve_teacher_for_user(
+    db: Session, tenant_id: int, user_id: int, email: Optional[str] = None
+) -> Optional[Teacher]:
+    teacher = (
+        db.query(Teacher)
+        .filter(
+            Teacher.tenant_id == tenant_id,
+            Teacher.is_deleted == False,
+            Teacher.is_active == True,
+            Teacher.user_id == user_id,
+        )
+        .first()
+    )
+    if teacher:
+        return teacher
+    if not email:
+        return None
+    return (
+        db.query(Teacher)
+        .filter(
+            Teacher.tenant_id == tenant_id,
+            Teacher.is_deleted == False,
+            Teacher.is_active == True,
+            Teacher.email == email,
+        )
+        .first()
+    )

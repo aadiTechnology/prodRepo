@@ -89,8 +89,6 @@ class AttendanceService:
                     StudentAttendance.is_deleted == False
                 ).first()
 
-                print(f"DEBUG: Record for student {record.student_id} on {req.attendance_date}: {'Found' if existing else 'Not Found'}")
-
                 if existing:
                     existing.status = record.status
                     existing.remarks = record.remarks

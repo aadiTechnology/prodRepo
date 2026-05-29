@@ -53,7 +53,12 @@ export interface AttendanceReportResponse {
 }
 
 const attendanceService = {
-  async getAttendance(params: { attendance_date: string; class_id: number; division_id: number }) {
+  async getAttendance(params: {
+    attendance_date: string;
+    class_id: number;
+    division_id: number;
+    academic_year_id?: number;
+  }) {
     const { data } = await axiosInstance.get<AttendanceListResponse>("/attendance", { params });
     return data;
   },
@@ -69,6 +74,7 @@ const attendanceService = {
     class_id?: number;
     division_id?: number;
     student_id?: number;
+    academic_year_id?: number;
     limit?: number;
     offset?: number;
   }) {

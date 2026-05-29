@@ -167,6 +167,7 @@ const MarkAttendance = () => {
     isTeacher,
     lockClassFilter,
     lockDivisionFilter,
+    disableClassUntilTeacherSelected,
   } = controller;
 
   const allRowsPresent = students.length > 0 && students.every((s) => s.status === "Present");
@@ -405,7 +406,7 @@ const MarkAttendance = () => {
           value={filters.class_id || ""}
           displayEmpty
           size="small"
-          disabled={lockClassFilter}
+          disabled={lockClassFilter || disableClassUntilTeacherSelected}
           onChange={(e) =>
             setFilters((prev) => ({
               ...prev,
@@ -427,7 +428,11 @@ const MarkAttendance = () => {
           value={filters.division_id || ""}
           displayEmpty
           size="small"
-          disabled={!filteredDivisions.length || lockDivisionFilter}
+          disabled={
+            !filteredDivisions.length ||
+            lockDivisionFilter ||
+            disableClassUntilTeacherSelected
+          }
           onChange={(e) =>
             setFilters((prev) => ({ ...prev, division_id: Number(e.target.value) }))
           }

@@ -31,8 +31,18 @@ import academicYearService, { AcademicYear } from "../../api/services/academicYe
 import attendanceService, { AttendanceReportResponse } from "../../api/services/attendanceService";
 import studentService from "../../api/services/studentService";
 import teacherService, { TeacherResponse } from "../../api/services/teacherService";
+import { TeacherAssignmentApiItem } from "../../api/teacherAssignmentApi";
 import { useAuth } from "../../context/AuthContext";
 import { useAttendanceReportRole } from "../../hooks/useAttendanceReportRole";
+import {
+  buildTeacherFallbackMappings,
+  fetchAllTeacherAssignments,
+  getFilteredClassesForTeacher,
+  getFilteredDivisionsForTeacher,
+  getTeacherClassDivisionPairs,
+  getTeacherScopedMappings,
+  resolveTeacherForUser,
+} from "../../utils/teacherAttendanceScope";
 import {
   AttendanceMonthCalendar,
   type AttendanceCalendarStatus,
@@ -165,6 +175,8 @@ const AttendanceReport = () => {
   const [divisions, setDivisions] = useState<ClassDivision[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<TeacherResponse[]>([]);
+  const [assignmentMappings, setAssignmentMappings] = useState<TeacherAssignmentApiItem[]>([]);
+  const [myTeacherId, setMyTeacherId] = useState(0);
 
   const [filters, setFilters] = useState({
     academic_year_id: 0,
@@ -194,37 +206,54 @@ const AttendanceReport = () => {
 
     const loadInitialData = async () => {
       try {
-        const [years, classList, teacherList] = await Promise.all([
+        const [years, classList, teacherList, assignmentList] = await Promise.all([
           academicYearService.getAll(),
           schoolClassService.getAll(),
-          teacherService.list({ limit: 1000 })
+          teacherService.list({ limit: 1000 }),
+          fetchAllTeacherAssignments(),
         ]);
 
         setAcademicYears(years);
         setClasses(classList);
         setTeachers(teacherList.items);
+        setAssignmentMappings(assignmentList);
 
-        const activeYear = years.find(y => y.is_active);
+        const activeYear = years.find((y) => y.is_active);
+        const activeYearId = activeYear?.id ?? 0;
+
         if (isTeacher && user?.id) {
-          let myTeacher = teacherList.items.find((t) => String(t.user_id) === String(user.id));
-          if (!myTeacher && user?.email) {
-            myTeacher = teacherList.items.find(
-              (t) => t.email?.toLowerCase() === user.email?.toLowerCase()
-            );
-          }
+          let myTeacher = resolveTeacherForUser(teacherList.items, user.id, user.email);
           if (myTeacher) {
+            let teacherRecord = myTeacher;
+            try {
+              teacherRecord = await teacherService.getById(myTeacher.id);
+            } catch {
+              /* use list row */
+            }
+            setMyTeacherId(teacherRecord.id);
+
+            let mappings = assignmentList.filter((a) => a.teacher_id === teacherRecord.id);
+            if (mappings.length === 0) {
+              mappings = buildTeacherFallbackMappings(teacherRecord, classList);
+              setAssignmentMappings([...assignmentList, ...mappings]);
+            }
+
+            const scoped = getTeacherScopedMappings(mappings, teacherRecord.id, activeYearId);
+            const pairs = getTeacherClassDivisionPairs(scoped);
+            const firstPair = pairs[0];
+
             setFilters((prev) => ({
               ...prev,
-              academic_year_id: activeYear?.id ?? prev.academic_year_id,
-              class_id: myTeacher.class_id || 0,
-              division_id: myTeacher.class_division_id || 0,
+              academic_year_id: activeYearId || prev.academic_year_id,
+              class_id: firstPair?.class_id ?? teacherRecord.class_id ?? 0,
+              division_id: firstPair?.division_id ?? teacherRecord.class_division_id ?? 0,
               student_id: 0,
             }));
           } else if (activeYear) {
             setFilters((prev) => ({ ...prev, academic_year_id: activeYear.id }));
           }
         } else if (activeYear) {
-          setFilters(prev => ({ ...prev, academic_year_id: activeYear.id }));
+          setFilters((prev) => ({ ...prev, academic_year_id: activeYear.id }));
         }
       } catch (err) {
         console.error("Failed to load initial data", err);
@@ -277,31 +306,49 @@ const AttendanceReport = () => {
     void loadStudentContext();
   }, [isStudent]);
 
+  const teacherScopedMappings = useMemo(() => {
+    if (!isTeacher || !myTeacherId) return [];
+    return getTeacherScopedMappings(
+      assignmentMappings,
+      myTeacherId,
+      filters.academic_year_id
+    );
+  }, [isTeacher, myTeacherId, assignmentMappings, filters.academic_year_id]);
+
   const filteredClasses = useMemo(() => {
     if (!isTeacher) return classes;
-    if (!teachers.length) return classes;
-    const myTeacher = teachers.find(
-      (t) =>
-        String(t.user_id) === String(user?.id) ||
-        (user?.email && t.email?.toLowerCase() === user.email.toLowerCase())
+    return getFilteredClassesForTeacher(
+      classes,
+      teachers,
+      teacherScopedMappings,
+      myTeacherId
     );
-    if (!myTeacher?.class_id) return [];
-    return classes.filter((c) => c.id === myTeacher.class_id);
-  }, [isTeacher, classes, teachers, user?.id, user?.email]);
+  }, [isTeacher, classes, teachers, teacherScopedMappings, myTeacherId]);
 
   const filteredDivisions = useMemo(() => {
-    if (!filters.class_id) return [];
-    const selectedClass = filteredClasses.find((c) => c.id === filters.class_id);
-    const classDivisions = selectedClass?.divisions || [];
-    if (!isTeacher) return classDivisions;
-    const myTeacher = teachers.find(
-      (t) =>
-        String(t.user_id) === String(user?.id) ||
-        (user?.email && t.email?.toLowerCase() === user.email.toLowerCase())
+    if (!isTeacher) {
+      if (!filters.class_id) return [];
+      const selectedClass = classes.find((c) => c.id === filters.class_id);
+      return selectedClass?.divisions || [];
+    }
+    return getFilteredDivisionsForTeacher(
+      classes,
+      teachers,
+      teacherScopedMappings,
+      myTeacherId,
+      filters.class_id
     );
-    if (!myTeacher?.class_division_id) return classDivisions;
-    return classDivisions.filter((d) => d.id === myTeacher.class_division_id);
-  }, [filters.class_id, filteredClasses, isTeacher, teachers, user?.id, user?.email]);
+  }, [
+    isTeacher,
+    classes,
+    teachers,
+    teacherScopedMappings,
+    myTeacherId,
+    filters.class_id,
+  ]);
+
+  const lockClassFilter = isTeacher && filteredClasses.length === 1;
+  const lockDivisionFilter = isTeacher && filteredDivisions.length === 1;
 
   // Update divisions when class changes (admin / teacher)
   useEffect(() => {
@@ -388,6 +435,7 @@ const AttendanceReport = () => {
               class_id: filters.class_id || undefined,
               division_id: filters.division_id || undefined,
               student_id: filters.student_id || undefined,
+              academic_year_id: filters.academic_year_id || undefined,
               limit: rowsPerPage,
               offset: page * rowsPerPage,
             }
@@ -529,15 +577,22 @@ const AttendanceReport = () => {
       return;
     }
 
-    const myTeacher = teachers.find(
-      (t) =>
-        String(t.user_id) === String(user?.id) ||
-        (user?.email && t.email?.toLowerCase() === user.email.toLowerCase())
-    );
+    let classId = 0;
+    let divisionId = 0;
+    if (isTeacher && myTeacherId) {
+      const scoped = getTeacherScopedMappings(
+        assignmentMappings,
+        myTeacherId,
+        academicYears.find((y) => y.is_active)?.id || 0
+      );
+      const firstPair = getTeacherClassDivisionPairs(scoped)[0];
+      classId = firstPair?.class_id ?? 0;
+      divisionId = firstPair?.division_id ?? 0;
+    }
     setFilters({
       academic_year_id: academicYears.find((y) => y.is_active)?.id || 0,
-      class_id: isTeacher ? (myTeacher?.class_id || 0) : 0,
-      division_id: isTeacher ? (myTeacher?.class_division_id || 0) : 0,
+      class_id: classId,
+      division_id: divisionId,
       student_id: 0,
       from_date: defaultFrom,
       to_date: defaultTo,
@@ -677,10 +732,15 @@ const AttendanceReport = () => {
           value={filters.class_id || ""}
           displayEmpty
           size="small"
-          disabled={isTeacher}
+          disabled={lockClassFilter}
           onChange={(e) => {
             setPage(0);
-            setFilters(prev => ({ ...prev, class_id: Number(e.target.value) }));
+            setFilters((prev) => ({
+              ...prev,
+              class_id: Number(e.target.value),
+              division_id: 0,
+              student_id: 0,
+            }));
           }}
           sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
         >
@@ -696,17 +756,21 @@ const AttendanceReport = () => {
           value={filters.division_id || ""}
           displayEmpty
           size="small"
-          disabled={!filters.class_id || isTeacher}
+          disabled={!filters.class_id || lockDivisionFilter}
           onChange={(e) => {
             setPage(0);
-            setFilters(prev => ({ ...prev, division_id: Number(e.target.value) }));
+            setFilters((prev) => ({
+              ...prev,
+              division_id: Number(e.target.value),
+              student_id: 0,
+            }));
           }}
           sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
         >
           <MenuItem value="">
             <Typography variant="body2" color="text.secondary">All Divisions</Typography>
           </MenuItem>
-          {divisions.map(div => (
+          {(isTeacher ? filteredDivisions : divisions).map((div) => (
             <MenuItem key={div.id} value={div.id}>{div.division_name}</MenuItem>
           ))}
         </Select>
