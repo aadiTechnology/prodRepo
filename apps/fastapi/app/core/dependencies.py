@@ -340,6 +340,51 @@ def require_permission(menu_name: str, action: str):
                 f"Access denied: Missing '{action}' permission on '{menu_name}'."
             )
 
+        # INTERSECTION CHECK FOR TENANT USERS:
+        # If the user has a tenant_id, and they are not a tenant admin,
+        # they must only be allowed if the tenant's ADMIN role ALSO has this permission active.
+        if current_user.tenant_id is not None:
+            # Check if this user is a tenant admin themselves (ADMIN or TENANT_ADMIN in role codes)
+            is_tenant_admin = any(code in ["admin", "tenant_admin"] for code in rbac_roles)
+            if not is_tenant_admin:
+                from app.models.role import Role
+                tenant_admin_role = (
+                    db.query(Role)
+                    .filter(
+                        Role.tenant_id == current_user.tenant_id,
+                        Role.code == "ADMIN",
+                        Role.is_deleted == False,
+                        Role.is_active == True,
+                    )
+                    .first()
+                )
+                if not tenant_admin_role:
+                    logger.warning(
+                        f"User {current_user.email} denied: Tenant {current_user.tenant_id} has no active ADMIN role."
+                    )
+                    raise ForbiddenException("Access denied: Tenant has no active administrator role.")
+
+                tenant_admin_perm = (
+                    db.query(RoleMenuPermission)
+                    .join(Menu, RoleMenuPermission.menu_id == Menu.id)
+                    .filter(
+                        RoleMenuPermission.role_id == tenant_admin_role.id,
+                        Menu.name == menu_name,
+                        Menu.is_active == True,
+                        Menu.is_deleted == False,
+                        getattr(RoleMenuPermission, action_col_name) == True,
+                    )
+                    .first()
+                )
+                if not tenant_admin_perm:
+                    logger.warning(
+                        f"User {current_user.email} denied: Tenant ADMIN role (id={tenant_admin_role.id}) "
+                        f"does not have '{action}' permission on '{menu_name}'"
+                    )
+                    raise ForbiddenException(
+                        f"Access denied: Tenant administrator does not have '{action}' permission on '{menu_name}'."
+                    )
+
         return current_user
 
     return checker

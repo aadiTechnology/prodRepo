@@ -149,33 +149,11 @@ def _resolve_effective_role_ids(
     """
     Return effective role IDs used for menu/permission resolution.
 
-    Tenant non-admin users inherit their tenant ADMIN role grants so that
-    teacher/student users automatically receive tenant-level enabled features
-    without needing duplicate per-role assignment.
+    Now decoupled so that tenant roles (like teachers and students) do not
+    automatically inherit all tenant admin role grants, allowing custom permissions
+    assigned to their roles to take effect.
     """
-    effective_role_ids = [int(r.id) for r in roles]  # type: ignore
-    if user.tenant_id is None:
-        return effective_role_ids
-
-    assigned_codes = {str(r.code).upper() for r in roles}
-    if "ADMIN" in assigned_codes or "TENANT_ADMIN" in assigned_codes:
-        return effective_role_ids
-
-    tenant_admin_role = (
-        db.query(Role)
-        .filter(
-            Role.tenant_id == user.tenant_id,
-            Role.code == "ADMIN",
-            Role.is_deleted == False,  # noqa: E712
-            Role.is_active == True,  # noqa: E712
-        )
-        .first()
-    )
-    if tenant_admin_role:
-        tenant_admin_id = int(tenant_admin_role.id)  # type: ignore
-        if tenant_admin_id not in effective_role_ids:
-            effective_role_ids.append(tenant_admin_id)
-    return effective_role_ids
+    return [int(r.id) for r in roles]  # type: ignore
 
 
 def _validate_role_scope(role: Role, user: User, action: str) -> None:
@@ -359,6 +337,30 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
         menu_rows = [m for m in menu_rows if m.tenant_id is None or m.tenant_id == user.tenant_id]  # type: ignore
         
     elif role_ids:
+        # Determine if it's a tenant non-admin user
+        tenant_admin_role_id = None
+        is_tenant_non_admin = False
+        if user.tenant_id is not None:
+            tenant_admin_role = (
+                db.query(Role)
+                .filter(
+                    Role.tenant_id == user.tenant_id,
+                    Role.code == "ADMIN",
+                    Role.is_deleted == False,
+                    Role.is_active == True,
+                )
+                .first()
+            )
+            if tenant_admin_role:
+                tenant_admin_role_id = int(tenant_admin_role.id)
+                assigned_codes_upper = {c.upper() for c in role_codes}
+                if "ADMIN" not in assigned_codes_upper and "TENANT_ADMIN" not in assigned_codes_upper:
+                    is_tenant_non_admin = True
+
+        query_role_ids = role_ids
+        if is_tenant_non_admin and tenant_admin_role_id is not None:
+            query_role_ids = list(set(role_ids + [tenant_admin_role_id]))
+
         # Single query: JOIN RoleMenuPermission → Menu → Feature + LEFT JOIN all menus for
         # parent resolution.  contains_eager() tells SQLAlchemy to populate the ORM
         # relationships from the rows already fetched by our explicit JOINs, so we
@@ -373,12 +375,66 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
                 contains_eager(RoleMenuPermission.menu).contains_eager(Menu.feature)
             )
             .filter(
-                RoleMenuPermission.role_id.in_(role_ids),
+                RoleMenuPermission.role_id.in_(query_role_ids),
                 Menu.is_active == True,  # noqa: E712
                 Menu.is_deleted == False,  # noqa: E712
             )
             .all()
         )
+
+        # Aggregate permissions for user roles (union)
+        user_menu_perms = {}
+        for p in perms:
+            if int(p.role_id) in role_ids:
+                menu_id = int(p.menu_id)
+                if menu_id not in user_menu_perms:
+                    user_menu_perms[menu_id] = {
+                        "can_view": False,
+                        "can_create": False,
+                        "can_edit": False,
+                        "can_delete": False,
+                        "menu": p.menu
+                    }
+                user_menu_perms[menu_id]["can_view"] |= bool(p.can_view)
+                user_menu_perms[menu_id]["can_create"] |= bool(p.can_create)
+                user_menu_perms[menu_id]["can_edit"] |= bool(p.can_edit)
+                user_menu_perms[menu_id]["can_delete"] |= bool(p.can_delete)
+
+        # Aggregate permissions for tenant admin (union/value)
+        admin_menu_perms = {}
+        if is_tenant_non_admin and tenant_admin_role_id is not None:
+            for p in perms:
+                if int(p.role_id) == tenant_admin_role_id:
+                    menu_id = int(p.menu_id)
+                    if menu_id not in admin_menu_perms:
+                        admin_menu_perms[menu_id] = {
+                            "can_view": False,
+                            "can_create": False,
+                            "can_edit": False,
+                            "can_delete": False
+                        }
+                    admin_menu_perms[menu_id]["can_view"] |= bool(p.can_view)
+                    admin_menu_perms[menu_id]["can_create"] |= bool(p.can_create)
+                    admin_menu_perms[menu_id]["can_edit"] |= bool(p.can_edit)
+                    admin_menu_perms[menu_id]["can_delete"] |= bool(p.can_delete)
+
+        # Compute effective intersected permissions
+        effective_menu_perms = {}
+        for menu_id, u_perm in user_menu_perms.items():
+            if is_tenant_non_admin:
+                a_perm = admin_menu_perms.get(menu_id)
+                if not a_perm or not a_perm["can_view"]:
+                    continue  # Admin doesn't have view access, so user doesn't either
+                
+                effective_menu_perms[menu_id] = {
+                    "can_view": u_perm["can_view"] and a_perm["can_view"],
+                    "can_create": u_perm["can_create"] and a_perm["can_create"],
+                    "can_edit": u_perm["can_edit"] and a_perm["can_edit"],
+                    "can_delete": u_perm["can_delete"] and a_perm["can_delete"],
+                    "menu": u_perm["menu"]
+                }
+            else:
+                effective_menu_perms[menu_id] = u_perm
 
         # Build permission codes and menu list (all related data in memory — no lazy loads)
         seen_menu_ids: set[int] = set()
@@ -394,30 +450,30 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
             if m.parent_id is not None:
                 children_by_parent[int(m.parent_id)].append(int(m.id))  # type: ignore
 
-        menus_with_view = {int(p.menu_id) for p in perms if p.can_view}  # type: ignore
+        menus_with_view = {mid for mid, ep in effective_menu_perms.items() if ep["can_view"]}
 
-        for p in perms:
-            m = p.menu
-            if not p.can_view:  # type: ignore
+        for menu_id, ep in effective_menu_perms.items():
+            m = ep["menu"]
+            if not ep["can_view"]:
                 continue
-            if m.tenant_id is not None and m.tenant_id != user.tenant_id:  # type: ignore
+            if m.tenant_id is not None and m.tenant_id != user.tenant_id:
                 continue
 
-            menu_id = int(m.id)  # type: ignore
+            menu_id_int = int(m.id)
             if m.level == 1 and not _level1_module_has_visible_child(
-                menu_id, menus_with_view, children_by_parent
+                menu_id_int, menus_with_view, children_by_parent
             ):
                 continue
 
             if m.feature_id and m.feature:
                 f_code = m.feature.code
-                if p.can_view:  # type: ignore
+                if ep["can_view"]:
                     permission_codes.add(f"{f_code}:view")
-                if p.can_create:  # type: ignore
+                if ep["can_create"]:
                     permission_codes.add(f"{f_code}:create")
-                if p.can_edit:  # type: ignore
+                if ep["can_edit"]:
                     permission_codes.add(f"{f_code}:edit")
-                if p.can_delete:  # type: ignore
+                if ep["can_delete"]:
                     permission_codes.add(f"{f_code}:delete")
 
             menus_to_include.append(m)
@@ -443,24 +499,46 @@ def compute_rbac_version(db: Session, user: User) -> str:
     user_id = int(user.id)  # type: ignore
     roles = get_user_roles(db, user_id)
     role_ids = _resolve_effective_role_ids(db, user, roles)
+    role_codes = [r.code.lower() for r in roles]
+
+    # For version computing, we want to watch any changes in user's own roles OR the tenant admin role
+    # if the user is a tenant non-admin user (due to permission intersection).
+    tenant_admin_id = None
+    if user.tenant_id is not None:
+        assigned_codes_upper = {c.upper() for c in role_codes}
+        if "ADMIN" not in assigned_codes_upper and "TENANT_ADMIN" not in assigned_codes_upper:
+            tenant_admin_role = (
+                db.query(Role)
+                .filter(
+                    Role.tenant_id == user.tenant_id,
+                    Role.code == "ADMIN",
+                    Role.is_deleted == False,
+                    Role.is_active == True,
+                )
+                .first()
+            )
+            if tenant_admin_role:
+                tenant_admin_id = int(tenant_admin_role.id)
+
+    version_role_ids = list(set(role_ids + ([tenant_admin_id] if tenant_admin_id is not None else [])))
 
     # Latest change across this user's RoleMenuPermission rows.
     perms_ts = None
     perms_count = 0
     perms_signature = 0
-    if role_ids:
+    if version_role_ids:
         perms_ts = (
             db.query(
                 func.max(
                     func.coalesce(RoleMenuPermission.updated_at, RoleMenuPermission.created_at)
                 )
             )
-            .filter(RoleMenuPermission.role_id.in_(role_ids))
+            .filter(RoleMenuPermission.role_id.in_(version_role_ids))
             .scalar()
         )
         perms_count = (
             db.query(RoleMenuPermission.id)
-            .filter(RoleMenuPermission.role_id.in_(role_ids))
+            .filter(RoleMenuPermission.role_id.in_(version_role_ids))
             .count()
         )
         perms_signature = (
@@ -475,7 +553,7 @@ def compute_rbac_version(db: Session, user: User) -> str:
                     0,
                 )
             )
-            .filter(RoleMenuPermission.role_id.in_(role_ids))
+            .filter(RoleMenuPermission.role_id.in_(version_role_ids))
             .scalar()
             or 0
         )
@@ -517,7 +595,7 @@ def compute_rbac_version(db: Session, user: User) -> str:
         _ts_to_str(perms_ts),
         _ts_to_str(user_roles_ts),
         _ts_to_str(menus_ts),
-        str(len(role_ids)),
+        str(len(version_role_ids)),
         str(perms_count),
         str(perms_signature),
     ]
