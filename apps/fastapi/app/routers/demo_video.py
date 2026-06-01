@@ -20,8 +20,8 @@ async def list_demo_videos(
     module_key: str | None = Query(default=None),
     active_only: bool | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_role([UserRole.USER, UserRole.ADMIN, UserRole.TENANT_ADMIN])),
 ) -> List[DemoVideoResponse]:
+    """List demo videos - publicly accessible."""
     return demo_video_service.list_demo_videos(db, module_key=module_key, active_only=active_only)
 
 
@@ -29,8 +29,8 @@ async def list_demo_videos(
 async def get_demo_video(
     demo_video_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_role([UserRole.USER, UserRole.ADMIN, UserRole.TENANT_ADMIN])),
 ) -> DemoVideoResponse:
+    """Get a single demo video - publicly accessible."""
     return demo_video_service.get_demo_video(db, demo_video_id)
 
 
