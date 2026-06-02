@@ -4,10 +4,11 @@
  * Fully token-aware and architecture-compliant list page.
  */
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert, Snackbar } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
+import { useSnackbar } from "notistack";
 import { PageHeader } from "../../components/layout";
 import {
   ListPageLayout,
@@ -31,6 +32,17 @@ import { createPermissionListConfig } from "./PermissionManagementPage.listConfi
 const PermissionManagementPage = () => {
   const controller = usePermissionListController();
   const navigate = useNavigate();
+  const { enqueueSnackbar } = useSnackbar();
+
+  useEffect(() => {
+    if (!controller.success) return;
+    enqueueSnackbar(controller.success, {
+      variant: "success",
+      autoHideDuration: 3000,
+      anchorOrigin: { vertical: "top", horizontal: "center" },
+    });
+    controller.setSuccess(null);
+  }, [controller.success, controller.setSuccess, enqueueSnackbar]);
 
   // ── Delete state ──────────────────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -225,22 +237,6 @@ const PermissionManagementPage = () => {
           sx={{ width: "100%" }}
         >
           {controller.error}
-        </Alert>
-      </Snackbar>
-
-      {/* Success snackbar */}
-      <Snackbar
-        open={!!controller.success}
-        autoHideDuration={4000}
-        onClose={() => controller.setSuccess(null)}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert
-          severity="success"
-          onClose={() => controller.setSuccess(null)}
-          sx={{ width: "100%" }}
-        >
-          {controller.success}
         </Alert>
       </Snackbar>
 

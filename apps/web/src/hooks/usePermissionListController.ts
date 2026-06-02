@@ -429,7 +429,6 @@ export const usePermissionListController = () => {
       await refreshRBAC();
       setSuccess("Permissions updated successfully!");
       setOriginalPermissions(new Map(permissions));
-      setTimeout(() => setSuccess(null), 4000);
     } catch (err: any) {
       setError(err?.message || "Failed to save permissions.");
     } finally {
