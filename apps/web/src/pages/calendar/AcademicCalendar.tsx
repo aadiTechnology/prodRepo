@@ -102,10 +102,7 @@ export default function AcademicCalendar() {
           <Box sx={{ mb: 2 }}>
             <PageHeader
               links={[
-                ...(c.showAddHolidayButton
-                  ? [{ title: "Academic Management", path: "/academics/configuration/holidays" }]
-                  : []),
-                { title: "Academic Calendar", path: "#" },
+                { title: "Holiday calender", path: "#" },
               ]}
               homePath="/"
               actions={

@@ -514,10 +514,18 @@ export function useHolidayFormController() {
       const payload = buildHolidayCreatePayload(formData);
       if (isEditMode && holidayId) {
         await updateMutation.mutateAsync({ editId: holidayId, payload });
-        enqueueSnackbar("Holiday updated successfully", { variant: "success" });
+        enqueueSnackbar("Holiday updated successfully", {
+          variant: "success",
+          autoHideDuration: 3000,
+          anchorOrigin: { vertical: "top", horizontal: "center" },
+        });
       } else {
         await createMutation.mutateAsync(payload);
-        enqueueSnackbar("Holiday created successfully", { variant: "success" });
+        enqueueSnackbar("Holiday created successfully", {
+          variant: "success",
+          autoHideDuration: 3000,
+          anchorOrigin: { vertical: "top", horizontal: "center" },
+        });
       }
       setTimeout(() => {
         navigate("/academics/configuration/holidays");

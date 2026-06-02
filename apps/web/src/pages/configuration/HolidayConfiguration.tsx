@@ -139,12 +139,8 @@ function useHolidayListController() {
     onSuccess: async () => {
       enqueueSnackbar("Holiday deleted successfully", {
         variant: "success",
-        persist: true,
-        action: (snackbarKey) => (
-          <MuiButton size="small" aria-label="Dismiss success message" onClick={() => closeSnackbar(snackbarKey)}>
-            Dismiss
-          </MuiButton>
-        ),
+        autoHideDuration: 3000,
+        anchorOrigin: { vertical: "top", horizontal: "center" },
       });
       await queryClient.invalidateQueries({ queryKey: ["holidays"] });
       setDeleteTarget(null);
@@ -268,7 +264,7 @@ export default function HolidayConfiguration() {
       header={
         <>
           <PageHeader
-            links={[{ title: "Academic Management", path: "#" }]}
+            links={[{ title: "Holiday list", path: "#" }]}
             homePath="/"
             actions={
               <Box

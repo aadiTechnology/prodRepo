@@ -26,7 +26,7 @@ export default function HolidayForm() {
         onSnackbarClose={() => {}}
         headerConfig={{
           links: [
-            { title: "Academic Management", path: "/academics/configuration/holidays" },
+            { title: "Holiday list", path: "/academics/configuration/holidays" },
             { title: c.pageTitle, path: "#" },
           ],
           homePath: "/",
