@@ -114,6 +114,7 @@ const ProfilePage = () => {
     const [isModified, setIsModified] = useState(false);
     const [photoMenuAnchor, setPhotoMenuAnchor] = useState<null | HTMLElement>(null);
     const [fileInputKey, setFileInputKey] = useState<number>(0);
+    const [avatarKey, setAvatarKey] = useState<number>(0); // Force avatar re-render
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // ── fetch ──────────────────────────────────────────────────────────────
@@ -213,6 +214,7 @@ const ProfilePage = () => {
         try {
             const updated = await profileService.uploadImage(file);
             setProfile(updated);
+            setAvatarKey(prev => prev + 1); // Force avatar re-render
             setSnack({ msg: "Profile photo updated successfully.", severity: "success" });
             // Notify other components to refresh - both specific image update and full profile
             window.dispatchEvent(new Event("profile-image-updated"));
@@ -233,6 +235,7 @@ const ProfilePage = () => {
         try {
             const updated = await profileService.deleteImage();
             setProfile(updated);
+            setAvatarKey(prev => prev + 1); // Force avatar re-render
             setSnack({ msg: "Profile photo removed.", severity: "success" });
             // Notify other components to refresh - both specific image update and full profile
             window.dispatchEvent(new Event("profile-image-updated"));
@@ -317,6 +320,7 @@ const ProfilePage = () => {
                             {/* Avatar with Camera Overlay */}
                             <Box sx={{ position: "relative", display: "inline-block", mb: 1.5 }}>
                                 <Avatar
+                                    key={avatarKey}
                                     src={avatarSrc}
                                     sx={{
                                         width: 112,

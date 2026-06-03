@@ -30,6 +30,7 @@ function MainLayout() {
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [avatarSrc, setAvatarSrc] = useState<string | undefined>(undefined);
   const [logoError, setLogoError] = useState(false);
+  const [avatarKey, setAvatarKey] = useState(0); // Force avatar re-render on image change
 
   // Reset logo error when tenant changes
   useEffect(() => {
@@ -73,6 +74,7 @@ function MainLayout() {
       if (data && typeof data.profile_image_path === 'string') {
         const validatedUrl = toFullUrl(data.profile_image_path);
         setAvatarSrc(validatedUrl);
+        setAvatarKey(prev => prev + 1); // Force re-render to bypass browser cache
       }
     } catch (error) {
       // SECURITY: Log error for debugging but don't expose to UI
@@ -368,6 +370,7 @@ function MainLayout() {
                     </Box>
                   </Box>
                   <Avatar
+                    key={avatarKey}
                     src={avatarSrc || ''}
                     sx={{
                       width: 42,

@@ -131,6 +131,7 @@ async def upload_profile_image(
     
     ✓ Each user's image is stored with THEIR user_id as filename
     ✓ Prevents image sharing between users
+    ✓ Includes timestamp for cache-busting
     """
     if not current_user or not current_user.id:
         logger.error(f"Invalid current_user: {current_user}")
@@ -161,7 +162,10 @@ async def upload_profile_image(
         logger.error(f"[DISK ERROR] Failed to save profile image for user {current_user.id}: {e}")
         raise HTTPException(status_code=500, detail="Unable to save image. Please try again.")
 
-    public_path = f"/profile-images/{filename}"
+    # Add timestamp for cache-busting (browser will fetch new image)
+    import time
+    timestamp = int(time.time())
+    public_path = f"/profile-images/{filename}?v={timestamp}"
 
     # Upsert into UserProfile table (user_id enforced)
     try:
