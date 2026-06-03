@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Alert,
-  Snackbar,
   Avatar,
   Box,
   Card,
@@ -33,6 +32,7 @@ import {
   ViewList as ListIcon,
   GridView as GridIcon,
 } from "@mui/icons-material";
+import { useSnackbar } from "notistack";
 import { PageHeader, PageLayout } from "../../components/layout";
 import { AppCard } from "../../components/primitives";
 import {
@@ -85,9 +85,30 @@ function formatDate(dateStr: string | null | undefined): string {
 export default function HomeworkList() {
   const navigate = useNavigate();
   const controller = useHomeworkListController();
+  const { enqueueSnackbar } = useSnackbar();
   const { hasPermission, roles } = useRBAC();
   const { user } = useAuth();
   const canView = hasPermission("HOMEWORK_MGMT:view");
+
+  useEffect(() => {
+    if (!controller.success) return;
+    enqueueSnackbar(controller.success, {
+      variant: "success",
+      autoHideDuration: 3000,
+      anchorOrigin: { vertical: "top", horizontal: "center" },
+    });
+    controller.setSuccess(null);
+  }, [controller.success, controller.setSuccess, enqueueSnackbar]);
+
+  useEffect(() => {
+    if (!controller.error) return;
+    enqueueSnackbar(controller.error, {
+      variant: "error",
+      autoHideDuration: 4000,
+      anchorOrigin: { vertical: "top", horizontal: "center" },
+    });
+    controller.setError(null);
+  }, [controller.error, controller.setError, enqueueSnackbar]);
 
   const isStudent = useMemo(() => isStudentHomeworkUser(user?.role, roles), [user?.role, roles]);
   const isParent = useMemo(() => isParentHomeworkUser(user?.role, roles), [user?.role, roles]);
@@ -1049,16 +1070,6 @@ export default function HomeworkList() {
         />
       }
     >
-      {controller.error && (
-        <Alert
-          severity="error"
-          sx={{ m: 2 }}
-          onClose={() => controller.setError(null)}
-        >
-          {controller.error}
-        </Alert>
-      )}
-
       <EntityTableSection<HomeworkRow>
         label="Homework"
         totalRows={controller.total}
@@ -1085,20 +1096,6 @@ export default function HomeworkList() {
         loading={controller.deleteLoading}
       />
 
-      <Snackbar
-        open={!!controller.success}
-        autoHideDuration={3000}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        onClose={() => controller.setSuccess(null)}
-      >
-        <Alert
-          onClose={() => controller.setSuccess(null)}
-          severity="success"
-          sx={{ width: "100%" }}
-        >
-          {controller.success}
-        </Alert>
-      </Snackbar>
     </ListPageLayout>
   );
 }
