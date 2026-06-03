@@ -25,6 +25,10 @@ import { ListPageLayout, ListPageToolbar } from "../../components/reusable";
 import { useRBAC } from "../../context/RBACContext";
 import { colorTokens } from "../../tokens/colors";
 import demoVideoService, { DemoVideoRecord } from "../../api/services/demoVideoService";
+import {
+  toYouTubeEmbedUrl,
+  YOUTUBE_IFRAME_REFERRER_POLICY,
+} from "../../utils/youtubeEmbed";
 
 export default function DemoSetupVideosPage() {
   const navigate = useNavigate();
@@ -112,20 +116,10 @@ export default function DemoSetupVideosPage() {
     [items, selectedVideoId]
   );
 
-  const embedUrl = useMemo(() => {
-    const raw = selectedVideo?.video_url?.trim() || "";
-    if (!raw) return "";
-    if (raw.includes("youtube.com/watch?v=")) {
-      const parsed = new URL(raw);
-      const videoId = parsed.searchParams.get("v");
-      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
-    }
-    if (raw.includes("youtu.be/")) {
-      const videoId = raw.split("youtu.be/")[1]?.split("?")[0];
-      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
-    }
-    return raw;
-  }, [selectedVideo]);
+  const embedUrl = useMemo(
+    () => toYouTubeEmbedUrl(selectedVideo?.video_url ?? ""),
+    [selectedVideo]
+  );
 
   const onDelete = async (id: number) => {
     setError(null);
@@ -335,6 +329,7 @@ export default function DemoSetupVideosPage() {
                     component="iframe"
                     src={embedUrl}
                     title={selectedVideo.title}
+                    referrerPolicy={YOUTUBE_IFRAME_REFERRER_POLICY}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                     sx={{

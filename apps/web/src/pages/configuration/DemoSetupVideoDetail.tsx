@@ -5,20 +5,10 @@ import { Alert, Box, Button, Paper, Typography } from "@mui/material";
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout } from "../../components/reusable";
 import demoVideoService, { DemoVideoRecord } from "../../api/services/demoVideoService";
-
-function toEmbedUrl(raw: string): string {
-  const url = raw.trim();
-  if (url.includes("youtube.com/watch?v=")) {
-    const parsed = new URL(url);
-    const id = parsed.searchParams.get("v");
-    if (id) return `https://www.youtube.com/embed/${id}`;
-  }
-  if (url.includes("youtu.be/")) {
-    const id = url.split("youtu.be/")[1]?.split("?")[0];
-    if (id) return `https://www.youtube.com/embed/${id}`;
-  }
-  return url;
-}
+import {
+  toYouTubeEmbedUrl,
+  YOUTUBE_IFRAME_REFERRER_POLICY,
+} from "../../utils/youtubeEmbed";
 
 export default function DemoSetupVideoDetail() {
   const navigate = useNavigate();
@@ -44,7 +34,10 @@ export default function DemoSetupVideoDetail() {
     void load();
   }, [id]);
 
-  const embedUrl = useMemo(() => (item ? toEmbedUrl(item.video_url) : ""), [item]);
+  const embedUrl = useMemo(
+    () => (item ? toYouTubeEmbedUrl(item.video_url) : ""),
+    [item]
+  );
 
   return (
     <ListPageLayout
@@ -67,6 +60,7 @@ export default function DemoSetupVideoDetail() {
               component="iframe"
               src={embedUrl}
               title={item.title}
+              referrerPolicy={YOUTUBE_IFRAME_REFERRER_POLICY}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               sx={{ width: "100%", minHeight: 420, border: 0, borderRadius: 1 }}
