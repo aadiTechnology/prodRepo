@@ -720,7 +720,7 @@ const ProfilePage = () => {
                 open={Boolean(snack)}
                 autoHideDuration={5000}
                 onClose={() => setSnack(null)}
-                anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                anchorOrigin={{ vertical: "top", horizontal: "center" }}
             >
                 <Alert
                     onClose={() => setSnack(null)}
