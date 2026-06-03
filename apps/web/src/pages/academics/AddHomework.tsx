@@ -158,6 +158,7 @@ export default function AddHomework() {
 
   // When academic year changes — reset class, division, and subject dropdowns
   useEffect(() => {
+    // Only reset when user manually changes academic year, not during initial load
     if (!isDataLoadedRef.current) return;
     handleFieldValueChange("class_id", "");
     handleFieldValueChange("class_division_id", "");
@@ -173,9 +174,6 @@ export default function AddHomework() {
       setSubjectOptions([]);
       return;
     }
-
-    // Skip API calls during initial data load in edit mode
-    if (!isDataLoadedRef.current) return;
 
     // Load divisions via homework-specific endpoint (accessible to teachers)
     homeworkService
@@ -196,9 +194,12 @@ export default function AddHomework() {
       )
       .catch(() => setSubjectOptions([]));
 
-    // Reset dependent dropdowns only when the user manually picks a different class.
-    handleFieldValueChange("class_division_id", "");
-    handleFieldValueChange("subject_id", "");
+    // Reset dependent dropdowns only when the user manually picks a different class
+    // Skip reset during initial data load in edit mode
+    if (isDataLoadedRef.current) {
+      handleFieldValueChange("class_division_id", "");
+      handleFieldValueChange("subject_id", "");
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.class_id]);
 
