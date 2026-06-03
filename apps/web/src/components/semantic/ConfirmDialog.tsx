@@ -50,6 +50,7 @@ export default function ConfirmDialog({
     <Dialog
       open={open}
       onClose={onClose}
+      disableRestoreFocus
       PaperProps={{
         sx: {
           borderRadius: 3,
@@ -156,6 +157,7 @@ export default function ConfirmDialog({
             {cancelLabel}
           </CancelButton>
           <Button
+            autoFocus
             onClick={onConfirm}
             disabled={loading}
             sx={(theme) => ({

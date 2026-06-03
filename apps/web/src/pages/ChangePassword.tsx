@@ -1,35 +1,16 @@
-
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSnackbar } from "notistack";
 import { useFormManager } from "../hooks";
 import BaseForm from "../components/reusable/BaseForm";
+import userService from "../api/services/userService";
 import { mapApiErrorsToFields } from "../utils/formValidation";
 import { newPasswordRules, confirmPasswordMatchRules } from "../utils/formValidationPresets";
 import { createChangePasswordFormConfig, type ChangePasswordFormData } from "./ChangePassword.formConfig";
 
-// Service for password change
-const changePasswordService = {
-  changePassword: async ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) => {
-    const token = localStorage.getItem("auth_token");
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    const response = await fetch("/api/account/change-password", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ currentPassword, newPassword }),
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw { response: { data: error } };
-    }
-    return response.json();
-  },
-};
-
 export default function ChangePassword() {
   const navigate = useNavigate();
+  const { enqueueSnackbar } = useSnackbar();
   const isEditMode = false; // Change password is always create mode for self
 
   const initialValues = useMemo<ChangePasswordFormData>(
@@ -70,7 +51,6 @@ export default function ChangePassword() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [snackbar, setSnackbar] = useState<string | null>(null);
 
   const formConfig = useMemo(() => createChangePasswordFormConfig({ isEditMode }), [isEditMode]);
 
@@ -78,11 +58,19 @@ export default function ChangePassword() {
     setLoading(true);
     setError(null);
     try {
-      await changePasswordService.changePassword({
+      const result = await userService.changeOwnPassword({
         currentPassword: formData.current_password,
         newPassword: formData.new_password,
       });
-      setSnackbar("Password changed successfully.");
+      if (!result.success) {
+        setError(result.message || "Failed to change password.");
+        return;
+      }
+      enqueueSnackbar(result.message || "Password changed successfully.", {
+        variant: "success",
+        autoHideDuration: 3000,
+        anchorOrigin: { vertical: "top", horizontal: "center" },
+      });
       setTimeout(() => navigate("/profile"), 1000);
     } catch (err) {
       const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
@@ -91,7 +79,7 @@ export default function ChangePassword() {
     } finally {
       setLoading(false);
     }
-  }, [formData, navigate, setFieldErrors]);
+  }, [formData, navigate, setFieldErrors, enqueueSnackbar]);
 
   return (
     <BaseForm<ChangePasswordFormData>
@@ -108,8 +96,9 @@ export default function ChangePassword() {
       loading={loading}
       error={error}
       onErrorDismiss={() => setError(null)}
-      snackbar={snackbar}
-      onSnackbarClose={() => setSnackbar(null)}
+      useErrorSnackbar
+      snackbar={null}
+      onSnackbarClose={() => {}}
       headerConfig={{
         links: [
           { title: "Profile", path: "/profile" },

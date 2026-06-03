@@ -6,6 +6,7 @@ export interface EmailInputProps extends Omit<TextFieldProps, "type"> {
   type?: "email" | "text";
   /** Blocks browser login autofill (readonly until focus). */
   preventAutofill?: boolean;
+  htmlInput?: React.InputHTMLAttributes<HTMLInputElement>;
 }
 
 export default function EmailInput({
@@ -17,7 +18,8 @@ export default function EmailInput({
   variant = "outlined",
   preventAutofill = false,
   autoComplete,
-  inputProps: inputPropsProp,
+  htmlInput,
+  slotProps,
   onFocus,
   sx,
   ...props
@@ -40,11 +42,15 @@ export default function EmailInput({
       fullWidth={fullWidth}
       variant={variant}
       autoComplete={resolvedAutoComplete}
-      inputProps={{
-        ...(inputPropsProp ?? {}),
-        ...(preventAutofill
-          ? { readOnly, inputMode: "email", autoComplete: "off" }
-          : {}),
+      slotProps={{
+        ...slotProps,
+        htmlInput: {
+          ...htmlInput,
+          ...(preventAutofill
+            ? { readOnly, inputMode: "email", autoComplete: "off" }
+            : {}),
+          ...slotProps?.htmlInput,
+        },
       }}
       onFocus={(e) => {
         if (preventAutofill) setReadOnly(false);

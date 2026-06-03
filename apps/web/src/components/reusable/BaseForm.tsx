@@ -79,13 +79,19 @@ export default function BaseForm<T extends Record<string, unknown>>({
   const confirmText =
     typeof confirmMessage === "function" ? confirmMessage(layoutCtx) : confirmMessage;
 
-  const onValid = () => setConfirmOpen(true);
+  const openConfirmDialog = () => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) {
+      active.blur();
+    }
+    setConfirmOpen(true);
+  };
 
-  const handleFormSubmit = (e: FormEvent) => runSubmit(e, handleSubmit, onValid);
+  const handleFormSubmit = (e: FormEvent) => runSubmit(e, handleSubmit, openConfirmDialog);
 
   const handleConfirm = async () => {
-    setConfirmOpen(false);
     await onConfirmSubmit();
+    window.setTimeout(() => setConfirmOpen(false), 0);
   };
 
   if (fetchLoading) {
@@ -123,7 +129,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
                   />
                   <FormHeaderIconAction
                     variant="save"
-                    onClick={(e) => runSubmit(e, handleSubmit, onValid)}
+                    onClick={(e) => runSubmit(e, handleSubmit, openConfirmDialog)}
                     loading={loading}
                     disabled={!canSubmit}
                     tooltipTitle={saveTooltip}

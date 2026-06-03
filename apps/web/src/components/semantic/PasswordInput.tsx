@@ -13,6 +13,8 @@ export interface PasswordInputProps extends Omit<TextFieldProps, "type"> {
   showToggle?: boolean;
   /** Blocks browser login autofill (readonly until focus). */
   preventAutofill?: boolean;
+  /** Props passed to the underlying HTML input (e.g. minLength). */
+  htmlInput?: React.InputHTMLAttributes<HTMLInputElement>;
 }
 
 export default function PasswordInput({
@@ -24,7 +26,8 @@ export default function PasswordInput({
   showToggle = true,
   preventAutofill = false,
   autoComplete,
-  inputProps: inputPropsProp,
+  htmlInput,
+  slotProps,
   onFocus,
   InputProps: inputPropsFromParent,
   ...props
@@ -62,11 +65,15 @@ export default function PasswordInput({
       fullWidth={fullWidth}
       variant={variant}
       autoComplete={resolvedAutoComplete}
-      inputProps={{
-        ...(inputPropsProp ?? {}),
-        ...(preventAutofill
-          ? { readOnly, autoComplete: "new-password" }
-          : {}),
+      slotProps={{
+        ...slotProps,
+        htmlInput: {
+          ...htmlInput,
+          ...(preventAutofill
+            ? { readOnly, autoComplete: "new-password" }
+            : {}),
+          ...slotProps?.htmlInput,
+        },
       }}
       onFocus={(e) => {
         if (preventAutofill) setReadOnly(false);
