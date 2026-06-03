@@ -5,6 +5,16 @@ import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 import { isHomeworkReadOnlyAudience } from "../utils/homeworkAudience";
 
+const resolveCurrentAcademicYearId = (
+  years: { id: number; is_current?: boolean | number; is_active?: boolean | number }[]
+): string => {
+  const current =
+    years.find((y) => y.is_current === true || y.is_current === 1) ??
+    years.find((y) => y.is_active === true || y.is_active === 1) ??
+    years[0];
+  return current?.id != null ? String(current.id) : "";
+};
+
 export function useHomeworkListController() {
   const { user } = useAuth();
   const { roles } = useRBAC();
@@ -28,6 +38,7 @@ export function useHomeworkListController() {
   const [classFilter, setClassFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("");
   const [academicYearFilter, setAcademicYearFilter] = useState("");
+  const [academicYearFilterReady, setAcademicYearFilterReady] = useState(false);
 
   // Dropdown options
   const [classOptions, setClassOptions] = useState<{ label: string; value: string }[]>([]);
@@ -40,7 +51,10 @@ export function useHomeworkListController() {
 
   // Admin/teacher filters — students and parents are scoped on the server
   useEffect(() => {
-    if (readOnlyAudience) return;
+    if (readOnlyAudience) {
+      setAcademicYearFilterReady(true);
+      return;
+    }
 
     homeworkService.getTeacherClasses()
       .then((classes) => {
@@ -49,12 +63,25 @@ export function useHomeworkListController() {
       .catch(() => {});
 
     academicYearService.list()
-      .then((years: any[]) => {
+      .then((data: unknown) => {
+        const yearsRaw =
+          (Array.isArray(data) ? data : (data as { data?: unknown[] })?.data) ?? [];
+        const years = yearsRaw as {
+          id: number;
+          name?: string;
+          code?: string;
+          is_current?: boolean | number;
+          is_active?: boolean | number;
+        }[];
         setAcademicYearOptions(
           years.map((y: any) => ({ label: y.name || y.code, value: String(y.id) })),
         );
+        setAcademicYearFilter((prev) => prev || resolveCurrentAcademicYearId(years));
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        setAcademicYearFilterReady(true);
+      });
   }, [readOnlyAudience]);
 
   const fetchHomework = async () => {
@@ -82,9 +109,10 @@ export function useHomeworkListController() {
   };
 
   useEffect(() => {
+    if (!readOnlyAudience && !academicYearFilterReady) return;
     fetchHomework();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, rowsPerPage, search, statusFilter, classFilter, subjectFilter, academicYearFilter]);
+  }, [page, rowsPerPage, search, statusFilter, classFilter, subjectFilter, academicYearFilter, readOnlyAudience, academicYearFilterReady]);
 
   // Reset to page 0 when filters change
   useEffect(() => {

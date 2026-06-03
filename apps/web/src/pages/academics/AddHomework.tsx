@@ -27,6 +27,7 @@ import { homeworkService, type HomeworkAttachment } from "../../api/services/hom
 import { academicYearService } from "../../api/services/dropdownServices";
 import { createHomeworkFormConfig, type AddHomeworkFormData } from "./AddHomework.formConfig";
 import { colorTokens } from "../../tokens/colors";
+import { useSnackbar } from "notistack";
 
 type DropdownOption = { label: string; value: string };
 
@@ -56,6 +57,7 @@ export default function AddHomework() {
   const { id } = useParams<{ id?: string }>();
   const isEditMode = Boolean(id && id !== "new");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { enqueueSnackbar } = useSnackbar();
   const { hasPermission } = useRBAC();
 
   const canCreate = hasPermission("HOMEWORK_MGMT:create");
@@ -70,7 +72,6 @@ export default function AddHomework() {
   const isDataLoadedRef = useRef(!isEditMode);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [snackbar, setSnackbar] = useState<string | null>(null);
 
   // Dropdown options
   const [academicYearOptions, setAcademicYearOptions] = useState<DropdownOption[]>([]);
@@ -314,14 +315,23 @@ export default function AddHomework() {
         if (isEditMode && id) {
           await homeworkService.update(Number(id), buildPayload(statusOverride));
           homeworkId = Number(id);
-          setSnackbar("Homework updated successfully");
+          enqueueSnackbar("Homework updated successfully", {
+            variant: "success",
+            autoHideDuration: 3000,
+            anchorOrigin: { vertical: "top", horizontal: "center" },
+          });
         } else {
           const hw = await homeworkService.create(buildPayload(statusOverride));
           homeworkId = hw.id;
-          setSnackbar(
+          enqueueSnackbar(
             statusOverride === "Published"
               ? "Homework assigned successfully"
               : "Homework saved as draft",
+            {
+              variant: "success",
+              autoHideDuration: 3000,
+              anchorOrigin: { vertical: "top", horizontal: "center" },
+            }
           );
         }
 
@@ -371,7 +381,7 @@ export default function AddHomework() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [formData, isEditMode, id, pendingFiles],
+    [formData, isEditMode, id, pendingFiles, enqueueSnackbar],
   );
 
   // Single submit handler — always publishes.
@@ -629,8 +639,8 @@ export default function AddHomework() {
       fetchLoading={fetchLoading}
       error={error}
       onErrorDismiss={() => setError(null)}
-      snackbar={snackbar}
-      onSnackbarClose={() => setSnackbar(null)}
+      snackbar={null}
+      onSnackbarClose={() => {}}
       headerConfig={{
         links: [
           { title: "Homework", path: "/homework" },
