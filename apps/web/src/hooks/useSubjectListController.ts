@@ -3,6 +3,16 @@ import { subjectService } from "../api/services/subjectService";
 import { classService, academicYearService } from "../api/services/dropdownServices";
 import { type SubjectClassRow } from "../pages/academics/SubjectList.listConfig";
 
+const resolveCurrentAcademicYearId = (
+    years: { id: number; is_current?: boolean | number; is_active?: boolean | number }[]
+): string => {
+    const current =
+        years.find((y) => y.is_current === true || y.is_current === 1) ??
+        years.find((y) => y.is_active === true || y.is_active === 1) ??
+        years[0];
+    return current?.id != null ? String(current.id) : "";
+};
+
 export function useSubjectListController() {
     const [subjects, setSubjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -19,6 +29,7 @@ export function useSubjectListController() {
     const [statusFilter, setStatusFilter] = useState("");
     const [classFilter, setClassFilter] = useState("");
     const [academicYearFilter, setAcademicYearFilter] = useState("");
+    const [academicYearFilterReady, setAcademicYearFilterReady] = useState(false);
 
     const [classOptions, setClassOptions] = useState<{ label: string; value: string }[]>([]);
     const [academicYearOptions, setAcademicYearOptions] = useState<{ label: string; value: string }[]>([]);
@@ -43,13 +54,25 @@ export function useSubjectListController() {
 
         // Load academic year options
         academicYearService.list()
-            .then((years: any[]) => {
+            .then((data: unknown) => {
+                const yearsRaw =
+                    (Array.isArray(data) ? data : (data as { data?: unknown[] })?.data) ?? [];
+                const years = yearsRaw as {
+                    id: number;
+                    name?: string;
+                    code?: string;
+                    is_current?: boolean | number;
+                    is_active?: boolean | number;
+                }[];
                 setAcademicYearOptions(
-                    years
-                        .map((y: any) => ({ label: y.name || y.code, value: String(y.id) })),
+                    years.map((y) => ({ label: y.name || y.code || String(y.id), value: String(y.id) })),
                 );
+                setAcademicYearFilter((prev) => prev || resolveCurrentAcademicYearId(years));
             })
-            .catch(() => { });
+            .catch(() => { })
+            .finally(() => {
+                setAcademicYearFilterReady(true);
+            });
     }, []);
 
     const fetchSubjects = async () => {
@@ -159,8 +182,10 @@ export function useSubjectListController() {
 
 
     useEffect(() => {
+        if (!academicYearFilterReady) return;
         fetchSubjects();
-    }, [page, rowsPerPage, search, statusFilter, classFilter, academicYearFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page, rowsPerPage, search, statusFilter, classFilter, academicYearFilter, academicYearFilterReady]);
 
     useEffect(() => {
         setPage(0);

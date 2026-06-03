@@ -1,6 +1,7 @@
+import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Alert, Snackbar } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
+import { useSnackbar } from "notistack";
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout, ListPageToolbar, EntityTableSection } from "../../components/reusable";
 import { type SubjectResponse } from "../../api/services/subjectService";
@@ -12,6 +13,27 @@ export default function SubjectList() {
     const navigate = useNavigate();
     const location = useLocation();
     const controller = useSubjectListController();
+    const { enqueueSnackbar } = useSnackbar();
+
+    useEffect(() => {
+        if (!controller.success) return;
+        enqueueSnackbar(controller.success, {
+            variant: "success",
+            autoHideDuration: 3000,
+            anchorOrigin: { vertical: "top", horizontal: "center" },
+        });
+        controller.setSuccess(null);
+    }, [controller.success, controller.setSuccess, enqueueSnackbar]);
+
+    useEffect(() => {
+        if (!controller.error) return;
+        enqueueSnackbar(controller.error, {
+            variant: "error",
+            autoHideDuration: 4000,
+            anchorOrigin: { vertical: "top", horizontal: "center" },
+        });
+        controller.setError(null);
+    }, [controller.error, controller.setError, enqueueSnackbar]);
 
     const fromConfigHub = location.state?.fromConfigHub;
 
@@ -69,12 +91,6 @@ export default function SubjectList() {
                 />
             }
         >
-            {controller.error && (
-                <Alert severity="error" sx={{ m: 2 }} onClose={() => controller.setError?.(null)}>
-                    {controller.error}
-                </Alert>
-            )}
-
             <EntityTableSection<SubjectClassRow>
                 label="Subjects"
                 totalRows={controller.totalSubjects}
@@ -101,16 +117,6 @@ export default function SubjectList() {
                 loading={controller.deleteLoading}
             />
 
-            <Snackbar
-                open={!!controller.success}
-                autoHideDuration={3000}
-                anchorOrigin={{ vertical: "top", horizontal: "center" }}
-                onClose={() => controller.setSuccess(null)}
-            >
-                <Alert onClose={() => controller.setSuccess(null)} severity="success" sx={{ width: "100%" }}>
-                    {controller.success}
-                </Alert>
-            </Snackbar>
         </ListPageLayout>
     );
 }

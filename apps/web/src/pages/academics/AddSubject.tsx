@@ -16,6 +16,16 @@ import { TextFieldInput, SelectItem } from "../../components/semantic";
 import { FormSectionLabel, DataTable, type DataTableColumn } from "../../components/reusable";
 import { colorTokens } from "../../tokens/colors";
 
+const resolveCurrentAcademicYearId = (
+    years: { id: number; is_current?: boolean | number; is_active?: boolean | number }[]
+): string => {
+    const current =
+        years.find((y) => y.is_current === true || y.is_current === 1) ??
+        years.find((y) => y.is_active === true || y.is_active === 1) ??
+        years[0];
+    return current?.id != null ? String(current.id) : "";
+};
+
 export default function AddSubject() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -263,12 +273,28 @@ export default function AddSubject() {
                     schoolClassService.getAll()
                 ]);
                 
-                const yearsData = years || [];
-                setAcademicYearOptions(yearsData.map((y: any) => ({
+                const yearsData = (years || []) as {
+                    id: number;
+                    name?: string;
+                    code?: string;
+                    is_current?: boolean | number;
+                    is_active?: boolean | number;
+                }[];
+                setAcademicYearOptions(yearsData.map((y) => ({
                     id: String(y.id),
-                    label: y.name || y.code,
+                    label: y.name || y.code || String(y.id),
                     value: String(y.id)
                 })));
+
+                if (!isEditMode) {
+                    const yearId =
+                        navigationState.academic_year_id != null
+                            ? String(navigationState.academic_year_id)
+                            : resolveCurrentAcademicYearId(yearsData);
+                    if (yearId) {
+                        handleFieldValueChange("academic_year_id", yearId);
+                    }
+                }
 
                 const classData = classes || [];
                 const options = classData.map((c: any) => ({
@@ -288,7 +314,8 @@ export default function AddSubject() {
             }
         };
         loadOptions();
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isEditMode, navigationState.academic_year_id]);
 
     const fetchSubjectForEdit = useCallback(async () => {
         if (!id || id === "new") return;
