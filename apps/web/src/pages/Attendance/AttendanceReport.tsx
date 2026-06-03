@@ -705,7 +705,7 @@ const AttendanceReport = () => {
             onClick={handleExport}
             icon={<ExportIcon sx={{ fontSize: 22 }} />}
             label="Export CSV"
-            disabled={!reportData || reportData.records.length === 0}
+            disabled
           />
         )}
       </Stack>
