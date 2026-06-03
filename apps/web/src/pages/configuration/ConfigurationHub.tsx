@@ -20,8 +20,12 @@ type ConfigFeature = {
   label: string;
   path: string;        // used for navigate()
   permission: string;  // kept for route-guard fallback
-  menuPath: string;    // matches MenuNode.path in RBAC menus tree
+  /** RBAC menu paths that grant visibility (seed + tenant DB may use different paths). */
+  menuPaths: string[];
 };
+
+const hasAnyGrantedMenuPath = (granted: Set<string>, paths: string[]) =>
+  paths.some((menuPath) => granted.has(menuPath));
 
 type ConfigSection = {
   id: string;
@@ -39,21 +43,21 @@ const CONFIG_SECTIONS: ConfigSection[] = [
         label: "Academic Year",
         path: "/academics/academic-years",
         permission: "ACADEMIC_MGMT:view",
-        menuPath: "/academics/academic-years",
+        menuPaths: ["/academics/academic-years", "/academic-years"],
       },
       {
         id: "class-div-setup",
         label: "Class-Div Setup",
         path: "/academics/classes",
         permission: "ACADEMIC_MGMT:view",
-        menuPath: "/academics/classes",
+        menuPaths: ["/academics/classes", "/classes"],
       },
       {
         id: "subjects",
         label: "Subjects",
         path: "/academics/subjects",
         permission: "ACADEMIC_MGMT:view",
-        menuPath: "/academics/subjects",
+        menuPaths: ["/academics/subjects", "/subjects"],
       },
     ],
   },
@@ -66,28 +70,28 @@ const CONFIG_SECTIONS: ConfigSection[] = [
         label: "Role Management",
         path: "/roles",
         permission: "ADMIN_MGMT:view",
-        menuPath: "/roles",
+        menuPaths: ["/roles"],
       },
       {
         id: "teacher-creation",
         label: "Teacher Creation",
         path: "/teachers",
         permission: "TEACHER_MGMT:view",
-        menuPath: "/teachers",
+        menuPaths: ["/teachers"],
       },
       {
         id: "student-creation",
         label: "Student Creation",
         path: "/students",
         permission: "ADMIN_MGMT:view",
-        menuPath: "/students",
+        menuPaths: ["/students"],
       },
       {
         id: "user Permission ",
         label: "User Permission ",
         path: "/admin/permission-management",
         permission: "ADMIN_MGMT:view",
-        menuPath: "/admin/permission-management",
+        menuPaths: ["/admin/permission-management"],
       },
     ],
   },
@@ -100,21 +104,21 @@ const CONFIG_SECTIONS: ConfigSection[] = [
         label: "Fee Category",
         path: "/fees/categories",
         permission: "FEE_MGMT:view",
-        menuPath: "/fees/categories",
+        menuPaths: ["/fees/categories"],
       },
       {
         id: "fee-structure",
         label: "Fee Structure",
         path: "/fees/setup",
         permission: "FEE_MGMT:view",
-        menuPath: "/fees/setup",
+        menuPaths: ["/fees/setup"],
       },
       {
         id: "discount-management",
         label: "Discount Management",
         path: "/fees/discounts",
         permission: "FEE_MGMT:view",
-        menuPath: "/fees/discounts",
+        menuPaths: ["/fees/discounts"],
       },
     ],
   },
@@ -128,7 +132,9 @@ export default function ConfigurationHub() {
     if (!isInitialized) return [];
     return CONFIG_SECTIONS.map((section) => ({
       ...section,
-      features: section.features.filter((feature) => grantedMenuPaths.has(feature.menuPath)),
+      features: section.features.filter((feature) =>
+        hasAnyGrantedMenuPath(grantedMenuPaths, feature.menuPaths)
+      ),
     })).filter((section) => section.features.length > 0);
   }, [grantedMenuPaths, isInitialized]);
 
