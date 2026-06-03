@@ -167,6 +167,8 @@ const ProfilePage = () => {
             setIsModified(false);
             setNameError("");
             setSnack({ msg: "Profile updated successfully.", severity: "success" });
+            // Notify other components (like MainLayout header) to refresh user data
+            window.dispatchEvent(new Event("profile-updated"));
         } catch {
             setSnack({ msg: "Unable to update profile. Please try again.", severity: "error" });
         } finally {
@@ -212,7 +214,9 @@ const ProfilePage = () => {
             const updated = await profileService.uploadImage(file);
             setProfile(updated);
             setSnack({ msg: "Profile photo updated successfully.", severity: "success" });
+            // Notify other components to refresh - both specific image update and full profile
             window.dispatchEvent(new Event("profile-image-updated"));
+            window.dispatchEvent(new Event("profile-updated"));
             setFileInputKey(prev => prev + 1); // Reset input to allow re-uploading
         } catch {
             setSnack({ msg: "Unable to upload image. Please try again.", severity: "error" });
@@ -230,7 +234,9 @@ const ProfilePage = () => {
             const updated = await profileService.deleteImage();
             setProfile(updated);
             setSnack({ msg: "Profile photo removed.", severity: "success" });
+            // Notify other components to refresh - both specific image update and full profile
             window.dispatchEvent(new Event("profile-image-updated"));
+            window.dispatchEvent(new Event("profile-updated"));
             setFileInputKey(prev => prev + 1); // Reset input to allow fresh upload
         } catch {
             setSnack({ msg: "Unable to remove photo. Please try again.", severity: "error" });

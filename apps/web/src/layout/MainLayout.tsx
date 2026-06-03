@@ -22,7 +22,7 @@ function MainLayout() {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, isAuthenticated, exitImpersonation } = useAuth();
+  const { user, logout, isAuthenticated, exitImpersonation, refreshUser } = useAuth();
   const { roles: rbacRoles, clearRBACData } = useRBAC();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -98,6 +98,17 @@ function MainLayout() {
     window.addEventListener("profile-image-updated", handler);
     return () => window.removeEventListener("profile-image-updated", handler);
   }, [refreshAvatar]);
+
+  // Listen for profile-updated event (name change, etc.) and refresh full user data
+  useEffect(() => {
+    const handler = () => {
+      if (refreshUser) {
+        refreshUser();
+      }
+    };
+    window.addEventListener("profile-updated", handler);
+    return () => window.removeEventListener("profile-updated", handler);
+  }, [refreshUser]);
 
   const handleUserMenuOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {
     setUserMenuAnchor(event.currentTarget);
