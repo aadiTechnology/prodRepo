@@ -16,6 +16,13 @@ export const publicSchoolService = {
     const response = await apiClient.get<TenantSchoolPickerItem>(`/tenants/tenants/${tenantId}`);
     return response.data;
   },
+
+  resolveByHost: async (host: string): Promise<TenantSchoolPickerItem> => {
+    const response = await apiClient.get<TenantSchoolPickerItem>("/tenants/tenants/by-host", {
+      params: { host },
+    });
+    return response.data;
+  },
 };
 
 export default publicSchoolService;

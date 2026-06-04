@@ -16,6 +16,8 @@ export interface Tenant {
     city?: string | null;
     state?: string | null;
     pin_code?: string | null;
+    /** Hostname for URL-based login (e.g. tenant1.myapp.com) */
+    login_url?: string | null;
     created_at: string;
 }
 
@@ -36,6 +38,7 @@ export interface TenantCreate {
     city?: string | null;
     state?: string | null;
     pin_code?: string | null;
+    login_url?: string | null;
 }
 
 /** Use this for the provision endpoint — admin_password is required by the backend API */
@@ -58,6 +61,7 @@ export interface TenantUpdate {
     city?: string | null;
     state?: string | null;
     pin_code?: string | null;
+    login_url?: string | null;
 }
 
 export interface TenantProvisionResponse {

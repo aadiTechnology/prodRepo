@@ -23,6 +23,8 @@ class TenantBase(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     pin_code: Optional[str] = None
+    # Hostname for URL-based login (e.g. tenant1.myapp.com)
+    login_url: Optional[str] = None
 
 
 class TenantCreate(TenantBase):
@@ -55,6 +57,7 @@ class TenantUpdate(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     pin_code: Optional[str] = None
+    login_url: Optional[str] = None
 
 
 class TenantResponse(TenantBase):

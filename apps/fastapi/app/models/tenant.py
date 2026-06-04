@@ -39,6 +39,9 @@ class Tenant(Base):
     state = Column(String(100), nullable=True)
     pin_code = Column(String(20), nullable=True)
 
+    # Login URL host for tenant-specific login (e.g. tenant1.myapp.com); unique when set
+    login_url = Column(String(253), nullable=True, unique=True, index=True)
+
     is_active = Column(Boolean, nullable=False, default=True)
 
     # Audit fields

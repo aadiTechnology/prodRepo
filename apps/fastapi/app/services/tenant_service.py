@@ -18,6 +18,42 @@ from app.utils.security import hash_password
 
 logger = get_logger(__name__)
 
+
+def normalize_login_host(raw: str) -> str:
+    """Normalize browser host or login URL for lookup (lowercase, host only)."""
+    host = (raw or "").strip().lower()
+    if not host:
+        return ""
+    if "://" in host:
+        host = host.split("://", 1)[1]
+    if "/" in host:
+        host = host.split("/", 1)[0]
+    if ":" in host and not host.startswith("["):
+        host = host.split(":", 1)[0]
+    return host.rstrip(".")
+
+
+def _normalize_tenant_login_url(raw: str | None) -> str | None:
+    """Persistable login URL (hostname) for tenants.login_url."""
+    if raw is None:
+        return None
+    normalized = normalize_login_host(raw)
+    return normalized or None
+
+
+def _assert_login_url_available(db: Session, login_url: str | None, exclude_tenant_id: int | None = None) -> None:
+    if not login_url:
+        return
+    query = db.query(Tenant).filter(
+        Tenant.login_url == login_url,
+        Tenant.is_deleted == False,  # noqa: E712
+    )
+    if exclude_tenant_id is not None:
+        query = query.filter(Tenant.id != exclude_tenant_id)
+    if query.first():
+        raise ConflictException(f"Login URL '{login_url}' is already assigned to another school.")
+
+
 def _to_school_picker_item(db: Session, tenant: Tenant) -> TenantSchoolPickerItem:
     tid = getattr(tenant, "theme_template_id", None)
     theme_config = theme_template_service.get_template_config(db, tid) if tid else None
@@ -64,6 +100,26 @@ def get_public_school_for_login(db: Session, tenant_id: int) -> TenantSchoolPick
     )
     if not tenant:
         raise NotFoundException("Tenant", tenant_id)
+    return _to_school_picker_item(db, tenant)
+
+
+def resolve_public_school_by_host(db: Session, host: str) -> TenantSchoolPickerItem:
+    """Resolve active tenant from login host (public, pre-login)."""
+    normalized = normalize_login_host(host)
+    if not normalized:
+        raise NotFoundException("Tenant", host)
+
+    tenant = (
+        db.query(Tenant)
+        .filter(
+            Tenant.login_url == normalized,
+            Tenant.is_deleted == False,  # noqa: E712
+            Tenant.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
+    if not tenant:
+        raise NotFoundException("Tenant", normalized)
     return _to_school_picker_item(db, tenant)
 
 
@@ -122,6 +178,9 @@ def provision_tenant(db: Session, data: TenantProvision, created_by: int | None 
     if db.query(User).filter(User.email == data.email.lower(), User.is_deleted == False).first():
         raise ConflictException(f"User with email '{data.email}' already exists")
 
+    login_url = _normalize_tenant_login_url(getattr(data, "login_url", None))
+    _assert_login_url_available(db, login_url)
+
     try:
         new_tenant = Tenant(
             code=code,
@@ -138,6 +197,7 @@ def provision_tenant(db: Session, data: TenantProvision, created_by: int | None 
             city=data.city,
             state=data.state,
             pin_code=data.pin_code,
+            login_url=login_url,
             created_by=created_by,
         )
         db.add(new_tenant)
@@ -246,7 +306,11 @@ def update_tenant(db: Session, tenant_id: int, data: TenantUpdate, updated_by: i
         tenant.logo_url = sent["logo_url"]
     if "theme_template_id" in sent:
         tenant.theme_template_id = sent["theme_template_id"]
-        
+    if "login_url" in sent:
+        login_url = _normalize_tenant_login_url(sent["login_url"])
+        _assert_login_url_available(db, login_url, exclude_tenant_id=tenant_id)
+        tenant.login_url = login_url
+
     if data.address_line1 is not None:
         tenant.address_line1 = data.address_line1
     if data.address_line2 is not None:

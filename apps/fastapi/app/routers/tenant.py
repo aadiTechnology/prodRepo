@@ -21,6 +21,18 @@ from app.models.user import User, UserRole
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
 
 
+@router.get("/tenants/by-host", response_model=TenantSchoolPickerItem)
+async def resolve_public_school_by_host(
+    host: str = Query(..., min_length=1, max_length=253, description="Browser hostname"),
+    db: Session = Depends(get_db),
+) -> TenantSchoolPickerItem:
+    """
+    Public tenant lookup by login host for URL-based school auto-selection.
+    No authentication required.
+    """
+    return tenant_service.resolve_public_school_by_host(db, host)
+
+
 @router.get("/tenants/", response_model=TenantSchoolPickerListResponse)
 async def list_public_schools_for_login(
     db: Session = Depends(get_db),

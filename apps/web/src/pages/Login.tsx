@@ -25,6 +25,10 @@ import type { TenantSchoolPickerItem } from "../types/tenant";
 import publicSchoolService from "../api/services/publicSchoolService";
 import AppThemeProvider from "../theme/AppThemeProvider";
 import { deriveThemePropsFromTenant } from "../theme/ThemeFromTenantProvider";
+import {
+  getLoginHostFromBrowser,
+  shouldAttemptHostTenantResolve,
+} from "../utils/tenantLoginHost";
 
 // ── Design tokens ─────────────────────────────────────────────────────────
 const T = {
@@ -118,12 +122,58 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [schoolPreview, setSchoolPreview] = useState<TenantSchoolPickerItem | null>(null);
   const [schoolModalOpen, setSchoolModalOpen] = useState(false);
+  const [tenantLockedFromHost, setTenantLockedFromHost] = useState(false);
+  const [hostResolveDone, setHostResolveDone] = useState(false);
 
   const tenantIdFromQuery = useMemo(() => {
     const raw = searchParams.get("tenant");
     if (!raw || !/^\d+$/.test(raw)) return undefined;
     return Number(raw);
   }, [searchParams]);
+
+  const applySchoolSelection = (school: TenantSchoolPickerItem, options?: { lockFromHost?: boolean }) => {
+    try {
+      sessionStorage.setItem(`schoolLoginPreview:${school.id}`, JSON.stringify(school));
+    } catch {
+      /* ignore */
+    }
+    setSearchParams({ tenant: String(school.id) }, { replace: true });
+    setSchoolPreview(school);
+    setSchoolModalOpen(false);
+    setError(null);
+    if (options?.lockFromHost) {
+      setTenantLockedFromHost(true);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const host = getLoginHostFromBrowser();
+    if (!shouldAttemptHostTenantResolve(host)) {
+      setHostResolveDone(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+    (async () => {
+      try {
+        const school = await publicSchoolService.resolveByHost(host);
+        if (!cancelled) {
+          applySchoolSelection(school, { lockFromHost: true });
+        }
+      } catch {
+        /* unknown host — manual school selection */
+      } finally {
+        if (!cancelled) {
+          setHostResolveDone(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on login mount
+  }, []);
 
   useEffect(() => {
     if (tenantIdFromQuery === undefined) {
@@ -155,13 +205,29 @@ export default function Login() {
           }
         }
       } catch {
-        if (!cancelled) setSchoolPreview(null);
+        if (!cancelled) {
+          setSchoolPreview(null);
+          setTenantLockedFromHost(false);
+          try {
+            sessionStorage.removeItem(`schoolLoginPreview:${id}`);
+          } catch {
+            /* ignore */
+          }
+          setSearchParams(
+            (prev) => {
+              const next = new URLSearchParams(prev);
+              next.delete("tenant");
+              return next;
+            },
+            { replace: true },
+          );
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [tenantIdFromQuery]);
+  }, [tenantIdFromQuery, setSearchParams]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -186,15 +252,10 @@ export default function Login() {
   };
 
   const handleSchoolSelected = (school: TenantSchoolPickerItem) => {
-    try {
-      sessionStorage.setItem(`schoolLoginPreview:${school.id}`, JSON.stringify(school));
-    } catch {
-      /* ignore */
-    }
-    setSearchParams({ tenant: String(school.id) }, { replace: true });
-    setSchoolModalOpen(false);
-    setError(null);
+    applySchoolSelection(school);
   };
+
+  const showChangeSchoolLink = hostResolveDone && !tenantLockedFromHost;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -458,27 +519,29 @@ export default function Login() {
                 </Typography>
               </Box>
 
-              <Box sx={{ textAlign: "center", mt: 1.5, animation: "fadeUp 0.5s 0.38s ease both" }}>
-                <MuiLink
-                  component="button"
-                  type="button"
-                  onClick={() => setSchoolModalOpen(true)}
-                  sx={{
-                    color: T.primary,
-                    textDecoration: "none",
-                    fontWeight: 600,
-                    fontSize: "0.82rem",
-                    border: "none",
-                    background: "none",
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    p: 0,
-                    "&:hover": { textDecoration: "underline", color: T.primaryDark },
-                  }}
-                >
-                  Change School for Login
-                </MuiLink>
-              </Box>
+              {showChangeSchoolLink && (
+                <Box sx={{ textAlign: "center", mt: 1.5, animation: "fadeUp 0.5s 0.38s ease both" }}>
+                  <MuiLink
+                    component="button"
+                    type="button"
+                    onClick={() => setSchoolModalOpen(true)}
+                    sx={{
+                      color: T.primary,
+                      textDecoration: "none",
+                      fontWeight: 600,
+                      fontSize: "0.82rem",
+                      border: "none",
+                      background: "none",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      p: 0,
+                      "&:hover": { textDecoration: "underline", color: T.primaryDark },
+                    }}
+                  >
+                    Change School for Login
+                  </MuiLink>
+                </Box>
+              )}
             </Box>
           </Box>
         </Grid>
