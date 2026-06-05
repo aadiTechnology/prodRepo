@@ -137,13 +137,16 @@ export default function RolePage() {
         throw new Error("Tenant ID is missing. Cannot create role.");
       }
 
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         name: formData.name,
         code: formData.code,
         description: formData.description,
-        is_active: formData.is_active,
         permission_ids: [], // TODO: add permission selection support
       };
+
+      if (!isEditMode) {
+        payload.is_active = formData.is_active;
+      }
 
       if (userRole === "SUPER_ADMIN") {
         payload.scope_type = "Platform";

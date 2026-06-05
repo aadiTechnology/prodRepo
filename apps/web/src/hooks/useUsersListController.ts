@@ -12,6 +12,30 @@ import { enqueueSnackbar } from "notistack";
 export type UsersFilters = { role: string; status: string };
 export type UsersSortBy = "name" | "created_at";
 
+const USERS_LIST_FILTERS_KEY = "users.listFilters";
+
+function readStoredUsersFilters(): UsersFilters {
+  try {
+    const raw = sessionStorage.getItem(USERS_LIST_FILTERS_KEY);
+    if (!raw) return { role: "", status: "" };
+    const parsed = JSON.parse(raw) as Partial<UsersFilters>;
+    return {
+      role: typeof parsed.role === "string" ? parsed.role : "",
+      status: typeof parsed.status === "string" ? parsed.status : "",
+    };
+  } catch {
+    return { role: "", status: "" };
+  }
+}
+
+function writeStoredUsersFilters(filters: UsersFilters) {
+  try {
+    sessionStorage.setItem(USERS_LIST_FILTERS_KEY, JSON.stringify(filters));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
 type UseUsersListControllerOptions = {
   currentUser: AuthUser | null;
   navigate: NavigateFunction;
@@ -70,13 +94,17 @@ export function useUsersListController({
   const currentTenantId = currentUser?.tenant_id ?? null;
 
   const listState = useListManager<UsersFilters, UsersSortBy>({
-    initialFilters: { role: "", status: "" },
+    initialFilters: readStoredUsersFilters(),
     initialSortBy: "created_at",
     initialSortOrder: "asc",
     initialRowsPerPage: 10,
     initialPage: 0,
     initialSearch: "",
   });
+
+  useEffect(() => {
+    writeStoredUsersFilters(listState.filters);
+  }, [listState.filters]);
 
   const fetchUsers = useCallback(async () => {
     try {
