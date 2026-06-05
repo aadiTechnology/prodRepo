@@ -42,6 +42,7 @@ export default function ChangePassword() {
     handleChange,
     handleFieldValueChange,
     handleSubmit,
+    resetForm,
   } = useFormManager<ChangePasswordFormData>({
     initialValues,
     validationConfig,
@@ -71,7 +72,7 @@ export default function ChangePassword() {
         autoHideDuration: 3000,
         anchorOrigin: { vertical: "top", horizontal: "center" },
       });
-      setTimeout(() => navigate("/profile"), 1000);
+      resetForm();
     } catch (err) {
       const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
       setFieldErrors((prev) => ({ ...prev, ...apiFieldErrors }));
@@ -79,7 +80,7 @@ export default function ChangePassword() {
     } finally {
       setLoading(false);
     }
-  }, [formData, navigate, setFieldErrors, enqueueSnackbar]);
+  }, [formData, resetForm, setFieldErrors, enqueueSnackbar]);
 
   return (
     <BaseForm<ChangePasswordFormData>
