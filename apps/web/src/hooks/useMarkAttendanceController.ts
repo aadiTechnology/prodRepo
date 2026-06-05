@@ -87,9 +87,6 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     setSnackbar({ open: true, message, severity: "error" });
   };
 
-  const isTeacherDateRestricted = (attendanceDate: string) =>
-    isTeacher && attendanceDate !== today;
-
   const isFutureDate = (attendanceDate: string) => attendanceDate > today;
 
   const resolveNetworkErrorMessage = (fallback: string, err: unknown) => {
@@ -377,10 +374,6 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
       showError("Please select Date");
       return;
     }
-    if (isTeacherDateRestricted(filters.attendance_date)) {
-      showError("You cannot edit past attendance");
-      return;
-    }
     if (isFutureDate(filters.attendance_date)) {
       showError("You cannot mark attendance for future dates");
       return;
@@ -434,10 +427,6 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     }
     if (!filters.division_id) {
       showError("Please select Division");
-      return;
-    }
-    if (isTeacherDateRestricted(filters.attendance_date)) {
-      showError("You cannot edit past attendance");
       return;
     }
     if (isFutureDate(filters.attendance_date)) {

@@ -305,7 +305,6 @@ const MarkAttendance = () => {
         InputLabelProps={{ shrink: true }}
         inputProps={{
           max: new Date().toISOString().split("T")[0],
-          min: isTeacher ? new Date().toISOString().split("T")[0] : undefined,
         }}
         sx={{
           minWidth: { xs: "100%", sm: 170 },
