@@ -3,6 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from app.models.teacher import Teacher
+from app.models.user import User
 from app.schemas.teacher_schema import TeacherCreate, TeacherUpdate
 from app.schemas.user import UserCreate, UserUpdate
 from app.services import user_service
@@ -311,6 +312,12 @@ def check_division_assignment_conflict(db: Session, tenant_id: int, class_id: Op
         )
 
 def create_teacher(db: Session, payload: TeacherCreate, created_by: int, tenant_id: int) -> Teacher:
+    if tenant_id is None:
+        raise ConflictException(
+            "No school tenant is associated with this session. "
+            "Sign in as a school administrator or use Login as Tenant."
+        )
+
     check_mobile_duplicate(db, payload.mobile_number, tenant_id)
     check_division_assignment_conflict(db, tenant_id, payload.class_id, payload.class_division_id)
     
@@ -319,14 +326,32 @@ def create_teacher(db: Session, payload: TeacherCreate, created_by: int, tenant_
     # Create or link user account
     user_id = None
     if payload.email:
-        # Check if user already exists
-        existing_user = user_service.get_user_by_email(db, payload.email)
+        existing_user = (
+            db.query(User)
+            .filter(
+                User.email == payload.email,
+                User.tenant_id == tenant_id,
+                User.is_deleted == False,  # noqa: E712
+            )
+            .first()
+        )
         if existing_user:
-            # If user exists, check if they already have a teacher profile
-            existing_teacher = db.query(Teacher).filter(Teacher.user_id == existing_user.id, Teacher.is_deleted == False).first()
+            existing_teacher = (
+                db.query(Teacher)
+                .filter(
+                    Teacher.user_id == existing_user.id,
+                    Teacher.tenant_id == tenant_id,
+                    Teacher.is_deleted == False,  # noqa: E712
+                )
+                .first()
+            )
             if existing_teacher:
                 raise ConflictException(f"A teacher profile already exists for user: {payload.email}")
             user_id = existing_user.id
+        elif user_service.get_user_by_email(db, payload.email):
+            raise ConflictException(
+                f"The email {payload.email} is already registered with another school."
+            )
         else:
             # Create new user for teacher
             user_data = UserCreate(

@@ -59,8 +59,10 @@ export interface TeacherListResponse {
 }
 
 const teacherService = {
-  create: async (data: TeacherCreate): Promise<TeacherResponse> => {
-    const response = await axiosInstance.post("/api/teachers/", data);
+  create: async (data: TeacherCreate, tenantId?: number | null): Promise<TeacherResponse> => {
+    const params =
+      tenantId != null && Number.isFinite(tenantId) ? { tenant_id: tenantId } : undefined;
+    const response = await axiosInstance.post("/api/teachers/", data, { params });
     return response.data;
   },
 

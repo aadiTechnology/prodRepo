@@ -31,17 +31,7 @@ export function useRolesListController() {
         sortOrder,
         activeOnly: true,
       });
-      const mappedRoles = (data.items ?? [])
-        .filter(
-          (role: { is_deleted?: boolean; is_active?: boolean }) =>
-            !role.is_deleted && role.is_active !== false
-        )
-        .map((role: any) => ({
-          ...role,
-          status: role.is_active ? "ACTIVE" : "INACTIVE",
-          createdAt: role.created_at,
-        }));
-      setRoles(mappedRoles);
+      setRoles(data.items ?? []);
       setTotalRoles(data.totalCount);
     } catch (err: any) {
       setError(err?.message || "Failed to fetch roles.");

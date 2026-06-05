@@ -12,19 +12,44 @@ interface GetRolesParams {
   activeOnly?: boolean;
 }
 
-type RoleListItem = Role & { is_deleted?: boolean };
+type RoleApiItem = {
+  id: number | string;
+  code: string;
+  name: string;
+  description?: string | null;
+  scope_type?: string;
+  is_system?: boolean;
+  is_active?: boolean;
+  is_deleted?: boolean;
+  created_at?: string;
+  permissions?: Role["permissions"];
+};
+
+function mapRoleApiItem(raw: RoleApiItem): Role {
+  return {
+    id: String(raw.id),
+    code: raw.code,
+    name: raw.name,
+    description: raw.description ?? null,
+    scope: raw.scope_type === "Platform" ? "PLATFORM" : "TENANT",
+    isSystemRole: raw.is_system ?? false,
+    status: raw.is_active !== false ? "ACTIVE" : "INACTIVE",
+    createdAt: raw.created_at ?? "",
+    permissions: raw.permissions ?? [],
+  };
+}
 
 function parseRoleListResponse(data: unknown): RoleListResponse {
   const body = data as {
-    data?: RoleListResponse;
-    items?: RoleListItem[];
+    data?: { items?: RoleApiItem[]; totalCount?: number; pageNumber?: number; pageSize?: number };
+    items?: RoleApiItem[];
     totalCount?: number;
     pageNumber?: number;
     pageSize?: number;
   };
   const payload = body?.data ?? body;
   const rawItems = payload?.items ?? [];
-  const items = rawItems.filter((r) => !r.is_deleted);
+  const items = rawItems.filter((r) => !r.is_deleted).map(mapRoleApiItem);
   return {
     items,
     totalCount: payload?.totalCount ?? items.length,
@@ -53,7 +78,7 @@ const roleService = {
   },
 
   /** Active, non-deleted roles for user create/edit role select. */
-  async getSelectableRoles(): Promise<RoleListItem[]> {
+  async getSelectableRoles(): Promise<Role[]> {
     const list = await this.getRoles({ pageSize: 1000, activeOnly: true });
     return list.items;
   },

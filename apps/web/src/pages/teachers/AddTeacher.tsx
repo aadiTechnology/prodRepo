@@ -8,6 +8,7 @@ import HomeIcon from "@mui/icons-material/Home";
 
 import teacherService, { type TeacherCreate, type TeacherResponse, type TeacherUpdate } from "../../api/services/teacherService";
 import schoolClassService, { type SchoolClass } from "../../api/services/schoolClassService";
+import { useAuth } from "../../context/AuthContext";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
 import { useFormManager } from "../../hooks/useFormManager";
 import BaseForm from "../../components/reusable/BaseForm";
@@ -39,6 +40,8 @@ export default function AddTeacher() {
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const activeTenantId = user?.tenant_id ?? user?.tenant?.id ?? null;
 
   const [loading, setLoading] = useState(false);
   const [initLoading, setInitLoading] = useState(isEditMode);
@@ -345,7 +348,7 @@ export default function AddTeacher() {
         setSnackbar("Teacher updated successfully");
         setTimeout(() => navigate("/teachers"), 1000);
       } else {
-        await teacherService.create(payload as TeacherCreate);
+        await teacherService.create(payload as TeacherCreate, activeTenantId);
         setSnackbar("Teacher added successfully");
         if (actionType === 'SAVE_AND_ADD') {
           setFormData(emptyForm());

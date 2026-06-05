@@ -3,7 +3,12 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, CurrentUser, require_admin
+from app.core.dependencies import (
+    get_current_user,
+    CurrentUser,
+    require_admin,
+    resolve_tenant_id_for_academic_year_list,
+)
 from app.schemas.teacher_schema import TeacherCreate, TeacherUpdate, TeacherResponse, TeacherListResponse
 from app.schemas.attendance_schema import AttendanceTeacherScopeResponse
 from app.services import teacher_service
@@ -131,12 +136,21 @@ async def get_teacher(
 @router.post("/", response_model=TeacherResponse, status_code=status.HTTP_201_CREATED)
 async def create_teacher(
     payload: TeacherCreate,
+    tenant_id: Optional[int] = Query(
+        None,
+        ge=1,
+        description="Active school tenant. Required for system administrators; must match the signed-in school user.",
+    ),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin)
+    current_user: CurrentUser = Depends(require_admin),
 ):
     """Create a new teacher."""
-    logger.info(f"User {current_user.email} creating teacher {payload.full_name}")
-    db_teacher = teacher_service.create_teacher(db, payload, current_user.id, current_user.tenant_id)
+    effective_tenant_id = resolve_tenant_id_for_academic_year_list(db, current_user, tenant_id)
+    logger.info(
+        f"User {current_user.email} creating teacher {payload.full_name} "
+        f"for tenant_id={effective_tenant_id} (account tenant_id={current_user.tenant_id})"
+    )
+    db_teacher = teacher_service.create_teacher(db, payload, current_user.id, effective_tenant_id)
     return map_db_model_to_response(db_teacher)
 
 @router.put("/{teacher_id}", response_model=TeacherResponse)
