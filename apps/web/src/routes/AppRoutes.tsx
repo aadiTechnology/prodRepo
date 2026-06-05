@@ -83,6 +83,7 @@ const ConfigurationHub = lazy(() =>
 const DemoSetupVideosPage = lazy(() => import("../pages/configuration/DemoSetupVideosPage"));
 const DemoSetupVideoFormPage = lazy(() => import("../pages/configuration/DemoSetupVideoFormPage"));
 const DemoSetupVideoDetail = lazy(() => import("../pages/configuration/DemoSetupVideoDetail"));
+const DigitalMarketingHub = lazy(() => import("../pages/marketing/DigitalMarketingHub"));
 // Loading fallback component
 const PageLoader = () => (
   <Box
@@ -421,6 +422,14 @@ export default function AppRoutes() {
             element={
               <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN", "ADMIN"]}>
                 <DemoSetupVideoFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/marketing/hub"
+            element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN", "ADMIN"]}>
+                <DigitalMarketingHub />
               </ProtectedRoute>
             }
           />

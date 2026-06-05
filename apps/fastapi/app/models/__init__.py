@@ -38,6 +38,7 @@ from app.models.subject import Subject, SubjectClass
 from app.models.holiday import Holiday
 from app.models.homework import Homework, HomeworkAttachment
 from app.models.demo_video import DemoVideo
+from app.models.marketing_hub import MarketingPlatform, MarketingSocialMediaLink
 
 # Export all models for convenience
 __all__ = [
@@ -92,5 +93,7 @@ __all__ = [
     "Homework",
     "HomeworkAttachment",
     "DemoVideo",
+    "MarketingPlatform",
+    "MarketingSocialMediaLink",
 ]
 

@@ -210,6 +210,7 @@ const ICON_MAP: Record<string, string> = {
   "attendance": calendarIcon,
   "config": assetsIcon,
   "admissions": letterIcon,
+  "marketing": bloggerIcon,
   "default": workingIcon
 };
 
@@ -227,6 +228,7 @@ const COLOR_MAP: Record<string, string> = {
   "users": colorTokens.menuColors.academics,
   "attendance": colorTokens.menuColors.academics,
   "config": colorTokens.menuColors.settings,
+  "marketing": colorTokens.menuColors.students,
 };
 
 
@@ -281,7 +283,8 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
       { id: "sprintwise-performance", label: "Sprintwise Performance", path: "/reports/sprintwise-performance" },
       { id: "my-tasks-effort", label: "My Tasks — Effort Entry", path: "/my-tasks/effort-entry" },
       { id: "sprints", label: "Sprints", path: "/sprints" },
-      { id: "demo-setup-videos", label: "Demo Setup Videos", path: "/demo-setup-videos" }
+      { id: "demo-setup-videos", label: "Demo Setup Videos", path: "/demo-setup-videos" },
+      { id: "digital-marketing-hub", label: "Digital Marketing Hub", path: "/marketing/hub" }
     ]
   }
 ];
@@ -343,7 +346,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
       node => !HUB_CHILD_MODULE_NAMES.has(node.name)
     );
 
-    return sidebarMenus.map(node => {
+    const items = sidebarMenus.map(node => {
       const path = (node.path || "").toLowerCase();
       const name = (node.name || "").toLowerCase();
       
@@ -380,6 +383,21 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
           : undefined,
       };
     });
+
+    const hasMarketingHub = menus.some(node => (node.path || "").toLowerCase().includes("marketing"));
+    const isAdmin = rbacRoles.some(role => role.toLowerCase().includes("admin"));
+    if (isAdmin && !hasMarketingHub) {
+      items.push({
+        id: "digital-marketing-hub",
+        label: "Marketing Hub",
+        icon: bloggerIcon,
+        path: "/marketing/hub",
+        color: colorTokens.menuColors.students,
+        children: undefined,
+      });
+    }
+
+    return items;
   }, [menus, user, rbacRoles]);
 
   const toggleSection = (id: string) => {

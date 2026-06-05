@@ -33,6 +33,8 @@ from app.models import (  # noqa: F401
     Homework,
     HomeworkAttachment,
     DemoVideo,
+    MarketingPlatform,
+    MarketingSocialMediaLink,
 )
 # Import FeePayment + FeePaymentAllocation so create_all creates fee_payment_allocations
 from app.models.fee_payment import FeePayment, FeePaymentAllocation  # noqa: F401
@@ -141,6 +143,8 @@ from app.routers import homework_router
 app.include_router(homework_router.router)
 app.include_router(holiday.configuration_router)
 app.include_router(demo_video.router)
+from app.routers import marketing_hub
+app.include_router(marketing_hub.router)
 
 
 
@@ -175,6 +179,18 @@ async def startup_event():
             timeout=60,  # Abort if schema sync takes longer than 60 s
         )
         logger.info("[OK] Database tables initialized successfully")
+        
+        # Seed default marketing platforms
+        from app.core.database import SessionLocal
+        from app.services.marketing_hub_service import seed_default_platforms
+        db = SessionLocal()
+        try:
+            seed_default_platforms(db)
+            logger.info("[OK] Default marketing platforms seeded successfully")
+        except Exception as e:
+            logger.error(f"Error seeding marketing platforms: {str(e)}")
+        finally:
+            db.close()
     except asyncio.TimeoutError:
         logger.error("✗ Database schema sync timed out (>60 s) — server will continue")
         conn_info = DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL
