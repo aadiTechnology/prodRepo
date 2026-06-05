@@ -130,6 +130,42 @@ const CATEGORIES = [
   "Website & Reviews",
 ];
 
+/** Normalize integration URLs to HTTPS within this module only. */
+const normalizeIntegrationUrl = (raw: string): string => {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+
+  if (/^https:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (/^http:\/\//i.test(trimmed)) {
+    return trimmed.replace(/^http:\/\//i, "https://");
+  }
+
+  return `https://${trimmed.replace(/^\/\//, "")}`;
+};
+
+const validateIntegrationUrl = (raw: string): string | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const normalized = normalizeIntegrationUrl(trimmed);
+
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== "https:") {
+      return "URL must use HTTPS.";
+    }
+    if (!parsed.hostname) {
+      return "Enter a valid HTTPS URL.";
+    }
+    return null;
+  } catch {
+    return "Enter a valid HTTPS URL (e.g. https://example.com).";
+  }
+};
+
 const DigitalMarketingHub = () => {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<number | null>(null);
@@ -157,11 +193,15 @@ const DigitalMarketingHub = () => {
     setLoading(true);
     try {
       const data = await marketingHubService.getMarketingConfig();
-      setPlatformConfig(data);
+      const normalizedData = data.map((p) => ({
+        ...p,
+        url: p.url ? normalizeIntegrationUrl(p.url) : p.url,
+      }));
+      setPlatformConfig(normalizedData);
       // Initialize inputs state
       const urls: Record<number, string> = {};
       const actives: Record<number, boolean> = {};
-      data.forEach((p) => {
+      normalizedData.forEach((p) => {
         urls[p.platform_id] = p.url || "";
         actives[p.platform_id] = p.link_active ?? true;
       });
@@ -183,24 +223,35 @@ const DigitalMarketingHub = () => {
     try {
       const url = editedUrls[platformId];
       const isActive = editedActives[platformId];
+      const trimmedUrl = url.trim();
 
-      if (url.trim() && !url.toLowerCase().startsWith("http://") && !url.toLowerCase().startsWith("https://")) {
-        setError("URL must start with http:// or https://");
-        setSavingId(null);
-        return;
+      if (trimmedUrl) {
+        const validationError = validateIntegrationUrl(trimmedUrl);
+        if (validationError) {
+          setError(validationError);
+          setSavingId(null);
+          return;
+        }
       }
+
+      const normalizedUrl = trimmedUrl ? normalizeIntegrationUrl(trimmedUrl) : trimmedUrl;
 
       await marketingHubService.saveMarketingLink({
         platform_id: platformId,
-        url: url.trim(),
+        url: normalizedUrl,
         is_active: isActive,
       });
+
+      setEditedUrls((prev) => ({
+        ...prev,
+        [platformId]: normalizedUrl,
+      }));
 
       // Update local state config
       setPlatformConfig((prev) =>
         prev.map((p) =>
           p.platform_id === platformId
-            ? { ...p, url: url.trim(), link_active: isActive }
+            ? { ...p, url: normalizedUrl, link_active: isActive }
             : p
         )
       );
@@ -326,7 +377,9 @@ const DigitalMarketingHub = () => {
             const urlValue = editedUrls[platformId] || "";
             const activeValue = editedActives[platformId] ?? true;
             const savedUrl = platform.url || "";
-            const isModified = urlValue !== savedUrl || activeValue !== (platform.link_active ?? true);
+            const normalizedUrlValue = urlValue.trim() ? normalizeIntegrationUrl(urlValue) : urlValue.trim();
+            const isModified =
+              normalizedUrlValue !== savedUrl || activeValue !== (platform.link_active ?? true);
             const brandColor = BrandGradients[platform.code] || BrandGradients.default;
 
             return (
@@ -371,8 +424,8 @@ const DigitalMarketingHub = () => {
                     <TextField
                       fullWidth
                       size="small"
-                      label="Integration Link (URL)"
-                      placeholder="https://..."
+                      label="Integration Link (HTTPS URL)"
+                      placeholder="https://example.com"
                       value={urlValue}
                       onChange={(e) =>
                         setEditedUrls((prev) => ({
@@ -380,6 +433,18 @@ const DigitalMarketingHub = () => {
                           [platformId]: e.target.value,
                         }))
                       }
+                      onBlur={() => {
+                        const current = editedUrls[platformId] || "";
+                        if (!current.trim()) return;
+                        const normalized = normalizeIntegrationUrl(current);
+                        if (normalized !== current) {
+                          setEditedUrls((prev) => ({
+                            ...prev,
+                            [platformId]: normalized,
+                          }));
+                        }
+                      }}
+                      helperText="HTTPS only. Bare domains are auto-prefixed with https://."
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: "12px",
@@ -393,7 +458,7 @@ const DigitalMarketingHub = () => {
                       variant="outlined"
                       color="inherit"
                       disabled={!savedUrl}
-                      onClick={() => window.open(savedUrl, "_blank")}
+                      onClick={() => window.open(normalizeIntegrationUrl(savedUrl), "_blank", "noopener,noreferrer")}
                       startIcon={<LaunchIcon />}
                       sx={{
                         borderRadius: "12px",
