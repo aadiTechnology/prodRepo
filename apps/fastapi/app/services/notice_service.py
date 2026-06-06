@@ -23,6 +23,7 @@ from app.schemas.notice import (
 
 ALLOWED_ATTACHMENT_TYPES = {"application/pdf", "image/jpeg", "image/jpg", "image/png"}
 ALLOWED_AUDIENCE_TYPES = {"ALL", "STUDENT", "TEACHER", "ADMIN"}
+NOTICE_MENU_PATH = "/communication/notices"
 ALLOWED_NOTICE_TYPES = {"GENERAL", "FEE", "EVENT", "HOLIDAY", "EXAM"}
 AUDIENCE_WITH_CLASS_TARGETS = frozenset({"STUDENT", "ALL"})
 
@@ -120,7 +121,7 @@ def user_can_manage_notices(db: Session, current_user: object) -> bool:
         .join(Menu, RoleMenuPermission.menu_id == Menu.id)
         .filter(
             RoleMenuPermission.role_id.in_(role_ids),
-            Menu.name == "Create Notices",
+            Menu.path == NOTICE_MENU_PATH,
             Menu.is_active == True,
             Menu.is_deleted == False,
         )

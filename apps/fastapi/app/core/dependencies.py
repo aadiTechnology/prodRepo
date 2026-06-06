@@ -257,15 +257,144 @@ require_admin = require_role([UserRole.ADMIN, UserRole.TENANT_ADMIN])
 require_user = require_role([UserRole.USER, UserRole.ADMIN])
 
 
+def _menu_permission_label(*, menu_name: str | None, menu_path: str | None) -> str:
+    if menu_name:
+        return menu_name
+    return f"route {menu_path}"
+
+
+def _enforce_menu_permission(
+    db: Session,
+    current_user: CurrentUser,
+    action: str,
+    *,
+    menu_name: str | None = None,
+    menu_path: str | None = None,
+) -> CurrentUser:
+    """
+    Enforce role_menu_permissions by menu name or route path.
+
+    Path-based checks match any active menu row with that path (handles renamed
+  catalog entries such as School Notices vs Create Notices).
+    """
+    if not menu_name and not menu_path:
+        raise ValueError("menu_name or menu_path is required")
+
+    from app.models.role import Role, user_roles as user_roles_table
+    from app.models.role_menu_permission import RoleMenuPermission
+    from app.models.menu import Menu
+
+    label = _menu_permission_label(menu_name=menu_name, menu_path=menu_path)
+
+    action_col_map = {
+        PermissionAction.VIEW.value: "can_view",
+        PermissionAction.CREATE.value: "can_create",
+        PermissionAction.EDIT.value: "can_edit",
+        PermissionAction.DELETE.value: "can_delete",
+    }
+    action_col_name = action_col_map.get(action)
+
+    if not action_col_name:
+        raise ForbiddenException(
+            f"Invalid action '{action}'. Must be one of: {[a.value for a in PermissionAction]}"
+        )
+
+    if current_user.role == UserRole.SUPER_ADMIN:
+        return current_user
+
+    if current_user.role == UserRole.ADMIN and current_user.tenant_id is None:
+        return current_user
+
+    rbac_roles = get_rbac_role_codes(db, current_user.id)
+    if SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_roles:
+        return current_user
+
+    role_id_rows = (
+        db.query(user_roles_table.c.role_id)
+        .filter(user_roles_table.c.user_id == current_user.id)
+        .all()
+    )
+    role_id_list = [r[0] for r in role_id_rows]
+
+    if not role_id_list:
+        logger.warning(
+            f"User {current_user.email} has no roles assigned — denied '{action}' on '{label}'"
+        )
+        raise ForbiddenException(
+            f"Access denied: No roles assigned. Required: '{action}' permission on '{label}'."
+        )
+
+    menu_filters = [
+        Menu.is_active == True,  # noqa: E712
+        Menu.is_deleted == False,  # noqa: E712
+    ]
+    if menu_name:
+        menu_filters.append(Menu.name == menu_name)
+    else:
+        menu_filters.append(Menu.path == menu_path)
+
+    perm = (
+        db.query(RoleMenuPermission)
+        .join(Menu, RoleMenuPermission.menu_id == Menu.id)
+        .filter(
+            RoleMenuPermission.role_id.in_(role_id_list),
+            *menu_filters,
+            getattr(RoleMenuPermission, action_col_name) == True,
+        )
+        .first()
+    )
+
+    if not perm:
+        logger.warning(
+            f"User {current_user.email} (roles={role_id_list}) denied: "
+            f"no '{action}' permission on '{label}'"
+        )
+        raise ForbiddenException(f"Access denied: Missing '{action}' permission on '{label}'.")
+
+    if current_user.tenant_id is not None:
+        is_tenant_admin = any(code in ["admin", "tenant_admin"] for code in rbac_roles)
+        if not is_tenant_admin:
+            tenant_admin_role = (
+                db.query(Role)
+                .filter(
+                    Role.tenant_id == current_user.tenant_id,
+                    Role.code == "ADMIN",
+                    Role.is_deleted == False,
+                    Role.is_active == True,
+                )
+                .first()
+            )
+            if not tenant_admin_role:
+                logger.warning(
+                    f"User {current_user.email} denied: Tenant {current_user.tenant_id} has no active ADMIN role."
+                )
+                raise ForbiddenException("Access denied: Tenant has no active administrator role.")
+
+            tenant_admin_perm = (
+                db.query(RoleMenuPermission)
+                .join(Menu, RoleMenuPermission.menu_id == Menu.id)
+                .filter(
+                    RoleMenuPermission.role_id == tenant_admin_role.id,
+                    *menu_filters,
+                    getattr(RoleMenuPermission, action_col_name) == True,
+                )
+                .first()
+            )
+            if not tenant_admin_perm:
+                logger.warning(
+                    f"User {current_user.email} denied: Tenant ADMIN role (id={tenant_admin_role.id}) "
+                    f"does not have '{action}' permission on '{label}'"
+                )
+                raise ForbiddenException(
+                    f"Access denied: Tenant administrator does not have '{action}' permission on '{label}'."
+                )
+
+    return current_user
+
+
 def require_permission(menu_name: str, action: str):
     """
-    Dependency factory that enforces role_menu_permissions.
-
-    Works for ALL users:
-      - SUPER_ADMIN / platform ADMIN → always allowed
-      - Tenant ADMIN with tenant_id → allowed for tenant-scoped menus only
-      - Everyone else → must have a role with can_{action}=True on the named menu
-        in role_menu_permissions (set via the Permission Mapping screen).
+    Dependency factory that enforces role_menu_permissions by menu name.
 
     Args:
         menu_name:  The `menus.name` value (e.g. "Fee Category", "Fee Structure")
@@ -273,118 +402,34 @@ def require_permission(menu_name: str, action: str):
     """
     if action not in [a.value for a in PermissionAction]:
         raise ValueError(f"Invalid action '{action}'. Must be one of: {[a.value for a in PermissionAction]}")
-    
+
     def checker(
         current_user: CurrentUser = Depends(get_current_user),
         db: Session = Depends(get_db),
     ) -> CurrentUser:
-        from app.models.role import user_roles as user_roles_table
-        from app.models.role_menu_permission import RoleMenuPermission
-        from app.models.menu import Menu
-        
-        action_col_map = {
-            PermissionAction.VIEW.value: "can_view",
-            PermissionAction.CREATE.value: "can_create",
-            PermissionAction.EDIT.value: "can_edit",
-            PermissionAction.DELETE.value: "can_delete",
-        }
-        action_col_name = action_col_map.get(action)
-        
-        if not action_col_name:
-            raise ForbiddenException(f"Invalid action '{action}'. Must be one of: {[a.value for a in PermissionAction]}")
-
-        if current_user.role == UserRole.SUPER_ADMIN:
-            return current_user
-        
-        if current_user.role == UserRole.ADMIN and current_user.tenant_id is None:
-            return current_user
-
-        rbac_roles = get_rbac_role_codes(db, current_user.id)
-        if SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_roles:
-            return current_user
-
-        role_id_rows = (
-            db.query(user_roles_table.c.role_id)
-            .filter(user_roles_table.c.user_id == current_user.id)
-            .all()
-        )
-        role_id_list = [r[0] for r in role_id_rows]
-
-        if not role_id_list:
-            logger.warning(
-                f"User {current_user.email} has no roles assigned — denied '{action}' on '{menu_name}'"
-            )
-            raise ForbiddenException(
-                f"Access denied: No roles assigned. Required: '{action}' permission on '{menu_name}'."
-            )
-
-        perm = (
-            db.query(RoleMenuPermission)
-            .join(Menu, RoleMenuPermission.menu_id == Menu.id)
-            .filter(
-                RoleMenuPermission.role_id.in_(role_id_list),
-                Menu.name == menu_name,
-                Menu.is_active == True,
-                Menu.is_deleted == False,
-                getattr(RoleMenuPermission, action_col_name) == True,
-            )
-            .first()
+        return _enforce_menu_permission(
+            db, current_user, action, menu_name=menu_name
         )
 
-        if not perm:
-            logger.warning(
-                f"User {current_user.email} (roles={role_id_list}) denied: "
-                f"no '{action}' permission on menu '{menu_name}'"
-            )
-            raise ForbiddenException(
-                f"Access denied: Missing '{action}' permission on '{menu_name}'."
-            )
+    return checker
 
-        # INTERSECTION CHECK FOR TENANT USERS:
-        # If the user has a tenant_id, and they are not a tenant admin,
-        # they must only be allowed if the tenant's ADMIN role ALSO has this permission active.
-        if current_user.tenant_id is not None:
-            # Check if this user is a tenant admin themselves (ADMIN or TENANT_ADMIN in role codes)
-            is_tenant_admin = any(code in ["admin", "tenant_admin"] for code in rbac_roles)
-            if not is_tenant_admin:
-                from app.models.role import Role
-                tenant_admin_role = (
-                    db.query(Role)
-                    .filter(
-                        Role.tenant_id == current_user.tenant_id,
-                        Role.code == "ADMIN",
-                        Role.is_deleted == False,
-                        Role.is_active == True,
-                    )
-                    .first()
-                )
-                if not tenant_admin_role:
-                    logger.warning(
-                        f"User {current_user.email} denied: Tenant {current_user.tenant_id} has no active ADMIN role."
-                    )
-                    raise ForbiddenException("Access denied: Tenant has no active administrator role.")
 
-                tenant_admin_perm = (
-                    db.query(RoleMenuPermission)
-                    .join(Menu, RoleMenuPermission.menu_id == Menu.id)
-                    .filter(
-                        RoleMenuPermission.role_id == tenant_admin_role.id,
-                        Menu.name == menu_name,
-                        Menu.is_active == True,
-                        Menu.is_deleted == False,
-                        getattr(RoleMenuPermission, action_col_name) == True,
-                    )
-                    .first()
-                )
-                if not tenant_admin_perm:
-                    logger.warning(
-                        f"User {current_user.email} denied: Tenant ADMIN role (id={tenant_admin_role.id}) "
-                        f"does not have '{action}' permission on '{menu_name}'"
-                    )
-                    raise ForbiddenException(
-                        f"Access denied: Tenant administrator does not have '{action}' permission on '{menu_name}'."
-                    )
+def require_menu_path_permission(menu_path: str, action: str):
+    """
+    Dependency factory that enforces role_menu_permissions by menu route path.
 
-        return current_user
+    Use when catalog menu names differ across environments but the frontend
+    route path is stable (e.g. /communication/notices).
+    """
+    if action not in [a.value for a in PermissionAction]:
+        raise ValueError(f"Invalid action '{action}'. Must be one of: {[a.value for a in PermissionAction]}")
+
+    def checker(
+        current_user: CurrentUser = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> CurrentUser:
+        return _enforce_menu_permission(
+            db, current_user, action, menu_path=menu_path
+        )
 
     return checker

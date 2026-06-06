@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser, require_permission
+from app.core.dependencies import CurrentUser, require_menu_path_permission
+from app.services.notice_service import NOTICE_MENU_PATH
 from app.schemas.notice import (
     NoticeCreateRequest,
     NoticeDropdownOptionsResponse,
@@ -26,7 +27,7 @@ async def list_notices(
     notice_type: str | None = Query(None),
     is_published: bool | None = Query(None),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_permission("Create Notices", "view")),
+    current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "view")),
 ):
     can_manage = notice_service.user_can_manage_notices(db, current_user)
     viewer_context = notice_service.get_viewer_context(
@@ -53,7 +54,7 @@ async def list_notices(
 
 @router.get("/dropdown/options", response_model=NoticeDropdownOptionsResponse)
 async def get_notice_dropdown_options(
-    current_user: CurrentUser = Depends(require_permission("Create Notices", "view")),
+    current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "view")),
 ):
     _ = current_user
     return notice_service.get_dropdown_options()
@@ -63,7 +64,7 @@ async def get_notice_dropdown_options(
 async def get_notice(
     notice_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_permission("Create Notices", "view")),
+    current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "view")),
 ):
     can_manage = notice_service.user_can_manage_notices(db, current_user)
     viewer_context = notice_service.get_viewer_context(
@@ -86,7 +87,7 @@ async def get_notice(
 async def create_notice(
     payload: NoticeCreateRequest,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_permission("Create Notices", "create")),
+    current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "create")),
 ):
     return notice_service.create_notice(
         db,
@@ -101,7 +102,7 @@ async def update_notice(
     notice_id: int,
     payload: NoticeUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_permission("Create Notices", "edit")),
+    current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "edit")),
 ):
     return notice_service.update_notice(
         db,
@@ -116,7 +117,7 @@ async def update_notice(
 async def publish_notice(
     notice_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_permission("Create Notices", "edit")),
+    current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "edit")),
 ):
     return notice_service.publish_notice(
         db,
@@ -130,7 +131,7 @@ async def publish_notice(
 async def unpublish_notice(
     notice_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_permission("Create Notices", "edit")),
+    current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "edit")),
 ):
     return notice_service.unpublish_notice(
         db,
@@ -144,7 +145,7 @@ async def unpublish_notice(
 async def delete_notice(
     notice_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_permission("Create Notices", "delete")),
+    current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "delete")),
 ):
     notice_service.delete_notice(
         db,
