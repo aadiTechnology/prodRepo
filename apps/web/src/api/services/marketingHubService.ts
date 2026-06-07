@@ -33,6 +33,11 @@ export const marketingHubService = {
     return response.data;
   },
 
+  getPlatformConfig: async (platformId: number): Promise<MarketingHubConfig> => {
+    const response = await apiClient.get<MarketingHubConfig>(`${BASE_URL}/config/${platformId}`);
+    return response.data;
+  },
+
   saveMarketingLink: async (payload: {
     platform_id: number;
     url: string;
@@ -61,6 +66,32 @@ export const marketingHubService = {
   }): Promise<MarketingPlatform> => {
     const response = await apiClient.post<MarketingPlatform>(`${BASE_URL}/platforms`, platformData);
     return response.data;
+  },
+
+  updatePlatform: async (
+    platformId: number,
+    platformData: {
+      name?: string;
+      category?: string;
+      description?: string;
+      icon_url?: string;
+      sort_order?: number;
+      is_active?: boolean;
+    }
+  ): Promise<MarketingPlatform> => {
+    const response = await apiClient.put<MarketingPlatform>(
+      `${BASE_URL}/platforms/${platformId}`,
+      platformData
+    );
+    return response.data;
+  },
+
+  deleteMarketingLink: async (linkId: number): Promise<void> => {
+    await apiClient.delete(`${BASE_URL}/links/${linkId}`);
+  },
+
+  deletePlatform: async (platformId: number): Promise<void> => {
+    await apiClient.delete(`${BASE_URL}/platforms/${platformId}`);
   },
 };
 

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import NotFoundException, ConflictException
 from app.models.marketing_hub import MarketingPlatform, MarketingSocialMediaLink
 from app.schemas.marketing_hub import MarketingPlatformCreate, MarketingPlatformUpdate
+from app.utils.integration_url import normalize_integration_url
 
 
 def list_platforms(db: Session, active_only: bool = False) -> list[MarketingPlatform]:
@@ -82,9 +83,11 @@ def save_marketing_link(
         .first()
     )
 
+    normalized_url = normalize_integration_url(url)
+
     if link:
         # Update existing link
-        link.url = url
+        link.url = normalized_url
         link.is_active = is_active
         link.updated_at = datetime.utcnow()
         link.updated_by = user_id
@@ -94,7 +97,7 @@ def save_marketing_link(
             scope_type="TENANT",
             tenant_id=tenant_id,
             platform_id=platform_id,
-            url=url,
+            url=normalized_url,
             is_active=is_active,
             created_at=datetime.utcnow(),
             created_by=user_id,
@@ -104,6 +107,123 @@ def save_marketing_link(
     db.commit()
     db.refresh(link)
     return link
+
+
+def get_platform_config_for_tenant(
+    db: Session,
+    tenant_id: int,
+    platform_id: int,
+) -> dict:
+    """Get a single active platform with tenant-specific link configuration."""
+    platform = (
+        db.query(MarketingPlatform)
+        .filter(
+            MarketingPlatform.id == platform_id,
+            MarketingPlatform.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
+    if not platform:
+        raise NotFoundException("Marketing platform", platform_id)
+
+    link = (
+        db.query(MarketingSocialMediaLink)
+        .filter(
+            MarketingSocialMediaLink.tenant_id == tenant_id,
+            MarketingSocialMediaLink.platform_id == platform_id,
+        )
+        .first()
+    )
+
+    return {
+        "platform_id": platform.id,
+        "name": platform.name,
+        "code": platform.code,
+        "category": platform.category,
+        "description": platform.description,
+        "icon_url": platform.icon_url,
+        "sort_order": platform.sort_order,
+        "is_active": platform.is_active,
+        "link_id": link.id if link else None,
+        "url": link.url if link else None,
+        "link_active": link.is_active if link else None,
+    }
+
+
+def update_platform(
+    db: Session,
+    platform_id: int,
+    data: MarketingPlatformUpdate,
+    user_id: int | None = None,
+) -> MarketingPlatform:
+    """Update an existing platform in the global marketing catalog."""
+    platform = (
+        db.query(MarketingPlatform)
+        .filter(MarketingPlatform.id == platform_id)
+        .first()
+    )
+    if not platform:
+        raise NotFoundException("Marketing platform", platform_id)
+
+    if data.name is not None:
+        platform.name = data.name.strip()
+    if data.category is not None:
+        platform.category = data.category.strip()
+    if data.description is not None:
+        platform.description = data.description.strip() if data.description else None
+    if data.icon_url is not None:
+        platform.icon_url = data.icon_url.strip() if data.icon_url else None
+    if data.sort_order is not None:
+        platform.sort_order = data.sort_order
+    if data.is_active is not None:
+        platform.is_active = data.is_active
+
+    platform.updated_at = datetime.utcnow()
+    platform.updated_by = user_id
+    db.commit()
+    db.refresh(platform)
+    return platform
+
+
+def delete_marketing_link(
+    db: Session,
+    tenant_id: int,
+    link_id: int,
+) -> None:
+    """Remove a tenant's URL configuration for a marketing platform."""
+    link = (
+        db.query(MarketingSocialMediaLink)
+        .filter(
+            MarketingSocialMediaLink.id == link_id,
+            MarketingSocialMediaLink.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if not link:
+        raise NotFoundException("Marketing link", link_id)
+
+    db.delete(link)
+    db.commit()
+
+
+def delete_platform(
+    db: Session,
+    platform_id: int,
+    user_id: int | None = None,
+) -> None:
+    """Soft-delete a platform from the global marketing catalog."""
+    platform = (
+        db.query(MarketingPlatform)
+        .filter(MarketingPlatform.id == platform_id)
+        .first()
+    )
+    if not platform:
+        raise NotFoundException("Marketing platform", platform_id)
+
+    platform.is_active = False
+    platform.updated_at = datetime.utcnow()
+    platform.updated_by = user_id
+    db.commit()
 
 
 def create_platform(

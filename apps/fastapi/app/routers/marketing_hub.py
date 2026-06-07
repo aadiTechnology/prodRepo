@@ -9,6 +9,7 @@ from app.core.dependencies import CurrentUser, get_current_user
 from app.schemas.marketing_hub import (
     MarketingPlatformCreate,
     MarketingPlatformResponse,
+    MarketingPlatformUpdate,
     MarketingSocialMediaLinkResponse,
     MarketingSocialMediaLinkCreate,
     MarketingHubConfigResponse,
@@ -65,6 +66,25 @@ def list_marketing_platforms(
     return marketing_hub_service.list_platforms(db, active_only=active_only)
 
 
+@router.get("/config/{platform_id}", response_model=MarketingHubConfigResponse)
+def get_marketing_platform_config(
+    platform_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> MarketingHubConfigResponse:
+    """Retrieve a single marketing platform with tenant-specific link configuration."""
+    if not current_user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tenant ID is required to fetch marketing configurations",
+        )
+    return marketing_hub_service.get_platform_config_for_tenant(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        platform_id=platform_id,
+    )
+
+
 @router.post("/platforms", response_model=MarketingPlatformResponse, status_code=status.HTTP_201_CREATED)
 def create_marketing_platform(
     payload: MarketingPlatformCreate,
@@ -76,4 +96,53 @@ def create_marketing_platform(
         db=db,
         data=payload,
         user_id=current_user.id
+    )
+
+
+@router.put("/platforms/{platform_id}", response_model=MarketingPlatformResponse)
+def update_marketing_platform(
+    platform_id: int,
+    payload: MarketingPlatformUpdate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> MarketingPlatformResponse:
+    """Update a platform in the global marketing catalog."""
+    return marketing_hub_service.update_platform(
+        db=db,
+        platform_id=platform_id,
+        data=payload,
+        user_id=current_user.id,
+    )
+
+
+@router.delete("/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_marketing_link(
+    link_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> None:
+    """Remove a tenant's configured link for a marketing platform."""
+    if not current_user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tenant ID is required to delete marketing links",
+        )
+    marketing_hub_service.delete_marketing_link(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        link_id=link_id,
+    )
+
+
+@router.delete("/platforms/{platform_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_marketing_platform(
+    platform_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> None:
+    """Soft-delete a platform from the global marketing catalog."""
+    marketing_hub_service.delete_platform(
+        db=db,
+        platform_id=platform_id,
+        user_id=current_user.id,
     )

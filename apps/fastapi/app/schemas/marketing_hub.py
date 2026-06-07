@@ -3,13 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
-def _validate_url(value: str) -> str:
-    cleaned = value.strip()
-    lowered = cleaned.lower()
-    if not (lowered.startswith("http://") or lowered.startswith("https://")):
-        raise ValueError("url must start with http:// or https://")
-    return cleaned
+from app.utils.integration_url import require_https_integration_url
 
 
 class MarketingPlatformBase(BaseModel):
@@ -52,8 +46,8 @@ class MarketingSocialMediaLinkBase(BaseModel):
 
     @field_validator("url")
     @classmethod
-    def url_must_be_valid(cls, value: str) -> str:
-        return _validate_url(value)
+    def url_must_be_https(cls, value: str) -> str:
+        return require_https_integration_url(value)
 
 
 class MarketingSocialMediaLinkCreate(MarketingSocialMediaLinkBase):
@@ -66,10 +60,10 @@ class MarketingSocialMediaLinkUpdate(BaseModel):
 
     @field_validator("url")
     @classmethod
-    def optional_url_must_be_valid(cls, value: str | None) -> str | None:
+    def optional_url_must_be_https(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        return _validate_url(value)
+        return require_https_integration_url(value)
 
 
 class MarketingSocialMediaLinkResponse(MarketingSocialMediaLinkBase):
