@@ -9,9 +9,7 @@ from app.core.exceptions import NotFoundException, ConflictException, AppExcepti
 from app.core.logging_config import get_logger
 from app.models.tenant import Tenant
 from app.models.user import User, UserRole
-from app.models.role import Role, user_roles, role_menus
-from app.models.menu import Menu
-from app.models.role_menu_permission import RoleMenuPermission
+from app.models.role import Role, user_roles
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantProvision, TenantSchoolPickerItem
 from app.services import theme_template_service
 from app.utils.security import hash_password
@@ -215,28 +213,6 @@ def provision_tenant(db: Session, data: TenantProvision, created_by: int | None 
         db.add(admin_role)
         db.flush()
 
-        active_menus = db.query(Menu).filter(Menu.is_active == True, Menu.is_deleted == False).all()
-        if active_menus:
-            menu_ids = [m.id for m in active_menus]
-            mappings = [{"role_id": admin_role.id, "menu_id": mid} for mid in menu_ids]
-            db.execute(insert(role_menus), mappings)
-            # Login and sidebar use RoleMenuPermission, not role_menus alone.
-            db.add_all(
-                [
-                    RoleMenuPermission(
-                        role_id=admin_role.id,
-                        tenant_id=new_tenant.id,
-                        menu_id=m.id,
-                        can_view=True,
-                        can_create=True,
-                        can_edit=True,
-                        can_delete=True,
-                        created_by=created_by,
-                    )
-                    for m in active_menus
-                ]
-            )
-
         admin_user = User(
             email=data.email.lower(),
             full_name=data.owner_name or "Admin User",
@@ -275,7 +251,7 @@ def provision_tenant(db: Session, data: TenantProvision, created_by: int | None 
             "tenant_id": new_tenant.id,
             "admin_user_id": admin_user.id,
             "admin_role_id": admin_role.id,
-            "message": "Tenant provisioned with default ADMIN user and role."
+            "message": "Tenant provisioned with default ADMIN user and role. Assign menu permissions via Permission Management."
         }
 
     except Exception as e:

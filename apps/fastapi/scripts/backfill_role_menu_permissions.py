@@ -1,10 +1,12 @@
 """
 Repair tenant admin menu access:
-  1) Backfill RoleMenuPermission from role_menus (provisioning used to only set role_menus).
-  2) Attach any new global catalog menus to tenant ADMIN roles (e.g. after seed_rbac adds reports).
+  Backfill RoleMenuPermission from role_menus (legacy rows missing granular permissions).
 
-Run from apps/fastapi (after seed_rbac.py if you added new menu rows):
+Run from apps/fastapi:
     python scripts/backfill_role_menu_permissions.py
+
+Note: Does NOT auto-assign new catalog menus to tenant ADMIN roles.
+      Use Permission Management to assign permissions manually.
 """
 import os
 import sys
@@ -19,9 +21,7 @@ def main() -> None:
     db = SessionLocal()
     try:
         n = rbac_service.backfill_role_menu_permissions_from_role_menus(db)
-        rm, rmp = rbac_service.sync_global_menus_to_tenant_admin_roles(db)
         print(f"Backfill: inserted {n} RoleMenuPermission row(s) from existing role_menus.")
-        print(f"Sync: role_menus +{rm}, RoleMenuPermission +{rmp} for global menus on tenant ADMIN roles.")
     finally:
         db.close()
 

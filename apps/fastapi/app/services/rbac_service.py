@@ -815,13 +815,13 @@ def backfill_role_menu_permissions_from_role_menus(
 
 def sync_global_menus_to_tenant_admin_roles(db: Session, *, created_by: int | None = None) -> tuple[int, int]:
     """
-    Ensure each tenant-scoped ADMIN role is linked to NEW active global menus (tenant_id NULL)
-    via role_menus and RoleMenuPermission. Use after adding new catalog menus (e.g. seed_rbac).
-    
-    IMPORTANT: This function ONLY adds new menus. It NEVER modifies or removes existing 
-    permission assignments. If an admin role already has permissions set for a menu, 
-    they are preserved exactly as configured by the admin.
-    
+    DEPRECATED — do not use under strict permission assignment.
+
+    Previously auto-granted all new global catalog menus with full CRUD to every
+    tenant-scoped ADMIN role. System admin must assign permissions manually via
+    Permission Management instead.
+
+    Kept for backward compatibility with one-off repair scripts only.
     Returns (role_menus_rows_inserted, role_menu_permissions_rows_inserted).
     """
     global_menu_ids = [

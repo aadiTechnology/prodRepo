@@ -26,7 +26,6 @@ class PermissionAction(str, Enum):
     DELETE = "delete"
 
 
-
 def get_current_user(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
@@ -143,10 +142,23 @@ def is_platform_system_admin(db: Session, current_user: CurrentUser) -> bool:
     """True if the user is an org-level system admin (no tenant) with admin privileges."""
     if current_user.tenant_id is not None:
         return False
-    if current_user.role in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+
+    if current_user.role in (UserRole.SUPER_ADMIN, UserRole.ADMIN):
         return True
+
+    role_str = (
+        current_user.role.value
+        if isinstance(current_user.role, UserRole)
+        else str(current_user.role or "")
+    ).upper()
+    if role_str in ("SUPER_ADMIN", "ADMIN", "SYSTEM_ADMIN"):
+        return True
+
     rbac_role_codes = get_rbac_role_codes(db, current_user.id)
-    return SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_role_codes
+    return any(
+        code in rbac_role_codes
+        for code in (SYSTEM_ADMIN_ROLE_CODE.lower(), "super_admin", "system_admin")
+    )
 
 
 def resolve_tenant_id_for_academic_year_list(
@@ -299,6 +311,9 @@ def _enforce_menu_permission(
             f"Invalid action '{action}'. Must be one of: {[a.value for a in PermissionAction]}"
         )
 
+    if is_platform_system_admin(db, current_user):
+        return current_user
+
     if current_user.role == UserRole.SUPER_ADMIN:
         return current_user
 
@@ -343,6 +358,28 @@ def _enforce_menu_permission(
         )
         .first()
     )
+
+    # Parent module VIEW grants read access to child pages (module row without route).
+    if not perm and menu_path and action == PermissionAction.VIEW.value:
+        target_menu = (
+            db.query(Menu)
+            .filter(
+                Menu.is_active == True,  # noqa: E712
+                Menu.is_deleted == False,  # noqa: E712
+                Menu.path == menu_path,
+            )
+            .first()
+        )
+        if target_menu and target_menu.parent_id is not None:
+            perm = (
+                db.query(RoleMenuPermission)
+                .filter(
+                    RoleMenuPermission.role_id.in_(role_id_list),
+                    RoleMenuPermission.menu_id == target_menu.parent_id,
+                    RoleMenuPermission.can_view == True,  # noqa: E712
+                )
+                .first()
+            )
 
     if not perm:
         logger.warning(

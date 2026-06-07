@@ -51,19 +51,24 @@ class UserRoleType(TypeDecorator):
         """Convert string value to enum when reading from database."""
         if value is None:
             return None
+        if isinstance(value, UserRole):
+            return value
         if isinstance(value, str):
-            # Handle SUPER_ADMIN directly (exact match)
-            if value == "SUPER_ADMIN":
+            normalized = value.strip()
+            upper = normalized.upper()
+            if upper == "SUPER_ADMIN":
                 return UserRole.SUPER_ADMIN
-            # Try to find enum by value
+            if upper == "ADMIN":
+                return UserRole.ADMIN
+            if upper == "TENANT_ADMIN":
+                return UserRole.TENANT_ADMIN
             for role in UserRole:
-                if role.value == value:
+                if role.value == normalized or role.value.upper() == upper:
                     return role
-            # Fallback: try to find by name (uppercase)
             try:
-                return UserRole[value.upper()]
+                return UserRole[upper]
             except KeyError:
-                return UserRole.USER  # Default fallback
+                return UserRole.USER
         return value
 
 

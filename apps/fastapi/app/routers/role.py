@@ -2,12 +2,11 @@ from datetime import datetime
 import logging
 
 from app.models.role import Role
-from app.models.user import UserRole
 
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.dependencies import require_permission, require_system_admin, CurrentUser, get_rbac_role_codes, SYSTEM_ADMIN_ROLE_CODE
+from app.core.dependencies import require_permission, require_system_admin, CurrentUser, get_rbac_role_codes, SYSTEM_ADMIN_ROLE_CODE, is_platform_system_admin
 from app.core.exceptions import ForbiddenException
 from app.schemas.role import RoleCreate, RoleUpdate, RoleResponse, RoleListResponse, RoleListData
 from app.services import role_service
@@ -20,18 +19,15 @@ router = APIRouter(prefix="/roles", tags=["Roles"])
 
 
 def _is_system_admin(current_user: CurrentUser, db: Session) -> bool:
-    if current_user.tenant_id is not None:
-        return False
-    if current_user.role in [UserRole.SUPER_ADMIN, UserRole.ADMIN]:
-        return True
-    rbac_role_codes = get_rbac_role_codes(db, current_user.id)
-    return SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_role_codes
+    return is_platform_system_admin(db, current_user)
 
 
 def _assert_role_access(role: Role, current_user: CurrentUser, db: Session) -> None:
     if _is_system_admin(current_user, db):
         return
-    if current_user.tenant_id is None or role.tenant_id != current_user.tenant_id:
+    if current_user.tenant_id is None:
+        raise ForbiddenException("Insufficient permissions")
+    if role.tenant_id != current_user.tenant_id:
         raise ForbiddenException("Insufficient permissions")
 
 

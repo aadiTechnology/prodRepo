@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict
 
 from app.core.database import get_db
-from app.core.dependencies import require_permission, CurrentUser, get_rbac_role_codes, SYSTEM_ADMIN_ROLE_CODE
+from app.core.dependencies import require_permission, CurrentUser, get_rbac_role_codes, SYSTEM_ADMIN_ROLE_CODE, is_platform_system_admin
 from app.core.exceptions import ForbiddenException
 from app.models.menu import Menu
 from app.schemas.role import RoleResponse
@@ -23,19 +23,15 @@ router = APIRouter(prefix="/rbac", tags=["RBAC"])
 
 
 def _is_system_admin(current_user: CurrentUser, db: Session) -> bool:
-    if current_user.tenant_id is not None:
-        return False
-    user_role = str(current_user.role)
-    if user_role in ["SUPER_ADMIN", "admin", "ADMIN"]:
-        return True
-    rbac_role_codes = get_rbac_role_codes(db, current_user.id)
-    return SYSTEM_ADMIN_ROLE_CODE.lower() in rbac_role_codes
+    return is_platform_system_admin(db, current_user)
 
 
 def _assert_role_scope_access(role, current_user: CurrentUser, db: Session) -> None:
     if _is_system_admin(current_user, db):
         return
-    if current_user.tenant_id is None or role.tenant_id != current_user.tenant_id:
+    if current_user.tenant_id is None:
+        raise ForbiddenException("Insufficient permissions")
+    if role.tenant_id != current_user.tenant_id:
         raise ForbiddenException("Insufficient permissions")
 
 @router.get("/roles/{role_id}/matrix", response_model=RolePermissionMatrixResponse)
@@ -154,7 +150,9 @@ async def get_user_roles(
     """Get roles assigned to a user."""
     user = user_service.get_user(db, user_id)
     if not _is_system_admin(current_user, db):
-        if current_user.tenant_id is None or user.tenant_id != current_user.tenant_id:
+        if current_user.tenant_id is None:
+            raise ForbiddenException("Insufficient permissions")
+        if user.tenant_id != current_user.tenant_id:
             raise ForbiddenException("Insufficient permissions")
     roles = rbac_service.get_user_roles(db, user_id)
     return roles
@@ -170,7 +168,9 @@ async def set_user_roles(
     """Replace roles assigned to a user."""
     user = user_service.get_user(db, user_id)
     if not _is_system_admin(current_user, db):
-        if current_user.tenant_id is None or user.tenant_id != current_user.tenant_id:
+        if current_user.tenant_id is None:
+            raise ForbiddenException("Insufficient permissions")
+        if user.tenant_id != current_user.tenant_id:
             raise ForbiddenException("Insufficient permissions")
     rbac_service.set_user_roles(db, user, role_ids, acting_user_id=current_user.id, acting_user=current_user)
     return None
