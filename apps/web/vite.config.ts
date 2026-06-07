@@ -2,6 +2,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
+  // Relative base path required for Capacitor WebView asset loading
+  base: "./",
   plugins: [react()],
   server: {
     proxy: {

@@ -44,7 +44,7 @@ export default function CommonPageHeader({
   links,
   rightActions,
   actions,
-  homePath = "http://localhost:5173/",
+  homePath = "/",
 }: CommonPageHeaderProps) {
   const navigate = useNavigate();
 

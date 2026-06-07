@@ -32,18 +32,8 @@ export interface DemoVideoUpdatePayload {
 }
 
 class DemoVideoService {
-  private getBaseUrl(): string {
-    if (import.meta.env.DEV && typeof window !== "undefined") {
-      const host = window.location.hostname;
-      if (host === "localhost" || host === "127.0.0.1") {
-        return "http://127.0.0.1:8022";
-      }
-    }
-    return apiBaseUrl;
-  }
-
   private endpoint(path: string): string {
-    return `${this.getBaseUrl()}${path}`;
+    return `${apiBaseUrl}${path}`;
   }
 
   async list(params?: { module_key?: string; active_only?: boolean }): Promise<DemoVideoRecord[]> {

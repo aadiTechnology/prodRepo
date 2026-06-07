@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+import { isNativePlatform } from "../utils/capacitor";
+
 /**
  * Environment configuration
  * Provides type-safe access to environment variables
@@ -11,6 +13,27 @@ interface EnvConfig {
   appVersion: string;
   isDevelopment: boolean;
   isProduction: boolean;
+  isNative: boolean;
+}
+
+const PRODUCTION_API_FALLBACK = "https://preschoolapi.aaditechnology.com";
+const DEV_API_FALLBACK = "http://127.0.0.1:8000";
+
+function normalizeBaseUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+function resolveApiBaseUrl(mode: string): string {
+  const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  if (configured?.trim()) {
+    return normalizeBaseUrl(configured.trim());
+  }
+
+  if (mode === "production" || isNativePlatform()) {
+    return PRODUCTION_API_FALLBACK;
+  }
+
+  return DEV_API_FALLBACK;
 }
 
 /**
@@ -18,17 +41,16 @@ interface EnvConfig {
  * Validates required environment variables and provides defaults
  */
 export const getEnvConfig = (): EnvConfig => {
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
-  const appName = import.meta.env.VITE_APP_NAME || "Production MUI App";
-  const appVersion = import.meta.env.VITE_APP_VERSION || "1.0.0";
   const mode = import.meta.env.MODE || "development";
+  const apiBaseUrl = resolveApiBaseUrl(mode);
+  const appName = import.meta.env.VITE_APP_NAME || "Preschool ERP";
+  const appVersion = import.meta.env.VITE_APP_VERSION || "1.0.0";
 
-  // Validate API URL format
   try {
     new URL(apiBaseUrl);
   } catch {
     console.warn(
-      `Invalid API base URL format: ${apiBaseUrl}. Using default: http://127.0.0.1:8000`
+      `Invalid API base URL format: ${apiBaseUrl}. Using default: ${DEV_API_FALLBACK}`,
     );
   }
 
@@ -38,6 +60,7 @@ export const getEnvConfig = (): EnvConfig => {
     appVersion,
     isDevelopment: mode === "development",
     isProduction: mode === "production",
+    isNative: isNativePlatform(),
   };
 };
 
@@ -45,4 +68,4 @@ export const getEnvConfig = (): EnvConfig => {
 export const env = getEnvConfig();
 
 // Export individual values for convenience
-export const { apiBaseUrl, appName, appVersion, isDevelopment, isProduction } = env;
+export const { apiBaseUrl, appName, appVersion, isDevelopment, isProduction, isNative } = env;

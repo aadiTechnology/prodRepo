@@ -3,4 +3,4 @@
  * Centralized configuration module
  */
 
-export { env, getEnvConfig, apiBaseUrl, appName, appVersion, isDevelopment, isProduction } from "./env";
+export { env, getEnvConfig, apiBaseUrl, appName, appVersion, isDevelopment, isProduction, isNative } from "./env";

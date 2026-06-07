@@ -8,9 +8,24 @@
     "dev:test": "vite --mode test",
     "build": "vite build",
     "build:test": "vite build --mode test",
-    "preview": "vite preview"
+    "build:capacitor": "vite build --mode production",
+    "build:capacitor:dev": "vite build --mode capacitor",
+    "preview": "vite preview",
+    "cap:sync": "npx cap sync",
+    "cap:copy": "npx cap copy",
+    "cap:open:android": "npx cap open android",
+    "cap:assets": "npx capacitor-assets generate --assetPath resources --android --iconBackgroundColor \"#1976d2\" --splashBackgroundColor \"#1976d2\"",
+    "cap:build": "npm run build:capacitor && npm run cap:sync",
+    "cap:build:dev": "npm run build:capacitor:dev && npm run cap:sync",
+    "cap:android": "npm run cap:build && npm run cap:open:android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -34,6 +49,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

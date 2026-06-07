@@ -6,6 +6,7 @@ import { mapApiErrorsToFields, type FormValidationConfig } from "../utils/formVa
 import { useFormManager } from "../hooks/useFormManager";
 import BaseForm from "../components/reusable/BaseForm";
 import { createAddRoleFormConfig, type AddRoleFormData } from "./AddRole.formConfig";
+import { apiBaseUrl } from "../config";
 
 const emptyForm = (): AddRoleFormData => ({
   name: "",
@@ -65,7 +66,7 @@ export default function RolePage() {
   // Fetch permission groups and tenants (if needed)
   useEffect(() => {
     (async () => {
-      const apiBase = "http://localhost:8022";
+      const apiBase = apiBaseUrl;
       // Get token from localStorage or context
       const token = auth?.token || localStorage.getItem("auth_token");
       const authHeaders: Record<string, string> = {
