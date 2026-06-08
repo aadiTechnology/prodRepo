@@ -16,6 +16,15 @@ import { TextField, Button } from "../components/primitives";
 import { EmailInput, PhoneInput, PasswordInput } from "../components/semantic";
 import apiClient from "../api/client";
 import { UserResponse } from "../types/user";
+import { EMAIL_PATTERN, PHONE_PATTERN } from "../utils/validationPatterns";
+
+type RegisterFieldErrors = {
+  email?: string;
+  full_name?: string;
+  password?: string;
+  confirmPassword?: string;
+  phone_number?: string;
+};
 
 export default function Register() {
   const navigate = useNavigate();
@@ -27,47 +36,57 @@ export default function Register() {
     confirmPassword: "",
     phone_number: "",
   });
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    setError(null);
+    if (fieldErrors[name as keyof RegisterFieldErrors]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
+    setSubmitError(null);
   };
 
   const validateForm = (): boolean => {
+    const newErrors: RegisterFieldErrors = {};
+
     if (!formData.email.trim()) {
-      setError("Email is required");
-      return false;
+      newErrors.email = "Email is required";
+    } else if (!EMAIL_PATTERN.test(formData.email.trim())) {
+      newErrors.email = "Please enter a valid email address";
     }
-    if (!formData.email.includes("@")) {
-      setError("Please enter a valid email address");
-      return false;
-    }
+
     if (!formData.full_name.trim()) {
-      setError("Full name is required");
-      return false;
+      newErrors.full_name = "Full name is required";
     }
+
     if (!formData.password.trim()) {
-      setError("Password is required");
-      return false;
+      newErrors.password = "Password is required";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters";
     }
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters");
-      return false;
+
+    if (!formData.confirmPassword.trim()) {
+      newErrors.confirmPassword = "Please confirm your password";
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
     }
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-      return false;
+
+    const phone = formData.phone_number.trim();
+    if (phone && !PHONE_PATTERN.test(phone)) {
+      newErrors.phone_number = "Please enter a valid phone number (10-15 digits)";
     }
-    return true;
+
+    setFieldErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setSubmitError(null);
     
     if (!validateForm()) {
       return;
@@ -88,7 +107,7 @@ export default function Register() {
         navigate("/login");
       }, 2000);
     } catch (err: any) {
-      setError(err?.message || err?.detail || "Registration failed. Please try again.");
+      setSubmitError(err?.message || err?.detail || "Registration failed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -147,13 +166,18 @@ export default function Register() {
             Create an account to get started
           </Typography>
 
-          {error && (
-            <Alert severity="error" onClose={() => setError(null)}>
-              {error}
+          {submitError && (
+            <Alert severity="error" onClose={() => setSubmitError(null)}>
+              {submitError}
             </Alert>
           )}
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <Box
+            component="form"
+            onSubmit={handleSubmit}
+            noValidate
+            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+          >
             <EmailInput
               name="email"
               label="Email"
@@ -163,6 +187,8 @@ export default function Register() {
               fullWidth
               autoComplete="email"
               autoFocus
+              error={!!fieldErrors.email}
+              helperText={fieldErrors.email}
             />
 
             <TextField
@@ -173,6 +199,8 @@ export default function Register() {
               required
               fullWidth
               autoComplete="name"
+              error={!!fieldErrors.full_name}
+              helperText={fieldErrors.full_name}
             />
 
             <PhoneInput
@@ -182,10 +210,8 @@ export default function Register() {
               onChange={handleChange}
               fullWidth
               autoComplete="tel"
-              helperText="Optional - Include country code (e.g., +1234567890)"
-              inputProps={{
-                pattern: "[+]?[0-9\\s\\-()]+",
-              }}
+              error={!!fieldErrors.phone_number}
+              helperText={fieldErrors.phone_number ?? "Optional - 10 to 15 digits only"}
             />
 
             <PasswordInput
@@ -196,7 +222,8 @@ export default function Register() {
               required
               fullWidth
               autoComplete="new-password"
-              helperText="Password must be at least 6 characters"
+              error={!!fieldErrors.password}
+              helperText={fieldErrors.password ?? "Password must be at least 6 characters"}
             />
 
             <PasswordInput
@@ -207,6 +234,8 @@ export default function Register() {
               required
               fullWidth
               autoComplete="new-password"
+              error={!!fieldErrors.confirmPassword}
+              helperText={fieldErrors.confirmPassword}
             />
 
             <Button
