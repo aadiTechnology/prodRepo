@@ -1,120 +1,99 @@
 /**
  * PermissionManagementPage.listConfig.tsx
  *
- * Column definitions for the permission management table.
- * This table renders a two-level (module → page) tree with
- * per-row permission checkboxes. Row actions (edit / delete)
- * are provided by the page via renderRowActions, not here.
+ * Column definitions and row actions for the permission matrix table.
  */
 
-import React from "react";
 import { Box, Typography, Checkbox, IconButton, alpha } from "@mui/material";
 import {
   ChevronRight as ChevronRightIcon,
   ExpandMore as ExpandMoreIcon,
 } from "@mui/icons-material";
-import type { DataTableColumn } from "../../components/reusable";
+import type { NavigateFunction } from "react-router-dom";
+import type { ListConfig } from "../../components/reusable/listFramework.types";
 import { colorTokens } from "../../tokens/colors";
 import type { PermissionTableRow } from "../../hooks/usePermissionListController";
 
-// ── Config options ────────────────────────────────────────────────────────────
+export type { PermissionTableRow };
 
-export interface PermissionListConfigOptions {
+type PermissionListConfigArgs = {
+  navigate: NavigateFunction;
   canEdit: boolean;
+  isSystemAdmin: boolean;
   selectedRole: unknown;
   allRows: PermissionTableRow[];
   expandedModuleIds: Set<number>;
-  permissions: Map<number, unknown>;
   onPermChange: (menuId: number, key: string, checked: boolean) => void;
   onMasterToggle: (moduleId: number, checked: boolean) => void;
   onToggleModule: (moduleId: number) => void;
   onSelectAllModules: (checked: boolean) => void;
+  onDeleteClick: (row: PermissionTableRow) => void;
+};
+
+const checkboxSx = {
+  color: alpha(colorTokens.preschool.turquoise.main, 0.4),
+  "&.Mui-checked": { color: colorTokens.preschool.turquoise.main },
+};
+
+function rowAllChecked(row: PermissionTableRow) {
+  return row.can_view && row.can_create && row.can_edit && row.can_delete;
 }
 
-// ── UI policy (shared across callers) ─────────────────────────────────────────
-
-export const permissionListUiPolicy = {
-  emptyMessage: "Select a role above to view its permissions.",
-  errorFallbackMessage: "Failed to load permissions.",
-  retryLabel: "Retry",
-} as const;
-
-// ── Column factory ────────────────────────────────────────────────────────────
+function rowSomeChecked(row: PermissionTableRow) {
+  return row.can_view || row.can_create || row.can_edit || row.can_delete;
+}
 
 export const createPermissionListConfig = ({
+  navigate,
   canEdit,
+  isSystemAdmin,
   selectedRole,
   allRows,
   expandedModuleIds,
-  permissions,
   onPermChange,
   onMasterToggle,
   onToggleModule,
   onSelectAllModules,
-}: PermissionListConfigOptions): { columns: DataTableColumn<PermissionTableRow>[] } => {
-  const columns: DataTableColumn<PermissionTableRow>[] = [
-
-    // ── Select-all header checkbox ────────────────────────────────────────
+  onDeleteClick,
+}: PermissionListConfigArgs): ListConfig<PermissionTableRow> => ({
+  columns: [
     {
       id: "selectAll",
       label: "",
-      width: "6%",
-      headerAlign: "center" as const,
+      width: 52,
+      headerAlign: "center",
       render: () => null,
       renderHeader: () => {
-        const allModules = allRows.filter((r) => r.level === 1);
-        const allSelected =
-          allModules.length > 0 &&
-          allModules.every(
-            (m) => m.can_view && m.can_create && m.can_edit && m.can_delete
-          );
-        const someSelected = allModules.some(
-          (m) => m.can_view || m.can_create || m.can_edit || m.can_delete
-        );
+        const modules = allRows.filter((r) => r.level === 1);
+        const allSelected = modules.length > 0 && modules.every((m) => rowAllChecked(m));
+        const someSelected = modules.some((m) => rowSomeChecked(m));
+
         return (
-          <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-            <Checkbox
-              size="small"
-              checked={allSelected}
-              indeterminate={someSelected && !allSelected}
-              onChange={(e) => onSelectAllModules(e.target.checked)}
-              disabled={!canEdit || !selectedRole}
-              sx={{
-                color: alpha(colorTokens.preschool.turquoise.main, 0.4),
-                "&.Mui-checked": { color: colorTokens.preschool.turquoise.main },
-              }}
-            />
-          </Box>
+          <Checkbox
+            size="small"
+            checked={allSelected}
+            indeterminate={someSelected && !allSelected}
+            onChange={(e) => onSelectAllModules(e.target.checked)}
+            disabled={!canEdit || !selectedRole}
+            sx={checkboxSx}
+          />
         );
       },
     },
-
-    // ── Module / Page name with expand toggle ─────────────────────────────
     {
       id: "name",
       label: "Module / Page",
-      field: "name" as const,
-      width: "55%",
+      field: "name",
+      width: "40%",
       render: (row) => {
         const isModule = row.level === 1;
         const isExpanded = expandedModuleIds.has(row.id);
-        const allChecked =
-          row.can_view && row.can_create && row.can_edit && row.can_delete;
-        const someChecked =
-          row.can_view || row.can_create || row.can_edit || row.can_delete;
+        const allChecked = rowAllChecked(row);
+        const someChecked = rowSomeChecked(row);
 
         if (isModule) {
           return (
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 0.5,
-                cursor: "pointer",
-                userSelect: "none",
-                py: 0.5,
-              }}
-            >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 200 }}>
               <Checkbox
                 size="small"
                 checked={allChecked}
@@ -122,24 +101,15 @@ export const createPermissionListConfig = ({
                 onChange={(e) => onMasterToggle(row.id, e.target.checked)}
                 disabled={!canEdit || !selectedRole}
                 onClick={(e) => e.stopPropagation()}
-                sx={{
-                  p: 0.25,
-                  color: alpha(colorTokens.preschool.turquoise.main, 0.4),
-                  "&.Mui-checked": { color: colorTokens.preschool.turquoise.main },
-                }}
+                sx={{ ...checkboxSx, p: 0.25 }}
               />
               <IconButton
                 size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleModule(row.id);
-                }}
+                onClick={() => onToggleModule(row.id)}
                 sx={{
                   p: 0.5,
                   color: colorTokens.preschool.turquoise.main,
-                  "&:hover": {
-                    bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.1),
-                  },
+                  "&:hover": { bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.1) },
                 }}
               >
                 {isExpanded ? (
@@ -148,27 +118,15 @@ export const createPermissionListConfig = ({
                   <ChevronRightIcon fontSize="small" />
                 )}
               </IconButton>
-              <Typography
-                variant="body2"
-                sx={{ fontWeight: 700, color: "text.primary", fontSize: "0.95rem" }}
-              >
+              <Typography variant="body2" sx={{ fontWeight: 700, wordBreak: "break-word" }}>
                 {row.name}
               </Typography>
             </Box>
           );
         }
 
-        // Page row (level 2)
         return (
-          <Box
-            sx={{
-              pl: 5,
-              display: "flex",
-              alignItems: "center",
-              gap: 0.5,
-              py: 0.5,
-            }}
-          >
+          <Box sx={{ pl: 4, display: "flex", alignItems: "center", gap: 0.5, minWidth: 180 }}>
             <Checkbox
               size="small"
               checked={allChecked}
@@ -176,29 +134,20 @@ export const createPermissionListConfig = ({
               onChange={(e) => onMasterToggle(row.id, e.target.checked)}
               disabled={!canEdit || !selectedRole}
               onClick={(e) => e.stopPropagation()}
-              sx={{
-                p: 0.25,
-                color: alpha(colorTokens.preschool.turquoise.main, 0.35),
-                "&.Mui-checked": { color: colorTokens.preschool.turquoise.main },
-              }}
+              sx={{ ...checkboxSx, p: 0.25 }}
             />
-            <Typography
-              variant="body2"
-              sx={{ fontWeight: 500, color: "text.secondary", fontSize: "0.85rem" }}
-            >
+            <Typography variant="body2" sx={{ fontWeight: 500, color: "text.secondary" }}>
               {row.name}
             </Typography>
           </Box>
         );
       },
     },
-
-    // ── View ──────────────────────────────────────────────────────────────
     {
       id: "can_view",
       label: "View",
-      headerAlign: "center" as const,
-      width: "10%",
+      headerAlign: "center",
+      width: 88,
       render: (row) => (
         <Box sx={{ display: "flex", justifyContent: "center" }}>
           <Checkbox
@@ -206,17 +155,16 @@ export const createPermissionListConfig = ({
             onChange={(e) => onPermChange(row.id, "can_view", e.target.checked)}
             disabled={!canEdit || !selectedRole}
             size="small"
+            sx={checkboxSx}
           />
         </Box>
       ),
     },
-
-    // ── Create ────────────────────────────────────────────────────────────
     {
       id: "can_create",
       label: "Create",
-      headerAlign: "center" as const,
-      width: "10%",
+      headerAlign: "center",
+      width: 88,
       render: (row) => (
         <Box sx={{ display: "flex", justifyContent: "center" }}>
           <Checkbox
@@ -224,17 +172,16 @@ export const createPermissionListConfig = ({
             onChange={(e) => onPermChange(row.id, "can_create", e.target.checked)}
             disabled={!canEdit || !row.can_view || !selectedRole}
             size="small"
+            sx={checkboxSx}
           />
         </Box>
       ),
     },
-
-    // ── Edit ──────────────────────────────────────────────────────────────
     {
       id: "can_edit",
       label: "Edit",
-      headerAlign: "center" as const,
-      width: "10%",
+      headerAlign: "center",
+      width: 88,
       render: (row) => (
         <Box sx={{ display: "flex", justifyContent: "center" }}>
           <Checkbox
@@ -242,17 +189,16 @@ export const createPermissionListConfig = ({
             onChange={(e) => onPermChange(row.id, "can_edit", e.target.checked)}
             disabled={!canEdit || !row.can_view || !selectedRole}
             size="small"
+            sx={checkboxSx}
           />
         </Box>
       ),
     },
-
-    // ── Delete ────────────────────────────────────────────────────────────
     {
       id: "can_delete",
       label: "Delete",
-      headerAlign: "center" as const,
-      width: "10%",
+      headerAlign: "center",
+      width: 88,
       render: (row) => (
         <Box sx={{ display: "flex", justifyContent: "center" }}>
           <Checkbox
@@ -260,11 +206,25 @@ export const createPermissionListConfig = ({
             onChange={(e) => onPermChange(row.id, "can_delete", e.target.checked)}
             disabled={!canEdit || !row.can_view || !selectedRole}
             size="small"
+            sx={checkboxSx}
           />
         </Box>
       ),
     },
-  ];
-
-  return { columns };
-};
+  ],
+  sortOptions: [],
+  uiPolicy: {
+    emptyMessage: "No modules found for this role.",
+    errorFallbackMessage: "Failed to load permissions.",
+    retryLabel: "Retry",
+  },
+  actions: {
+    rowActions: (row) => {
+      if (!isSystemAdmin) return undefined;
+      return {
+        onEdit: () => navigate(`/admin/menus/${row.id}/edit`),
+        onDelete: () => onDeleteClick(row),
+      };
+    },
+  },
+});

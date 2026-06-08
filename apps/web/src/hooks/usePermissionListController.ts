@@ -10,6 +10,7 @@ import permissionService, {
   Role,
   RoleMenuPermission,
 } from "../api/services/permissionService";
+import menuService from "../api/services/menuService";
 import tenantService from "../api/services/tenantService";
 import type { Tenant } from "../types/tenant";
 import { useAuth } from "../context/AuthContext";
@@ -25,6 +26,8 @@ export interface PermissionTableRow {
   level: 1 | 2;
   parent_id?: number;
 }
+
+export type PermissionDeleteTarget = { id: number; name: string };
 
 const hasAnyMenuAccess = (perm: RoleMenuPermission): boolean =>
   perm.can_view || perm.can_create || perm.can_edit || perm.can_delete;
@@ -60,6 +63,8 @@ export const usePermissionListController = () => {
   const [loadingSave, setLoadingSave] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PermissionDeleteTarget | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // ── Fetch Roles ─────────────────────────────────────────────────────────
   const fetchRoles = useCallback(async () => {
@@ -441,6 +446,44 @@ export const usePermissionListController = () => {
     setPermissions(new Map(originalPermissions));
   }, [originalPermissions]);
 
+  const requestDelete = useCallback((row: PermissionTableRow) => {
+    setDeleteTarget({ id: row.id, name: row.name });
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await menuService.deleteMenu(deleteTarget.id);
+      setSuccess(`"${deleteTarget.name}" deleted successfully.`);
+      setDeleteTarget(null);
+      if (selectedRole) {
+        const menuData = await permissionService.getRolePermissions(selectedRole.id);
+        setMenuTree(menuData);
+        const map = new Map<number, RoleMenuPermission>();
+        const traverse = (nodes: MenuTreeNode[]) =>
+          nodes.forEach((n) => {
+            map.set(n.id, n.permissions);
+            if (n.children) traverse(n.children);
+          });
+        traverse(menuData);
+        setPermissions(map);
+        setOriginalPermissions(new Map(map));
+      }
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || "Failed to delete menu.");
+    } finally {
+      setDeleting(false);
+    }
+  }, [deleteTarget, selectedRole]);
+
+  const deleteDialogMessage = useMemo(() => {
+    if (!deleteTarget) return "";
+    return `Are you sure you want to delete "${deleteTarget.name}"? This action cannot be undone.`;
+  }, [deleteTarget]);
+
+  const loading = loadingRoles || loadingMenus;
+
   // ── Filtered Roles ────────────────────────────────────────────────────
   const filteredRoles = useMemo(
     () => {
@@ -475,19 +518,24 @@ export const usePermissionListController = () => {
     setSearchQuery,
     selectedTenantId,
     tenantOptions,
-    loadingRoles,
-    loadingMenus,
+    loading,
     loadingSave,
     error,
     setError,
     success,
     setSuccess,
+    deleteTarget,
+    setDeleteTarget,
+    deleting,
+    requestDelete,
+    handleConfirmDelete,
+    deleteDialogMessage,
     expandedModuleIds,
     toggleModule,
     page,
+    setPage: handlePageChange,
     rowsPerPage,
-    handlePageChange,
-    handleRowsPerPageChange,
+    setRowsPerPage: handleRowsPerPageChange,
     handleRoleChange,
     handleTenantChange,
     allRows,
