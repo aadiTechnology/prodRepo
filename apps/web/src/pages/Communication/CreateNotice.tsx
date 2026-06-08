@@ -10,15 +10,16 @@ import { mapApiErrorsToFields, validateForm } from "../../utils/formValidation";
 import schoolClassService from "../../api/services/schoolClassService";
 import noticeService from "../../api/services/noticeService";
 import { createNoticeFormConfig, type CreateNoticeFormData, type SelectOption } from "./CreateNotice.formConfig";
-import type { Notice, NoticeAudienceType, NoticeCreateAttachment, NoticeCreateTarget } from "../../types/notice";
+import type { Notice, NoticeAudienceType, NoticeCreateTarget } from "../../types/notice";
 import { audienceTypeLabel, noticeTypeLabel } from "../../utils/noticeLabels";
 
-const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
+const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 255;
 const ALLOWED_FILE_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
-const UPLOAD_FILE_HINT = "Allowed: PDF, JPG, PNG. Maximum size 5 MB.";
+const UPLOAD_FILE_HINT = "Allowed: PDF, JPG, PNG. Maximum size 3 MB.";
 
-type AttachmentState = {
+type SavedAttachmentState = {
+  id?: number;
   file_name: string;
   file_path: string;
   file_type: string;
@@ -37,15 +38,6 @@ function toApiDateTime(value?: string): string | undefined {
 function fromApiDate(value?: string | null): string {
   if (!value) return "";
   return value.slice(0, 10);
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
 const emptyForm = (): CreateNoticeFormData => ({
@@ -100,7 +92,9 @@ export default function CreateNotice() {
   const [divisionOptions, setDivisionOptions] = useState<
     { id: string; label: string; value: string; classId: number }[]
   >([]);
-  const [attachment, setAttachment] = useState<AttachmentState | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [savedAttachment, setSavedAttachment] = useState<SavedAttachmentState | null>(null);
+  const [attachmentCleared, setAttachmentCleared] = useState(false);
   const [dropdownNoticeTypes, setDropdownNoticeTypes] = useState<SelectOption[]>([]);
   const [dropdownAudienceTypes, setDropdownAudienceTypes] = useState<SelectOption[]>([]);
 
@@ -240,15 +234,18 @@ export default function CreateNotice() {
         setLoadedStatus(notice.status);
         if (notice.attachments?.[0]) {
           const a = notice.attachments[0];
-          setAttachment({
+          setSavedAttachment({
+            id: a.id,
             file_name: a.file_name ?? "attachment",
             file_path: a.file_path ?? "",
             file_type: a.file_type ?? "application/octet-stream",
             file_size_kb: a.file_size_kb ?? undefined,
           });
         } else {
-          setAttachment(null);
+          setSavedAttachment(null);
         }
+        setPendingFile(null);
+        setAttachmentCleared(false);
         setFetchLoading(false);
       })
       .catch(() => {
@@ -315,18 +312,6 @@ export default function CreateNotice() {
       class_id: divisionMap.get(divisionId),
     }));
   }, [divisionOptions, formData.audience_type, formData.class_ids, formData.division_ids]);
-
-  const buildAttachments = useCallback((): NoticeCreateAttachment[] => {
-    if (!attachment) return [];
-    return [
-      {
-        file_name: attachment.file_name,
-        file_path: attachment.file_path,
-        file_type: attachment.file_type,
-        file_size_kb: attachment.file_size_kb,
-      },
-    ];
-  }, [attachment]);
 
   const handleApplicableRoleToggle = useCallback(() => undefined, []);
 
@@ -428,15 +413,6 @@ export default function CreateNotice() {
     }
   }, [formData.audience_type, setFormData]);
 
-  const handleResetForm = useCallback(() => {
-    resetForm(emptyForm());
-    setAttachment(null);
-    setLoadedStatus(null);
-    setApplicableToError(null);
-    setFieldErrors({});
-    setError(null);
-  }, [resetForm, setFieldErrors]);
-
   const handleUnpublish = useCallback(async () => {
     if (!isEditMode || !Number.isFinite(editId)) return;
     try {
@@ -471,8 +447,7 @@ export default function CreateNotice() {
       setError(null);
       try {
         const targets = buildTargets();
-        const attachments = buildAttachments();
-        const basePayload = {
+        const basePayload: Parameters<typeof noticeService.create>[0] = {
           title: formData.title.trim(),
           description: formData.description.trim(),
           audience_type: formData.audience_type as NoticeAudienceType,
@@ -482,16 +457,48 @@ export default function CreateNotice() {
           send_notification: formData.send_notification,
           is_draft: isDraft,
           targets,
-          attachments,
+          attachments: [],
         };
 
         if (isEditMode) {
-          const updated = await noticeService.update(editId, basePayload);
+          const updatePayload: Parameters<typeof noticeService.update>[1] = { ...basePayload };
+          if (attachmentCleared) {
+            updatePayload.attachments = [];
+          } else if (!pendingFile) {
+            delete updatePayload.attachments;
+          }
+          const updated = await noticeService.update(editId, updatePayload);
+          let noticeId = editId;
           setLoadedStatus(updated.status);
+
+          if (pendingFile) {
+            try {
+              await noticeService.uploadAttachment(noticeId, pendingFile);
+            } catch {
+              setError(
+                `Notice saved, but attachment upload failed. Check file type (PDF, JPG, PNG) and size (max 3 MB).`
+              );
+              return;
+            }
+          }
+
           setSnackbar(isDraft ? "Notice updated successfully." : "Notice published successfully.");
-          setTimeout(() => navigate(`/communication/notices/${editId}`), 800);
+          setTimeout(() => navigate(`/communication/notices/${noticeId}`), 800);
         } else {
-          await noticeService.create(basePayload);
+          const created = await noticeService.create(basePayload);
+          const noticeId = created.id;
+
+          if (pendingFile) {
+            try {
+              await noticeService.uploadAttachment(noticeId, pendingFile);
+            } catch {
+              setError(
+                `Notice saved, but attachment upload failed. Check file type (PDF, JPG, PNG) and size (max 3 MB).`
+              );
+              return;
+            }
+          }
+
           setSnackbar(isDraft ? "Notice saved as draft successfully." : "Notice published successfully.");
           setTimeout(() => navigate("/communication/notices"), 800);
         }
@@ -499,52 +506,44 @@ export default function CreateNotice() {
         const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
         setFieldErrors((prev) => ({ ...prev, ...apiFieldErrors }));
         const fallback = isDraft ? "Unable to save notice" : "Failed to publish notice";
-        const attachmentHint =
-          attachment && String(err instanceof Error ? err.message : "").includes("Network")
-            ? "Unable to upload attachment. Check file type (PDF, JPG, PNG) and size (max 5 MB)."
-            : null;
-        setError(attachmentHint || message || fallback);
+        setError(message || fallback);
       } finally {
         setLoading(false);
         setPublishLoading(false);
       }
     },
     [
-      attachment,
-      buildAttachments,
+      attachmentCleared,
       buildTargets,
       editId,
       formData,
       isEditMode,
       navigate,
+      pendingFile,
       setFieldErrors,
       validateAudienceSelection,
       validationConfig,
     ]
   );
 
-  const onAttachmentSelect = useCallback(async (file?: File) => {
+  const onAttachmentSelect = useCallback((file?: File) => {
     if (!file) {
-      setAttachment(null);
+      setPendingFile(null);
+      setSavedAttachment(null);
+      setAttachmentCleared(true);
       return;
     }
     if (!ALLOWED_FILE_TYPES.includes(file.type.toLowerCase()) || file.size > MAX_ATTACHMENT_SIZE) {
       setError(`Invalid file format or size exceeded. ${UPLOAD_FILE_HINT}`);
       return;
     }
-    try {
-      const dataUrl = await readFileAsDataUrl(file);
-      setAttachment({
-        file_name: file.name,
-        file_path: dataUrl,
-        file_type: file.type,
-        file_size_kb: Math.round(file.size / 1024),
-      });
-      setError(null);
-    } catch {
-      setError("File upload failed");
-    }
+    setPendingFile(file);
+    setSavedAttachment(null);
+    setAttachmentCleared(false);
+    setError(null);
   }, []);
+
+  const attachmentDisplayName = pendingFile?.name ?? savedAttachment?.file_name ?? null;
 
   const usesClassAudience = formData.audience_type === "STUDENT" || formData.audience_type === "ALL";
 
@@ -589,9 +588,9 @@ export default function CreateNotice() {
           <Button variant="outlined" onClick={() => fileInputRef.current?.click()} disabled={loading}>
             Upload File
           </Button>
-          {attachment ? (
+          {attachmentDisplayName ? (
             <>
-              <Typography variant="body2">{attachment.file_name}</Typography>
+              <Typography variant="body2">{attachmentDisplayName}</Typography>
               <Button variant="text" color="error" onClick={() => onAttachmentSelect(undefined)}>
                 Remove
               </Button>
@@ -603,7 +602,7 @@ export default function CreateNotice() {
     [
       applicableTo,
       applicableToError,
-      attachment,
+      attachmentDisplayName,
       classDivisionMap,
       formData.class_ids,
       formData.division_ids,
@@ -719,7 +718,6 @@ export default function CreateNotice() {
         saveTooltipEdit: "Save changes",
       }}
       onCancelNavigate={() => navigate("/communication/notices")}
-      onFooterCancel={handleResetForm}
       confirmMessage={
         isEditMode ? "Are you sure you want to save changes to this notice?" : "Are you sure you want to save this notice as draft?"
       }

@@ -26,8 +26,14 @@ import { FormHeaderIconAction } from "../../components/primitives";
 import { ListPageLayout } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
 import noticeService from "../../api/services/noticeService";
+import { apiBaseUrl } from "../../config";
 import { useNoticePermissions } from "../../hooks/useNoticePermissions";
 import type { Notice, NoticeStatus } from "../../types/notice";
+
+function buildAttachmentUrl(filePath: string): string {
+  if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
+  return `${apiBaseUrl}${filePath}`;
+}
 import { formatShortDate } from "../../utils/formatters";
 import { noticeStatusLabel, noticeTypeLabel } from "../../utils/noticeLabels";
 
@@ -399,7 +405,7 @@ export default function NoticeDetails() {
                       <AttachFileIcon color="primary" sx={{ fontSize: 20, flexShrink: 0 }} />
                       {a.file_path ? (
                         <Link
-                          href={a.file_path}
+                          href={buildAttachmentUrl(a.file_path)}
                           target="_blank"
                           rel="noopener noreferrer"
                           underline="hover"

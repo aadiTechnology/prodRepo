@@ -136,6 +136,31 @@ def get_notice_targets(db: Session, *, notice_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_notice_attachment(
+    db: Session,
+    *,
+    tenant_id: int,
+    notice_id: int,
+    attachment_id: int,
+) -> dict | None:
+    sql = text(
+        """
+        SELECT id, tenant_id, notice_id, file_name, file_path, file_type, file_size_kb, uploaded_at, uploaded_by
+        FROM communication_notice_attachments
+        WHERE id = :attachment_id AND notice_id = :notice_id AND tenant_id = :tenant_id AND is_deleted = 0
+        """
+    )
+    row = (
+        db.execute(
+            sql,
+            {"attachment_id": attachment_id, "notice_id": notice_id, "tenant_id": tenant_id},
+        )
+        .mappings()
+        .first()
+    )
+    return dict(row) if row else None
+
+
 def get_notice_attachments(db: Session, *, notice_id: int) -> list[dict]:
     sql = text(
         """

@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Depends, Query, status
+import os
+
+from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser, require_menu_path_permission
+from app.core.dependencies import CurrentUser, get_current_user, require_menu_path_permission
+from app.core.exceptions import ValidationException
+from app.services.notice_attachment_storage import ALLOWED_MIME_TYPES, MAX_FILE_BYTES, disk_path_for_attachment
 from app.services.notice_service import NOTICE_MENU_PATH
 from app.schemas.notice import (
+    NoticeAttachmentResponse,
     NoticeCreateRequest,
     NoticeDropdownOptionsResponse,
     NoticeListResponse,
@@ -15,6 +20,15 @@ from app.schemas.notice import (
 from app.services import notice_service
 
 router = APIRouter(prefix="/communications/notices", tags=["Communication - Notices"])
+
+
+def _require_notice_manage_permission(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> CurrentUser:
+    if not notice_service.user_can_manage_notices(db, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    return current_user
 
 
 @router.get("", response_model=NoticeListResponse)
@@ -153,4 +167,58 @@ async def delete_notice(
         notice_id=notice_id,
         user_id=current_user.id,
     )
+    return None
+
+
+@router.post(
+    "/{notice_id}/attachments",
+    response_model=NoticeAttachmentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_notice_attachment(
+    notice_id: int = Path(..., ge=1),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(_require_notice_manage_permission),
+):
+    content_type = (file.content_type or "").lower()
+    if content_type not in ALLOWED_MIME_TYPES:
+        raise ValidationException("Invalid file format. Allowed: PDF, JPG, PNG")
+
+    content = await file.read()
+    if len(content) > MAX_FILE_BYTES:
+        raise ValidationException("File size exceeded. Maximum allowed size is 3 MB")
+
+    return notice_service.upload_notice_attachment(
+        db,
+        tenant_id=current_user.tenant_id,
+        notice_id=notice_id,
+        user_id=current_user.id,
+        file_name=file.filename or "attachment",
+        content=content,
+        content_type=content_type,
+    )
+
+
+@router.delete(
+    "/{notice_id}/attachments/{attachment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_notice_attachment(
+    notice_id: int = Path(..., ge=1),
+    attachment_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(_require_notice_manage_permission),
+):
+    file_path = notice_service.delete_notice_attachment(
+        db,
+        tenant_id=current_user.tenant_id,
+        notice_id=notice_id,
+        attachment_id=attachment_id,
+        user_id=current_user.id,
+    )
+    if file_path:
+        disk_path = disk_path_for_attachment(file_path)
+        if os.path.exists(disk_path):
+            os.remove(disk_path)
     return None

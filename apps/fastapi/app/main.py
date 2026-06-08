@@ -5,6 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from typing import Any, cast
 from app.core.database import Base, engine, DATABASE_URL
 from app.core.config import settings
+from app.core.upload_paths import ensure_upload_directories, notice_attachments_dir
 from app.core.logging_config import setup_logging, get_logger
 from app.core.exceptions import AppException
 from app.core.exception_handlers import (
@@ -157,8 +158,12 @@ os.makedirs("static/enrollment-documents", exist_ok=True)
 app.mount("/enrollment-documents", StaticFiles(directory="static/enrollment-documents"), name="enrollment-documents")
 os.makedirs("static/homework-attachments", exist_ok=True)
 app.mount("/homework-attachments", StaticFiles(directory="static/homework-attachments"), name="homework-attachments")
-os.makedirs("static/notice-attachments", exist_ok=True)
-app.mount("/notice-attachments", StaticFiles(directory="static/notice-attachments"), name="notice-attachments")
+ensure_upload_directories()
+app.mount(
+    "/notice-attachments",
+    StaticFiles(directory=notice_attachments_dir()),
+    name="notice-attachments",
+)
 
 @app.on_event("startup")
 async def startup_event():
@@ -167,6 +172,8 @@ async def startup_event():
 
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     logger.info(f"Debug mode: {settings.DEBUG}")
+    ensure_upload_directories()
+    logger.info(f"Notice attachments directory: {notice_attachments_dir()}")
 
 
     # create_all compares every SQLAlchemy model to the server over the network.

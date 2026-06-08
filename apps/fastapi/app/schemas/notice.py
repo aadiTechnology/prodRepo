@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 AudienceType = Literal["ALL", "STUDENT", "TEACHER", "ADMIN"]
@@ -21,6 +21,15 @@ class NoticeAttachmentItem(BaseModel):
     file_path: str | None = Field(None, max_length=500)
     file_type: str | None = Field(None, max_length=50)
     file_size_kb: int | None = Field(None, ge=0)
+
+    @field_validator("file_path")
+    @classmethod
+    def reject_embedded_content(cls, value: str | None) -> str | None:
+        if value and value.strip().startswith("data:"):
+            raise ValueError(
+                "file_path must be a server path; upload files via the attachment endpoint"
+            )
+        return value
 
 
 class NoticeCreateRequest(BaseModel):

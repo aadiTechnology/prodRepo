@@ -8,7 +8,11 @@ from app.core.exceptions import NotFoundException, ValidationException
 from app.repositories import notice_repository
 from app.services.homework_access import HomeworkViewerContext
 from app.services.notice_access import NoticeViewerContext, is_notice_consumer, resolve_notice_viewer_context
-from app.services.notice_attachment_storage import persist_notice_attachment_path
+from app.services.notice_attachment_storage import (
+    disk_path_for_attachment,
+    save_notice_attachment_file,
+    validate_attachment_path,
+)
 from app.schemas.notice import (
     NoticeAttachmentResponse,
     NoticeCreateRequest,
@@ -152,24 +156,13 @@ def get_viewer_context(
     )
 
 
-def _normalize_attachments(
-    *,
-    tenant_id: int,
-    notice_id: int,
-    attachments: list[dict],
-) -> list[dict]:
+def _normalize_attachments(*, attachments: list[dict]) -> list[dict]:
     normalized: list[dict] = []
     for item in attachments:
         file_path = item.get("file_path") or ""
         if not file_path:
             continue
-        stored_path = persist_notice_attachment_path(
-            tenant_id=tenant_id,
-            notice_id=notice_id,
-            file_name=str(item.get("file_name") or "attachment"),
-            file_path=str(file_path),
-            file_type=str(item.get("file_type") or "application/octet-stream"),
-        )
+        stored_path = validate_attachment_path(str(file_path))
         normalized.append({**item, "file_path": stored_path})
     return normalized
 
@@ -359,11 +352,7 @@ def create_notice(
         user_id=user_id,
         targets=targets if audience_type in AUDIENCE_WITH_CLASS_TARGETS else [],
     )
-    stored_attachments = _normalize_attachments(
-        tenant_id=tenant_id,
-        notice_id=notice_id,
-        attachments=attachments,
-    )
+    stored_attachments = _normalize_attachments(attachments=attachments)
     notice_repository.replace_notice_attachments(
         db,
         tenant_id=tenant_id,
@@ -373,6 +362,80 @@ def create_notice(
     )
     db.commit()
     return get_notice(db, tenant_id=tenant_id, notice_id=notice_id)
+
+
+def upload_notice_attachment(
+    db: Session,
+    *,
+    tenant_id: int,
+    notice_id: int,
+    user_id: int,
+    file_name: str,
+    content: bytes,
+    content_type: str,
+) -> NoticeAttachmentResponse:
+    row = notice_repository.get_notice_by_id(db, tenant_id=tenant_id, notice_id=notice_id)
+    if not row:
+        raise NotFoundException("Notice", notice_id)
+
+    stored_path = save_notice_attachment_file(
+        tenant_id=tenant_id,
+        notice_id=notice_id,
+        file_name=file_name,
+        content=content,
+        content_type=content_type,
+    )
+    attachment = {
+        "file_name": file_name,
+        "file_path": stored_path,
+        "file_type": content_type,
+        "file_size_kb": int(len(content) / 1024),
+    }
+    notice_repository.replace_notice_attachments(
+        db,
+        tenant_id=tenant_id,
+        notice_id=notice_id,
+        user_id=user_id,
+        attachments=[attachment],
+    )
+    db.commit()
+    attachments = notice_repository.get_notice_attachments(db, notice_id=notice_id)
+    if not attachments:
+        raise ValidationException("File upload failed")
+    return NoticeAttachmentResponse(**attachments[-1])
+
+
+def delete_notice_attachment(
+    db: Session,
+    *,
+    tenant_id: int,
+    notice_id: int,
+    attachment_id: int,
+    user_id: int,
+) -> str | None:
+    row = notice_repository.get_notice_by_id(db, tenant_id=tenant_id, notice_id=notice_id)
+    if not row:
+        raise NotFoundException("Notice", notice_id)
+
+    attachment = notice_repository.get_notice_attachment(
+        db,
+        tenant_id=tenant_id,
+        notice_id=notice_id,
+        attachment_id=attachment_id,
+    )
+    if not attachment:
+        raise NotFoundException("Notice attachment", attachment_id)
+
+    file_path = str(attachment.get("file_path") or "")
+    notice_repository.replace_notice_attachments(
+        db,
+        tenant_id=tenant_id,
+        notice_id=notice_id,
+        user_id=user_id,
+        attachments=[],
+    )
+    db.commit()
+    return file_path or None
 
 
 def update_notice(
@@ -457,11 +520,7 @@ def update_notice(
             targets=normalized_targets if next_audience_type in AUDIENCE_WITH_CLASS_TARGETS else [],
         )
     if normalized_attachments is not None:
-        stored_attachments = _normalize_attachments(
-            tenant_id=tenant_id,
-            notice_id=notice_id,
-            attachments=normalized_attachments,
-        )
+        stored_attachments = _normalize_attachments(attachments=normalized_attachments)
         notice_repository.replace_notice_attachments(
             db,
             tenant_id=tenant_id,

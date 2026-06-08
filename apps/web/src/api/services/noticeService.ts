@@ -57,6 +57,19 @@ const noticeService = {
   delete: async (id: number): Promise<void> => {
     await apiClient.delete(`${BASE}/${id}`);
   },
+
+  uploadAttachment: async (noticeId: number, file: File): Promise<Notice["attachments"][number]> => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await apiClient.post(`${BASE}/${noticeId}/attachments`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+  },
+
+  deleteAttachment: async (noticeId: number, attachmentId: number): Promise<void> => {
+    await apiClient.delete(`${BASE}/${noticeId}/attachments/${attachmentId}`);
+  },
 };
 
 export default noticeService;
