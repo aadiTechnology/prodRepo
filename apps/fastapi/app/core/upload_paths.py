@@ -12,8 +12,12 @@ NOTICE_ATTACHMENTS_SUBDIR = "notice-attachments"
 NOTICE_ATTACHMENTS_URL_PREFIX = f"/{NOTICE_ATTACHMENTS_SUBDIR}"
 
 
+DEFAULT_UPLOADS_ROOT = "static/uploads"
+
+
 def uploads_root() -> str:
-    return settings.UPLOADS_ROOT
+    # Fallback keeps the API bootable if an older config.py is deployed without UPLOADS_ROOT.
+    return getattr(settings, "UPLOADS_ROOT", None) or DEFAULT_UPLOADS_ROOT
 
 
 def notice_attachments_dir() -> str:
