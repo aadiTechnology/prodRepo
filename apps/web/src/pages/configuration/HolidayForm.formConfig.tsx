@@ -3,7 +3,7 @@ import { Box } from "../../components/primitives";
 import FormFieldRenderer from "../../components/reusable/FormFieldRenderer";
 import type { FormConfig } from "../../components/reusable/formFramework.types";
 import type { SelectItemOption } from "../../components/semantic";
-import type { HolidayFormData } from "./holidayForm.config";
+import { HOLIDAY_TYPE_OPTIONS, type HolidayFormData } from "./holidayForm.config";
 
 export type HolidayFormConfigFactoryArgs = {
   academicYears: { id: number; name: string }[];
@@ -55,12 +55,18 @@ export function createHolidayFormConfig({
     holiday_type: {
       name: "holiday_type",
       label: "Holiday Type",
-      type: "text",
+      type: "select",
       required: true,
-      placeholder: "e.g. Public holiday, festival closure",
       props: {
+        options: HOLIDAY_TYPE_OPTIONS.map((o) => ({
+          id: `holiday-type-${o.value}`,
+          value: o.value,
+          label: o.label,
+        })),
         size: "small",
-        slotProps: { htmlInput: { "aria-label": "Holiday type", maxLength: 50 } },
+        slotProps: {
+          htmlInput: { "aria-label": "Holiday type" },
+        },
       },
     },
     start_date: {

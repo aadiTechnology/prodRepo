@@ -22,6 +22,13 @@ def coerce_holiday_type_for_db(user_input: str) -> tuple[str, str | None]:
     raw = (user_input or "").strip()
     if not raw:
         return "NON_TEACHING_DAY", None
+    simple = raw.lower()
+    if simple == "holiday":
+        return "PUBLIC_HOLIDAY", None
+    if simple == "event":
+        return "NON_TEACHING_DAY", "Event"
+    if simple == "exam":
+        return "NON_TEACHING_DAY", "Exam"
     u = raw.upper()
     if u in _ALLOWED_DB_HOLIDAY_TYPES:
         return u, None

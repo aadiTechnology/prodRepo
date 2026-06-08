@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, status, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_permission
+from app.core.dependencies import (
+    get_current_user,
+    require_permission,
+    resolve_tenant_id_for_academic_year_list,
+)
 from app.schemas.auth import CurrentUser
 from app.schemas.academic import AcademicYearCreate, AcademicYearUpdate, AcademicYearResponse
 from app.crud import academic_year as academic_year_crud
@@ -16,14 +20,20 @@ def list_academic_years(
         False,
         description="When true, return only active academic years (for dropdowns).",
     ),
+    tenant_id: Optional[int] = Query(
+        None,
+        ge=1,
+        description="School tenant. Required for system administrators.",
+    ),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    if not current_user.tenant_id:
-        raise HTTPException(status_code=400, detail="User does not belong to a tenant")
+    effective_tenant_id = resolve_tenant_id_for_academic_year_list(
+        db, current_user, tenant_id
+    )
     return academic_year_crud.get_all(
         db,
-        tenant_id=current_user.tenant_id,
+        tenant_id=effective_tenant_id,
         active_only=active_only,
     )
 

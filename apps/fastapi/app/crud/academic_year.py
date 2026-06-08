@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from typing import List, Optional
@@ -6,16 +7,40 @@ from app.models.academic import AcademicYear
 from app.schemas.academic import AcademicYearCreate, AcademicYearUpdate
 
 def get_all(db: Session, tenant_id: int, *, active_only: bool = False) -> List[AcademicYear]:
-    query = db.query(AcademicYear).filter(
-        AcademicYear.tenant_id == tenant_id,
-        AcademicYear.is_deleted == False,  # noqa: E712 (SQL Server BIT needs '= 0', not 'IS 0')
-    )
+    """List academic years for a tenant. Uses raw SQL when active_only for SQL Server BIT safety."""
     if active_only:
-        query = query.filter(AcademicYear.is_active.is_(True))
-    return query.order_by(
-        AcademicYear.start_date.desc(),
-        AcademicYear.id.desc(),
-    ).distinct().all()
+        rows = db.execute(
+            text(
+                """
+                SELECT id
+                FROM academic_years
+                WHERE tenant_id = :tenant_id
+                  AND is_deleted = 0
+                  AND is_active = 1
+                ORDER BY start_date DESC, id DESC
+                """
+            ),
+            {"tenant_id": tenant_id},
+        ).fetchall()
+        if not rows:
+            return []
+        ids = [row[0] for row in rows]
+        return (
+            db.query(AcademicYear)
+            .filter(AcademicYear.id.in_(ids))
+            .order_by(AcademicYear.start_date.desc(), AcademicYear.id.desc())
+            .all()
+        )
+
+    return (
+        db.query(AcademicYear)
+        .filter(
+            AcademicYear.tenant_id == tenant_id,
+            AcademicYear.is_deleted == False,  # noqa: E712
+        )
+        .order_by(AcademicYear.start_date.desc(), AcademicYear.id.desc())
+        .all()
+    )
 
 def get_by_id(db: Session, id: int, tenant_id: int) -> Optional[AcademicYear]:
     return db.query(AcademicYear).filter(

@@ -1,6 +1,33 @@
 import type { NoticeAudienceType } from "../../types/notice";
 import type { HolidayCreatePayload } from "../../services/holidayApi";
 
+export const HOLIDAY_TYPE_OPTIONS = [
+  { value: "Holiday", label: "Holiday" },
+  { value: "Event", label: "Event" },
+  { value: "Exam", label: "Exam" },
+] as const;
+
+export type HolidayTypeOption = (typeof HOLIDAY_TYPE_OPTIONS)[number]["value"];
+
+const HOLIDAY_TYPE_VALUES = new Set<string>(HOLIDAY_TYPE_OPTIONS.map((o) => o.value));
+
+/** Map API / legacy DB holiday_type values back to a form dropdown value. */
+export function normalizeHolidayTypeForForm(apiType: string): HolidayTypeOption {
+  const token = (apiType ?? "").trim();
+  const lower = token.toLowerCase();
+  if (lower === "holiday" || token === "PUBLIC_HOLIDAY" || token === "ACADEMIC_BREAK") {
+    return "Holiday";
+  }
+  if (lower === "event" || lower.includes("event")) return "Event";
+  if (lower === "exam" || lower.includes("exam")) return "Exam";
+  if (lower.includes("holiday") || lower.includes("break")) return "Holiday";
+  return "Event";
+}
+
+export function isValidHolidayType(value: string): value is HolidayTypeOption {
+  return HOLIDAY_TYPE_VALUES.has(value);
+}
+
 export type HolidayFormData = {
   academic_year_id: number | null;
   holiday_name: string;
@@ -17,7 +44,7 @@ export type HolidayFormData = {
 export const EMPTY_FORM: HolidayFormData = {
   academic_year_id: null,
   holiday_name: "",
-  holiday_type: "",
+  holiday_type: "Holiday",
   start_date: "",
   end_date: "",
   audience_type: "STUDENT",

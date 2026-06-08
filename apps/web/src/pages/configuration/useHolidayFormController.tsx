@@ -18,6 +18,8 @@ import {
   compareIsoDateStrings,
   EMPTY_FORM,
   isDateWithinAcademicYear,
+  isValidHolidayType,
+  normalizeHolidayTypeForForm,
   normalizeIsoDatePart,
   serializeHolidayFormSnapshot,
   type HolidayFormData,
@@ -143,7 +145,7 @@ export function useHolidayFormController() {
           validate: (fd) => {
             const t = fd.holiday_type.trim();
             if (!t) return "Holiday type is required.";
-            if (t.length > 50) return "Holiday type must be 50 characters or fewer.";
+            if (!isValidHolidayType(t)) return "Select a valid holiday type.";
             return "";
           },
         },
@@ -281,7 +283,7 @@ export function useHolidayFormController() {
     const next: HolidayFormData = {
       academic_year_id: holiday.academic_year_id,
       holiday_name: holiday.holiday_name,
-      holiday_type: holiday.holiday_type,
+      holiday_type: normalizeHolidayTypeForForm(holiday.holiday_type),
       start_date: holiday.start_date,
       end_date: holiday.end_date ?? holiday.start_date,
       audience_type: (holiday.audience_type as NoticeAudienceType) || "STUDENT",

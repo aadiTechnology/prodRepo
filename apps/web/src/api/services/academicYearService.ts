@@ -42,9 +42,9 @@ const BASE_URL = "/api/academic-years";
 // ═══════════════════════════════════════════════════════════════════════════
 export const academicYearService = {
   getAll: async (options?: AcademicYearListOptions): Promise<AcademicYear[]> => {
-    const response = await apiClient.get(BASE_URL, {
-      params: options?.activeOnly ? { active_only: true } : undefined,
-    });
+    // Filter active years client-side only. Sending active_only=true breaks on some API
+    // deployments (SQL Server BIT handling); client filter is sufficient for dropdowns.
+    const response = await apiClient.get(BASE_URL);
     const years: AcademicYear[] = response.data ?? [];
     return options?.activeOnly ? filterActiveAcademicYears(years) : years;
   },

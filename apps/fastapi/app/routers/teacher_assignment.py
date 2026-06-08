@@ -1,8 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from app.core.database import get_db
-from app.core.dependencies import require_admin
+from app.core.dependencies import (
+    get_current_user,
+    require_admin,
+    resolve_tenant_id_for_academic_year_list,
+)
+from app.crud import academic_year as academic_year_crud
 from app.schemas.auth import CurrentUser
 from app.schemas.teacher_assignment_schema import (
     AcademicYearOption,
@@ -23,15 +29,19 @@ from app.services import teacher_assignment_service
 router = APIRouter(prefix="/api", tags=["Teacher Assignments"])
 
 
-@router.get("/academic-years", response_model=list[AcademicYearOption])
-def list_academic_years(
+@router.get("/teacher-assignment/academic-years", response_model=list[AcademicYearOption])
+def list_academic_years_for_assignment(
+    tenant_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
-    return teacher_assignment_service.get_academic_years(
-        db=db,
-        tenant_id=current_user.tenant_id,
+    effective_tenant_id = resolve_tenant_id_for_academic_year_list(
+        db, current_user, tenant_id
     )
+    rows = academic_year_crud.get_all(
+        db, tenant_id=effective_tenant_id, active_only=True
+    )
+    return [AcademicYearOption(id=row.id, name=row.name) for row in rows]
 
 
 @router.get("/classes", response_model=list[ClassOption])
