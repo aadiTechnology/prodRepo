@@ -1,4 +1,5 @@
 import axiosInstance from "./axiosInstance";
+import academicYearService from "./services/academicYearService";
 
 export interface AcademicYearOption {
   id: number;
@@ -98,9 +99,8 @@ const invoiceApi = {
       .filter((row): row is InvoiceStudentItem => row !== null);
   },
 
-  async getAcademicYears(): Promise<AcademicYearOption[]> {
-    const response = await axiosInstance.get("/api/academic-years");
-    return Array.isArray(response.data) ? response.data : [];
+  getAcademicYears(): Promise<AcademicYearOption[]> {
+    return academicYearService.listActive();
   },
 
   async getClasses(academicYearId: number): Promise<ClassOption[]> {

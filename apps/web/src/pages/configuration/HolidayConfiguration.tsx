@@ -83,7 +83,7 @@ function useHolidayListController() {
 
   const academicYearsQuery = useQuery({
     queryKey: ["holidays", "academic-years", effectiveTenantId],
-    queryFn: academicYearService.getAll,
+    queryFn: academicYearService.listActive,
     enabled: true,
     retry: 1,
   });

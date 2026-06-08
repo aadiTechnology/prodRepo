@@ -1,4 +1,5 @@
 import axiosInstance from "./axiosInstance";
+import academicYearService from "./services/academicYearService";
 
 export type TeacherAssignmentStatus = "ASSIGNED" | "NOT_ASSIGNED";
 
@@ -106,10 +107,7 @@ export interface TeacherAssignmentDetailResponse {
 }
 
 const teacherAssignmentApi = {
-  getAcademicYears: async (): Promise<AcademicYearOption[]> => {
-    const response = await axiosInstance.get("/api/academic-years");
-    return response.data;
-  },
+  getAcademicYears: (): Promise<AcademicYearOption[]> => academicYearService.listActive(),
 
   getClasses: async (academicYearId: number): Promise<ClassOption[]> => {
     const response = await axiosInstance.get("/api/classes", {

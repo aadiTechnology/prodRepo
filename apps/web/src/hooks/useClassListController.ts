@@ -1,16 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import schoolClassService, { type SchoolClass } from "../api/services/schoolClassService";
 import academicYearService from "../api/services/academicYearService";
-
-const resolveCurrentAcademicYearId = (
-  years: { id: number; is_current?: boolean | number; is_active?: boolean | number }[]
-): string => {
-  const current =
-    years.find((y) => y.is_current === true || y.is_current === 1) ??
-    years.find((y) => y.is_active === true || y.is_active === 1) ??
-    years[0];
-  return current?.id != null ? String(current.id) : "";
-};
+import { resolveCurrentAcademicYearId } from "../utils/academicYear";
 
 export function useClassListController() {
   const [classes, setClasses] = useState<SchoolClass[]>([]);
@@ -54,7 +45,7 @@ export function useClassListController() {
 
   useEffect(() => {
     academicYearService
-      .getAll()
+      .listActive()
       .then((data: unknown) => {
         const items = (Array.isArray(data) ? data : (data as { data?: unknown[] })?.data) || [];
         const years = items as {
@@ -64,13 +55,16 @@ export function useClassListController() {
           is_current?: boolean | number;
           is_active?: boolean | number;
         }[];
-        setAcademicYearOptions(
-          years.map((year) => ({
-            label: year.name || year.code || String(year.id),
-            value: String(year.id),
-          }))
-        );
-        setAcademicYearFilter((prev) => prev || resolveCurrentAcademicYearId(years));
+        const options = years.map((year) => ({
+          label: year.name || year.code || String(year.id),
+          value: String(year.id),
+        }));
+        setAcademicYearOptions(options);
+        const validIds = new Set(options.map((option) => option.value));
+        setAcademicYearFilter((prev) => {
+          if (prev && validIds.has(prev)) return prev;
+          return resolveCurrentAcademicYearId(years);
+        });
       })
       .catch(() => {
         setAcademicYearOptions([]);

@@ -269,7 +269,7 @@ export default function AddSubject() {
         const loadOptions = async () => {
             try {
                 const [years, classes] = await Promise.all([
-                    academicYearService.getAll(),
+                    academicYearService.listActive(),
                     schoolClassService.getAll()
                 ]);
                 

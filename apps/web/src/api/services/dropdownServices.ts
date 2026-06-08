@@ -1,4 +1,5 @@
 import { apiClient } from "../client";
+import academicYearApi from "./academicYearService";
 
 export const classService = {
   async list() {
@@ -8,10 +9,7 @@ export const classService = {
 };
 
 export const academicYearService = {
-  async list() {
-    const response = await apiClient.get("/api/academic-years");
-    return response.data;
-  },
+  list: () => academicYearApi.listActive(),
 };
 
 export const feeStructureService = {

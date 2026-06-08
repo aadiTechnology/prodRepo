@@ -14,16 +14,7 @@ import SchoolIcon from "@mui/icons-material/School";
 import LayersIcon from "@mui/icons-material/Layers";
 import { colorTokens } from "../../tokens/colors";
 import { alpha } from "@mui/material/styles";
-
-const resolveCurrentAcademicYearId = (
-    years: { id: number; is_current?: boolean | number; is_active?: boolean | number }[]
-): string => {
-    const current =
-        years.find((y) => y.is_current === true || y.is_current === 1) ??
-        years.find((y) => y.is_active === true || y.is_active === 1) ??
-        years[0];
-    return current?.id != null ? String(current.id) : "";
-};
+import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
 
 export default function AddClass() {
     const navigate = useNavigate();
@@ -259,7 +250,7 @@ export default function AddClass() {
 
     useEffect(() => {
         academicYearService
-            .getAll()
+            .listActive()
             .then((data: unknown) => {
                 const items = (Array.isArray(data) ? data : (data as { data?: unknown[] })?.data) || [];
                 const years = items as {
@@ -278,9 +269,10 @@ export default function AddClass() {
                 );
                 if (!isEditMode) {
                     const currentYearId = resolveCurrentAcademicYearId(years);
-                    if (currentYearId) {
-                        setFormData((prev) => ({ ...prev, academic_year_id: currentYearId }));
-                    }
+                    setFormData((prev) => ({
+                        ...prev,
+                        academic_year_id: currentYearId,
+                    }));
                 }
             })
             .catch(() => {

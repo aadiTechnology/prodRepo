@@ -69,7 +69,7 @@ export function useHolidayFormController() {
 
   const academicYearsQuery = useQuery({
     queryKey: ["holidays", "academic-years", "form"],
-    queryFn: academicYearService.getAll,
+    queryFn: academicYearService.listActive,
   });
   const academicYears = academicYearsQuery.data ?? [];
 

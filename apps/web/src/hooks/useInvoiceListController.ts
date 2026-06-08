@@ -20,7 +20,7 @@ async function getInvoiceLookups(): Promise<InvoiceLookupPayload> {
 
   if (!invoiceLookupInFlight) {
     invoiceLookupInFlight = Promise.all([
-      academicYearService.getAll(),
+      academicYearService.listActive(),
       schoolClassService.getAll(),
     ])
       .then(([yearData, classData]) => {

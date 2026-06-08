@@ -109,7 +109,7 @@ export default function AddLeadPage() {
       )
     ).catch(() => {});
 
-    academicYearService.getAll().then((data: any) => {
+    academicYearService.listActive().then((data: any) => {
       const items = data?.data || data || [];
       setAcademicYearOptions(
         items.map((y: any) => ({

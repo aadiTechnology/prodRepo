@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -12,12 +12,20 @@ router = APIRouter(prefix="/api/academic-years", tags=["Academic Years"])
 
 @router.get("", response_model=List[AcademicYearResponse])
 def list_academic_years(
+    active_only: bool = Query(
+        False,
+        description="When true, return only active academic years (for dropdowns).",
+    ),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user)
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="User does not belong to a tenant")
-    return academic_year_crud.get_all(db, tenant_id=current_user.tenant_id)
+    return academic_year_crud.get_all(
+        db,
+        tenant_id=current_user.tenant_id,
+        active_only=active_only,
+    )
 
 @router.get("/{id}", response_model=AcademicYearResponse)
 def get_academic_year(

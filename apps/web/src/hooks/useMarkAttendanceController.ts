@@ -100,7 +100,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const years = await academicYearService.getAll();
+        const years = await academicYearService.listActive();
         setAcademicYears(years);
         const activeYear = years.find((y) => y.is_active);
         const activeYearId = activeYear?.id ?? 0;

@@ -248,7 +248,7 @@ export default function EnrollmentPage() {
   // Load initial dropdown data
   useEffect(() => {
     academicYearService
-      .getAll()
+      .listActive()
       .then((data: any) => {
         const items = data?.data || data || [];
         setAcademicYears(

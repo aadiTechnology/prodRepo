@@ -39,7 +39,7 @@ export function useAcademicCalendarController() {
 
   const academicYearsQuery = useQuery({
     queryKey: ["academic-calendar", "academic-years"],
-    queryFn: academicYearService.getAll,
+    queryFn: academicYearService.listActive,
     retry: 1,
   });
 

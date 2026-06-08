@@ -1,4 +1,5 @@
 import apiClient from "../client";
+import academicYearService from "./academicYearService";
 
 export type FeeDueStatusFilter = "ALL" | "DUE" | "OVERDUE";
 
@@ -54,10 +55,7 @@ const feesApi = {
     return response.data;
   },
 
-  getAcademicYears: async (): Promise<AcademicYearOption[]> => {
-    const response = await apiClient.get<AcademicYearOption[]>("/api/academic-years");
-    return response.data ?? [];
-  },
+  getAcademicYears: (): Promise<AcademicYearOption[]> => academicYearService.listActive(),
 
   getClasses: async (academicYearId?: number): Promise<ClassOption[]> => {
     const response = await apiClient.get<ClassOption[]>("/academic/classes", {

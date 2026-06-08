@@ -5,6 +5,7 @@
  */
 
 import apiClient from "../client";
+import { filterActiveAcademicYears } from "../../utils/academicYear";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Type Definitions
@@ -29,15 +30,28 @@ export interface AcademicYearCreate {
 
 export interface AcademicYearUpdate extends Partial<AcademicYearCreate> {}
 
+export interface AcademicYearListOptions {
+  /** When true, exclude inactive/deactivated years (use for dropdowns). */
+  activeOnly?: boolean;
+}
+
 const BASE_URL = "/api/academic-years";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Academic Year Service - CRUD operations
 // ═══════════════════════════════════════════════════════════════════════════
 export const academicYearService = {
-  getAll: async (): Promise<AcademicYear[]> => {
-    const response = await apiClient.get(BASE_URL);
-    return response.data;
+  getAll: async (options?: AcademicYearListOptions): Promise<AcademicYear[]> => {
+    const response = await apiClient.get(BASE_URL, {
+      params: options?.activeOnly ? { active_only: true } : undefined,
+    });
+    const years: AcademicYear[] = response.data ?? [];
+    return options?.activeOnly ? filterActiveAcademicYears(years) : years;
+  },
+
+  /** Active academic years only — for dropdowns across the app. */
+  listActive: async (): Promise<AcademicYear[]> => {
+    return academicYearService.getAll({ activeOnly: true });
   },
 
   getById: async (id: number): Promise<AcademicYear> => {

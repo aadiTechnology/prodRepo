@@ -5,11 +5,14 @@ from datetime import datetime
 from app.models.academic import AcademicYear
 from app.schemas.academic import AcademicYearCreate, AcademicYearUpdate
 
-def get_all(db: Session, tenant_id: int) -> List[AcademicYear]:
-    return db.query(AcademicYear).filter(
+def get_all(db: Session, tenant_id: int, *, active_only: bool = False) -> List[AcademicYear]:
+    query = db.query(AcademicYear).filter(
         AcademicYear.tenant_id == tenant_id,
-        AcademicYear.is_deleted == False  # noqa: E712 (SQL Server BIT needs '= 0', not 'IS 0')
-    ).order_by(
+        AcademicYear.is_deleted == False,  # noqa: E712 (SQL Server BIT needs '= 0', not 'IS 0')
+    )
+    if active_only:
+        query = query.filter(AcademicYear.is_active.is_(True))
+    return query.order_by(
         AcademicYear.start_date.desc(),
         AcademicYear.id.desc(),
     ).distinct().all()

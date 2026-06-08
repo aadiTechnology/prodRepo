@@ -1,4 +1,5 @@
 import apiClient from "../client";
+import academicYearService from "./academicYearService";
 import {
   FeeStructure,
   FeeStructureCreate,
@@ -76,8 +77,8 @@ const feeService = {
   },
 
   getAcademicYears: async (): Promise<AcademicYear[]> => {
-    const response = await apiClient.get("/api/academic-years");
-    return response.data;
+    const years = await academicYearService.listActive();
+    return years as AcademicYear[];
   },
 
   getClasses: async (academicYearId?: number): Promise<ClassEntity[]> => {
