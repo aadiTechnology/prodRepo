@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, Field, computed_field
 from typing import List
 import os
@@ -7,6 +7,11 @@ from dotenv import load_dotenv
 load_dotenv(os.getenv("ENV_FILE", ".env"))
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        populate_by_name=True,
+    )
     """
     Centralized application settings with environment variable support.
     Includes validation for production readiness.
@@ -29,9 +34,8 @@ class Settings(BaseSettings):
    
     # CORS - comma-separated string in .env (parsed to list via CORS_ORIGINS property)
     CORS_ORIGINS_STR: str = Field(
-        env="CORS_ORIGINS",
         default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://localhost,http://localhost,capacitor://localhost,http://erpui.aaditechnology.com,https://erpui.aaditechnology.com,http://erpui1.aaditechnology.com,https://app.smartkidzwakad.com",
-        
+        validation_alias="CORS_ORIGINS",
     )
     CORS_CREDENTIALS: bool = True
     CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
@@ -48,6 +52,12 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
+    # File uploads (notice attachments, etc.)
+    UPLOADS_ROOT: str = Field(
+        default="static/uploads",
+        description="Root directory on disk for uploaded attachment files",
+    )
+
     # Logging
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -114,10 +124,6 @@ class Settings(BaseSettings):
                 errors.append("CORS_ORIGINS should not contain '*' in production")
         
         return errors
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 # Create settings instance
 settings = Settings()
