@@ -22,6 +22,7 @@ export type FormFieldType =
   | "select"
   | "switch"
   | "phone"
+  | "numeric"
   | "custom"
   | "date";
 

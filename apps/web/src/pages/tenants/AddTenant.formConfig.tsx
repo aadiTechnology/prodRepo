@@ -108,9 +108,9 @@ export function createAddTenantFormConfig({
       pin_code: {
         name: "pin_code",
         label: "Pin code",
-        type: "text",
+        type: "numeric",
         placeholder: "400001",
-        props: { htmlInput: { maxLength: 20, minLength: 0 } },
+        props: { inputProps: { maxLength: 20 }, autoComplete: "postal-code" },
       },
       theme_template_id: {
         name: "theme_template_id",

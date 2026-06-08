@@ -14,6 +14,7 @@ import {
   confirmPasswordMatchRules,
   emailRequiredPatternRules,
   newPasswordRules,
+  optionalNumericPatternRules,
   optionalPhonePatternRules,
 } from "../../utils/formValidationPresets";
 import { useFormManager } from "../../hooks/useFormManager";
@@ -74,6 +75,7 @@ export default function AddTenant() {
       owner_name: [{ type: "required", message: "Required." }],
       email: emailRequiredPatternRules<AddTenantFormData>(),
       phone: optionalPhonePatternRules<AddTenantFormData>(),
+      pin_code: optionalNumericPatternRules<AddTenantFormData>(),
     };
     if (!isEditMode) {
       cfg.admin_password = newPasswordRules<AddTenantFormData>();

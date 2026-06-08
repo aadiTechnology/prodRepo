@@ -1,5 +1,5 @@
 import type { ValidationRule } from "./formValidation";
-import { EMAIL_PATTERN, PHONE_PATTERN } from "./validationPatterns";
+import { EMAIL_PATTERN, NUMERIC_PATTERN, PHONE_PATTERN } from "./validationPatterns";
 
 export function emailRequiredPatternRules<
   T extends Record<string, unknown> = Record<string, unknown>,
@@ -14,6 +14,12 @@ export function optionalPhonePatternRules<
   T extends Record<string, unknown> = Record<string, unknown>,
 >(): ValidationRule<T>[] {
   return [{ type: "pattern", regex: PHONE_PATTERN, message: "Invalid phone." }];
+}
+
+export function optionalNumericPatternRules<
+  T extends Record<string, unknown> = Record<string, unknown>,
+>(message = "Only numeric values are allowed."): ValidationRule<T>[] {
+  return [{ type: "pattern", regex: NUMERIC_PATTERN, message }];
 }
 
 export function newPasswordRules<

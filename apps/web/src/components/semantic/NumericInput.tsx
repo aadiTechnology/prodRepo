@@ -1,26 +1,25 @@
 /**
- * PhoneInput — Semantic component
- * Phone number field. Uses TextField primitive.
+ * NumericInput — Semantic component
+ * Text field that accepts digits only.
  */
 
 import type { ChangeEvent } from "react";
 import { TextField, type TextFieldProps } from "../primitives";
 import { withDigitsOnlyChange } from "../../utils/sanitizeDigitsOnly";
 
-export interface PhoneInputProps extends Omit<TextFieldProps, "type"> {
-  /** Override type (default tel). */
-  type?: "tel" | "text";
+export interface NumericInputProps extends Omit<TextFieldProps, "type"> {
+  type?: "text" | "tel";
 }
 
-export default function PhoneInput({
-  type = "tel",
-  label = "Phone",
+export default function NumericInput({
+  type = "text",
+  label,
   placeholder,
   onChange,
   slotProps,
   inputProps,
   ...props
-}: PhoneInputProps) {
+}: NumericInputProps) {
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     withDigitsOnlyChange(onChange, event);
   };
@@ -30,8 +29,7 @@ export default function PhoneInput({
       type={type}
       fullWidth={true}
       label={label}
-      placeholder={placeholder ?? "e.g. 9876543210"}
-      autoComplete="tel"
+      placeholder={placeholder}
       onChange={handleChange}
       slotProps={{
         ...slotProps,

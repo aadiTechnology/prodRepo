@@ -21,6 +21,9 @@ export type { TextFieldInputProps } from "./TextFieldInput";
 export { default as PhoneInput } from "./PhoneInput";
 export type { PhoneInputProps } from "./PhoneInput";
 
+export { default as NumericInput } from "./NumericInput";
+export type { NumericInputProps } from "./NumericInput";
+
 export { default as PasswordInput } from "./PasswordInput";
 export type { PasswordInputProps } from "./PasswordInput";
 

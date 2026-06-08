@@ -8,6 +8,7 @@ import {
 } from "../semantic";
 import TextFieldInput from "../semantic/TextFieldInput";
 import PhoneInput from "../semantic/PhoneInput";
+import NumericInput from "../semantic/NumericInput";
 import type { FormFieldConfig, FormRenderContext } from "./formFramework.types";
 
 function resolveHelperText<T extends Record<string, unknown>>(
@@ -132,6 +133,19 @@ export default function FormFieldRenderer<T extends Record<string, unknown>>({
     case "phone":
       return (
         <PhoneInput
+          label={field.label}
+          name={name}
+          value={String(formData[name] ?? "")}
+          onChange={handleChange}
+          placeholder={field.placeholder}
+          error={showError}
+          helperText={helperText}
+          {...(extra as Record<string, unknown>)}
+        />
+      );
+    case "numeric":
+      return (
+        <NumericInput
           label={field.label}
           name={name}
           value={String(formData[name] ?? "")}
