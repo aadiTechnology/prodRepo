@@ -447,7 +447,7 @@ export default function CreateNotice() {
       setError(null);
       try {
         const targets = buildTargets();
-        const basePayload: Parameters<typeof noticeService.create>[0] = {
+        const sharedPayload = {
           title: formData.title.trim(),
           description: formData.description.trim(),
           audience_type: formData.audience_type as NoticeAudienceType,
@@ -455,17 +455,20 @@ export default function CreateNotice() {
           publish_date: toApiDateTime(formData.publish_date),
           expiry_date: toApiDateTime(formData.expiry_date),
           send_notification: formData.send_notification,
-          is_draft: isDraft,
           targets,
-          attachments: [],
         };
 
         if (isEditMode) {
-          const updatePayload: Parameters<typeof noticeService.update>[1] = { ...basePayload };
+          const updatePayload: Parameters<typeof noticeService.update>[1] = { ...sharedPayload };
+          if (isDraft) {
+            if (loadedStatus === "DRAFT") {
+              updatePayload.is_draft = true;
+            }
+          } else {
+            updatePayload.is_draft = false;
+          }
           if (attachmentCleared) {
             updatePayload.attachments = [];
-          } else if (!pendingFile) {
-            delete updatePayload.attachments;
           }
           const updated = await noticeService.update(editId, updatePayload);
           let noticeId = editId;
@@ -485,7 +488,11 @@ export default function CreateNotice() {
           setSnackbar(isDraft ? "Notice updated successfully." : "Notice published successfully.");
           setTimeout(() => navigate(`/communication/notices/${noticeId}`), 800);
         } else {
-          const created = await noticeService.create(basePayload);
+          const created = await noticeService.create({
+            ...sharedPayload,
+            is_draft: isDraft,
+            attachments: [],
+          });
           const noticeId = created.id;
 
           if (pendingFile) {
@@ -518,6 +525,7 @@ export default function CreateNotice() {
       editId,
       formData,
       isEditMode,
+      loadedStatus,
       navigate,
       pendingFile,
       setFieldErrors,
@@ -727,18 +735,16 @@ export default function CreateNotice() {
       extraHeaderActions={
         <>
           {isEditMode && loadedStatus === "PUBLISHED" && perms.canEdit ? (
-            <Button
-              variant="outlined"
-              color="warning"
-              size="small"
+            <FormHeaderIconAction
+              variant="unpublish"
+              tooltipTitle="Unpublish notice"
               onClick={() => void handleUnpublish()}
               disabled={publishLoading || loading || fetchLoading}
-              sx={{ mr: 0.5 }}
-            >
-              Unpublish
-            </Button>
+              loading={publishLoading}
+            />
           ) : null}
-          {(perms.canCreate || perms.canEdit) ? (
+          {(perms.canCreate || perms.canEdit) &&
+          (!isEditMode || loadedStatus === "DRAFT" || loadedStatus === "UNPUBLISHED") ? (
             <FormHeaderIconAction
               variant="publish"
               tooltipTitle={isEditMode ? "Publish notice" : "Publish Notice"}

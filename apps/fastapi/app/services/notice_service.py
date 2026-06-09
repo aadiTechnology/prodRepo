@@ -32,6 +32,14 @@ ALLOWED_NOTICE_TYPES = {"GENERAL", "FEE", "EVENT", "HOLIDAY", "EXAM"}
 AUDIENCE_WITH_CLASS_TARGETS = frozenset({"STUDENT", "ALL"})
 
 
+def _coerce_naive_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.replace(tzinfo=None)
+    return value
+
+
 def _validate_notice_input(
     *,
     title: str | None,
@@ -51,6 +59,8 @@ def _validate_notice_input(
         raise ValidationException("Please select audience")
     if notice_type is not None and notice_type not in ALLOWED_NOTICE_TYPES:
         raise ValidationException("Invalid notice type")
+    publish_date = _coerce_naive_utc(publish_date)
+    expiry_date = _coerce_naive_utc(expiry_date)
     if publish_date and expiry_date and expiry_date < publish_date:
         raise ValidationException("Expiry date cannot be before publish date")
 
@@ -72,6 +82,8 @@ def _validate_notice_input(
 
 
 def _derive_status_from_timeline(*, publish_date: datetime, expiry_date: datetime | None) -> str:
+    publish_date = _coerce_naive_utc(publish_date) or datetime.utcnow()
+    expiry_date = _coerce_naive_utc(expiry_date)
     now = datetime.utcnow()
     if expiry_date and expiry_date < now:
         return "EXPIRED"
@@ -82,13 +94,13 @@ def _derive_status_from_timeline(*, publish_date: datetime, expiry_date: datetim
 
 def _effective_notice_status(row: dict) -> str:
     stored = str(row.get("status") or "DRAFT")
-    expiry_date = row.get("expiry_date")
+    expiry_date = _coerce_naive_utc(row.get("expiry_date"))
     now = datetime.utcnow()
     if expiry_date and expiry_date < now:
         return "EXPIRED"
     if stored in {"DRAFT", "UNPUBLISHED", "EXPIRED"}:
         return stored
-    publish_date = row.get("publish_date")
+    publish_date = _coerce_naive_utc(row.get("publish_date"))
     if publish_date and publish_date > now:
         return "UNPUBLISHED"
     return stored
@@ -468,10 +480,9 @@ def update_notice(
     next_notice_type = update_data.get("notice_type", existing["notice_type"])
     next_publish_date = update_data.get("publish_date", existing["publish_date"])
     next_expiry_date = update_data.get("expiry_date", existing.get("expiry_date"))
-    normalized_targets = [item.model_dump() for item in targets] if targets is not None else None
-    normalized_attachments = (
-        [item.model_dump() for item in attachments] if attachments is not None else None
-    )
+    # payload.model_dump() already converts nested targets/attachments to plain dicts.
+    normalized_targets = targets
+    normalized_attachments = attachments
 
     _validate_notice_input(
         title=update_data.get("title", existing["title"]),
@@ -486,10 +497,18 @@ def update_notice(
         attachments=normalized_attachments,
     )
 
+    existing_status = str(existing.get("status") or "DRAFT").upper()
     if "status" in update_data and update_data["status"] is not None:
         next_status = str(update_data["status"]).upper()
     elif update_data.get("is_draft") is True:
         next_status = "DRAFT"
+    elif update_data.get("is_draft") is False:
+        next_status = _derive_status_from_timeline(
+            publish_date=next_publish_date,
+            expiry_date=next_expiry_date,
+        )
+    elif existing_status in {"PUBLISHED", "UNPUBLISHED"}:
+        next_status = existing_status
     else:
         next_status = _derive_status_from_timeline(
             publish_date=next_publish_date,
@@ -498,7 +517,11 @@ def update_notice(
     update_data["status"] = next_status
     update_data.pop("is_draft", None)
     update_data["is_published"] = next_status == "PUBLISHED"
-    update_data["published_at"] = datetime.utcnow() if next_status == "PUBLISHED" else existing.get("published_at")
+    update_data["published_at"] = (
+        datetime.utcnow()
+        if next_status == "PUBLISHED" and existing_status != "PUBLISHED"
+        else existing.get("published_at")
+    )
     update_data["unpublished_at"] = (
         datetime.utcnow() if next_status == "UNPUBLISHED" else existing.get("unpublished_at")
     )
