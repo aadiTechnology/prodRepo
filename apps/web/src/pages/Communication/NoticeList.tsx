@@ -27,13 +27,12 @@ export default function NoticeList() {
   );
 
   const toolbarFilters = useMemo(() => {
-    const filters = [
-      {
-        label: "Status",
-        value: c.status,
-        onChange: c.setStatus,
-        options: c.statusFilterOptions,
-      },
+    const filters: {
+      label: string;
+      value: string;
+      onChange: (value: string) => void;
+      options: { label: string; value: string }[];
+    }[] = [
       {
         label: "Type",
         value: c.noticeType,
@@ -41,7 +40,17 @@ export default function NoticeList() {
         options: c.noticeTypeFilterOptions,
       },
     ];
-    if (!c.readOnlyAudience) {
+
+    if (c.canUseAdminFilters) {
+      filters.unshift({
+        label: "Status",
+        value: c.status,
+        onChange: c.setStatus,
+        options: c.statusFilterOptions,
+      });
+    }
+
+    if (c.canUseAdminFilters && !c.readOnlyAudience) {
       filters.splice(1, 0, {
         label: "Audience",
         value: c.audienceType,
@@ -49,10 +58,12 @@ export default function NoticeList() {
         options: c.audienceFilterOptions,
       });
     }
+
     return filters;
   }, [
     c.audienceFilterOptions,
     c.audienceType,
+    c.canUseAdminFilters,
     c.noticeType,
     c.noticeTypeFilterOptions,
     c.readOnlyAudience,
@@ -110,7 +121,7 @@ export default function NoticeList() {
         onRowsPerPageChange={c.setRowsPerPage}
         columns={listConfig.columns}
         data={c.items}
-        loading={c.loading}
+        loading={c.tableLoading}
         emptyMessage={listConfig.uiPolicy.emptyMessage}
         getRowKey={(row) => row.id}
         renderRowActions={(row) => {

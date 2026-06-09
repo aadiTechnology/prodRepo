@@ -9,6 +9,46 @@ from app.models.notice import Notice, NoticeAttachment, NoticeTarget
 from app.services.notice_access import NoticeViewerContext, is_notice_consumer
 
 
+def _append_effective_status_filter(
+    where_sql: list[str],
+    params: dict,
+    status: str,
+    *,
+    table_alias: str = "n",
+) -> None:
+    """Match list chips / detail view via the same rules as notice_service._effective_notice_status."""
+    normalized = status.strip().upper()
+    if not normalized:
+        return
+
+    now = datetime.utcnow()
+    params["effective_status_now"] = now
+    table = table_alias
+
+    if normalized == "EXPIRED":
+        where_sql.append(f"({table}.expiry_date IS NOT NULL AND {table}.expiry_date < :effective_status_now)")
+    elif normalized == "DRAFT":
+        where_sql.append(
+            f"({table}.status = 'DRAFT' "
+            f"AND ({table}.expiry_date IS NULL OR {table}.expiry_date >= :effective_status_now))"
+        )
+    elif normalized == "UNPUBLISHED":
+        where_sql.append(
+            f"(({table}.expiry_date IS NULL OR {table}.expiry_date >= :effective_status_now) "
+            f"AND ({table}.status = 'UNPUBLISHED' "
+            f"OR ({table}.status = 'PUBLISHED' AND {table}.publish_date > :effective_status_now)))"
+        )
+    elif normalized == "PUBLISHED":
+        where_sql.append(
+            f"(({table}.expiry_date IS NULL OR {table}.expiry_date >= :effective_status_now) "
+            f"AND {table}.status NOT IN ('DRAFT', 'UNPUBLISHED', 'EXPIRED') "
+            f"AND {table}.publish_date <= :effective_status_now)"
+        )
+    else:
+        params["status"] = normalized
+        where_sql.append(f"{table}.status = :status")
+
+
 def _apply_consumer_visibility(
     where_sql: list[str],
     params: dict,
@@ -85,8 +125,7 @@ def list_notices(
         where_sql.append("n.notice_type = :notice_type")
         params["notice_type"] = notice_type
     if status:
-        where_sql.append("n.status = :status")
-        params["status"] = status
+        _append_effective_status_filter(where_sql, params, status)
     if is_published is not None:
         where_sql.append("n.is_published = :is_published")
         params["is_published"] = 1 if is_published else 0

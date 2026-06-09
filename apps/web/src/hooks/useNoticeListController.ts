@@ -1,26 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import noticeService from "../api/services/noticeService";
-import type { Notice, NoticeDropdownOptionsResponse } from "../types/notice";
+import type {
+  Notice,
+  NoticeAudienceType,
+  NoticeDropdownOptionsResponse,
+  NoticeStatus,
+  NoticeType,
+} from "../types/notice";
 import { audienceTypeLabel, noticeStatusLabel, noticeTypeLabel } from "../utils/noticeLabels";
 import { useNoticePermissions } from "./useNoticePermissions";
 
-const STATIC_STATUS_OPTIONS = ["DRAFT", "PUBLISHED", "UNPUBLISHED", "EXPIRED"].map((v) => ({
-  value: v,
-  label: noticeStatusLabel(v),
-}));
+const STATIC_STATUS_VALUES = ["DRAFT", "PUBLISHED", "UNPUBLISHED", "EXPIRED"] as const satisfies readonly NoticeStatus[];
 
-const STATIC_AUDIENCE_OPTIONS = ["ALL", "STUDENT", "TEACHER", "ADMIN"].map((v) => ({
-  value: v,
-  label: audienceTypeLabel(v),
-}));
+const STATIC_AUDIENCE_VALUES = ["ALL", "STUDENT", "TEACHER", "ADMIN"] as const satisfies readonly NoticeAudienceType[];
 
-const STATIC_NOTICE_TYPE_OPTIONS = ["GENERAL", "FEE", "EVENT", "HOLIDAY", "EXAM"].map((v) => ({
-  value: v,
-  label: noticeTypeLabel(v),
-}));
+const STATIC_NOTICE_TYPE_VALUES = ["GENERAL", "FEE", "EVENT", "HOLIDAY", "EXAM"] as const satisfies readonly NoticeType[];
 
 export function useNoticeListController() {
-  const { readOnlyAudience } = useNoticePermissions();
+  const { readOnlyAudience, canEdit, canCreate } = useNoticePermissions();
+  const canUseAdminFilters = canEdit || canCreate;
+
   const [items, setItems] = useState<Notice[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -37,6 +36,9 @@ export function useNoticeListController() {
   const [noticeToDelete, setNoticeToDelete] = useState<Notice | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+
+  const hasLoadedOnceRef = useRef(false);
+  const fetchGenerationRef = useRef(0);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 400);
@@ -58,37 +60,56 @@ export function useNoticeListController() {
     };
   }, []);
 
+  const listQueryParams = useMemo(
+    () => ({
+      page,
+      size: rowsPerPage,
+      search: debouncedSearch || undefined,
+      status: canUseAdminFilters && status ? status : undefined,
+      audience_type: canUseAdminFilters && !readOnlyAudience && audienceType ? audienceType : undefined,
+      notice_type: noticeType || undefined,
+    }),
+    [
+      audienceType,
+      canUseAdminFilters,
+      debouncedSearch,
+      noticeType,
+      page,
+      readOnlyAudience,
+      rowsPerPage,
+      status,
+    ]
+  );
+
   const fetchNotices = useCallback(async () => {
+    const generation = ++fetchGenerationRef.current;
+    const showBlockingLoader = !hasLoadedOnceRef.current;
+
     try {
-      setLoading(true);
+      if (showBlockingLoader) setLoading(true);
       setError(null);
-      const res = await noticeService.list({
-        page,
-        size: rowsPerPage,
-        search: debouncedSearch || undefined,
-        status: readOnlyAudience ? undefined : status || undefined,
-        audience_type: readOnlyAudience ? undefined : audienceType || undefined,
-        notice_type: noticeType || undefined,
-      });
+
+      const res = await noticeService.list(listQueryParams);
+      if (generation !== fetchGenerationRef.current) return;
+
       setItems(res.items ?? []);
       setTotalRows(res.total ?? 0);
+      hasLoadedOnceRef.current = true;
     } catch (err: unknown) {
-      setItems([]);
-      setTotalRows(0);
+      if (generation !== fetchGenerationRef.current) return;
+
+      if (!hasLoadedOnceRef.current) {
+        setItems([]);
+        setTotalRows(0);
+      }
       const msg = err instanceof Error ? err.message : "Unable to load notices";
       setError(msg);
     } finally {
-      setLoading(false);
+      if (generation === fetchGenerationRef.current) {
+        setLoading(false);
+      }
     }
-  }, [
-    audienceType,
-    debouncedSearch,
-    noticeType,
-    page,
-    readOnlyAudience,
-    rowsPerPage,
-    status,
-  ]);
+  }, [listQueryParams]);
 
   useEffect(() => {
     void fetchNotices();
@@ -96,19 +117,19 @@ export function useNoticeListController() {
 
   const statusFilterOptions = useMemo(() => {
     const raw = dropdowns?.status_types ?? [];
-    const source = raw.length > 0 ? raw : STATIC_STATUS_OPTIONS.map((o) => o.value);
+    const source: readonly NoticeStatus[] = raw.length > 0 ? raw : STATIC_STATUS_VALUES;
     return source.map((v) => ({ value: v, label: noticeStatusLabel(v) }));
   }, [dropdowns]);
 
   const audienceFilterOptions = useMemo(() => {
     const raw = dropdowns?.audience_types ?? [];
-    const source = raw.length > 0 ? raw : STATIC_AUDIENCE_OPTIONS.map((o) => o.value);
+    const source: readonly NoticeAudienceType[] = raw.length > 0 ? raw : STATIC_AUDIENCE_VALUES;
     return source.map((v) => ({ value: v, label: audienceTypeLabel(v) }));
   }, [dropdowns]);
 
   const noticeTypeFilterOptions = useMemo(() => {
     const raw = dropdowns?.notice_types ?? [];
-    const source = raw.length > 0 ? raw : STATIC_NOTICE_TYPE_OPTIONS.map((o) => o.value);
+    const source: readonly NoticeType[] = raw.length > 0 ? raw : STATIC_NOTICE_TYPE_VALUES;
     return source.map((v) => ({ value: v, label: noticeTypeLabel(v) }));
   }, [dropdowns]);
 
@@ -163,10 +184,13 @@ export function useNoticeListController() {
     }
   }, [closeDeleteConfirm, fetchNotices, noticeToDelete]);
 
+  const tableLoading = loading && items.length === 0;
+
   return {
     items,
     totalRows,
     loading,
+    tableLoading,
     error,
     setError,
     search,
@@ -194,5 +218,6 @@ export function useNoticeListController() {
     snackbar,
     setSnackbar,
     readOnlyAudience,
+    canUseAdminFilters,
   };
 }
