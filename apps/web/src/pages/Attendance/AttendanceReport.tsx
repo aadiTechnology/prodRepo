@@ -51,6 +51,44 @@ import {
 import holidayApi, { parseHolidayDateRange } from "../../services/holidayApi";
 
 const STUDENT_REPORT_LIMIT = 500;
+const EXPORT_REPORT_LIMIT = 10000;
+
+const escapeCsvCell = (value: string | number | null | undefined) => {
+  const str = String(value ?? "");
+  if (/[",\n\r]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};
+
+const exportAttendanceReportCsv = (
+  records: AttendanceReportResponse["records"],
+  fromDate: string,
+  toDate: string
+) => {
+  const headers = ["Date", "Roll #", "Student Name", "Status", "Type", "Remarks"];
+  const csvRows = [
+    headers.join(","),
+    ...records.map((record) =>
+      [
+        record.date,
+        escapeCsvCell(record.roll_no || "-"),
+        escapeCsvCell(record.student_name),
+        escapeCsvCell(record.status),
+        escapeCsvCell(record.type || "-"),
+        escapeCsvCell(record.remarks || "-"),
+      ].join(",")
+    ),
+  ].join("\n");
+
+  const blob = new Blob([csvRows], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Attendance_Report_${fromDate}_to_${toDate}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+};
 
 // ── Shared select style ───────────────────────────────────────────────────────
 const filterSelectSx = {
@@ -190,6 +228,7 @@ const AttendanceReport = () => {
 
   const [reportData, setReportData] = useState<AttendanceReportResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
@@ -460,31 +499,44 @@ const AttendanceReport = () => {
     fetchReport();
   }, [fetchReport]);
 
-  const handleExport = () => {
-    if (!reportData || reportData.records.length === 0) return;
+  const handleExport = async () => {
+    if (!reportData || reportData.total_count === 0) {
+      setSnackbar({ open: true, message: "No attendance records to export", severity: "error" });
+      return;
+    }
 
-    // Simple CSV Export
-    const headers = ["Date", "Roll #", "Student Name", "Status", "Type", "Remarks"];
-    const rows = reportData.records.map(r => [
-      r.date,
-      r.roll_no || "-",
-      r.student_name,
-      r.status,
-      r.type || "-",
-      r.remarks || "-"
-    ]);
+    if (filters.from_date > filters.to_date) {
+      setSnackbar({ open: true, message: "From Date cannot be greater than To Date", severity: "error" });
+      return;
+    }
 
-    const csvContent = "data:text/csv;charset=utf-8,"
-      + headers.join(",") + "\n"
-      + rows.map(e => e.join(",")).join("\n");
+    setExporting(true);
+    try {
+      const exportLimit = Math.min(reportData.total_count, EXPORT_REPORT_LIMIT);
+      const data = await attendanceService.getReport({
+        from_date: filters.from_date,
+        to_date: filters.to_date,
+        class_id: filters.class_id || undefined,
+        division_id: filters.division_id || undefined,
+        student_id: filters.student_id || undefined,
+        academic_year_id: filters.academic_year_id || undefined,
+        limit: exportLimit,
+        offset: 0,
+      });
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Attendance_Report_${filters.from_date}_to_${filters.to_date}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      if (!data.records.length) {
+        setSnackbar({ open: true, message: "No attendance records to export", severity: "error" });
+        return;
+      }
+
+      exportAttendanceReportCsv(data.records, filters.from_date, filters.to_date);
+      setSnackbar({ open: true, message: "Attendance report exported successfully", severity: "success" });
+    } catch (err) {
+      console.error("Failed to export attendance report", err);
+      setSnackbar({ open: true, message: "Failed to export attendance report", severity: "error" });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const getStatusChip = (status: string) => {
@@ -647,13 +699,21 @@ const AttendanceReport = () => {
     return map;
   }, [reportData, holidayDates]);
 
-  const headerActions = (
-    <Stack
-      direction={{ xs: "column", sm: "row" }}
-      alignItems={{ xs: "stretch", sm: "center" }}
-      gap={1}
-      sx={{ width: { xs: "100%", sm: "auto" } }}
-    >
+  const dateFieldSx = {
+    minWidth: { xs: "100%", sm: 160 },
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "15px",
+      fontSize: "0.85rem",
+      fontWeight: 600,
+      bgcolor: "#ffffff",
+      "& fieldset": { borderColor: colorTokens.border.subtle },
+      "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
+      "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
+    },
+  };
+
+  const dateFilterFields = (
+    <>
       <TextField
         label="From Date"
         type="date"
@@ -662,17 +722,9 @@ const AttendanceReport = () => {
         InputLabelProps={{ shrink: true }}
         onChange={(e) => {
           setPage(0);
-          setFilters(prev => ({ ...prev, from_date: e.target.value }));
+          setFilters((prev) => ({ ...prev, from_date: e.target.value }));
         }}
-        sx={{
-          minWidth: { xs: "100%", sm: 140 },
-          "& .MuiOutlinedInput-root": {
-            borderRadius: "15px",
-            fontSize: "0.85rem",
-            fontWeight: 600,
-            bgcolor: "#ffffff",
-          },
-        }}
+        sx={dateFieldSx}
       />
       <TextField
         label="To Date"
@@ -682,38 +734,40 @@ const AttendanceReport = () => {
         InputLabelProps={{ shrink: true }}
         onChange={(e) => {
           setPage(0);
-          setFilters(prev => ({ ...prev, to_date: e.target.value }));
+          setFilters((prev) => ({ ...prev, to_date: e.target.value }));
         }}
-        sx={{
-          minWidth: { xs: "100%", sm: 140 },
-          "& .MuiOutlinedInput-root": {
-            borderRadius: "15px",
-            fontSize: "0.85rem",
-            fontWeight: 600,
-            bgcolor: "#ffffff",
-          },
-        }}
+        sx={dateFieldSx}
       />
-      <Stack direction="row" spacing={1} alignItems="center">
+    </>
+  );
+
+  const headerActions = (
+    <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap">
+      <HeaderGradientIconButton
+        onClick={handleResetFilters}
+        icon={<RefreshIcon sx={{ fontSize: 22 }} />}
+        label={isStudent ? "Reset date range" : "Reset Filters"}
+      />
+      {!isStudent && (
         <HeaderGradientIconButton
-          onClick={handleResetFilters}
-          icon={<RefreshIcon sx={{ fontSize: 22 }} />}
-          label={isStudent ? "Reset date range" : "Reset Filters"}
+          onClick={() => void handleExport()}
+          icon={
+            exporting ? (
+              <CircularProgress size={22} sx={{ color: colorTokens.primary.contrast }} />
+            ) : (
+              <ExportIcon sx={{ fontSize: 22 }} />
+            )
+          }
+          label="Export CSV"
+          disabled={exporting || !reportData?.total_count}
         />
-        {!isStudent && (
-          <HeaderGradientIconButton
-            onClick={handleExport}
-            icon={<ExportIcon sx={{ fontSize: 22 }} />}
-            label="Export CSV"
-            disabled
-          />
-        )}
-      </Stack>
+      )}
     </Stack>
   );
 
   const filterCard = (
     <AppCard
+      paddingSize="none"
       sx={{
         borderRadius: "14px",
         border: `1px solid ${colorTokens.border.default}`,
@@ -727,11 +781,13 @@ const AttendanceReport = () => {
         flexWrap="wrap"
         sx={{
           width: "100%",
-          "& > .MuiInputBase-root": {
-            flex: { sm: 1 },
-          },
+          px: { xs: 2, sm: 2.5 },
+          py: 1.75,
+          bgcolor: alpha(colorTokens.primary.main, 0.015),
         }}
       >
+        {dateFilterFields}
+
         <Select
           value={filters.class_id || ""}
           displayEmpty
@@ -832,8 +888,33 @@ const AttendanceReport = () => {
           gap: { xs: 1.8, sm: 1.8 },
         }}
       >
-        {/* ── Filters (Row 1) — admin / teacher only ── */}
-        {!isStudent && filterCard}
+        {/* ── Filters (Row 1) ── */}
+        {!isStudent ? (
+          filterCard
+        ) : (
+          <AppCard
+            paddingSize="none"
+            sx={{
+              borderRadius: "14px",
+              border: `1px solid ${colorTokens.border.default}`,
+              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.03)",
+            }}
+          >
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              alignItems={{ xs: "stretch", sm: "center" }}
+              gap={1.5}
+              flexWrap="wrap"
+              sx={{
+                px: { xs: 2, sm: 2.5 },
+                py: 1.75,
+                bgcolor: alpha(colorTokens.primary.main, 0.015),
+              }}
+            >
+              {dateFilterFields}
+            </Stack>
+          </AppCard>
+        )}
 
         {reportData && isStudent && studentStats && (
           <>
