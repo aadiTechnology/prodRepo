@@ -103,7 +103,7 @@ export function addTeacherFormConfig({
         label: "Email Address",
         type: "text",
         placeholder: "user@example.com",
-        required: false,
+        required: true,
       },
 
       // Professional Details

@@ -10,6 +10,7 @@ import teacherService, { type TeacherCreate, type TeacherResponse, type TeacherU
 import schoolClassService, { type SchoolClass } from "../../api/services/schoolClassService";
 import { useAuth } from "../../context/AuthContext";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
+import { emailRequiredPatternRules } from "../../utils/formValidationPresets";
 import { useFormManager } from "../../hooks/useFormManager";
 import BaseForm from "../../components/reusable/BaseForm";
 import type { SelectItemOption, MediaUploadSlotItem } from "../../components/semantic";
@@ -67,9 +68,7 @@ export default function AddTeacher() {
       { type: "required", message: "Mobile number is required" },
       { type: "pattern", regex: /^[0-9]{10}$/, message: "Invalid mobile number" }
     ],
-    email: [
-      { type: "pattern", regex: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Invalid email format" }
-    ],
+    email: emailRequiredPatternRules<AddTeacherFormData>(),
     experience_years: [
       { type: "pattern", regex: /^\d*$/, message: "Must be a whole number" }
     ]
