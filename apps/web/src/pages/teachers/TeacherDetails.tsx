@@ -174,6 +174,7 @@ export default function TeacherDetails() {
               }}
             >
               <Avatar
+                key={teacher.photo_url || teacher.updated_at || teacher.id}
                 src={toMediaUrl(teacher.photo_url) || undefined}
                 sx={{
                   width: 112,

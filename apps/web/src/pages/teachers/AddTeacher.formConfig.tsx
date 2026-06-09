@@ -241,6 +241,7 @@ export function addTeacherFormConfig({
                     >
                       <Box
                         component="img"
+                        key={selectedItem.previewUrl}
                         src={selectedItem.previewUrl}
                         alt="Teacher profile"
                         sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
