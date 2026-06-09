@@ -151,7 +151,11 @@ def get_attendance(
         )
         service = AttendanceService(db)
         return service.get_attendance_grid(
-            attendance_date, class_id, division_id, current_user.tenant_id
+            attendance_date,
+            class_id,
+            division_id,
+            current_user.tenant_id,
+            academic_year_id,
         )
     except HTTPException:
         raise

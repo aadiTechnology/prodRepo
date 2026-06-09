@@ -289,34 +289,12 @@ const MarkAttendance = () => {
   // ── Row 1: PageHeader actions (Date + gradient action icons + Save) ──────
   const headerActions = (
     <Stack
-      direction={{ xs: "column", sm: "row" }}
-      alignItems={{ xs: "stretch", sm: "center" }}
-      gap={1.5}
+      direction="row"
+      spacing={1.25}
+      alignItems="center"
       flexWrap="wrap"
+      sx={{ justifyContent: { xs: "flex-start", sm: "flex-end" } }}
     >
-      <TextField
-        label="Date"
-        type="date"
-        size="small"
-        value={filters.attendance_date}
-        onChange={(e) =>
-          setFilters((prev) => ({ ...prev, attendance_date: e.target.value }))
-        }
-        InputLabelProps={{ shrink: true }}
-        inputProps={{
-          max: new Date().toISOString().split("T")[0],
-        }}
-        sx={{
-          minWidth: { xs: "100%", sm: 170 },
-          "& .MuiOutlinedInput-root": {
-            borderRadius: "15px",
-            fontSize: "0.85rem",
-            fontWeight: 600,
-            bgcolor: "#ffffff",
-          },
-        }}
-      />
-
       <Stack direction="row" spacing={1.25} alignItems="center">
         <HeaderGradientIconButton
           onClick={resetFilters}
@@ -340,6 +318,19 @@ const MarkAttendance = () => {
     </Stack>
   );
 
+  const dateFieldSx = {
+    minWidth: { xs: "100%", sm: 170 },
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "15px",
+      fontSize: "0.85rem",
+      fontWeight: 600,
+      bgcolor: "#ffffff",
+      "& fieldset": { borderColor: colorTokens.border.subtle },
+      "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
+      "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
+    },
+  };
+
   // ── Row 2: Filter & Legend card (separate container) ──────────────────────
   const filterCard = (
     <AppCard
@@ -361,6 +352,21 @@ const MarkAttendance = () => {
           bgcolor: alpha(colorTokens.primary.main, 0.015),
         }}
       >
+        <TextField
+          label="Date"
+          type="date"
+          size="small"
+          value={filters.attendance_date}
+          onChange={(e) =>
+            setFilters((prev) => ({ ...prev, attendance_date: e.target.value }))
+          }
+          InputLabelProps={{ shrink: true }}
+          inputProps={{
+            max: new Date().toISOString().split("T")[0],
+          }}
+          sx={dateFieldSx}
+        />
+
         <Select
           value={filters.academic_year_id || ""}
           displayEmpty
@@ -498,7 +504,7 @@ const MarkAttendance = () => {
         </Box>
       ) : students.length > 0 ? (
         <EntityTableSection<any>
-          label="Student Attendance"
+          label=""
           loading={loading}
           totalRows={students.length}
           page={page}
@@ -511,7 +517,7 @@ const MarkAttendance = () => {
           columns={columns}
           data={paginatedStudents}
           showPagination
-          showInfoBar
+          showInfoBar={false}
           getRowKey={(row) => String(row.student_id)}
         />
       ) : (

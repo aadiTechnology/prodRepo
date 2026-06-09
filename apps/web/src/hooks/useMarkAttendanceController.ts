@@ -83,6 +83,9 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     severity: 'success',
   });
 
+  const prevAcademicYearId = useRef<number>(0);
+  const prevAutoFetchKey = useRef<string>("");
+
   const showError = (message: string) => {
     setSnackbar({ open: true, message, severity: "error" });
   };
@@ -142,9 +145,13 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
           );
           const firstPair = getTeacherClassDivisionPairs(scoped)[0];
 
+          const resolvedYearId = activeYearId || prev.academic_year_id;
+          if (resolvedYearId) {
+            prevAcademicYearId.current = resolvedYearId;
+          }
           setFilters((prev) => ({
             ...prev,
-            academic_year_id: activeYearId || prev.academic_year_id,
+            academic_year_id: resolvedYearId,
             teacher_id: teacherId,
             class_id: firstPair?.class_id ?? teacherDetail!.class_id ?? 0,
             division_id: firstPair?.division_id ?? teacherDetail!.class_division_id ?? 0,
@@ -177,6 +184,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         setAllTeachers(Array.from(uniqueTeachersById.values()));
 
         if (activeYear) {
+          prevAcademicYearId.current = activeYear.id;
           setFilters((prev) => ({ ...prev, academic_year_id: activeYear.id }));
         }
       } catch (err) {
@@ -345,67 +353,146 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredClasses]);
 
-  const prevAutoFetchKey = useRef<string>("");
+  const buildAutoFetchKey = useCallback(
+    (nextFilters: AttendanceFilters) =>
+      `${nextFilters.academic_year_id}_${nextFilters.class_id}_${nextFilters.division_id}_${nextFilters.attendance_date}`,
+    []
+  );
+
+  const reloadTeacherScopeForYear = useCallback(
+    async (academicYearId: number) => {
+      if (!isTeacher || !user?.id) return;
+
+      const scope = await attendanceService.getMyScope(academicYearId || undefined);
+      const assignmentList = buildMappingsFromAttendanceScope(scope, academicYearId);
+      const classList = scopeToSchoolClasses(scope, user.tenant_id ?? 0);
+
+      setClasses(classList);
+      setAssignmentMappings(assignmentList);
+
+      const scoped = getTeacherAttendanceScopedMappings(
+        assignmentList,
+        scope.teacher_id,
+        academicYearId
+      );
+      const firstPair = getTeacherClassDivisionPairs(scoped)[0];
+
+      setFilters((prev) => ({
+        ...prev,
+        academic_year_id: academicYearId,
+        teacher_id: scope.teacher_id,
+        class_id: firstPair?.class_id ?? 0,
+        division_id: firstPair?.division_id ?? 0,
+      }));
+    },
+    [isTeacher, user?.id, user?.tenant_id]
+  );
+
+  const fetchStudentsWithFilters = useCallback(
+    async (nextFilters: AttendanceFilters, options?: { force?: boolean }) => {
+      if (!nextFilters.class_id) {
+        if (!options?.force) showError("Please select Class");
+        return;
+      }
+      if (!nextFilters.division_id) {
+        if (!options?.force) showError("Please select Division");
+        return;
+      }
+      if (!nextFilters.attendance_date) {
+        if (!options?.force) showError("Please select Date");
+        return;
+      }
+      if (isFutureDate(nextFilters.attendance_date)) {
+        showError("You cannot mark attendance for future dates");
+        return;
+      }
+
+      const selectedYear = academicYears.find((y) => y.id === nextFilters.academic_year_id);
+      if (selectedYear) {
+        if (
+          nextFilters.attendance_date < selectedYear.start_date ||
+          nextFilters.attendance_date > selectedYear.end_date
+        ) {
+          showError("Selected date is outside the academic year");
+          return;
+        }
+      }
+
+      setLoading(true);
+      try {
+        const data = await attendanceService.getAttendance({
+          attendance_date: nextFilters.attendance_date,
+          class_id: nextFilters.class_id,
+          division_id: nextFilters.division_id,
+          academic_year_id: nextFilters.academic_year_id || undefined,
+        });
+        setStudents(data.attendance);
+        prevAutoFetchKey.current = buildAutoFetchKey(nextFilters);
+      } catch (err) {
+        console.error("Failed to fetch students", err);
+        showError(resolveNetworkErrorMessage("Unable to load student list", err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [academicYears, today, buildAutoFetchKey]
+  );
+
+  const fetchStudents = useCallback(
+    () => fetchStudentsWithFilters(filters),
+    [filters, fetchStudentsWithFilters]
+  );
+
   useEffect(() => {
-    const key = `${filters.class_id}_${filters.division_id}_${filters.attendance_date}`;
+    if (!filters.academic_year_id) return;
+
+    const previousYear = prevAcademicYearId.current;
+    if (previousYear === filters.academic_year_id) return;
+
+    prevAcademicYearId.current = filters.academic_year_id;
+    if (previousYear === 0) return;
+
+    prevAutoFetchKey.current = "";
+    setStudents([]);
+
+    if (isTeacher) {
+      void reloadTeacherScopeForYear(filters.academic_year_id).catch((err) => {
+        console.error("Failed to reload teacher scope for academic year", err);
+        showError("Unable to load classes for the selected academic year");
+      });
+      return;
+    }
+
+    setFilters((prev) => ({
+      ...prev,
+      teacher_id: 0,
+      class_id: 0,
+      division_id: 0,
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.academic_year_id, isTeacher, reloadTeacherScopeForYear]);
+
+  useEffect(() => {
+    const key = buildAutoFetchKey(filters);
     if (
       filters.class_id &&
       filters.division_id &&
       filters.attendance_date &&
+      filters.academic_year_id &&
       key !== prevAutoFetchKey.current
     ) {
-      prevAutoFetchKey.current = key;
       if (filters.attendance_date > today) return;
-      void fetchStudents();
+      void fetchStudentsWithFilters(filters);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.class_id, filters.division_id, filters.attendance_date]);
-
-  const fetchStudents = useCallback(async () => {
-    if (!filters.class_id) {
-      showError("Please select Class");
-      return;
-    }
-    if (!filters.division_id) {
-      showError("Please select Division");
-      return;
-    }
-    if (!filters.attendance_date) {
-      showError("Please select Date");
-      return;
-    }
-    if (isFutureDate(filters.attendance_date)) {
-      showError("You cannot mark attendance for future dates");
-      return;
-    }
-
-    const selectedYear = academicYears.find((y) => y.id === filters.academic_year_id);
-    if (selectedYear) {
-      if (
-        filters.attendance_date < selectedYear.start_date ||
-        filters.attendance_date > selectedYear.end_date
-      ) {
-        showError("Selected date is outside the academic year");
-        return;
-      }
-    }
-
-    setLoading(true);
-    try {
-      const data = await attendanceService.getAttendance({
-        attendance_date: filters.attendance_date,
-        class_id: filters.class_id,
-        division_id: filters.division_id,
-        academic_year_id: filters.academic_year_id || undefined,
-      });
-      setStudents(data.attendance);
-    } catch (err) {
-      console.error("Failed to fetch students", err);
-      showError(resolveNetworkErrorMessage("Unable to load student list", err));
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, academicYears, today]);
+  }, [
+    filters.academic_year_id,
+    filters.class_id,
+    filters.division_id,
+    filters.attendance_date,
+    buildAutoFetchKey,
+    fetchStudentsWithFilters,
+  ]);
 
   const updateStudentStatus = (studentId: number, status: string) => {
     setStudents((prev) => prev.map((s) => (s.student_id === studentId ? { ...s, status } : s)));
@@ -473,31 +560,62 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
   };
 
   const resetFilters = () => {
-    setStudents([]);
+    const activeYear = academicYears.find((y) => y.is_active);
+    const activeYearId = activeYear?.id ?? filters.academic_year_id;
     prevAutoFetchKey.current = "";
+
     if (!isTeacher) {
-      setFilters((prev) => ({
-        ...prev,
+      if (activeYearId) {
+        prevAcademicYearId.current = activeYearId;
+      }
+      setStudents([]);
+      setFilters({
+        academic_year_id: activeYearId,
         teacher_id: 0,
         class_id: 0,
         division_id: 0,
         attendance_date: today,
-      }));
-    } else {
-      const scoped = getTeacherAttendanceScopedMappings(
-        assignmentMappings,
-        filters.teacher_id,
-        filters.academic_year_id
-      );
-      const pairs = getTeacherClassDivisionPairs(scoped);
-      const firstPair = pairs[0];
-      setFilters((prev) => ({
-        ...prev,
-        class_id: firstPair?.class_id ?? 0,
-        division_id: firstPair?.division_id ?? 0,
-        attendance_date: today,
-      }));
+      });
+      return;
     }
+
+    if (!user?.id) return;
+
+    void (async () => {
+      try {
+        const scope = await attendanceService.getMyScope(activeYearId || undefined);
+        const assignmentList = buildMappingsFromAttendanceScope(scope, activeYearId);
+        const classList = scopeToSchoolClasses(scope, user.tenant_id ?? 0);
+
+        setClasses(classList);
+        setAssignmentMappings(assignmentList);
+
+        const scoped = getTeacherAttendanceScopedMappings(
+          assignmentList,
+          scope.teacher_id,
+          activeYearId
+        );
+        const firstPair = getTeacherClassDivisionPairs(scoped)[0];
+
+        const nextFilters: AttendanceFilters = {
+          academic_year_id: activeYearId,
+          teacher_id: scope.teacher_id,
+          class_id: firstPair?.class_id ?? 0,
+          division_id: firstPair?.division_id ?? 0,
+          attendance_date: today,
+        };
+
+        if (activeYearId) {
+          prevAcademicYearId.current = activeYearId;
+        }
+
+        setFilters(nextFilters);
+        await fetchStudentsWithFilters(nextFilters, { force: true });
+      } catch (err) {
+        console.error("Failed to reset attendance filters", err);
+        showError("Unable to reset filters");
+      }
+    })();
   };
 
   return {

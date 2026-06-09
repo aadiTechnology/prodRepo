@@ -22,22 +22,28 @@ class AttendanceService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_attendance_grid(self, attendance_date: date, class_id: int, division_id: int, tenant_id: int) -> AttendanceListResponse:
+    def get_attendance_grid(
+        self,
+        attendance_date: date,
+        class_id: int,
+        division_id: int,
+        tenant_id: int,
+        academic_year_id: Optional[int] = None,
+    ) -> AttendanceListResponse:
         if attendance_date > date.today():
             raise HTTPException(status_code=400, detail="Cannot fetch attendance for future dates")
 
-        # 1. Fetch all active students for this class/division
-        students = (
-            self.db.query(Student)
-            .filter(
-                Student.tenant_id == tenant_id,
-                Student.class_id == class_id,
-                Student.class_division_id == division_id,
-                Student.is_active == True
-            )
-            .order_by(Student.roll_no, Student.student_name)
-            .all()
+        # 1. Fetch all active students for this class/division (optionally scoped to academic year)
+        student_query = self.db.query(Student).filter(
+            Student.tenant_id == tenant_id,
+            Student.class_id == class_id,
+            Student.class_division_id == division_id,
+            Student.is_active == True,
         )
+        if academic_year_id is not None:
+            student_query = student_query.filter(Student.academic_year_id == academic_year_id)
+
+        students = student_query.order_by(Student.roll_no, Student.student_name).all()
 
         # 2. Fetch existing attendance records for the date
         existing_attendance = {
