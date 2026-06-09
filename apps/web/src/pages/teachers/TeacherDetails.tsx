@@ -29,6 +29,7 @@ import { DetailFieldRow } from "../../components/reusable";
 import PrimaryActionButton from "../../components/reusable/PrimaryActionButton";
 import StatusChip from "../../components/roles/StatusChip";
 import { formatShortDate } from "../../utils/formatters";
+import { toMediaUrl } from "../../utils/mediaUrl";
 import { colorTokens } from "../../tokens/colors";
 
 function SectionHeader({ title, icon }: { title: string; icon: React.ReactNode }) {
@@ -173,7 +174,7 @@ export default function TeacherDetails() {
               }}
             >
               <Avatar
-                src={teacher.photo_url || undefined}
+                src={toMediaUrl(teacher.photo_url) || undefined}
                 sx={{
                   width: 112,
                   height: 112,

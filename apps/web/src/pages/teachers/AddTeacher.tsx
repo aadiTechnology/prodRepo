@@ -15,6 +15,7 @@ import { useFormManager } from "../../hooks/useFormManager";
 import BaseForm from "../../components/reusable/BaseForm";
 import type { SelectItemOption, MediaUploadSlotItem } from "../../components/semantic";
 import { addTeacherFormConfig, type AddTeacherFormData } from "./AddTeacher.formConfig";
+import { toMediaUrl } from "../../utils/mediaUrl";
 
 const MULTI_ASSIGNED_CLASS_VALUE = "__multi_assigned_class__";
 const MULTI_ASSIGNED_DIVISION_VALUE = "__multi_assigned_division__";
@@ -125,7 +126,7 @@ export default function AddTeacher() {
         pincode: teacher.pincode || null,
       });
       if (teacher.photo_url) {
-        setUploadItems([{ id: "existing", previewUrl: teacher.photo_url }]);
+        setUploadItems([{ id: "existing", previewUrl: toMediaUrl(teacher.photo_url) || teacher.photo_url }]);
       }
 
     } catch (err) {

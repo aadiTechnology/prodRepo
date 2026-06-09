@@ -35,28 +35,11 @@ import { PageHeader, PageLayout } from "../components/layout";
 import PrimaryActionButton from "../components/reusable/PrimaryActionButton";
 import { DetailFieldRow } from "../components/reusable";
 import profileService, { ProfileResponse } from "../api/services/profileService";
-import { apiBaseUrl } from "../config";
 import { colorTokens } from "../tokens/colors";
+import { toMediaUrl } from "../utils/mediaUrl";
 import { formatShortDate } from "../utils/formatters";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
-
-const toFullUrl = (path: string | null | undefined): string | undefined => {
-    if (!path) return undefined;
-    if (path.startsWith("http")) {
-        try {
-            const url = new URL(path);
-            const apiUrl = new URL(apiBaseUrl);
-            if (url.hostname !== apiUrl.hostname) return undefined;
-            return path;
-        } catch {
-            return undefined;
-        }
-    }
-    if (path.includes("..") || path.includes("//")) return undefined;
-    const root = apiBaseUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
-    return `${root}${path}`;
-};
 
 const formatRole = (role: string): string =>
     role
@@ -267,7 +250,7 @@ const ProfilePage = () => {
         );
     }
 
-    const avatarSrc = toFullUrl(profile?.profile_image_path);
+    const avatarSrc = toMediaUrl(profile?.profile_image_path);
     const initials = (profile?.full_name ?? "?")
         .split(" ")
         .map((n) => n[0])
