@@ -85,6 +85,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
 
   const prevAcademicYearId = useRef<number>(0);
   const prevAutoFetchKey = useRef<string>("");
+  const suppressAutoFillRef = useRef(false);
 
   const showError = (message: string) => {
     setSnackbar({ open: true, message, severity: "error" });
@@ -145,17 +146,19 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
           );
           const firstPair = getTeacherClassDivisionPairs(scoped)[0];
 
-          const resolvedYearId = activeYearId || prev.academic_year_id;
-          if (resolvedYearId) {
-            prevAcademicYearId.current = resolvedYearId;
-          }
-          setFilters((prev) => ({
-            ...prev,
-            academic_year_id: resolvedYearId,
-            teacher_id: teacherId,
-            class_id: firstPair?.class_id ?? teacherDetail!.class_id ?? 0,
-            division_id: firstPair?.division_id ?? teacherDetail!.class_division_id ?? 0,
-          }));
+          setFilters((prev) => {
+            const resolvedYearId = activeYearId || prev.academic_year_id;
+            if (resolvedYearId) {
+              prevAcademicYearId.current = resolvedYearId;
+            }
+            return {
+              ...prev,
+              academic_year_id: resolvedYearId,
+              teacher_id: teacherId,
+              class_id: firstPair?.class_id ?? teacherDetail!.class_id ?? 0,
+              division_id: firstPair?.division_id ?? teacherDetail!.class_division_id ?? 0,
+            };
+          });
           return;
         }
 
@@ -294,8 +297,14 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     }
   }, [filters.academic_year_id, teachers, filters.teacher_id, isTeacher]);
 
+  const updateFilters = useCallback((action: React.SetStateAction<AttendanceFilters>) => {
+    suppressAutoFillRef.current = false;
+    setFilters(action);
+  }, []);
+
   useEffect(() => {
     setDivisions(filteredDivisions);
+    if (suppressAutoFillRef.current) return;
     if (!filters.class_id || filteredDivisions.length === 0) {
       if (filteredDivisions.length === 0 && filters.division_id !== 0) {
         setFilters((prev) => ({ ...prev, division_id: 0 }));
@@ -310,6 +319,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
   }, [filteredDivisions, filters.class_id]);
 
   useEffect(() => {
+    if (suppressAutoFillRef.current) return;
     if (filteredClasses.length === 0) {
       if (filters.class_id !== 0) {
         setFilters((prev) => ({ ...prev, class_id: 0, division_id: 0 }));
@@ -561,14 +571,16 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
 
   const resetFilters = () => {
     const activeYear = academicYears.find((y) => y.is_active);
-    const activeYearId = activeYear?.id ?? filters.academic_year_id;
+    const activeYearId = activeYear?.id ?? 0;
     prevAutoFetchKey.current = "";
 
     if (!isTeacher) {
+      suppressAutoFillRef.current = true;
       if (activeYearId) {
         prevAcademicYearId.current = activeYearId;
       }
       setStudents([]);
+      setLoading(false);
       setFilters({
         academic_year_id: activeYearId,
         teacher_id: 0,
@@ -583,6 +595,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
 
     void (async () => {
       try {
+        suppressAutoFillRef.current = false;
         const scope = await attendanceService.getMyScope(activeYearId || undefined);
         const assignmentList = buildMappingsFromAttendanceScope(scope, activeYearId);
         const classList = scopeToSchoolClasses(scope, user.tenant_id ?? 0);
@@ -612,8 +625,8 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         setFilters(nextFilters);
         await fetchStudentsWithFilters(nextFilters, { force: true });
       } catch (err) {
-        console.error("Failed to reset attendance filters", err);
-        showError("Unable to reset filters");
+        console.error("Failed to refresh attendance", err);
+        showError("Unable to refresh attendance");
       }
     })();
   };
@@ -628,7 +641,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     loading,
     saving,
     snackbar,
-    setFilters,
+    setFilters: updateFilters,
     setSnackbar,
     fetchStudents,
     updateStudentStatus,

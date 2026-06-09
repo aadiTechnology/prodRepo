@@ -59,6 +59,7 @@ const HeaderGradientIconButton = ({
   <Tooltip title={label}>
     <span style={{ display: "inline-flex" }}>
       <IconButton
+        type="button"
         onClick={onClick}
         aria-label={label}
         disabled={disabled}
@@ -299,7 +300,7 @@ const MarkAttendance = () => {
         <HeaderGradientIconButton
           onClick={resetFilters}
           icon={<RefreshIcon sx={{ fontSize: 22 }} />}
-          label="Reset Filters"
+          label="Clear filters and roster"
         />
         <HeaderGradientIconButton
           onClick={markAllPresent}
