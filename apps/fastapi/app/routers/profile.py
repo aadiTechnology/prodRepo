@@ -9,6 +9,7 @@ from app.models.user_profile import UserProfile
 from app.models.teacher import Teacher
 from app.schemas.profile import ProfileResponse, ProfileUpdate
 from app.core.logging_config import get_logger
+from app.services import profile_image_service
 
 logger = get_logger(__name__)
 
@@ -68,9 +69,7 @@ async def get_profile(
         logger.warning(f"User not found for ID: {current_user.id}")
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Get UserProfile for THIS user only (user_id enforced)
-    profile = db.query(UserProfile).filter(UserProfile.UserId == current_user.id).first()
-    image_path = profile.ProfileImagePath if profile else None
+    image_path = profile_image_service.resolve_user_profile_image_path(db, current_user.id)
 
     logger.info(
         f"✓ Profile fetched for user {current_user.id} ({db_user.email}) | "
@@ -110,9 +109,7 @@ async def update_profile(
     db.commit()
     db.refresh(db_user)
 
-    # Get UserProfile for THIS user only
-    profile = db.query(UserProfile).filter(UserProfile.UserId == current_user.id).first()
-    image_path = profile.ProfileImagePath if profile else None
+    image_path = profile_image_service.resolve_user_profile_image_path(db, current_user.id)
 
     logger.info(
         f"✓ Profile name updated for user {current_user.id} ({db_user.email}) | "
@@ -196,6 +193,10 @@ async def upload_profile_image(
         )
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+    profile_image_service.sync_teacher_photo_from_profile_path(
+        db, current_user.id, profile.ProfileImagePath
+    )
+
     # Get updated User record
     db_user = db.query(User).filter(User.id == current_user.id).first()
     logger.info(
@@ -253,6 +254,8 @@ async def delete_profile_image(
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     else:
         logger.info(f"[DELETE] No image found for user {current_user.id} to delete")
+
+    profile_image_service.sync_teacher_photo_from_profile_path(db, current_user.id, None)
 
     # Get updated User record
     db_user = db.query(User).filter(User.id == current_user.id).first()

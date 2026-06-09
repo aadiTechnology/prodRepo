@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.revoked_token import RevokedToken
 from app.models.user import User, UserRole
 from app.models.tenant import Tenant
-from app.models.user_profile import UserProfile
+from app.services import profile_image_service
 from app.schemas.auth import LoginContextResponse, TenantInfo, UserWithRole
 from app.utils.security import create_access_token
 from app.services import rbac_service, theme_template_service
@@ -57,9 +57,8 @@ def get_login_context(
             theme_config=theme_template_service.get_template_config(db, tenant.theme_template_id) if getattr(tenant, "theme_template_id", None) else None,
         )
 
-    # 3. Profile Image Fetch
-    profile = db.query(UserProfile).filter(UserProfile.UserId == user.id).first()
-    profile_image_path = profile.ProfileImagePath if profile else None
+    # 3. Profile Image Fetch (UserProfile + teacher photo fallback)
+    profile_image_path = profile_image_service.resolve_user_profile_image_path(db, user.id)
 
     # 4. RBAC Resolution
     roles = [role.code for role in rbac_service.get_user_roles(db, user.id)]

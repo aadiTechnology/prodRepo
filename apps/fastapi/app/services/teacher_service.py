@@ -6,7 +6,7 @@ from app.models.teacher import Teacher
 from app.models.user import User
 from app.schemas.teacher_schema import TeacherCreate, TeacherUpdate
 from app.schemas.user import UserCreate, UserUpdate
-from app.services import user_service
+from app.services import user_service, profile_image_service
 from app.core.exceptions import ConflictException, NotFoundException
 from fastapi import HTTPException, status
 
@@ -384,6 +384,11 @@ def create_teacher(db: Session, payload: TeacherCreate, created_by: int, tenant_
     db.add(db_teacher)
     db.commit()
     db.refresh(db_teacher)
+
+    if user_id and payload.photo_url:
+        profile_image_service.save_user_profile_image(db, user_id, payload.photo_url)
+        db.refresh(db_teacher)
+
     return db_teacher
 
 def update_teacher(db: Session, teacher_id: int, payload: TeacherUpdate, updated_by: int, tenant_id: int) -> Teacher:
@@ -401,11 +406,14 @@ def update_teacher(db: Session, teacher_id: int, payload: TeacherUpdate, updated
             check_division_assignment_conflict(db, tenant_id, new_class_id, new_div_id, exclude_id=teacher_id)
         
     update_data = payload.model_dump(exclude_unset=True)
+    photo_url_provided = "photo_url" in update_data
+    photo_url_value = update_data.pop("photo_url", None) if photo_url_provided else None
+
     for key, value in update_data.items():
         setattr(db_teacher, key, value)
-        
+
     db_teacher.updated_by = updated_by
-    
+
     # Sync with User account if linked
     if db_teacher.user_id:
         user_update_data = {}
@@ -415,10 +423,21 @@ def update_teacher(db: Session, teacher_id: int, payload: TeacherUpdate, updated
             user_update_data['phone_number'] = payload.mobile_number
         if payload.is_active is not None:
             user_update_data['is_active'] = payload.is_active
-            
+
         if user_update_data:
             from app.schemas.user import UserUpdate
             user_service.update_user(db, db_teacher.user_id, UserUpdate(**user_update_data), updated_by=updated_by)
+
+    if photo_url_provided:
+        if db_teacher.user_id:
+            public_path = profile_image_service.save_user_profile_image(
+                db,
+                db_teacher.user_id,
+                photo_url_value,
+            )
+            db_teacher.photo_url = public_path
+        else:
+            db_teacher.photo_url = photo_url_value
 
     db.commit()
     db.refresh(db_teacher)

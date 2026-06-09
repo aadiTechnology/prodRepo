@@ -11,7 +11,7 @@ from app.core.dependencies import (
 )
 from app.schemas.teacher_schema import TeacherCreate, TeacherUpdate, TeacherResponse, TeacherListResponse
 from app.schemas.attendance_schema import AttendanceTeacherScopeResponse
-from app.services import teacher_service
+from app.services import teacher_service, profile_image_service
 from app.services.attendance_service import AttendanceService
 from app.core.logging_config import get_logger
 
@@ -19,14 +19,25 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/teachers", tags=["Teachers"])
 
-def map_db_model_to_response(teacher: Any, assignment_rows: list[dict] | None = None) -> TeacherResponse:
+def map_db_model_to_response(
+    teacher: Any,
+    assignment_rows: list[dict] | None = None,
+    db: Session | None = None,
+) -> TeacherResponse:
     assignment_rows = assignment_rows or []
 
     if isinstance(teacher, Mapping):
+        user_id = teacher.get("user_id")
+        stored_photo_url = teacher.get("photo_url")
+        photo_url = (
+            profile_image_service.resolve_teacher_photo_url(db, user_id, stored_photo_url)
+            if db
+            else stored_photo_url
+        )
         return TeacherResponse(
             id=teacher["id"],
             tenant_id=teacher["tenant_id"],
-            user_id=teacher.get("user_id"),
+            user_id=user_id,
             teacher_code=teacher.get("teacher_code"),
             full_name=teacher["full_name"],
             date_of_birth=teacher.get("date_of_birth"),
@@ -35,7 +46,7 @@ def map_db_model_to_response(teacher: Any, assignment_rows: list[dict] | None = 
             email=teacher.get("email"),
             qualification=teacher.get("qualification"),
             experience_years=teacher.get("experience_years"),
-            photo_url=teacher.get("photo_url"),
+            photo_url=photo_url,
             class_id=teacher.get("class_id"),
             class_division_id=teacher.get("class_division_id"),
             is_active=teacher["is_active"],
@@ -50,6 +61,11 @@ def map_db_model_to_response(teacher: Any, assignment_rows: list[dict] | None = 
             assignment_rows=assignment_rows,
         )
 
+    photo_url = (
+        profile_image_service.resolve_teacher_photo_url(db, teacher.user_id, teacher.photo_url)
+        if db
+        else teacher.photo_url
+    )
     return TeacherResponse(
         id=teacher.id,
         tenant_id=teacher.tenant_id,
@@ -62,7 +78,7 @@ def map_db_model_to_response(teacher: Any, assignment_rows: list[dict] | None = 
         email=teacher.email,
         qualification=teacher.qualification,
         experience_years=teacher.experience_years,
-        photo_url=teacher.photo_url,
+        photo_url=photo_url,
         class_id=teacher.class_id,
         class_division_id=teacher.class_division_id,
         is_active=teacher.is_active,
@@ -102,7 +118,7 @@ async def list_teachers(
     )
     
     return TeacherListResponse(
-        items=[map_db_model_to_response(t) for t in db_teachers],
+        items=[map_db_model_to_response(t, db=db) for t in db_teachers],
         total=total
     )
 
@@ -131,7 +147,7 @@ async def get_teacher(
     """Get a specific teacher by ID."""
     db_teacher = teacher_service.get_teacher_by_id(db, teacher_id, current_user.tenant_id)
     assignment_rows = teacher_service.get_teacher_assignment_rows(db, current_user.tenant_id, teacher_id)
-    return map_db_model_to_response(db_teacher, assignment_rows=assignment_rows)
+    return map_db_model_to_response(db_teacher, assignment_rows=assignment_rows, db=db)
 
 @router.post("/", response_model=TeacherResponse, status_code=status.HTTP_201_CREATED)
 async def create_teacher(
@@ -151,7 +167,7 @@ async def create_teacher(
         f"for tenant_id={effective_tenant_id} (account tenant_id={current_user.tenant_id})"
     )
     db_teacher = teacher_service.create_teacher(db, payload, current_user.id, effective_tenant_id)
-    return map_db_model_to_response(db_teacher)
+    return map_db_model_to_response(db_teacher, db=db)
 
 @router.put("/{teacher_id}", response_model=TeacherResponse)
 async def update_teacher(
@@ -163,7 +179,7 @@ async def update_teacher(
     """Update a teacher."""
     logger.info(f"User {current_user.email} updating teacher {teacher_id}")
     db_teacher = teacher_service.update_teacher(db, teacher_id, payload, current_user.id, current_user.tenant_id)
-    return map_db_model_to_response(db_teacher)
+    return map_db_model_to_response(db_teacher, db=db)
 
 @router.patch("/{teacher_id}/status", response_model=TeacherResponse)
 async def toggle_teacher_status(
@@ -173,7 +189,7 @@ async def toggle_teacher_status(
 ):
     """Toggle a teacher's status (active/inactive)."""
     db_teacher = teacher_service.toggle_teacher_status(db, teacher_id, current_user.id, current_user.tenant_id)
-    return map_db_model_to_response(db_teacher)
+    return map_db_model_to_response(db_teacher, db=db)
 
 @router.delete("/{teacher_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_teacher(
