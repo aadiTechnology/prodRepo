@@ -332,6 +332,70 @@ interface SnapCardProps {
   sub?: React.ReactNode;
   onClick?: () => void;
 }
+const genderChipLabelSx = {
+  display: "inline-flex",
+  alignItems: "center",
+  px: 1,
+  py: 0,
+  fontSize: "11px",
+  fontWeight: 700,
+  lineHeight: 1.25,
+};
+
+const GenderCountChip = ({
+  tooltip,
+  count,
+  variant,
+}: {
+  tooltip: string;
+  count: number;
+  variant: "boys" | "girls";
+}) => {
+  const isBoys = variant === "boys";
+  const label = isBoys ? `♂ ${count}` : `♀ ${count}`;
+
+  return (
+    <Tooltip
+      title={tooltip}
+      arrow
+      placement="bottom"
+      enterDelay={150}
+      slotProps={{
+        popper: {
+          sx: { zIndex: (theme) => theme.zIndex.tooltip + 2 },
+        },
+        tooltip: {
+          sx: { fontSize: "12px", fontWeight: 600 },
+        },
+      }}
+    >
+      <Box
+        component="span"
+        onClick={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
+        sx={{ display: "inline-flex", cursor: "help" }}
+      >
+        <Chip
+          label={label}
+          size="small"
+          aria-label={`${tooltip} ${label}`}
+          sx={{
+            height: 26,
+            bgcolor: isBoys ? C.blueGlass : "rgba(236,72,153,0.12)",
+            color: isBoys ? C.blue : "#EC4899",
+            borderRadius: "6px",
+            border: `1px solid ${isBoys ? "rgba(37,99,235,0.2)" : "rgba(236,72,153,0.25)"}`,
+            "& .MuiChip-label": {
+              ...genderChipLabelSx,
+              color: "inherit",
+            },
+          }}
+        />
+      </Box>
+    </Tooltip>
+  );
+};
+
 const SnapCard: React.FC<SnapCardProps> = ({ title, value, icon, accentColor, glassBg, sub, onClick }) => (
   <GCard sx={{ cursor: onClick ? "pointer" : "default" }}>
     <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }} onClick={onClick}>
@@ -1438,47 +1502,21 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
             sub={
               <>
                 <Sparkline color={C.purple} delay={0} />
-                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
-                  <Tooltip
-                    title={`Boys: ${totalBoys} student${totalBoys === 1 ? "" : "s"} across your assigned class${divisionStats.divisions === 1 ? "" : "es"}`}
-                    arrow
-                    placement="top"
-                  >
-                    <span>
-                      <Chip
-                        label={`♂ ${totalBoys}`}
-                        size="small"
-                        sx={{
-                          bgcolor: C.blueGlass,
-                          color: C.blue,
-                          fontWeight: 700,
-                          height: 18,
-                          fontSize: "11px",
-                          borderRadius: "5px",
-                        }}
-                      />
-                    </span>
-                  </Tooltip>
-                  <Tooltip
-                    title={`Girls: ${totalGirls} student${totalGirls === 1 ? "" : "s"} across your assigned class${divisionStats.divisions === 1 ? "" : "es"}`}
-                    arrow
-                    placement="top"
-                  >
-                    <span>
-                      <Chip
-                        label={`♀ ${totalGirls}`}
-                        size="small"
-                        sx={{
-                          bgcolor: "rgba(236,72,153,0.08)",
-                          color: "#EC4899",
-                          fontWeight: 700,
-                          height: 18,
-                          fontSize: "11px",
-                          borderRadius: "5px",
-                        }}
-                      />
-                    </span>
-                  </Tooltip>
+                <Box
+                  onClick={(event) => event.stopPropagation()}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  sx={{
+                    display: "flex",
+                    gap: 1,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    mt: 0.25,
+                    position: "relative",
+                    zIndex: 1,
+                  }}
+                >
+                  <GenderCountChip tooltip="Boys" count={totalBoys} variant="boys" />
+                  <GenderCountChip tooltip="Girls" count={totalGirls} variant="girls" />
                 </Box>
               </>
             }
