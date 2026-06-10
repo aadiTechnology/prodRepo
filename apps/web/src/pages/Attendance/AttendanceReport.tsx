@@ -381,9 +381,19 @@ const AttendanceReport = () => {
       classes,
       teachers,
       teacherScopedMappings,
-      myTeacherId
+      myTeacherId,
+      filters.academic_year_id,
+      user?.tenant_id ?? 0
     );
-  }, [isTeacher, classes, teachers, teacherScopedMappings, myTeacherId]);
+  }, [
+    isTeacher,
+    classes,
+    teachers,
+    teacherScopedMappings,
+    myTeacherId,
+    filters.academic_year_id,
+    user?.tenant_id,
+  ]);
 
   const filteredDivisions = useMemo(() => {
     if (!isTeacher) {
@@ -396,7 +406,9 @@ const AttendanceReport = () => {
       teachers,
       teacherScopedMappings,
       myTeacherId,
-      filters.class_id
+      filters.class_id,
+      filters.academic_year_id,
+      user?.tenant_id ?? 0
     );
   }, [
     isTeacher,
@@ -405,6 +417,8 @@ const AttendanceReport = () => {
     teacherScopedMappings,
     myTeacherId,
     filters.class_id,
+    filters.academic_year_id,
+    user?.tenant_id,
   ]);
 
   const lockClassFilter = isTeacher && filteredClasses.length === 1;

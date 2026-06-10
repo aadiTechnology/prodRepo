@@ -478,7 +478,8 @@ def get_teacher_class_division_pairs(
 ) -> list[tuple[int, int]]:
     """
     Class-teacher homeroom slots only (subject_id IS NULL) for attendance mark/report.
-    Supports multiple class/division pairs per teacher. Legacy fallback when no CT rows exist.
+    Supports multiple class/division pairs per teacher. Legacy homeroom on teachers row
+    is merged when not already present in teacher_assignments.
     """
     pairs: set[tuple[int, int]] = set()
     try:
@@ -491,7 +492,11 @@ def get_teacher_class_division_pairs(
                   AND ta.teacher_id = :teacher_id
                   AND ta.is_active = 1
                   AND ta.subject_id IS NULL
-                  AND (:academic_year_id IS NULL OR ta.academic_year_id = :academic_year_id)
+                  AND (
+                        :academic_year_id IS NULL
+                        OR ta.academic_year_id = :academic_year_id
+                        OR ta.academic_year_id IS NULL
+                      )
                 """
             ),
             {
@@ -506,9 +511,6 @@ def get_teacher_class_division_pairs(
     except SQLAlchemyError:
         pass
 
-    if pairs:
-        return sorted(pairs)
-
     teacher = (
         db.query(Teacher)
         .filter(
@@ -519,8 +521,9 @@ def get_teacher_class_division_pairs(
         .first()
     )
     if teacher and teacher.class_id and teacher.class_division_id:
-        return [(int(teacher.class_id), int(teacher.class_division_id))]
-    return []
+        pairs.add((int(teacher.class_id), int(teacher.class_division_id)))
+
+    return sorted(pairs)
 
 
 def resolve_teacher_for_user(

@@ -171,7 +171,9 @@ export function getFilteredClassesForTeacher(
   classes: SchoolClass[],
   teachers: TeacherResponse[],
   teacherScopedMappings: TeacherAssignmentApiItem[],
-  teacherId: number
+  teacherId: number,
+  academicYearId = 0,
+  tenantId = 0
 ): SchoolClass[] {
   if (!teacherId) return [];
 
@@ -180,7 +182,37 @@ export function getFilteredClassesForTeacher(
   ) as number[];
 
   if (assignedClassIds.length > 0) {
-    return classes.filter((c) => assignedClassIds.includes(c.id));
+    const fromMappings = buildSchoolClassesFromClassTeacherMappings(
+      teacherScopedMappings,
+      academicYearId,
+      tenantId
+    );
+    const byId = new Map<number, SchoolClass>();
+
+    for (const schoolClass of classes) {
+      if (assignedClassIds.includes(schoolClass.id)) {
+        byId.set(schoolClass.id, { ...schoolClass, divisions: [...schoolClass.divisions] });
+      }
+    }
+
+    for (const mappedClass of fromMappings) {
+      if (!assignedClassIds.includes(mappedClass.id)) continue;
+      const existing = byId.get(mappedClass.id);
+      if (!existing) {
+        byId.set(mappedClass.id, mappedClass);
+        continue;
+      }
+      const knownDivisionIds = new Set(existing.divisions.map((d) => d.id));
+      for (const division of mappedClass.divisions) {
+        if (!knownDivisionIds.has(division.id)) {
+          existing.divisions.push(division);
+        }
+      }
+    }
+
+    return Array.from(byId.values()).sort((a, b) =>
+      (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" })
+    );
   }
 
   const selectedTeacher = teachers.find((t) => t.id === teacherId);
@@ -195,10 +227,19 @@ export function getFilteredDivisionsForTeacher(
   teachers: TeacherResponse[],
   teacherScopedMappings: TeacherAssignmentApiItem[],
   teacherId: number,
-  classId: number
+  classId: number,
+  academicYearId = 0,
+  tenantId = 0
 ): ClassDivision[] {
   if (!classId) return [];
-  const selectedClass = classes.find((c) => c.id === classId);
+  let selectedClass = classes.find((c) => c.id === classId);
+  if (!selectedClass && teacherScopedMappings.length > 0) {
+    selectedClass = buildSchoolClassesFromClassTeacherMappings(
+      teacherScopedMappings,
+      academicYearId,
+      tenantId
+    ).find((c) => c.id === classId);
+  }
   if (!selectedClass) return [];
   const allDivisions = selectedClass.divisions || [];
   if (!teacherId) return allDivisions;

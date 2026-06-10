@@ -239,9 +239,18 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         classes,
         allTeachers,
         teacherScopedMappings,
-        filters.teacher_id
+        filters.teacher_id,
+        filters.academic_year_id,
+        user?.tenant_id ?? 0
       ),
-    [classes, allTeachers, teacherScopedMappings, filters.teacher_id]
+    [
+      classes,
+      allTeachers,
+      teacherScopedMappings,
+      filters.teacher_id,
+      filters.academic_year_id,
+      user?.tenant_id,
+    ]
   );
 
   const filteredDivisions = useMemo(
@@ -251,22 +260,22 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         allTeachers,
         teacherScopedMappings,
         filters.teacher_id,
-        filters.class_id
+        filters.class_id,
+        filters.academic_year_id,
+        user?.tenant_id ?? 0
       ),
-    [classes, allTeachers, teacherScopedMappings, filters.teacher_id, filters.class_id]
+    [
+      classes,
+      allTeachers,
+      teacherScopedMappings,
+      filters.teacher_id,
+      filters.class_id,
+      filters.academic_year_id,
+      user?.tenant_id,
+    ]
   );
 
-  const teacherClassTeacherClassCount = useMemo(() => {
-    if (!isTeacher || !filters.teacher_id) return 0;
-    const scoped = getTeacherAttendanceScopedMappings(
-      assignmentMappings,
-      filters.teacher_id,
-      filters.academic_year_id
-    );
-    return new Set(scoped.map((m) => m.class_id).filter(Boolean)).size;
-  }, [isTeacher, assignmentMappings, filters.teacher_id, filters.academic_year_id]);
-
-  const lockClassFilter = isTeacher && teacherClassTeacherClassCount === 1;
+  const lockClassFilter = isTeacher && filteredClasses.length === 1;
   const lockDivisionFilter = isTeacher && filteredDivisions.length === 1;
   const disableClassUntilTeacherSelected = !isTeacher && !filters.teacher_id;
 
@@ -337,7 +346,9 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         allTeachers,
         teacherScopedMappings,
         filters.teacher_id,
-        nextClassId
+        nextClassId,
+        filters.academic_year_id,
+        user?.tenant_id ?? 0
       );
       setFilters((prev) => ({
         ...prev,
@@ -354,7 +365,9 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         allTeachers,
         teacherScopedMappings,
         filters.teacher_id,
-        nextClassId
+        nextClassId,
+        filters.academic_year_id,
+        user?.tenant_id ?? 0
       );
       setFilters((prev) => ({
         ...prev,

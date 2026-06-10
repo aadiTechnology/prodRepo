@@ -236,7 +236,11 @@ class AttendanceService:
                       AND ta.is_active = 1
                       AND ta.subject_id IS NULL
                       AND c.is_deleted = 0
-                      AND (:academic_year_id IS NULL OR ta.academic_year_id = :academic_year_id)
+                      AND (
+                            :academic_year_id IS NULL
+                            OR ta.academic_year_id = :academic_year_id
+                            OR ta.academic_year_id IS NULL
+                          )
                     ORDER BY c.name ASC, cd.division_name ASC
                     """
                 ),
@@ -262,7 +266,7 @@ class AttendanceService:
         except SQLAlchemyError:
             pass
 
-        if not classes_by_id and teacher.class_id and teacher.class_division_id:
+        if teacher.class_id and teacher.class_division_id:
             try:
                 legacy = self.db.execute(
                     text(
@@ -284,17 +288,20 @@ class AttendanceService:
                 ).mappings().first()
                 if legacy:
                     cid = int(legacy["class_id"])
-                    classes_by_id[cid] = {
-                        "id": cid,
-                        "name": legacy["class_name"],
-                        "academic_year_id": legacy["academic_year_id"],
-                        "divisions": [
-                            {
-                                "id": int(legacy["division_id"]),
-                                "division_name": legacy["division_name"],
-                            }
-                        ],
+                    did = int(legacy["division_id"])
+                    div = {
+                        "id": did,
+                        "division_name": legacy["division_name"],
                     }
+                    if cid not in classes_by_id:
+                        classes_by_id[cid] = {
+                            "id": cid,
+                            "name": legacy["class_name"],
+                            "academic_year_id": legacy["academic_year_id"],
+                            "divisions": [div],
+                        }
+                    elif not any(d["id"] == did for d in classes_by_id[cid]["divisions"]):
+                        classes_by_id[cid]["divisions"].append(div)
             except SQLAlchemyError:
                 pass
 
