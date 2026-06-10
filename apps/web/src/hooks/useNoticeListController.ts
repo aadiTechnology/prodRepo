@@ -16,12 +16,13 @@ const STATIC_AUDIENCE_VALUES = ["ALL", "STUDENT", "TEACHER", "ADMIN"] as const s
 
 const STATIC_NOTICE_TYPE_VALUES = ["GENERAL", "FEE", "EVENT", "HOLIDAY", "EXAM"] as const satisfies readonly NoticeType[];
 
+const FETCH_PAGE_SIZE = 100;
+
 export function useNoticeListController() {
   const { readOnlyAudience, canEdit, canCreate } = useNoticePermissions();
   const canUseAdminFilters = canEdit || canCreate;
 
-  const [items, setItems] = useState<Notice[]>([]);
-  const [totalRows, setTotalRows] = useState(0);
+  const [allItems, setAllItems] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -62,23 +63,12 @@ export function useNoticeListController() {
 
   const listQueryParams = useMemo(
     () => ({
-      page,
-      size: rowsPerPage,
       search: debouncedSearch || undefined,
       status: canUseAdminFilters && status ? status : undefined,
       audience_type: canUseAdminFilters && !readOnlyAudience && audienceType ? audienceType : undefined,
       notice_type: noticeType || undefined,
     }),
-    [
-      audienceType,
-      canUseAdminFilters,
-      debouncedSearch,
-      noticeType,
-      page,
-      readOnlyAudience,
-      rowsPerPage,
-      status,
-    ]
+    [audienceType, canUseAdminFilters, debouncedSearch, noticeType, readOnlyAudience, status]
   );
 
   const fetchNotices = useCallback(async () => {
@@ -89,18 +79,30 @@ export function useNoticeListController() {
       if (showBlockingLoader) setLoading(true);
       setError(null);
 
-      const res = await noticeService.list(listQueryParams);
-      if (generation !== fetchGenerationRef.current) return;
+      let pageIndex = 0;
+      let fetched: Notice[] = [];
+      let total = 0;
 
-      setItems(res.items ?? []);
-      setTotalRows(res.total ?? 0);
+      do {
+        const res = await noticeService.list({
+          ...listQueryParams,
+          page: pageIndex,
+          size: FETCH_PAGE_SIZE,
+        });
+        if (generation !== fetchGenerationRef.current) return;
+
+        fetched = [...fetched, ...(res.items ?? [])];
+        total = res.total ?? fetched.length;
+        pageIndex += 1;
+      } while (fetched.length < total);
+
+      setAllItems(fetched);
       hasLoadedOnceRef.current = true;
     } catch (err: unknown) {
       if (generation !== fetchGenerationRef.current) return;
 
       if (!hasLoadedOnceRef.current) {
-        setItems([]);
-        setTotalRows(0);
+        setAllItems([]);
       }
       const msg = err instanceof Error ? err.message : "Unable to load notices";
       setError(msg);
@@ -138,10 +140,28 @@ export function useNoticeListController() {
     setPage(0);
   }, []);
 
-  const onRowsPerPageChange = useCallback((value: number) => {
-    setRowsPerPage(value);
+  const handlePageChange = useCallback((newPage: number) => {
+    setPage(newPage);
+  }, []);
+
+  const handleRowsPerPageChange = useCallback((newRowsPerPage: number) => {
+    setRowsPerPage(newRowsPerPage);
     setPage(0);
   }, []);
+
+  const totalRows = allItems.length;
+
+  const paginatedItems = useMemo(() => {
+    const start = page * rowsPerPage;
+    return allItems.slice(start, start + rowsPerPage);
+  }, [allItems, page, rowsPerPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(allItems.length / rowsPerPage) - 1);
+    if (page > maxPage) {
+      setPage(maxPage);
+    }
+  }, [allItems.length, page, rowsPerPage]);
 
   const onStatusChange = useCallback((value: string) => {
     setStatus(value);
@@ -184,10 +204,10 @@ export function useNoticeListController() {
     }
   }, [closeDeleteConfirm, fetchNotices, noticeToDelete]);
 
-  const tableLoading = loading && items.length === 0;
+  const tableLoading = loading && allItems.length === 0;
 
   return {
-    items,
+    items: paginatedItems,
     totalRows,
     loading,
     tableLoading,
@@ -196,9 +216,9 @@ export function useNoticeListController() {
     search,
     setSearch: onSearchChange,
     page,
-    setPage,
+    setPage: handlePageChange,
     rowsPerPage,
-    setRowsPerPage: onRowsPerPageChange,
+    setRowsPerPage: handleRowsPerPageChange,
     status,
     setStatus: onStatusChange,
     audienceType,

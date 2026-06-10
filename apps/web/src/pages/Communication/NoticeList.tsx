@@ -135,6 +135,7 @@ export default function NoticeList() {
         }}
         stickyHeader
         size="small"
+        showPagination={c.totalRows > 10}
       />
 
       <ConfirmDialog
