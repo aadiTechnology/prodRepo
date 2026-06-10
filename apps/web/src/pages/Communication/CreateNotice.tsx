@@ -226,7 +226,7 @@ export default function CreateNotice() {
       .getById(editId)
       .then((notice) => {
         if (cancelled) return;
-        if (notice.status === "EXPIRED") {
+        if (notice.status === "EXPIRED" || notice.status === "PUBLISHED") {
           navigate(`/communication/notices/${notice.id}`, { replace: true });
           return;
         }
@@ -412,20 +412,6 @@ export default function CreateNotice() {
       );
     }
   }, [formData.audience_type, setFormData]);
-
-  const handleUnpublish = useCallback(async () => {
-    if (!isEditMode || !Number.isFinite(editId)) return;
-    try {
-      setPublishLoading(true);
-      const res = await noticeService.unpublish(editId);
-      setLoadedStatus(res.notice.status);
-      setSnackbar(res.message);
-    } catch {
-      setError("Action not allowed in current state");
-    } finally {
-      setPublishLoading(false);
-    }
-  }, [editId, isEditMode]);
 
   const submitNotice = useCallback(
     async (isDraft: boolean) => {
@@ -734,15 +720,6 @@ export default function CreateNotice() {
       canSubmit={perms.canCreate || perms.canEdit}
       extraHeaderActions={
         <>
-          {isEditMode && loadedStatus === "PUBLISHED" && perms.canEdit ? (
-            <FormHeaderIconAction
-              variant="unpublish"
-              tooltipTitle="Unpublish notice"
-              onClick={() => void handleUnpublish()}
-              disabled={publishLoading || loading || fetchLoading}
-              loading={publishLoading}
-            />
-          ) : null}
           {(perms.canCreate || perms.canEdit) &&
           (!isEditMode || loadedStatus === "DRAFT" || loadedStatus === "UNPUBLISHED") ? (
             <FormHeaderIconAction

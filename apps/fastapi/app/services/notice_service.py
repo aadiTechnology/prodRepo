@@ -462,6 +462,10 @@ def update_notice(
     if not existing:
         raise NotFoundException("Notice", notice_id)
 
+    effective_status = _effective_notice_status(existing)
+    if effective_status in {"PUBLISHED", "EXPIRED"}:
+        raise ValidationException("Action not allowed in current state")
+
     update_data = payload.model_dump(exclude_unset=True)
     targets = update_data.pop("targets", None)
     attachments = update_data.pop("attachments", None)
@@ -617,7 +621,7 @@ def unpublish_notice(
     )
     db.commit()
     return NoticeStatusUpdateResponse(
-        message="Notice unpublished successfully",
+        message="Notice unpublished successfully.",
         notice=get_notice(db, tenant_id=tenant_id, notice_id=notice_id),
     )
 

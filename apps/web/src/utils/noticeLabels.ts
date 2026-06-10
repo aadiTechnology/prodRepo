@@ -19,6 +19,10 @@ export function noticeTypeLabel(value: NoticeType): string {
     .join(" ");
 }
 
+export function isNoticeEditable(status: NoticeStatus): boolean {
+  return status === "DRAFT" || status === "UNPUBLISHED";
+}
+
 export function noticeStatusLabel(value: NoticeStatus): string {
   switch (value) {
     case "DRAFT":

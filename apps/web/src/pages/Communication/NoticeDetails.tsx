@@ -35,7 +35,7 @@ function buildAttachmentUrl(filePath: string): string {
   return `${apiBaseUrl}${filePath}`;
 }
 import { formatShortDate } from "../../utils/formatters";
-import { noticeStatusLabel, noticeTypeLabel } from "../../utils/noticeLabels";
+import { isNoticeEditable, noticeStatusLabel, noticeTypeLabel } from "../../utils/noticeLabels";
 
 function statusChipColor(status: NoticeStatus): "default" | "success" | "error" | "warning" {
   switch (status) {
@@ -182,7 +182,7 @@ export default function NoticeDetails() {
   }, [load]);
 
   const isExpired = notice?.status === "EXPIRED";
-  const canEdit = Boolean(perms.canEdit && notice && !isExpired);
+  const canEdit = Boolean(perms.canEdit && notice && isNoticeEditable(notice.status));
   const canPublish = Boolean(
     perms.canEdit && notice && (notice.status === "DRAFT" || notice.status === "UNPUBLISHED") && !isExpired,
   );

@@ -4,7 +4,7 @@ import type { Notice, NoticeStatus } from "../../types/notice";
 import type { ListConfig } from "../../components/reusable/listFramework.types";
 import TableRowActions from "../../components/reusable/TableRowActions";
 import { formatShortDate } from "../../utils/formatters";
-import { audienceTypeLabel, noticeStatusLabel, noticeTypeLabel } from "../../utils/noticeLabels";
+import { audienceTypeLabel, isNoticeEditable, noticeStatusLabel, noticeTypeLabel } from "../../utils/noticeLabels";
 
 type NoticeListSortBy = "title";
 
@@ -107,7 +107,7 @@ export function createNoticeListConfig({
       rowActions: (row) => ({
         onView: () => navigate(`/communication/notices/${row.id}`),
         onEdit:
-          canEdit && row.status !== "EXPIRED"
+          canEdit && isNoticeEditable(row.status)
             ? () => navigate(`/communication/notices/${row.id}/edit`)
             : undefined,
         onDelete: canDelete ? () => onDeleteClick(row) : undefined,
