@@ -13,6 +13,8 @@ import {
   Stack,
   alpha,
   IconButton,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
@@ -102,6 +104,21 @@ const filterSelectSx = {
     "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
     "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
   },
+};
+
+const filterStackSx = {
+  width: "100%",
+  px: { xs: 2, sm: 2.5 },
+  py: 2.25,
+  bgcolor: alpha(colorTokens.primary.main, 0.015),
+  gap: { xs: 2.5, sm: 2 },
+  rowGap: { xs: 2.5, sm: 2.25 },
+  columnGap: { xs: 2.5, sm: 1.5 },
+};
+
+const filterControlSx = {
+  minWidth: { xs: "100%", sm: 180 },
+  width: { xs: "100%", sm: "auto" },
 };
 
 const HeaderGradientIconButton = ({
@@ -701,6 +718,11 @@ const AttendanceReport = () => {
 
   const dateFieldSx = {
     minWidth: { xs: "100%", sm: 160 },
+    width: { xs: "100%", sm: "auto" },
+    "& .MuiInputLabel-root": {
+      fontSize: "0.85rem",
+      fontWeight: 600,
+    },
     "& .MuiOutlinedInput-root": {
       borderRadius: "15px",
       fontSize: "0.85rem",
@@ -776,83 +798,90 @@ const AttendanceReport = () => {
     >
       <Stack
         direction={{ xs: "column", sm: "row" }}
-        alignItems={{ xs: "stretch", sm: "center" }}
-        gap={1.5}
+        alignItems={{ xs: "stretch", sm: "flex-end" }}
         flexWrap="wrap"
-        sx={{
-          width: "100%",
-          px: { xs: 2, sm: 2.5 },
-          py: 1.75,
-          bgcolor: alpha(colorTokens.primary.main, 0.015),
-        }}
+        sx={filterStackSx}
       >
         {dateFilterFields}
 
-        <Select
-          value={filters.class_id || ""}
-          displayEmpty
-          size="small"
-          disabled={lockClassFilter}
-          onChange={(e) => {
-            setPage(0);
-            setFilters((prev) => ({
-              ...prev,
-              class_id: Number(e.target.value),
-              division_id: 0,
-              student_id: 0,
-            }));
-          }}
-          sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
-        >
-          <MenuItem value="">
-            <Typography variant="body2" color="text.secondary">All Classes</Typography>
-          </MenuItem>
-          {filteredClasses.map(cls => (
-            <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
-          ))}
-        </Select>
+        <FormControl size="small" sx={filterControlSx} disabled={lockClassFilter}>
+          <InputLabel shrink>Class</InputLabel>
+          <Select
+            label="Class"
+            value={filters.class_id || ""}
+            displayEmpty
+            notched
+            onChange={(e) => {
+              setPage(0);
+              setFilters((prev) => ({
+                ...prev,
+                class_id: Number(e.target.value),
+                division_id: 0,
+                student_id: 0,
+              }));
+            }}
+            sx={filterSelectSx}
+          >
+            <MenuItem value="">
+              <Typography variant="body2" color="text.secondary">All Classes</Typography>
+            </MenuItem>
+            {filteredClasses.map((cls) => (
+              <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
 
-        <Select
-          value={filters.division_id || ""}
-          displayEmpty
+        <FormControl
           size="small"
+          sx={filterControlSx}
           disabled={!filters.class_id || lockDivisionFilter}
-          onChange={(e) => {
-            setPage(0);
-            setFilters((prev) => ({
-              ...prev,
-              division_id: Number(e.target.value),
-              student_id: 0,
-            }));
-          }}
-          sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
         >
-          <MenuItem value="">
-            <Typography variant="body2" color="text.secondary">All Divisions</Typography>
-          </MenuItem>
-          {(isTeacher ? filteredDivisions : divisions).map((div) => (
-            <MenuItem key={div.id} value={div.id}>{div.division_name}</MenuItem>
-          ))}
-        </Select>
+          <InputLabel shrink>Division</InputLabel>
+          <Select
+            label="Division"
+            value={filters.division_id || ""}
+            displayEmpty
+            notched
+            onChange={(e) => {
+              setPage(0);
+              setFilters((prev) => ({
+                ...prev,
+                division_id: Number(e.target.value),
+                student_id: 0,
+              }));
+            }}
+            sx={filterSelectSx}
+          >
+            <MenuItem value="">
+              <Typography variant="body2" color="text.secondary">All Divisions</Typography>
+            </MenuItem>
+            {(isTeacher ? filteredDivisions : divisions).map((div) => (
+              <MenuItem key={div.id} value={div.id}>{div.division_name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
 
-        <Select
-          value={filters.student_id || ""}
-          displayEmpty
-          size="small"
-          disabled={!filters.division_id}
-          onChange={(e) => {
-            setPage(0);
-            setFilters(prev => ({ ...prev, student_id: Number(e.target.value) }));
-          }}
-          sx={{ ...filterSelectSx, minWidth: { xs: "100%", sm: 180 } }}
-        >
-          <MenuItem value="">
-            <Typography variant="body2" color="text.secondary">All Students</Typography>
-          </MenuItem>
-          {students.map(s => (
-            <MenuItem key={s.id} value={s.id}>{s.student_name || s.name}</MenuItem>
-          ))}
-        </Select>
+        <FormControl size="small" sx={filterControlSx} disabled={!filters.division_id}>
+          <InputLabel shrink>Student</InputLabel>
+          <Select
+            label="Student"
+            value={filters.student_id || ""}
+            displayEmpty
+            notched
+            onChange={(e) => {
+              setPage(0);
+              setFilters((prev) => ({ ...prev, student_id: Number(e.target.value) }));
+            }}
+            sx={filterSelectSx}
+          >
+            <MenuItem value="">
+              <Typography variant="body2" color="text.secondary">All Students</Typography>
+            </MenuItem>
+            {students.map((s) => (
+              <MenuItem key={s.id} value={s.id}>{s.student_name || s.name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </Stack>
     </AppCard>
   );
@@ -878,16 +907,7 @@ const AttendanceReport = () => {
         />
       }
     >
-      <Box
-        sx={{
-          px: { xs: 1.5, sm: 3 },
-          py: { xs: 0.6, sm: 0.9 },
-          mt: { xs: -0.2, sm: -1.15 },
-          display: "flex",
-          flexDirection: "column",
-          gap: { xs: 1.8, sm: 1.8 },
-        }}
-      >
+      <Stack spacing={2} sx={{ width: "100%" }}>
         {/* ── Filters (Row 1) ── */}
         {!isStudent ? (
           filterCard
@@ -902,14 +922,9 @@ const AttendanceReport = () => {
           >
             <Stack
               direction={{ xs: "column", sm: "row" }}
-              alignItems={{ xs: "stretch", sm: "center" }}
-              gap={1.5}
+              alignItems={{ xs: "stretch", sm: "flex-end" }}
               flexWrap="wrap"
-              sx={{
-                px: { xs: 2, sm: 2.5 },
-                py: 1.75,
-                bgcolor: alpha(colorTokens.primary.main, 0.015),
-              }}
+              sx={filterStackSx}
             >
               {dateFilterFields}
             </Stack>
@@ -1502,7 +1517,7 @@ const AttendanceReport = () => {
             </Typography>
           </Box>
         )}
-      </Box>
+      </Stack>
 
       <Snackbar
         open={snackbar.open}

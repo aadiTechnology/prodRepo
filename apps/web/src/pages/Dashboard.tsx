@@ -1428,10 +1428,46 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
               <>
                 <Sparkline color={C.purple} delay={0} />
                 <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
-                  <Chip label={`♂ ${totalBoys}`} size="small"
-                    sx={{ bgcolor: C.blueGlass, color: C.blue, fontWeight: 700, height: 18, fontSize: "11px", borderRadius: "5px" }} />
-                  <Chip label={`♀ ${totalGirls}`} size="small"
-                    sx={{ bgcolor: "rgba(236,72,153,0.08)", color: "#EC4899", fontWeight: 700, height: 18, fontSize: "11px", borderRadius: "5px" }} />
+                  <Tooltip
+                    title={`Boys: ${totalBoys} student${totalBoys === 1 ? "" : "s"} across your assigned class${divisionStats.divisions === 1 ? "" : "es"}`}
+                    arrow
+                    placement="top"
+                  >
+                    <span>
+                      <Chip
+                        label={`♂ ${totalBoys}`}
+                        size="small"
+                        sx={{
+                          bgcolor: C.blueGlass,
+                          color: C.blue,
+                          fontWeight: 700,
+                          height: 18,
+                          fontSize: "11px",
+                          borderRadius: "5px",
+                        }}
+                      />
+                    </span>
+                  </Tooltip>
+                  <Tooltip
+                    title={`Girls: ${totalGirls} student${totalGirls === 1 ? "" : "s"} across your assigned class${divisionStats.divisions === 1 ? "" : "es"}`}
+                    arrow
+                    placement="top"
+                  >
+                    <span>
+                      <Chip
+                        label={`♀ ${totalGirls}`}
+                        size="small"
+                        sx={{
+                          bgcolor: "rgba(236,72,153,0.08)",
+                          color: "#EC4899",
+                          fontWeight: 700,
+                          height: 18,
+                          fontSize: "11px",
+                          borderRadius: "5px",
+                        }}
+                      />
+                    </span>
+                  </Tooltip>
                 </Box>
               </>
             }
