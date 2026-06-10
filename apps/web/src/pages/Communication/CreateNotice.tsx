@@ -97,6 +97,8 @@ export default function CreateNotice() {
   const [attachmentCleared, setAttachmentCleared] = useState(false);
   const [dropdownNoticeTypes, setDropdownNoticeTypes] = useState<SelectOption[]>([]);
   const [dropdownAudienceTypes, setDropdownAudienceTypes] = useState<SelectOption[]>([]);
+  const [loadedFormSnapshot, setLoadedFormSnapshot] = useState<CreateNoticeFormData | null>(null);
+  const [loadedAttachmentSnapshot, setLoadedAttachmentSnapshot] = useState<SavedAttachmentState | null>(null);
 
   const initialValues = useMemo(() => emptyForm(), []);
   const validationConfig = useMemo<FormValidationConfig<CreateNoticeFormData>>(
@@ -230,19 +232,24 @@ export default function CreateNotice() {
           navigate(`/communication/notices/${notice.id}`, { replace: true });
           return;
         }
-        resetForm(noticeToForm(notice));
+        const loadedForm = noticeToForm(notice);
+        resetForm(loadedForm);
+        setLoadedFormSnapshot(loadedForm);
         setLoadedStatus(notice.status);
         if (notice.attachments?.[0]) {
           const a = notice.attachments[0];
-          setSavedAttachment({
+          const attachment = {
             id: a.id,
             file_name: a.file_name ?? "attachment",
             file_path: a.file_path ?? "",
             file_type: a.file_type ?? "application/octet-stream",
             file_size_kb: a.file_size_kb ?? undefined,
-          });
+          };
+          setSavedAttachment(attachment);
+          setLoadedAttachmentSnapshot(attachment);
         } else {
           setSavedAttachment(null);
+          setLoadedAttachmentSnapshot(null);
         }
         setPendingFile(null);
         setAttachmentCleared(false);
@@ -683,6 +690,34 @@ export default function CreateNotice() {
     await submitNotice(true);
   };
 
+  const handleResetForm = useCallback(() => {
+    if (isEditMode && loadedFormSnapshot) {
+      resetForm(loadedFormSnapshot);
+      setSavedAttachment(loadedAttachmentSnapshot);
+      setPendingFile(null);
+      setAttachmentCleared(false);
+    } else {
+      resetForm(emptyForm());
+      setSavedAttachment(null);
+      setLoadedAttachmentSnapshot(null);
+      setPendingFile(null);
+      setAttachmentCleared(false);
+    }
+    setFieldErrors({});
+    setError(null);
+    setApplicableToError(null);
+    setSnackbar(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, [
+    isEditMode,
+    loadedAttachmentSnapshot,
+    loadedFormSnapshot,
+    resetForm,
+    setFieldErrors,
+  ]);
+
   return (
     <BaseForm<CreateNoticeFormData>
       formConfig={formConfig}
@@ -711,7 +746,8 @@ export default function CreateNotice() {
         saveTooltipCreate: "Save Draft",
         saveTooltipEdit: "Save changes",
       }}
-      onCancelNavigate={() => navigate("/communication/notices")}
+      hideHeaderCancel
+      onCancelNavigate={handleResetForm}
       confirmMessage={
         isEditMode ? "Are you sure you want to save changes to this notice?" : "Are you sure you want to save this notice as draft?"
       }

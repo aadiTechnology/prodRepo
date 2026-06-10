@@ -51,6 +51,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
   formTopSlot,
   canSubmit = true,
   hideFooterActions = false,
+  hideHeaderCancel = false,
   footerActionOrder = "cancel-first",
   useErrorSnackbar = false,
   gridSpacing = 2,
@@ -122,11 +123,13 @@ export default function BaseForm<T extends Record<string, unknown>>({
               homePath={headerConfig.homePath ?? "/"}
               actions={
                 <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
-                  <FormHeaderIconAction
-                    variant="cancel"
-                    onClick={onCancelNavigate}
-                    tooltipTitle={cancelTooltip}
-                  />
+                  {!hideHeaderCancel ? (
+                    <FormHeaderIconAction
+                      variant="cancel"
+                      onClick={onCancelNavigate}
+                      tooltipTitle={cancelTooltip}
+                    />
+                  ) : null}
                   <FormHeaderIconAction
                     variant="save"
                     onClick={(e) => runSubmit(e, handleSubmit, openConfirmDialog)}
