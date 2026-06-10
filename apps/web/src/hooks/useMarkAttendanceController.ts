@@ -39,6 +39,7 @@ export interface UseMarkAttendanceControllerResult {
   setFilters: React.Dispatch<React.SetStateAction<AttendanceFilters>>;
   setSnackbar: React.Dispatch<React.SetStateAction<{ open: boolean; message: string; severity: 'success' | 'error' }>>;
   fetchStudents: () => Promise<void>;
+  handleAcademicYearChange: (academicYearId: number) => void;
   updateStudentStatus: (studentId: number, status: string) => void;
   updateStudentRemarks: (studentId: number, remarks: string) => void;
   markAllPresent: () => void;
@@ -86,6 +87,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
   const prevAcademicYearId = useRef<number>(0);
   const prevAutoFetchKey = useRef<string>("");
   const suppressAutoFillRef = useRef(false);
+  const scopeReloadingRef = useRef(false);
 
   const showError = (message: string) => {
     setSnackbar({ open: true, message, severity: "error" });
@@ -373,29 +375,95 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     async (academicYearId: number) => {
       if (!isTeacher || !user?.id) return;
 
-      const scope = await attendanceService.getMyScope(academicYearId || undefined);
-      const assignmentList = buildMappingsFromAttendanceScope(scope, academicYearId);
-      const classList = scopeToSchoolClasses(scope, user.tenant_id ?? 0);
+      scopeReloadingRef.current = true;
+      try {
+        const scope = await attendanceService.getMyScope(academicYearId || undefined);
+        const assignmentList = buildMappingsFromAttendanceScope(scope, academicYearId);
+        const classList = scopeToSchoolClasses(scope, user.tenant_id ?? 0);
 
-      setClasses(classList);
-      setAssignmentMappings(assignmentList);
+        setClasses(classList);
+        setAssignmentMappings(assignmentList);
 
-      const scoped = getTeacherAttendanceScopedMappings(
-        assignmentList,
-        scope.teacher_id,
-        academicYearId
-      );
-      const firstPair = getTeacherClassDivisionPairs(scoped)[0];
+        const scoped = getTeacherAttendanceScopedMappings(
+          assignmentList,
+          scope.teacher_id,
+          academicYearId
+        );
+        const firstPair = getTeacherClassDivisionPairs(scoped)[0];
+
+        setFilters((prev) => ({
+          ...prev,
+          academic_year_id: academicYearId,
+          teacher_id: scope.teacher_id,
+          class_id: firstPair?.class_id ?? 0,
+          division_id: firstPair?.division_id ?? 0,
+        }));
+      } finally {
+        scopeReloadingRef.current = false;
+      }
+    },
+    [isTeacher, user?.id, user?.tenant_id]
+  );
+
+  const reloadAdminClassesForYear = useCallback(
+    async (academicYearId: number) => {
+      if (isTeacher) return;
+      try {
+        const classList = await schoolClassService.getAll(
+          academicYearId ? { academic_year_id: academicYearId } : undefined
+        );
+        setClasses(classList);
+      } catch (err) {
+        console.error("Failed to reload classes for academic year", err);
+        showError("Unable to load classes for the selected academic year");
+      }
+    },
+    [isTeacher]
+  );
+
+  const handleAcademicYearChange = useCallback(
+    (academicYearId: number) => {
+      if (!academicYearId) return;
+
+      const previousYear = prevAcademicYearId.current;
+      if (previousYear === academicYearId) {
+        setFilters((prev) => ({ ...prev, academic_year_id: academicYearId }));
+        return;
+      }
+
+      prevAutoFetchKey.current = "";
+      setStudents([]);
+      prevAcademicYearId.current = academicYearId;
+
+      if (previousYear === 0) {
+        setFilters((prev) => ({ ...prev, academic_year_id: academicYearId }));
+        return;
+      }
+
+      if (isTeacher) {
+        setFilters((prev) => ({
+          ...prev,
+          academic_year_id: academicYearId,
+          class_id: 0,
+          division_id: 0,
+        }));
+        void reloadTeacherScopeForYear(academicYearId).catch((err) => {
+          console.error("Failed to reload teacher scope for academic year", err);
+          showError("Unable to load classes for the selected academic year");
+        });
+        return;
+      }
 
       setFilters((prev) => ({
         ...prev,
         academic_year_id: academicYearId,
-        teacher_id: scope.teacher_id,
-        class_id: firstPair?.class_id ?? 0,
-        division_id: firstPair?.division_id ?? 0,
+        teacher_id: 0,
+        class_id: 0,
+        division_id: 0,
       }));
+      void reloadAdminClassesForYear(academicYearId);
     },
-    [isTeacher, user?.id, user?.tenant_id]
+    [isTeacher, reloadTeacherScopeForYear, reloadAdminClassesForYear]
   );
 
   const fetchStudentsWithFilters = useCallback(
@@ -454,37 +522,9 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
   );
 
   useEffect(() => {
-    if (!filters.academic_year_id) return;
-
-    const previousYear = prevAcademicYearId.current;
-    if (previousYear === filters.academic_year_id) return;
-
-    prevAcademicYearId.current = filters.academic_year_id;
-    if (previousYear === 0) return;
-
-    prevAutoFetchKey.current = "";
-    setStudents([]);
-
-    if (isTeacher) {
-      void reloadTeacherScopeForYear(filters.academic_year_id).catch((err) => {
-        console.error("Failed to reload teacher scope for academic year", err);
-        showError("Unable to load classes for the selected academic year");
-      });
-      return;
-    }
-
-    setFilters((prev) => ({
-      ...prev,
-      teacher_id: 0,
-      class_id: 0,
-      division_id: 0,
-    }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.academic_year_id, isTeacher, reloadTeacherScopeForYear]);
-
-  useEffect(() => {
     const key = buildAutoFetchKey(filters);
     if (
+      !scopeReloadingRef.current &&
       filters.class_id &&
       filters.division_id &&
       filters.attendance_date &&
@@ -644,6 +684,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     setFilters: updateFilters,
     setSnackbar,
     fetchStudents,
+    handleAcademicYearChange,
     updateStudentStatus,
     updateStudentRemarks,
     markAllPresent,

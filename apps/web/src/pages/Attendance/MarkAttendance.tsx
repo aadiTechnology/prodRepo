@@ -163,6 +163,7 @@ const MarkAttendance = () => {
     markAllPresent,
     saveAttendance,
     resetFilters,
+    handleAcademicYearChange,
     filteredClasses,
     filteredDivisions,
     isTeacher,
@@ -372,9 +373,7 @@ const MarkAttendance = () => {
           value={filters.academic_year_id || ""}
           displayEmpty
           size="small"
-          onChange={(e) =>
-            setFilters((prev) => ({ ...prev, academic_year_id: Number(e.target.value) }))
-          }
+          onChange={(e) => handleAcademicYearChange(Number(e.target.value))}
           sx={filterSelectSx}
         >
           <MenuItem value="">
@@ -587,8 +586,10 @@ const MarkAttendance = () => {
           then mark attendance for each separately.
         </Alert>
       ) : null}
-      {filterCard}
-      {tableCard}
+      <Stack spacing={2} sx={{ width: "100%" }}>
+        {filterCard}
+        {tableCard}
+      </Stack>
 
       <Snackbar
         open={snackbar.open}
