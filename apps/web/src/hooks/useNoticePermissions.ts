@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 import { useRBAC } from "../context/RBACContext";
-import { isNoticeReadOnlyAudience } from "../utils/noticeAudience";
+import {
+  isNoticeReadOnlyAudience,
+  isStudentNoticeUser,
+  isTeacherNoticeUser,
+} from "../utils/noticeAudience";
 import { useAuth } from "../context/AuthContext";
 
 export function useNoticePermissions() {
@@ -15,6 +19,15 @@ export function useNoticePermissions() {
     () => isNoticeReadOnlyAudience(user?.role, roles),
     [user?.role, roles],
   );
+  const isViewOnly = canView && !canCreate && !canEdit && !canDelete;
+  const isNoticeConsumerView = useMemo(() => {
+    if (!isViewOnly) return false;
+    return (
+      readOnlyAudience ||
+      isTeacherNoticeUser(user?.role, roles) ||
+      isStudentNoticeUser(user?.role, roles)
+    );
+  }, [isViewOnly, readOnlyAudience, user?.role, roles]);
 
   return {
     canView,
@@ -22,6 +35,7 @@ export function useNoticePermissions() {
     canEdit,
     canDelete,
     readOnlyAudience,
-    isViewOnly: canView && !canCreate && !canEdit && !canDelete,
+    isViewOnly,
+    isNoticeConsumerView,
   };
 }

@@ -28,6 +28,7 @@ type NoticeListConfigArgs = {
   onDeleteClick: (row: Notice) => void;
   canEdit?: boolean;
   canDelete?: boolean;
+  hideAdminColumns?: boolean;
 };
 
 export function createNoticeListConfig({
@@ -35,9 +36,9 @@ export function createNoticeListConfig({
   onDeleteClick,
   canEdit = true,
   canDelete = true,
+  hideAdminColumns = false,
 }: NoticeListConfigArgs): ListConfig<Notice, NoticeListSortBy> {
-  return {
-    columns: [
+  const columns: ListConfig<Notice, NoticeListSortBy>["columns"] = [
       {
         id: "title",
         label: "Title",
@@ -63,11 +64,15 @@ export function createNoticeListConfig({
         label: "Type",
         render: (row) => noticeTypeLabel(row.notice_type),
       },
-      {
-        id: "audience_type",
-        label: "Audience",
-        render: (row) => audienceTypeLabel(row.audience_type),
-      },
+      ...(hideAdminColumns
+        ? []
+        : [
+            {
+              id: "audience_type",
+              label: "Audience",
+              render: (row: Notice) => audienceTypeLabel(row.audience_type),
+            },
+          ]),
       {
         id: "publish_date",
         label: "Publish Date",
@@ -78,19 +83,26 @@ export function createNoticeListConfig({
         label: "Expiry Date",
         render: (row) => (row.expiry_date ? formatShortDate(row.expiry_date) : "—"),
       },
-      {
-        id: "status",
-        label: "Status",
-        render: (row) => (
-          <Chip
-            size="small"
-            label={noticeStatusLabel(row.status)}
-            color={statusChipColor(row.status)}
-            variant={row.status === "DRAFT" ? "outlined" : "filled"}
-          />
-        ),
-      },
-    ],
+      ...(hideAdminColumns
+        ? []
+        : [
+            {
+              id: "status",
+              label: "Status",
+              render: (row: Notice) => (
+                <Chip
+                  size="small"
+                  label={noticeStatusLabel(row.status)}
+                  color={statusChipColor(row.status)}
+                  variant={row.status === "DRAFT" ? "outlined" : "filled"}
+                />
+              ),
+            },
+          ]),
+  ];
+
+  return {
+    columns,
     sortOptions: [],
     uiPolicy: {
       emptyMessage: (

@@ -22,8 +22,9 @@ export default function NoticeList() {
         onDeleteClick: c.openDeleteConfirm,
         canEdit: perms.canEdit,
         canDelete: perms.canDelete,
+        hideAdminColumns: perms.isNoticeConsumerView,
       }),
-    [c.openDeleteConfirm, navigate, perms.canDelete, perms.canEdit]
+    [c.openDeleteConfirm, navigate, perms.canDelete, perms.canEdit, perms.isNoticeConsumerView]
   );
 
   const toolbarFilters = useMemo(() => {
@@ -41,7 +42,7 @@ export default function NoticeList() {
       },
     ];
 
-    if (c.canUseAdminFilters) {
+    if (!perms.isNoticeConsumerView && c.canUseAdminFilters) {
       filters.unshift({
         label: "Status",
         value: c.status,
@@ -50,7 +51,7 @@ export default function NoticeList() {
       });
     }
 
-    if (c.canUseAdminFilters && !c.readOnlyAudience) {
+    if (!perms.isNoticeConsumerView && c.canUseAdminFilters && !c.readOnlyAudience) {
       filters.splice(1, 0, {
         label: "Audience",
         value: c.audienceType,
@@ -72,6 +73,7 @@ export default function NoticeList() {
     c.setStatus,
     c.status,
     c.statusFilterOptions,
+    perms.isNoticeConsumerView,
   ]);
 
   return (

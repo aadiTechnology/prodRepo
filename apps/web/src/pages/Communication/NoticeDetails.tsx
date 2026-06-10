@@ -181,6 +181,7 @@ export default function NoticeDetails() {
     void load();
   }, [load]);
 
+  const isConsumerView = perms.isNoticeConsumerView;
   const isExpired = notice?.status === "EXPIRED";
   const canEdit = Boolean(perms.canEdit && notice && isNoticeEditable(notice.status));
   const canPublish = Boolean(
@@ -325,12 +326,14 @@ export default function NoticeDetails() {
                   {notice.title}
                 </Typography>
                 <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
-                  <Chip
-                    label={noticeStatusLabel(notice.status)}
-                    color={statusChipColor(notice.status)}
-                    size="small"
-                    sx={{ height: 24, fontWeight: 700, fontSize: "0.72rem" }}
-                  />
+                  {!isConsumerView ? (
+                    <Chip
+                      label={noticeStatusLabel(notice.status)}
+                      color={statusChipColor(notice.status)}
+                      size="small"
+                      sx={{ height: 24, fontWeight: 700, fontSize: "0.72rem" }}
+                    />
+                  ) : null}
                   <Chip
                     label={noticeTypeLabel(notice.notice_type)}
                     size="small"
@@ -425,25 +428,29 @@ export default function NoticeDetails() {
               )}
             </ViewSection>
 
-            <Divider sx={{ opacity: 0.7 }} />
+            {!isConsumerView ? (
+              <>
+                <Divider sx={{ opacity: 0.7 }} />
 
-            <ViewSection title="Notification">
-              <Chip
-                icon={
-                  <NotifyIcon
-                    sx={{
-                      fontSize: "18px !important",
-                      color: notice.send_notification ? "warning.main !important" : undefined,
-                    }}
+                <ViewSection title="Notification">
+                  <Chip
+                    icon={
+                      <NotifyIcon
+                        sx={{
+                          fontSize: "18px !important",
+                          color: notice.send_notification ? "warning.main !important" : undefined,
+                        }}
+                      />
+                    }
+                    label={notificationLabel(notice)}
+                    size="small"
+                    variant={notice.send_notification ? "filled" : "outlined"}
+                    color={notice.send_notification ? "warning" : "default"}
+                    sx={{ fontWeight: 700, height: 28 }}
                   />
-                }
-                label={notificationLabel(notice)}
-                size="small"
-                variant={notice.send_notification ? "filled" : "outlined"}
-                color={notice.send_notification ? "warning" : "default"}
-                sx={{ fontWeight: 700, height: 28 }}
-              />
-            </ViewSection>
+                </ViewSection>
+              </>
+            ) : null}
           </Box>
         </Paper>
       </Box>
