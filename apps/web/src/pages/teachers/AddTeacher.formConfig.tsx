@@ -94,7 +94,7 @@ export function addTeacherFormConfig({
       mobile_number: {
         name: "mobile_number",
         label: "Mobile Number",
-        type: "text",
+        type: "phone",
         placeholder: "10-digit mobile number",
         required: true,
       },
