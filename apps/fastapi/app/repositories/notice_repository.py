@@ -21,28 +21,27 @@ def _append_effective_status_filter(
     if not normalized:
         return
 
-    now = datetime.utcnow()
-    params["effective_status_now"] = now
     table = table_alias
+    now_expr = "GETUTCDATE()"
 
     if normalized == "EXPIRED":
-        where_sql.append(f"({table}.expiry_date IS NOT NULL AND {table}.expiry_date < :effective_status_now)")
+        where_sql.append(f"({table}.expiry_date IS NOT NULL AND {table}.expiry_date < {now_expr})")
     elif normalized == "DRAFT":
         where_sql.append(
             f"({table}.status = 'DRAFT' "
-            f"AND ({table}.expiry_date IS NULL OR {table}.expiry_date >= :effective_status_now))"
+            f"AND ({table}.expiry_date IS NULL OR {table}.expiry_date >= {now_expr}))"
         )
     elif normalized == "UNPUBLISHED":
         where_sql.append(
-            f"(({table}.expiry_date IS NULL OR {table}.expiry_date >= :effective_status_now) "
+            f"(({table}.expiry_date IS NULL OR {table}.expiry_date >= {now_expr}) "
             f"AND ({table}.status = 'UNPUBLISHED' "
-            f"OR ({table}.status = 'PUBLISHED' AND {table}.publish_date > :effective_status_now)))"
+            f"OR ({table}.status = 'PUBLISHED' AND {table}.publish_date > {now_expr})))"
         )
     elif normalized == "PUBLISHED":
         where_sql.append(
-            f"(({table}.expiry_date IS NULL OR {table}.expiry_date >= :effective_status_now) "
+            f"(({table}.expiry_date IS NULL OR {table}.expiry_date >= {now_expr}) "
             f"AND {table}.status NOT IN ('DRAFT', 'UNPUBLISHED', 'EXPIRED') "
-            f"AND {table}.publish_date <= :effective_status_now)"
+            f"AND {table}.publish_date <= {now_expr})"
         )
     else:
         params["status"] = normalized

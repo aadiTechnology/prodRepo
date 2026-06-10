@@ -149,19 +149,27 @@ export function useNoticeListController() {
     setPage(0);
   }, []);
 
-  const totalRows = allItems.length;
+  const filteredItems = useMemo(() => {
+    if (!canUseAdminFilters || !status) {
+      return allItems;
+    }
+    const normalizedStatus = status.toUpperCase() as NoticeStatus;
+    return allItems.filter((item) => item.status === normalizedStatus);
+  }, [allItems, canUseAdminFilters, status]);
+
+  const totalRows = filteredItems.length;
 
   const paginatedItems = useMemo(() => {
     const start = page * rowsPerPage;
-    return allItems.slice(start, start + rowsPerPage);
-  }, [allItems, page, rowsPerPage]);
+    return filteredItems.slice(start, start + rowsPerPage);
+  }, [filteredItems, page, rowsPerPage]);
 
   useEffect(() => {
-    const maxPage = Math.max(0, Math.ceil(allItems.length / rowsPerPage) - 1);
+    const maxPage = Math.max(0, Math.ceil(filteredItems.length / rowsPerPage) - 1);
     if (page > maxPage) {
       setPage(maxPage);
     }
-  }, [allItems.length, page, rowsPerPage]);
+  }, [filteredItems.length, page, rowsPerPage]);
 
   const onStatusChange = useCallback((value: string) => {
     setStatus(value);

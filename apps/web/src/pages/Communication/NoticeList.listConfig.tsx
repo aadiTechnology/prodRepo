@@ -110,8 +110,7 @@ export function createNoticeListConfig({
           canEdit && row.status !== "EXPIRED"
             ? () => navigate(`/communication/notices/${row.id}/edit`)
             : undefined,
-        onDelete:
-          canDelete && row.status !== "EXPIRED" ? () => onDeleteClick(row) : undefined,
+        onDelete: canDelete ? () => onDeleteClick(row) : undefined,
       }),
     },
   };
