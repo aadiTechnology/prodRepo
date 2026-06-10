@@ -501,6 +501,17 @@ const NoticeLegend: React.FC<{ notices: RecentNoticeItem[] }> = ({ notices }) =>
   );
 };
 
+const openRecentNoticeItem = (
+  notice: RecentNoticeItem,
+  navigate: ReturnType<typeof useNavigate>
+) => {
+  if (notice.item_type === "holiday") {
+    navigate("/calendar/academic");
+    return;
+  }
+  navigate(`/communication/notices/${notice.id}`);
+};
+
 // ─── Notices table ────────────────────────────────────────────────────────────
 const NoticesTable: React.FC<{ notices: RecentNoticeItem[]; navigate: ReturnType<typeof useNavigate> }> = ({
   notices,
@@ -564,7 +575,7 @@ const NoticesTable: React.FC<{ notices: RecentNoticeItem[]; navigate: ReturnType
               <TableCell align="right">
                 <Button
                   size="small"
-                  onClick={() => navigate("/communication/notices")}
+                  onClick={() => openRecentNoticeItem(n, navigate)}
                   sx={{ color: C.blue, fontWeight: 700, fontSize: "11px", minWidth: 0, px: 1, textTransform: "none" }}
                 >
                   View

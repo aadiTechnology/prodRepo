@@ -14,8 +14,10 @@ from app.models.student import Student
 from app.models.teacher import Teacher
 from app.models.student_attendance import StudentAttendance
 from app.models.student_invoice import StudentInvoice
-from app.models.notice import Notice
 from app.models.holiday import Holiday
+from app.repositories import notice_repository
+from app.services.notice_access import NoticeViewerContext
+from app.services import notice_service
 from app.models.homework import Homework
 from app.repositories.homework_repository import _build_class_division_scope_filter
 from app.services.homework_access import resolve_teacher_assignment_scopes
@@ -49,7 +51,12 @@ router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
 
 # ─── Helper: fetch recent published notices + upcoming holidays ───────────────
-def _fetch_recent_notices(db: Session, tenant_id: int, limit: int = 10) -> List[RecentNoticeItem]:
+def _fetch_recent_notices(
+    db: Session,
+    tenant_id: int,
+    limit: int = 10,
+    viewer_context: NoticeViewerContext | None = None,
+) -> List[RecentNoticeItem]:
     """Fetch the most recent published notices AND upcoming/recent holidays for a tenant."""
 
     def _priority(notice_type: str) -> str:
@@ -64,26 +71,25 @@ def _fetch_recent_notices(db: Session, tenant_id: int, limit: int = 10) -> List[
 
     # ── Notices ──────────────────────────────────────────────────────────────
     try:
-        records = (
-            db.query(Notice)
-            .filter(Notice.tenant_id == tenant_id)
-            .filter(Notice.is_published == True)
-            .filter(Notice.is_deleted == False)
-            .order_by(Notice.published_at.desc())
-            .limit(limit)
-            .all()
+        records = notice_repository.list_recent_published_notices(
+            db,
+            tenant_id=tenant_id,
+            limit=limit,
+            viewer_context=viewer_context,
         )
-        for n in records:
-            published_at = n.published_at  # type: ignore[assignment]
+        for row in records:
+            published_at = row.get("published_at")
             result.append(RecentNoticeItem(
-                id=n.id,  # type: ignore[arg-type]
-                title=n.title,  # type: ignore[arg-type]
-                notice_type=n.notice_type,  # type: ignore[arg-type]
+                id=int(row["id"]),
+                title=str(row["title"]),
+                notice_type=str(row["notice_type"]),
                 item_type="notice",
                 published_at=(
-                    published_at.strftime("%d %b %Y") if published_at is not None else None
+                    published_at.strftime("%d %b %Y")
+                    if published_at is not None and hasattr(published_at, "strftime")
+                    else None
                 ),
-                priority=_priority(n.notice_type),  # type: ignore[arg-type]
+                priority=_priority(str(row.get("notice_type") or "")),
             ))
     except Exception as e:
         logger.warning(f"Could not fetch recent notices: {e}")
@@ -607,6 +613,24 @@ def _build_teacher_assigned_infos(
     return assigned_infos
 
 
+def _resolve_notice_viewer_context(
+    db: Session,
+    tenant_id: int,
+    current_user: CurrentUser,
+) -> NoticeViewerContext | None:
+    try:
+        return notice_service.get_viewer_context(
+            db,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+            email=current_user.email or "",
+            legacy_role=current_user.role,
+        )
+    except Exception as e:
+        logger.warning(f"Could not resolve notice viewer context: {e}")
+        return None
+
+
 def _build_teacher_dashboard(
     db: Session,
     tenant_id: int,
@@ -616,6 +640,7 @@ def _build_teacher_dashboard(
     eff_att_start: Optional[date],
     eff_att_end: Optional[date],
 ) -> DashboardResponse:
+    notice_viewer_context = _resolve_notice_viewer_context(db, tenant_id, current_user)
     teacher = (
         db.query(Teacher)
         .filter(Teacher.tenant_id == tenant_id)
@@ -631,7 +656,9 @@ def _build_teacher_dashboard(
                 today_attendance=AttendanceOverview(),
                 absentees_list=[],
                 weekly_trend=[WeeklyTrendPoint(date="Mon", present_rate=100.0)],
-                recent_notices=_fetch_recent_notices(db, tenant_id),
+                recent_notices=_fetch_recent_notices(
+                    db, tenant_id, viewer_context=notice_viewer_context
+                ),
                 dashboard_mode="subject_focused",
                 can_mark_attendance=False,
             ),
@@ -806,7 +833,9 @@ def _build_teacher_dashboard(
         today_attendance=overview,
         absentees_list=absentees,
         weekly_trend=weekly_points,
-        recent_notices=_fetch_recent_notices(db, tenant_id, limit=5),
+        recent_notices=_fetch_recent_notices(
+            db, tenant_id, limit=5, viewer_context=notice_viewer_context
+        ),
         recent_homework=hw_items,
         dashboard_mode=dashboard_mode,
         class_teacher_slot_count=class_teacher_slot_count,
@@ -997,13 +1026,17 @@ def _build_student_dashboard(
         except Exception as e:
             logger.warning(f"Could not resolve class teacher: {e}")
 
+    notice_viewer_context = _resolve_notice_viewer_context(db, tenant_id, current_user)
+
     student_data = StudentDashboardResponse(
         profile=profile_info,
         attendance=att_summary,
         fee_status=fee_status,
         class_teacher=class_teacher,
         homework=homework_summary,
-        recent_notices=_fetch_recent_notices(db, tenant_id, limit=5),
+        recent_notices=_fetch_recent_notices(
+            db, tenant_id, limit=5, viewer_context=notice_viewer_context
+        ),
     )
     return DashboardResponse(role=role_str, data=student_data)
 

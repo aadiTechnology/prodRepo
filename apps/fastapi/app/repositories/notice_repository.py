@@ -96,6 +96,36 @@ def _apply_consumer_visibility(
         where_sql.append(f"({' OR '.join(scope_clauses)})")
 
 
+def list_recent_published_notices(
+    db: Session,
+    *,
+    tenant_id: int,
+    limit: int,
+    viewer_context: NoticeViewerContext | None = None,
+) -> list[dict]:
+    """Published notices for dashboard widgets, with optional consumer visibility rules."""
+    where_sql = ["n.tenant_id = :tenant_id", "n.is_deleted = 0"]
+    params: dict = {"tenant_id": tenant_id, "limit": limit}
+
+    if viewer_context and is_notice_consumer(viewer_context):
+        _apply_consumer_visibility(where_sql, params, viewer_context)
+    else:
+        where_sql.append("n.is_published = 1")
+
+    where_clause = " AND ".join(where_sql)
+    list_sql = text(
+        f"""
+        SELECT n.*
+        FROM communication_notices n
+        WHERE {where_clause}
+        ORDER BY n.published_at DESC, n.id DESC
+        OFFSET 0 ROWS FETCH NEXT :limit ROWS ONLY
+        """
+    )
+    rows = db.execute(list_sql, params).mappings().all()
+    return [dict(r) for r in rows]
+
+
 def list_notices(
     db: Session,
     *,
