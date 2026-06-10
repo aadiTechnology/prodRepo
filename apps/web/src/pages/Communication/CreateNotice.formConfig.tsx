@@ -81,11 +81,11 @@ export function createNoticeFormConfig({
         type: "date",
         required: false,
       },
-      send_notification: {
-        name: "send_notification",
-        label: "Send Notification",
-        type: "switch",
-      },
+      // send_notification: {
+      //   name: "send_notification",
+      //   label: "Send Notification",
+      //   type: "switch",
+      // },
     },
     layoutRows: [
       { kind: "fields", grid: { xs: 12 }, fieldNames: ["title"] },
