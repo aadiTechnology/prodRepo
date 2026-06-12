@@ -587,7 +587,8 @@ export default function HomeworkList() {
               sx={{
                 display: "flex",
                 justifyContent: "space-between",
-                alignItems: "center",
+                alignItems: { xs: "stretch", md: "center" },
+                flexDirection: { xs: "column", md: "row" },
                 flexWrap: "wrap",
                 gap: 2,
                 mb: 2,
@@ -618,7 +619,16 @@ export default function HomeworkList() {
                 <Tab label={`Active (${stats.active})`} />
                 <Tab label={`Overdue (${stats.overdue})`} />
               </Tabs>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                  flexWrap: "wrap",
+                  justifyContent: { xs: "space-between", md: "flex-end" },
+                  width: { xs: "100%", md: "auto" },
+                }}
+              >
                 <Box
                   sx={{
                     display: 'flex',
@@ -747,7 +757,7 @@ export default function HomeworkList() {
                 }}
               >
                 <EntityTableSection<HomeworkRow>
-                  label="Tasks"
+                  label=""
                   totalRows={finalHomeworkList.length}
                   page={listPage}
                   rowsPerPage={listRowsPerPage}
@@ -760,6 +770,8 @@ export default function HomeworkList() {
                   rowActions={listConfig.actions.rowActions}
                   stickyHeader
                   size="small"
+                  showPagination={true}
+                  showInfoBar={false}
                 />
               </AppCard>
             ) : (
@@ -781,7 +793,7 @@ export default function HomeworkList() {
                   const subColor = getSubjectColor(hw.subject_name);
 
                   return (
-                    <Grid key={hw.id} size={{ xs: 12, sm: 6, lg: 4 }}>
+                    <Grid key={hw.id} size={{ xs: 12, sm: 6, md: 6, lg: 4 }}>
                       <Card
                         variant="outlined"
                         sx={{
@@ -1039,16 +1051,16 @@ export default function HomeworkList() {
                   ? []
                   : [
                     {
-                      label: "Academic Year",
-                      value: controller.academicYearFilter,
-                      onChange: controller.setAcademicYearFilter,
-                      options: controller.academicYearOptions,
-                    },
-                    {
                       label: "Class",
                       value: controller.classFilter,
                       onChange: controller.setClassFilter,
                       options: controller.classOptions,
+                    },
+                    {
+                      label: "Division",
+                      value: controller.divisionFilter,
+                      onChange: controller.setDivisionFilter,
+                      options: controller.divisionOptions,
                     },
                     {
                       label: "Status",
@@ -1071,7 +1083,7 @@ export default function HomeworkList() {
       }
     >
       <EntityTableSection<HomeworkRow>
-        label="Homework"
+        label=""
         totalRows={controller.total}
         page={controller.page}
         rowsPerPage={controller.rowsPerPage}
@@ -1084,6 +1096,8 @@ export default function HomeworkList() {
         rowActions={listConfig.actions.rowActions}
         stickyHeader
         size="small"
+        showPagination={true}
+        showInfoBar={false}
       />
 
       <ConfirmDialog

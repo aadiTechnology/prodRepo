@@ -1,7 +1,8 @@
-import { Chip, alpha } from "@mui/material";
+import { Chip } from "@mui/material";
 import { colorTokens } from "../../tokens/colors";
 import type { ListConfig } from "../../components/reusable/listFramework.types";
 import type { HomeworkResponse } from "../../api/services/homeworkService";
+import { formatHomeworkClassLabel } from "./AddHomework.formConfig";
 
 export type HomeworkRow = HomeworkResponse;
 
@@ -14,17 +15,21 @@ function formatDate(dateStr: string | null | undefined): string {
   });
 }
 
-function computeDisplayStatus(row: HomeworkRow): { label: string; color: string } {
+function computeDisplayStatus(row: HomeworkRow): {
+  label: string;
+  color: "default" | "success" | "error" | "warning";
+  variant: "filled" | "outlined";
+} {
   if (row.status === "Draft") {
-    return { label: "Draft", color: "#ED6C02" }; // MUI warning.dark — amber tone
+    return { label: "Draft", color: "default", variant: "outlined" };
   }
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const submission = new Date(row.submission_date);
   if (submission < today) {
-    return { label: "Overdue", color: colorTokens.preschool.coral.main };
+    return { label: "Overdue", color: "error", variant: "filled" };
   }
-  return { label: "Active", color: colorTokens.preschool.mint.main };
+  return { label: "Active", color: "success", variant: "filled" };
 }
 
 type HomeworkListConfigArgs = {
@@ -64,8 +69,13 @@ export const createHomeworkListConfig = ({
       label: "Class",
       width: "10%",
       render: (row: HomeworkRow) => {
-        const division = row.division_name ? ` (${row.division_name})` : "";
-        return `${row.class_name ?? "—"}${division}`;
+        const classLabel = row.class_name
+          ? formatHomeworkClassLabel(row.class_name)
+          : "—";
+        const division = row.division_name
+          ? ` (${formatHomeworkClassLabel(row.division_name)})`
+          : "";
+        return `${classLabel}${division}`;
       },
     },
     {
@@ -86,22 +96,13 @@ export const createHomeworkListConfig = ({
       width: "10%",
       align: "center",
       render: (row: HomeworkRow) => {
-        const { label, color } = computeDisplayStatus(row);
+        const { label, color, variant } = computeDisplayStatus(row);
         return (
           <Chip
             label={label}
             size="small"
-            sx={{
-              fontWeight: 800,
-              fontSize: "0.68rem",
-              textTransform: "uppercase",
-              letterSpacing: "0.5px",
-              bgcolor: alpha(color, 0.1),
-              color: color,
-              border: `1px solid ${alpha(color, 0.2)}`,
-              borderRadius: "6px",
-              height: "22px",
-            }}
+            color={color}
+            variant={variant}
           />
         );
       },
