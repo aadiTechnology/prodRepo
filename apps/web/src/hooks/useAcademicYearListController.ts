@@ -1,5 +1,25 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import academicYearService, { type AcademicYear } from "../api/services/academicYearService";
+import { isAcademicYearActive } from "../utils/academicYear";
+
+function compareAcademicYearsForList(
+  a: AcademicYear & { is_current?: boolean | number },
+  b: AcademicYear & { is_current?: boolean | number }
+): number {
+  const aCurrent = a.is_current === true || a.is_current === 1;
+  const bCurrent = b.is_current === true || b.is_current === 1;
+  if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
+
+  const aActive = isAcademicYearActive(a);
+  const bActive = isAcademicYearActive(b);
+  if (aActive !== bActive) return aActive ? -1 : 1;
+
+  const dateA = new Date(a.start_date || "").getTime();
+  const dateB = new Date(b.start_date || "").getTime();
+  const normalizedA = Number.isNaN(dateA) ? 0 : dateA;
+  const normalizedB = Number.isNaN(dateB) ? 0 : dateB;
+  return normalizedB - normalizedA;
+}
 
 export function useAcademicYearListController() {
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
@@ -15,8 +35,8 @@ export function useAcademicYearListController() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [entityToDelete, setEntityToDelete] = useState<AcademicYear | null>(null);
 
-  const [sortBy, setSortBy] = useState<"name" | "start_date">("name");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<"name" | "start_date" | "default">("default");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const fetchAcademicYears = useCallback(async () => {
     try {
@@ -74,11 +94,14 @@ export function useAcademicYearListController() {
 
   const sortedAcademicYears = useMemo(() => {
     return [...filteredAcademicYears].sort((a, b) => {
+      if (sortBy === "default") {
+        return compareAcademicYearsForList(a, b);
+      }
       if (sortBy === "start_date") {
         const dateA = new Date(a.start_date || "").getTime();
         const dateB = new Date(b.start_date || "").getTime();
-        const normalizedA = isNaN(dateA) ? 0 : dateA;
-        const normalizedB = isNaN(dateB) ? 0 : dateB;
+        const normalizedA = Number.isNaN(dateA) ? 0 : dateA;
+        const normalizedB = Number.isNaN(dateB) ? 0 : dateB;
         return sortOrder === "asc" ? normalizedA - normalizedB : normalizedB - normalizedA;
       }
       const fieldA = a.name ?? "";

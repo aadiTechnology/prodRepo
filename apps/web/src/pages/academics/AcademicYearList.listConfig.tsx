@@ -49,10 +49,11 @@ export const createAcademicYearListConfig = ({
     },
   ],
   sortOptions: [
-    { id: "name-asc", label: "Name (A-Z)", sortBy: "name", sortOrder: "asc" },
-    { id: "name-desc", label: "Name (Z-A)", sortBy: "name", sortOrder: "desc" },
+    { id: "default", label: "Current Year First", sortBy: "default", sortOrder: "desc" },
     { id: "start-desc", label: "Start Date (newest)", sortBy: "start_date", sortOrder: "desc" },
     { id: "start-asc", label: "Start Date (oldest)", sortBy: "start_date", sortOrder: "asc" },
+    { id: "name-asc", label: "Name (A-Z)", sortBy: "name", sortOrder: "asc" },
+    { id: "name-desc", label: "Name (Z-A)", sortBy: "name", sortOrder: "desc" },
   ],
   uiPolicy: {
     emptyMessage: "No academic years found. Click 'Add Academic Year' to begin.",
