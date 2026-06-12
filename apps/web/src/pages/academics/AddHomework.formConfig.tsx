@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { FormConfig } from "../../components/reusable/formFramework.types";
 
 export type AddHomeworkFormData = {
@@ -10,31 +11,24 @@ export type AddHomeworkFormData = {
   assigned_date: string;
   submission_date: string;
   notify_parents: boolean;
-  // "Draft" | "Published" — controlled programmatically, not rendered as a field
   status: string;
 };
 
 type Options = { label: string; value: string }[];
 
+/** Strip trailing full stops from class labels (e.g. "Nursury." → "Nursury"). */
+export function formatHomeworkClassLabel(name: string): string {
+  return name.replace(/\.$/, "").trim();
+}
+
 export const createHomeworkFormConfig = (options: {
-  academicYearOptions: Options;
   classOptions: Options;
   divisionOptions: Options;
   subjectOptions: Options;
-  academicYearSelected: boolean;
   classSelected: boolean;
+  attachmentSlot?: ReactNode;
 }): FormConfig<AddHomeworkFormData> => ({
   fields: {
-    academic_year_id: {
-      name: "academic_year_id",
-      label: "Academic Year",
-      type: "select",
-      required: true,
-      props: {
-        options: options.academicYearOptions,
-        placeholder: "Select Academic Year",
-      },
-    },
     class_id: {
       name: "class_id",
       label: "Class",
@@ -42,8 +36,7 @@ export const createHomeworkFormConfig = (options: {
       required: true,
       props: {
         options: options.classOptions,
-        placeholder: options.academicYearSelected ? "Select Class" : "Select academic year first",
-        disabled: !options.academicYearSelected,
+        placeholder: "Select Class",
       },
     },
     class_division_id: {
@@ -53,12 +46,8 @@ export const createHomeworkFormConfig = (options: {
       required: false,
       props: {
         options: options.divisionOptions,
-        placeholder: !options.academicYearSelected
-          ? "Select academic year first"
-          : !options.classSelected
-          ? "Select class first"
-          : "Select Division",
-        disabled: !options.academicYearSelected || !options.classSelected,
+        placeholder: options.classSelected ? "Select Division" : "Select class first",
+        disabled: !options.classSelected,
       },
     },
     subject_id: {
@@ -68,12 +57,8 @@ export const createHomeworkFormConfig = (options: {
       required: true,
       props: {
         options: options.subjectOptions,
-        placeholder: !options.academicYearSelected
-          ? "Select academic year first"
-          : !options.classSelected
-          ? "Select class first"
-          : "Select Subject",
-        disabled: !options.academicYearSelected || !options.classSelected || !options.subjectOptions.length,
+        placeholder: options.classSelected ? "Select Subject" : "Select class first",
+        disabled: !options.classSelected || !options.subjectOptions.length,
       },
     },
     title: {
@@ -106,17 +91,10 @@ export const createHomeworkFormConfig = (options: {
       type: "date",
       required: true,
     },
-    notify_parents: {
-      name: "notify_parents",
-      label: "Notify Students / Parents",
-      type: "switch",
-      required: false,
-    },
   },
 
   layoutRows: [
     { kind: "section", title: "Class & Subject", grid: { xs: 12 } },
-    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["academic_year_id"] },
     { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["class_id"] },
     { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["class_division_id"] },
     { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["subject_id"] },
@@ -126,7 +104,14 @@ export const createHomeworkFormConfig = (options: {
     { kind: "section", title: "Schedule", grid: { xs: 12 } },
     { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["assigned_date"] },
     { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["submission_date"] },
-    { kind: "section", title: "Notification", grid: { xs: 12 } },
-    { kind: "fields", grid: { xs: 12 }, fieldNames: ["notify_parents"] },
+    ...(options.attachmentSlot
+      ? [
+          {
+            kind: "custom" as const,
+            grid: { xs: 12 },
+            render: () => options.attachmentSlot ?? null,
+          },
+        ]
+      : []),
   ],
 });
