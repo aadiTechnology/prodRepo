@@ -149,7 +149,6 @@ const MarkAttendance = () => {
   const controller = useMarkAttendanceController();
 
   const {
-    academicYears,
     teachers,
     filters,
     students,
@@ -163,7 +162,6 @@ const MarkAttendance = () => {
     markAllPresent,
     saveAttendance,
     resetFilters,
-    handleAcademicYearChange,
     filteredClasses,
     filteredDivisions,
     isTeacher,
@@ -180,6 +178,10 @@ const MarkAttendance = () => {
     page * rowsPerPage,
     (page + 1) * rowsPerPage
   );
+
+  React.useEffect(() => {
+    setPage(0);
+  }, [filters.class_id, filters.division_id, filters.attendance_date, students.length]);
 
   // ── Column definitions ────────────────────────────────────────────────────
   const columns = useMemo(
@@ -370,21 +372,6 @@ const MarkAttendance = () => {
         />
 
         <Select
-          value={filters.academic_year_id || ""}
-          displayEmpty
-          size="small"
-          onChange={(e) => handleAcademicYearChange(Number(e.target.value))}
-          sx={filterSelectSx}
-        >
-          <MenuItem value="">
-            <Typography variant="body2" color="text.secondary">Academic Year</Typography>
-          </MenuItem>
-          {academicYears.map((year) => (
-            <MenuItem key={year.id} value={year.id}>{year.name}</MenuItem>
-          ))}
-        </Select>
-
-        <Select
           value={filters.teacher_id || ""}
           displayEmpty
           size="small"
@@ -432,6 +419,7 @@ const MarkAttendance = () => {
         </Select>
 
         <Select
+          key={`division-${filters.class_id}`}
           value={filters.division_id || ""}
           displayEmpty
           size="small"
@@ -516,7 +504,7 @@ const MarkAttendance = () => {
           }}
           columns={columns}
           data={paginatedStudents}
-          showPagination
+          showPagination={true}
           showInfoBar={false}
           getRowKey={(row) => String(row.student_id)}
         />
@@ -552,7 +540,7 @@ const MarkAttendance = () => {
             color="text.secondary"
             sx={{ maxWidth: 350, lineHeight: 1.6, opacity: 0.7 }}
           >
-            Pick Date, Academic Year, Class &amp; Division above to load the student roster.
+            Pick Date{isTeacher ? "" : ", Teacher"}, Class &amp; Division above to load the student roster.
           </Typography>
         </Box>
       )}

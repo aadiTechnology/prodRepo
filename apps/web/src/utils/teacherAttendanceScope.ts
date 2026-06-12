@@ -241,7 +241,9 @@ export function getFilteredDivisionsForTeacher(
     ).find((c) => c.id === classId);
   }
   if (!selectedClass) return [];
-  const allDivisions = selectedClass.divisions || [];
+  const allDivisions = (selectedClass.divisions || []).filter(
+    (division) => !division.class_id || division.class_id === classId
+  );
   if (!teacherId) return allDivisions;
 
   const assignedDivisionIds = Array.from(
