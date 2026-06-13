@@ -21,7 +21,7 @@ export interface EnrollmentPrefill {
 export interface EnrollmentCreatePayload {
   lead_id?: number | null;
   student_name: string;
-  date_of_birth: string;
+  date_of_birth?: string | null;
   gender?: string | null;
   admission_no?: string | null;
   admission_date: string;

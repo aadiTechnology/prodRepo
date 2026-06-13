@@ -211,7 +211,6 @@ export default function EnrollmentPage() {
   const validationConfig = useMemo(
     () => ({
       student_name: [{ type: "required" as const, message: "Student name is required." }],
-      date_of_birth: [{ type: "required" as const, message: "Date of birth is required." }],
       parent_name: [{ type: "required" as const, message: "Parent name is required." }],
       admission_date: [{ type: "required" as const, message: "Admission date is required." }],
       academic_year_id: [{ type: "required" as const, message: "Academic year is required." }],
@@ -571,7 +570,7 @@ export default function EnrollmentPage() {
   const buildPayload = (): EnrollmentCreatePayload => ({
     lead_id: selectedLead?.id ?? null,
     student_name: formData.student_name.trim(),
-    date_of_birth: formData.date_of_birth,
+    date_of_birth: formData.date_of_birth || null,
     gender: formData.gender || null,
     admission_no: formData.admission_no.trim() || null,
     admission_date: formData.admission_date,
@@ -602,7 +601,7 @@ export default function EnrollmentPage() {
         const res = await studentService.update(editStudentId, {
           student_name: formData.student_name.trim(),
           gender: formData.gender || null,
-          date_of_birth: formData.date_of_birth,
+          date_of_birth: formData.date_of_birth || null,
           mobile_number: formData.mobile_number.trim(),
           email: formData.email.trim() || null,
           class_id: Number(formData.class_id),

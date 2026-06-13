@@ -51,7 +51,7 @@ export function createEnrollmentFormConfig({
         name: "date_of_birth",
         label: "Date of Birth",
         type: "text",
-        required: true,
+        required: false,
         props: { type: "date", InputLabelProps: { shrink: true } },
       },
       gender: {

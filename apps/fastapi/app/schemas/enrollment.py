@@ -30,7 +30,7 @@ class EnrollmentCreateRequest(BaseModel):
     lead_id: Optional[int] = Field(default=None, description="Optional lead id to convert")
 
     student_name: str
-    date_of_birth: date
+    date_of_birth: Optional[date] = None
     gender: Optional[str] = None
 
     admission_no: Optional[str] = None
