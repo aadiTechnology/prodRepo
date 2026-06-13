@@ -12,6 +12,7 @@ export interface PrimaryActionButtonProps {
   icon: ReactNode;
   label: string;
   "aria-label"?: string;
+  disabled?: boolean;
 }
 
 export default function PrimaryActionButton({
@@ -19,28 +20,39 @@ export default function PrimaryActionButton({
   icon,
   label,
   "aria-label": ariaLabel = label,
+  disabled = false,
 }: PrimaryActionButtonProps) {
+  const button = (
+    <IconButton
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      sx={(theme) => ({
+        background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
+        color: colorTokens.primary.contrast,
+        borderRadius: "15px",
+        width: 44,
+        height: 44,
+        boxShadow: `0 8px 16px ${alpha(colorTokens.preschool.turquoise.main, 0.25)}`,
+        transition: "all 0.3s ease",
+        "&:hover": {
+          transform: "scale(1.1) rotate(5deg)",
+          boxShadow: `0 12px 20px ${alpha(colorTokens.preschool.turquoise.main, 0.35)}`,
+        },
+        "&.Mui-disabled": {
+          background: "#e2e8f0",
+          color: "#94a3b8",
+          boxShadow: "none",
+        },
+      })}
+    >
+      {icon}
+    </IconButton>
+  );
+
   return (
     <Tooltip title={label}>
-      <IconButton
-        onClick={onClick}
-        aria-label={ariaLabel}
-        sx={(theme) => ({
-          background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
-          color: colorTokens.primary.contrast,
-          borderRadius: '15px',
-          width: 44,
-          height: 44,
-          boxShadow: `0 8px 16px ${alpha(colorTokens.preschool.turquoise.main, 0.25)}`,
-          transition: "all 0.3s ease",
-          "&:hover": {
-            transform: "scale(1.1) rotate(5deg)",
-            boxShadow: `0 12px 20px ${alpha(colorTokens.preschool.turquoise.main, 0.35)}`,
-          },
-        })}
-      >
-        {icon}
-      </IconButton>
+      {disabled ? <span style={{ display: "inline-flex" }}>{button}</span> : button}
     </Tooltip>
   );
 }

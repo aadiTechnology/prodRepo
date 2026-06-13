@@ -390,17 +390,18 @@ def insert_media(
     file_path: str,
     file_size: int | None,
     display_order: int,
+    file_content: bytes | None = None,
 ) -> int:
     sql = text(
         """
         INSERT INTO activity_gallery_media (
             gallery_id, media_type, file_name, original_file_name,
-            file_path, file_size, display_order, uploaded_at, status
+            file_path, file_content, file_size, display_order, uploaded_at, status
         )
         OUTPUT INSERTED.id
         VALUES (
             :gallery_id, :media_type, :file_name, :original_file_name,
-            :file_path, :file_size, :display_order, :uploaded_at, 1
+            :file_path, :file_content, :file_size, :display_order, :uploaded_at, 1
         )
         """
     )
@@ -412,6 +413,7 @@ def insert_media(
             "file_name": file_name,
             "original_file_name": original_file_name,
             "file_path": file_path,
+            "file_content": file_content,
             "file_size": file_size,
             "display_order": display_order,
             "uploaded_at": datetime.utcnow(),
@@ -419,6 +421,26 @@ def insert_media(
     ).scalar_one()
     db.commit()
     return int(media_id)
+
+
+def update_media_file_path(
+    db: Session,
+    *,
+    gallery_id: int,
+    media_id: int,
+    file_path: str,
+) -> None:
+    db.execute(
+        text(
+            """
+            UPDATE activity_gallery_media
+            SET file_path = :file_path
+            WHERE id = :media_id AND gallery_id = :gallery_id AND status = 1
+            """
+        ),
+        {"media_id": media_id, "gallery_id": gallery_id, "file_path": file_path},
+    )
+    db.commit()
 
 
 def get_media_by_id(

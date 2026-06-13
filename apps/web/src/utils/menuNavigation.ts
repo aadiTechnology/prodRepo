@@ -21,3 +21,14 @@ export function isValidMenuPath(path: string | null | undefined): path is string
 export function hasMenuChildren(children?: unknown[] | null): boolean {
   return Array.isArray(children) && children.length > 0;
 }
+
+/** True when the user has sidebar access to this route (exact or child path). */
+export function hasGrantedMenuAccess(pathname: string, grantedMenuPaths: Set<string>): boolean {
+  if (grantedMenuPaths.has(pathname)) return true;
+  for (const menuPath of grantedMenuPaths) {
+    if (menuPath !== "/" && pathname.startsWith(`${menuPath}/`)) {
+      return true;
+    }
+  }
+  return false;
+}

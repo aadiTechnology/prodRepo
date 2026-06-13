@@ -84,27 +84,49 @@ export function mapApiErrorsToFields(err: unknown): {
   fieldErrors: Record<string, string>;
   message: string;
 } {
-  const e = err as { message?: string; response?: { data?: { detail?: unknown } } };
+  const e = err as {
+    message?: string;
+    response?: { data?: { detail?: unknown; errors?: unknown } };
+  };
   const fieldErrors: Record<string, string> = {};
   let msg = e?.message || "";
   const errorData = e?.response?.data;
   const detail = errorData?.detail;
+  const validationIssues = Array.isArray(detail)
+    ? detail
+    : Array.isArray(errorData?.errors)
+      ? errorData.errors
+      : null;
 
-  if (detail && Array.isArray(detail)) {
-    detail.forEach((issue: { loc?: unknown[]; msg?: string }) => {
+  if (validationIssues) {
+    validationIssues.forEach((issue: { loc?: unknown[]; msg?: string }) => {
       const field = issue.loc?.[issue.loc.length - 1];
+      const issueMsg = issue.msg ?? "";
       if (field && typeof field === "string") {
-        fieldErrors[field] = issue.msg ?? "";
+        if (field === "file" || field === "files" || field === "body") {
+          if (issueMsg) msg = issueMsg;
+          return;
+        }
+        fieldErrors[field] = issueMsg;
       }
     });
     if (Object.keys(fieldErrors).length > 0) {
       msg = "Please fix the highlighted errors.";
     } else {
-      const first = detail[0] as { msg?: string } | undefined;
+      const first = validationIssues[0] as { msg?: string } | undefined;
       msg = first?.msg || msg;
     }
   } else if (typeof detail === "string") {
     msg = detail;
+  }
+
+  if (
+    (!msg || msg === "Validation error" || msg.includes("Request failed with status code")) &&
+    typeof e?.message === "string" &&
+    e.message &&
+    !e.message.includes("Request failed with status code")
+  ) {
+    msg = e.message;
   }
 
   if (msg.toLowerCase().includes("email already exists")) {

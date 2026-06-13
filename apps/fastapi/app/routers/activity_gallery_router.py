@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List
 
 from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -325,6 +325,28 @@ def delete_gallery_media(
     )
 
 
+@router.get("/{gallery_id}/media/{media_id}/content")
+def get_gallery_media_content(
+    gallery_id: int = Path(..., ge=1),
+    media_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    can_manage = activity_gallery_service.user_can_manage(db, current_user)
+    is_admin = is_admin_like(
+        db, current_user.id, current_user.role, current_user.tenant_id
+    )
+    viewer_context = _viewer_context(db, current_user, manage=can_manage and is_admin)
+    content, mime, _ = activity_gallery_service.get_media_content(
+        db,
+        tenant_id=current_user.tenant_id,
+        gallery_id=gallery_id,
+        media_id=media_id,
+        viewer_context=viewer_context,
+    )
+    return Response(content=content, media_type=mime)
+
+
 @router.get("/{gallery_id}/media/{media_id}/download")
 def download_gallery_media(
     gallery_id: int = Path(..., ge=1),
@@ -337,15 +359,21 @@ def download_gallery_media(
         db, current_user.id, current_user.role, current_user.tenant_id
     )
     viewer_context = _viewer_context(db, current_user, manage=can_manage and is_admin)
-    disk_path, download_name = activity_gallery_service.get_media_for_download(
+    content, disk_path, mime, download_name = activity_gallery_service.get_media_for_download(
         db,
         tenant_id=current_user.tenant_id,
         gallery_id=gallery_id,
         media_id=media_id,
         viewer_context=viewer_context,
     )
+    if content is not None:
+        return Response(
+            content=content,
+            media_type=mime,
+            headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
+        )
     return FileResponse(
         path=disk_path,
         filename=download_name,
-        media_type="application/octet-stream",
+        media_type=mime,
     )

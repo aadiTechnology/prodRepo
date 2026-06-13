@@ -6,9 +6,6 @@ from uuid import uuid4
 
 from app.core.exceptions import ValidationException
 
-UPLOAD_DIR = os.path.join("static", "activity-gallery-media")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
 PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".jfif"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi"}
 MAX_FILE_SIZE_MB = 50
@@ -21,6 +18,13 @@ CONTENT_TYPE_TO_EXTENSION = {
     "video/mp4": ".mp4",
     "video/quicktime": ".mov",
     "video/x-msvideo": ".avi",
+}
+
+EXTENSION_TO_MIME = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".jfif": "image/jpeg",
 }
 
 
@@ -59,29 +63,36 @@ def validate_media_file(
     return extension
 
 
-def persist_gallery_media_file(
+def build_gallery_photo_file_name(
     *,
     tenant_id: int,
     gallery_id: int,
     original_filename: str,
     content: bytes,
-    media_type: str,
     content_type: str | None = None,
-) -> tuple[str, str]:
+) -> str:
     extension = validate_media_file(
         filename=original_filename,
         content=content,
-        media_type=media_type,
+        media_type="Photo",
         content_type=content_type,
     )
     unique_suffix = datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
-    safe_name = f"{tenant_id}_{gallery_id}_{unique_suffix}{extension}"
-    disk_path = os.path.join(UPLOAD_DIR, safe_name)
+    return f"{tenant_id}_{gallery_id}_{unique_suffix}{extension}"
 
-    try:
-        with open(disk_path, "wb") as buf:
-            buf.write(content)
-    except OSError as exc:
-        raise ValidationException("Unable to upload file. Please try again.") from exc
 
-    return safe_name, f"/activity-gallery-media/{safe_name}"
+def gallery_media_content_path(*, gallery_id: int, media_id: int) -> str:
+    return f"/api/activity-galleries/{gallery_id}/media/{media_id}/content"
+
+
+def mime_type_for_file_name(file_name: str) -> str:
+    extension = os.path.splitext(file_name or "")[1].lower()
+    return EXTENSION_TO_MIME.get(extension, "application/octet-stream")
+
+
+def is_db_stored_media_path(file_path: str) -> bool:
+    return file_path.strip().startswith("/api/activity-galleries/")
+
+
+def legacy_disk_path(file_path: str) -> str:
+    return os.path.join("static", file_path.lstrip("/"))

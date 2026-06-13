@@ -75,6 +75,17 @@ const createAxiosInstance = (): AxiosInstance => {
   // Request interceptor
   instance.interceptors.request.use(
     (config) => {
+      // Let the browser set multipart boundary for file uploads
+      if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+        const headers = config.headers;
+        if (headers && typeof (headers as { delete?: (name: string) => void }).delete === "function") {
+          (headers as { delete: (name: string) => void }).delete("Content-Type");
+        } else if (headers) {
+          delete (headers as Record<string, unknown>)["Content-Type"];
+          delete (headers as Record<string, unknown>)["content-type"];
+        }
+      }
+
       // Log request in development
       if (isDevelopment) {
         console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
@@ -147,7 +158,15 @@ const createAxiosInstance = (): AxiosInstance => {
 
         // Server responded with error status
         const errorData = error.response.data || {};
+        const pydanticIssues = Array.isArray(errorData.errors) ? errorData.errors : null;
+        const firstIssueMsg =
+          pydanticIssues?.[0] && typeof pydanticIssues[0] === "object"
+            ? String((pydanticIssues[0] as { msg?: string }).msg ?? "")
+            : "";
         const errorMessage =
+          (typeof errorData.detail === "string" && errorData.detail !== "Validation error"
+            ? errorData.detail
+            : firstIssueMsg) ||
           errorData.detail ||
           errorData.message ||
           `Request failed with status ${error.response.status}`;

@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -48,6 +48,7 @@ class ActivityGalleryMedia(Base):
     file_name = Column(String(255), nullable=False)
     original_file_name = Column(String(255), nullable=True)
     file_path = Column(String(1000), nullable=False)
+    file_content = Column(LargeBinary, nullable=True)
     file_size = Column(BigInteger, nullable=True)
     display_order = Column(Integer, default=1, nullable=False)
     uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)

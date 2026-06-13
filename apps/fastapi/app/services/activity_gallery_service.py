@@ -34,7 +34,13 @@ from app.services.activity_gallery_access import (
     teacher_can_manage_class_division,
     user_can_manage_galleries,
 )
-from app.services.activity_gallery_media_storage import persist_gallery_media_file
+from app.services.activity_gallery_media_storage import (
+    build_gallery_photo_file_name,
+    gallery_media_content_path,
+    is_db_stored_media_path,
+    legacy_disk_path,
+    mime_type_for_file_name,
+)
 from app.services.activity_gallery_youtube import normalize_youtube_url
 
 __all__ = ["ACTIVITY_GALLERY_MENU_PATH"]
@@ -478,12 +484,11 @@ def upload_media(
     if media_type == "Photo":
         _assert_photo_gallery_total_size(db, gallery_id=gallery_id, incoming_bytes=len(content))
 
-    safe_name, public_path = persist_gallery_media_file(
+    safe_name = build_gallery_photo_file_name(
         tenant_id=tenant_id,
         gallery_id=gallery_id,
         original_filename=filename,
         content=content,
-        media_type=media_type,
         content_type=content_type,
     )
     media_id = repo.insert_media(
@@ -492,9 +497,17 @@ def upload_media(
         media_type=media_type,
         file_name=safe_name,
         original_file_name=filename,
-        file_path=public_path,
+        file_path="/pending",
+        file_content=content,
         file_size=len(content),
         display_order=current_count + 1,
+    )
+    public_path = gallery_media_content_path(gallery_id=gallery_id, media_id=media_id)
+    repo.update_media_file_path(
+        db,
+        gallery_id=gallery_id,
+        media_id=media_id,
+        file_path=public_path,
     )
     media_row = repo.get_media_by_id(db, gallery_id=gallery_id, media_id=media_id)
     if not media_row:
@@ -612,8 +625,10 @@ def delete_media(
 
     try:
         stored_path = str(media_row["file_path"])
-        if not stored_path.startswith(("http://", "https://")):
-            file_path = os.path.join("static", stored_path.lstrip("/"))
+        if not stored_path.startswith(("http://", "https://")) and not is_db_stored_media_path(
+            stored_path
+        ):
+            file_path = legacy_disk_path(stored_path)
             if os.path.exists(file_path):
                 os.remove(file_path)
     except OSError:
@@ -623,6 +638,50 @@ def delete_media(
     return ActivityGalleryDeleteResponse(message="Media deleted successfully")
 
 
+def _resolve_media_bytes(
+    media_row: dict,
+) -> tuple[bytes, str, str]:
+    stored_path = str(media_row["file_path"])
+    download_name = str(
+        media_row.get("original_file_name") or media_row.get("file_name") or "download"
+    )
+    file_content = media_row.get("file_content")
+    if file_content is not None:
+        mime = mime_type_for_file_name(str(media_row.get("file_name") or download_name))
+        return bytes(file_content), mime, download_name
+
+    if is_db_stored_media_path(stored_path):
+        raise NotFoundException("Gallery media content", media_row.get("id"))
+
+    disk_path = legacy_disk_path(stored_path)
+    if not os.path.isfile(disk_path):
+        raise NotFoundException("Gallery media file", media_row.get("id"))
+    with open(disk_path, "rb") as handle:
+        content = handle.read()
+    mime = mime_type_for_file_name(str(media_row.get("file_name") or download_name))
+    return content, mime, download_name
+
+
+def get_media_content(
+    db: Session,
+    *,
+    tenant_id: int,
+    gallery_id: int,
+    media_id: int,
+    viewer_context: GalleryViewerContext | None,
+) -> tuple[bytes, str, str]:
+    _assert_gallery_visible(
+        db,
+        tenant_id=tenant_id,
+        gallery_id=gallery_id,
+        viewer_context=viewer_context,
+    )
+    media_row = repo.get_media_by_id(db, gallery_id=gallery_id, media_id=media_id)
+    if not media_row:
+        raise NotFoundException("Gallery media", media_id)
+    return _resolve_media_bytes(media_row)
+
+
 def get_media_for_download(
     db: Session,
     *,
@@ -630,7 +689,8 @@ def get_media_for_download(
     gallery_id: int,
     media_id: int,
     viewer_context: GalleryViewerContext | None,
-) -> tuple[str, str]:
+) -> tuple[bytes | None, str | None, str, str]:
+    """Return (content_bytes, disk_path, mime, download_name). Exactly one of content or disk_path is set."""
     _assert_gallery_visible(
         db,
         tenant_id=tenant_id,
@@ -641,9 +701,23 @@ def get_media_for_download(
     if not media_row:
         raise NotFoundException("Gallery media", media_id)
 
-    disk_path = os.path.join("static", str(media_row["file_path"]).lstrip("/"))
-    download_name = media_row.get("original_file_name") or media_row.get("file_name") or "download"
-    return disk_path, str(download_name)
+    stored_path = str(media_row["file_path"])
+    download_name = str(
+        media_row.get("original_file_name") or media_row.get("file_name") or "download"
+    )
+    mime = mime_type_for_file_name(str(media_row.get("file_name") or download_name))
+
+    file_content = media_row.get("file_content")
+    if file_content is not None:
+        return bytes(file_content), None, mime, download_name
+
+    if is_db_stored_media_path(stored_path):
+        raise NotFoundException("Gallery media content", media_id)
+
+    disk_path = legacy_disk_path(stored_path)
+    if not os.path.isfile(disk_path):
+        raise NotFoundException("Gallery media file", media_id)
+    return None, disk_path, mime, download_name
 
 
 def get_classes_for_teacher(db: Session, *, tenant_id: int, user_id: int) -> list[ClassOption]:

@@ -76,6 +76,9 @@ const HolidayForm = lazy(() => import("../pages/configuration/HolidayForm"));
 const HomeworkList = lazy(() => import("../pages/academics/HomeworkList"));
 const AddHomework = lazy(() => import("../pages/academics/AddHomework"));
 const HomeworkDetails = lazy(() => import("../pages/academics/HomeworkDetails"));
+const ActivityGalleryList = lazy(() => import("../pages/activity-management/ActivityGalleryList"));
+const ActivityGalleryDetails = lazy(() => import("../pages/activity-management/ActivityGalleryDetails"));
+const CreateActivityGallery = lazy(() => import("../pages/activity-management/CreateActivityGallery"));
 const AcademicCalendar = lazy(() => import("../pages/calendar/AcademicCalendar"));
 const ConfigurationHub = lazy(() =>
   import("../pages/configuration").then((module) => ({ default: module.ConfigurationHub }))
@@ -450,6 +453,50 @@ export default function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          {/* Activity Management — Photo/Video Gallery */}
+          <Route
+            path="/activity-management/photo-video-gallery"
+            element={
+              <ProtectedRoute requiredPermissions="ACTIVITY_GALLERY_MGMT:view">
+                <ActivityGalleryList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/activity-management/photo-video-gallery/new"
+            element={
+              <ProtectedRoute
+                requiredPermissions={[
+                  "ACTIVITY_GALLERY_MGMT:create",
+                  "ACTIVITY_GALLERY_MGMT:view",
+                ]}
+              >
+                <CreateActivityGallery />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/activity-management/photo-video-gallery/:id/edit"
+            element={
+              <ProtectedRoute
+                requiredPermissions={[
+                  "ACTIVITY_GALLERY_MGMT:edit",
+                  "ACTIVITY_GALLERY_MGMT:view",
+                ]}
+              >
+                <CreateActivityGallery />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/activity-management/photo-video-gallery/:id"
+            element={
+              <ProtectedRoute requiredPermissions="ACTIVITY_GALLERY_MGMT:view">
+                <ActivityGalleryDetails />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Homework Management */}
           <Route path="/homework" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:view"><HomeworkList /></ProtectedRoute>} />
           <Route path="/homework/new" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:create"><AddHomework /></ProtectedRoute>} />

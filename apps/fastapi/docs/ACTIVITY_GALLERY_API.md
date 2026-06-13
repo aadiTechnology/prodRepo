@@ -110,7 +110,7 @@ All endpoints require authentication unless noted. Admin and Teacher flows use m
       "media_type": "Photo",
       "file_name": "10_1_20260610093000_a1b2c3d4.jpg",
       "original_file_name": "sports-day-1.jpg",
-      "file_path": "/activity-gallery-media/10_1_20260610093000_a1b2c3d4.jpg",
+      "file_path": "/api/activity-galleries/1/media/101/content",
       "file_size": 245760,
       "display_order": 1,
       "uploaded_at": "2026-06-10T09:30:00"
@@ -241,7 +241,7 @@ All endpoints require authentication unless noted. Admin and Teacher flows use m
 | **HTTP Method** | POST |
 | **Content-Type** | `multipart/form-data` |
 | **Permission** | `create` or `edit` on menu path |
-| **Description** | Uploads one photo. Photo galleries accept JPG, JPEG, PNG, JFIF (max 20 photos, **10 MB combined**). Video galleries use YouTube links only (see endpoint 7b). |
+| **Description** | Uploads one photo. Bytes are stored in `activity_gallery_media.file_content`; `file_path` is the API content URL (no JPG files on disk). Photo galleries accept JPG, JPEG, PNG, JFIF (max 20 photos, **10 MB combined**). Video galleries use YouTube links only (see endpoint 7b). |
 
 **Form field**
 
@@ -258,7 +258,7 @@ All endpoints require authentication unless noted. Admin and Teacher flows use m
   "media_type": "Photo",
   "file_name": "10_1_20260610093000_a1b2c3d4.jpg",
   "original_file_name": "sports-day-1.jpg",
-  "file_path": "/activity-gallery-media/10_1_20260610093000_a1b2c3d4.jpg",
+  "file_path": "/api/activity-galleries/1/media/101/content",
   "file_size": 245760,
   "display_order": 1,
   "uploaded_at": "2026-06-10T09:30:00"
@@ -430,7 +430,13 @@ All endpoints require authentication unless noted. Admin and Teacher flows use m
 | Schemas | `app/schemas/activity_gallery_schema.py` |
 | Models | `app/models/activity_gallery.py` |
 
-Static media URL prefix: `/activity-gallery-media/{filename}`
+Static media URL prefix (legacy uploads only): `/activity-gallery-media/{filename}`
+
+New photo uploads store content in the database and expose it at:
+
+`GET /api/activity-galleries/{gallery_id}/media/{media_id}/content`
+
+Run `scripts/add_activity_gallery_media_content.sql` once to add the `file_content` column.
 
 ---
 

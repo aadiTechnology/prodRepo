@@ -8,6 +8,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
+import { hasGrantedMenuAccess } from "../../utils/menuNavigation";
 import { ReactNode } from "react";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -118,6 +119,7 @@ export default function ProtectedRoute({
     hasRole,
     hasAnyRole,
     hasAllRoles,
+    grantedMenuPaths,
   } = useRBAC();
   const location = useLocation();
   const userRole = normalizeRole(user?.role);
@@ -201,6 +203,10 @@ export default function ProtectedRoute({
       } else {
         hasRequiredPermission = hasAnyPermission(requiredPermissions);
       }
+    }
+
+    if (!hasRequiredPermission) {
+      hasRequiredPermission = hasGrantedMenuAccess(location.pathname, grantedMenuPaths);
     }
 
     if (!hasRequiredPermission) {
