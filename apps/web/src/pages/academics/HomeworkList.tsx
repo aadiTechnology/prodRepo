@@ -39,6 +39,7 @@ import {
   ListPageLayout,
   ListPageToolbar,
   EntityTableSection,
+  TablePaginationBar,
 } from "../../components/reusable";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { useHomeworkListController } from "../../hooks/useHomeworkListController";
@@ -116,9 +117,13 @@ export default function HomeworkList() {
   const [children, setChildren] = useState<any[]>([]);
   const [selectedChild, setSelectedChild] = useState<any | null>(null);
   const [tabValue, setTabValue] = useState(0); // 0: All, 1: Active, 2: Overdue
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [listPage, setListPage] = useState(0);
   const [listRowsPerPage, setListRowsPerPage] = useState(10);
+
+  useEffect(() => {
+    setListPage(0);
+  }, [selectedChild?.id]);
 
   // Fetch student profile or parent's children info
   useEffect(() => {
@@ -274,6 +279,25 @@ export default function HomeworkList() {
     });
   }, [filteredHomeworkByChild, tabValue]);
 
+  const paginatedHomeworkList = useMemo(() => {
+    const start = listPage * listRowsPerPage;
+    return finalHomeworkList.slice(start, start + listRowsPerPage);
+  }, [finalHomeworkList, listPage, listRowsPerPage]);
+
+  const audiencePaginationBar =
+    finalHomeworkList.length > 0 ? (
+      <TablePaginationBar
+        page={listPage}
+        rowsPerPage={listRowsPerPage}
+        totalRows={finalHomeworkList.length}
+        onPageChange={setListPage}
+        onRowsPerPageChange={(value) => {
+          setListRowsPerPage(value);
+          setListPage(0);
+        }}
+      />
+    ) : null;
+
   const listConfig = createHomeworkListConfig({
     navigate,
     onDeleteClick: controller.handleDeleteClick,
@@ -396,7 +420,11 @@ export default function HomeworkList() {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(auto-fit, minmax(200px, 1fr))" },
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, 1fr)",
+                md: "repeat(3, 1fr)",
+              },
               gap: { xs: 1.5, sm: 2 },
             }}
           >
@@ -599,14 +627,19 @@ export default function HomeworkList() {
                 onChange={(e, v) => { setTabValue(v); setListPage(0); }}
                 textColor="primary"
                 indicatorColor="primary"
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
                 sx={{
+                  width: { xs: "100%", md: "auto" },
+                  maxWidth: "100%",
                   "& .MuiTab-root": {
                     fontWeight: 700,
-                    px: 2,
-                    fontSize: "0.9rem",
+                    px: { xs: 1.25, sm: 2 },
+                    fontSize: { xs: "0.8rem", sm: "0.9rem" },
                     color: colorTokens.text.secondary,
                     textTransform: "none",
-                    minWidth: 100,
+                    minWidth: { xs: 88, sm: 100 },
                   },
                   "& .Mui-selected": { color: `${colorTokens.primary.main} !important` },
                   "& .MuiTabs-indicator": {
@@ -762,9 +795,12 @@ export default function HomeworkList() {
                   page={listPage}
                   rowsPerPage={listRowsPerPage}
                   onPageChange={setListPage}
-                  onRowsPerPageChange={setListRowsPerPage}
+                  onRowsPerPageChange={(value) => {
+                    setListRowsPerPage(value);
+                    setListPage(0);
+                  }}
                   columns={listConfig.columns}
-                  data={finalHomeworkList.slice(listPage * listRowsPerPage, listPage * listRowsPerPage + listRowsPerPage)}
+                  data={paginatedHomeworkList}
                   loading={controller.loading}
                   emptyMessage="No tasks found."
                   rowActions={listConfig.actions.rowActions}
@@ -778,17 +814,18 @@ export default function HomeworkList() {
               <Card
                 variant="outlined"
                 sx={{
-                  p: { xs: 2.5, md: 4 },
-                  borderRadius: "24px",
+                  p: { xs: 1.5, sm: 2.5, md: 3 },
+                  borderRadius: { xs: "16px", md: "24px" },
                   borderColor: colorTokens.border.default,
                   background: colorTokens.surface.card,
                   boxShadow: "0 4px 16px rgba(0, 0, 0, 0.04)",
                   display: "flex",
                   flexDirection: "column",
+                  overflow: "hidden",
                 }}
               >
-                <Grid container spacing={2.5}>
-                {finalHomeworkList.map((hw) => {
+                <Grid container spacing={{ xs: 1.5, sm: 2, md: 2.5 }}>
+                {paginatedHomeworkList.map((hw) => {
                   const isOverdue = new Date(hw.submission_date) < new Date();
                   const subColor = getSubjectColor(hw.subject_name);
 
@@ -1024,6 +1061,7 @@ export default function HomeworkList() {
                   );
                 })}
               </Grid>
+              {audiencePaginationBar}
             </Card>
             )}
           </Box>
@@ -1037,6 +1075,10 @@ export default function HomeworkList() {
     <ListPageLayout
       pageBackground
       contentPaddingSize="none"
+      contentSx={{
+        overflow: { xs: "auto", md: "hidden" },
+        WebkitOverflowScrolling: "touch",
+      }}
       header={
         <PageHeader
           links={[{ title: "Homework", path: "#" }]}
@@ -1088,7 +1130,10 @@ export default function HomeworkList() {
         page={controller.page}
         rowsPerPage={controller.rowsPerPage}
         onPageChange={controller.setPage}
-        onRowsPerPageChange={controller.setRowsPerPage}
+        onRowsPerPageChange={(value) => {
+          controller.setRowsPerPage(value);
+          controller.setPage(0);
+        }}
         columns={listConfig.columns}
         data={controller.homework}
         loading={controller.loading}

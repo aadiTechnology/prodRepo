@@ -127,8 +127,8 @@ export function useHomeworkListController() {
       setLoading(true);
       setError(null);
       const response = await homeworkService.list({
-        skip: page * rowsPerPage,
-        limit: rowsPerPage,
+        skip: readOnlyAudience ? 0 : page * rowsPerPage,
+        limit: readOnlyAudience ? 200 : rowsPerPage,
         search: search || undefined,
         class_id: readOnlyAudience || !classFilter ? undefined : Number(classFilter),
         class_division_id:
@@ -137,7 +137,7 @@ export function useHomeworkListController() {
           readOnlyAudience || !academicYearFilter ? undefined : Number(academicYearFilter),
         status: readOnlyAudience
           ? "Published"
-          : (statusFilter as "Draft" | "Published") || undefined,
+          : (statusFilter as "Draft" | "Published" | "Overdue") || undefined,
       });
       setHomework(response.data);
       setTotal(response.total);
@@ -223,6 +223,7 @@ export function useHomeworkListController() {
     statusOptions: [
       { label: "Draft", value: "Draft" },
       { label: "Published", value: "Published" },
+      { label: "Overdue", value: "Overdue" },
     ],
     readOnlyAudience,
   };
