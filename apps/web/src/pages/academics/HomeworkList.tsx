@@ -284,19 +284,20 @@ export default function HomeworkList() {
     return finalHomeworkList.slice(start, start + listRowsPerPage);
   }, [finalHomeworkList, listPage, listRowsPerPage]);
 
-  const audiencePaginationBar =
-    finalHomeworkList.length > 0 ? (
-      <TablePaginationBar
-        page={listPage}
-        rowsPerPage={listRowsPerPage}
-        totalRows={finalHomeworkList.length}
-        onPageChange={setListPage}
-        onRowsPerPageChange={(value) => {
-          setListRowsPerPage(value);
-          setListPage(0);
-        }}
-      />
-    ) : null;
+  const showAudiencePagination = finalHomeworkList.length > 10;
+
+  const audiencePaginationBar = showAudiencePagination ? (
+    <TablePaginationBar
+      page={listPage}
+      rowsPerPage={listRowsPerPage}
+      totalRows={finalHomeworkList.length}
+      onPageChange={setListPage}
+      onRowsPerPageChange={(value) => {
+        setListRowsPerPage(value);
+        setListPage(0);
+      }}
+    />
+  ) : null;
 
   const listConfig = createHomeworkListConfig({
     navigate,
@@ -717,19 +718,7 @@ export default function HomeworkList() {
             </Box>
 
             {/* Main Homework List view */}
-            {controller.loading ? (
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  flexGrow: 1,
-                  py: 8,
-                }}
-              >
-                <CircularProgress size={48} thickness={4} />
-              </Box>
-            ) : finalHomeworkList.length === 0 ? (
+            {!controller.tableLoading && finalHomeworkList.length === 0 ? (
               <Box
                 sx={{
                   textAlign: "center",
@@ -801,12 +790,12 @@ export default function HomeworkList() {
                   }}
                   columns={listConfig.columns}
                   data={paginatedHomeworkList}
-                  loading={controller.loading}
+                  loading={controller.tableLoading}
                   emptyMessage="No tasks found."
                   rowActions={listConfig.actions.rowActions}
                   stickyHeader
                   size="small"
-                  showPagination={true}
+                  showPagination={showAudiencePagination}
                   showInfoBar={false}
                 />
               </AppCard>
@@ -824,6 +813,18 @@ export default function HomeworkList() {
                   overflow: "hidden",
                 }}
               >
+                {controller.tableLoading ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      py: 8,
+                    }}
+                  >
+                    <CircularProgress size={48} thickness={4} />
+                  </Box>
+                ) : (
                 <Grid container spacing={{ xs: 1.5, sm: 2, md: 2.5 }}>
                 {paginatedHomeworkList.map((hw) => {
                   const isOverdue = new Date(hw.submission_date) < new Date();
@@ -1061,6 +1062,7 @@ export default function HomeworkList() {
                   );
                 })}
               </Grid>
+                )}
               {audiencePaginationBar}
             </Card>
             )}
@@ -1075,10 +1077,6 @@ export default function HomeworkList() {
     <ListPageLayout
       pageBackground
       contentPaddingSize="none"
-      contentSx={{
-        overflow: { xs: "auto", md: "hidden" },
-        WebkitOverflowScrolling: "touch",
-      }}
       header={
         <PageHeader
           links={[{ title: "Homework", path: "#" }]}
@@ -1136,12 +1134,12 @@ export default function HomeworkList() {
         }}
         columns={listConfig.columns}
         data={controller.homework}
-        loading={controller.loading}
+        loading={controller.tableLoading}
         emptyMessage={listConfig.uiPolicy.emptyMessage}
         rowActions={listConfig.actions.rowActions}
         stickyHeader
         size="small"
-        showPagination={true}
+        showPagination={controller.total > 10}
         showInfoBar={false}
       />
 

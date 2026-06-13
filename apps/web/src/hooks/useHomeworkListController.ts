@@ -20,7 +20,7 @@ export function useHomeworkListController() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [total, setTotal] = useState(0);
 
   const [search, setSearch] = useState("");
@@ -190,9 +190,12 @@ export function useHomeworkListController() {
     }
   };
 
+  const tableLoading = loading && homework.length === 0;
+
   return {
     homework,
     loading,
+    tableLoading,
     error,
     setError,
     success,
