@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { FormConfig } from "../../components/reusable/formFramework.types";
+import { formatClassDisplayLabel } from "../../utils/formatters";
 
 export type AddHomeworkFormData = {
   academic_year_id: string;
@@ -16,9 +17,9 @@ export type AddHomeworkFormData = {
 
 type Options = { label: string; value: string }[];
 
-/** Strip trailing full stops from class labels (e.g. "Nursury." → "Nursury"). */
+/** @deprecated Use `formatClassDisplayLabel` from `utils/formatters`. */
 export function formatHomeworkClassLabel(name: string): string {
-  return name.replace(/\.$/, "").trim();
+  return formatClassDisplayLabel(name);
 }
 
 export const createHomeworkFormConfig = (options: {

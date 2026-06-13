@@ -29,6 +29,12 @@ export function formatShortDate(
   });
 }
 
+/** Strip trailing full stops from class/division labels (e.g. "Nursury." → "Nursury"). */
+export function formatClassDisplayLabel(name: string | null | undefined): string {
+  if (!name) return "";
+  return name.replace(/\.$/, "").trim();
+}
+
 /** Hours / effort values from APIs that may return string decimals. */
 export function formatHours(
   value: string | number | null | undefined,

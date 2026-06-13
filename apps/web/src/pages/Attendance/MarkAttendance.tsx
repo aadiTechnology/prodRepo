@@ -27,6 +27,7 @@ import FormHeaderIconAction from "../../components/primitives/FormHeaderIconActi
 import { useMarkAttendanceController } from "../../hooks/useMarkAttendanceController";
 import { ATTENDANCE_STATUSES } from "./MarkAttendance.config";
 import { colorTokens } from "../../tokens/colors";
+import { formatClassDisplayLabel } from "../../utils/formatters";
 
 // ── Shared select style (token-based) ─────────────────────────────────────────
 const filterSelectSx = {
@@ -414,7 +415,7 @@ const MarkAttendance = () => {
             <Typography variant="body2" color="text.secondary">Class</Typography>
           </MenuItem>
           {filteredClasses.map((cls) => (
-            <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
+            <MenuItem key={cls.id} value={cls.id}>{formatClassDisplayLabel(cls.name)}</MenuItem>
           ))}
         </Select>
 
@@ -438,7 +439,7 @@ const MarkAttendance = () => {
             <Typography variant="body2" color="text.secondary">Division</Typography>
           </MenuItem>
           {filteredDivisions.map((div) => (
-            <MenuItem key={div.id} value={div.id}>{div.division_name}</MenuItem>
+            <MenuItem key={div.id} value={div.id}>{formatClassDisplayLabel(div.division_name)}</MenuItem>
           ))}
         </Select>
 
@@ -504,7 +505,6 @@ const MarkAttendance = () => {
           }}
           columns={columns}
           data={paginatedStudents}
-          showPagination={true}
           showInfoBar={false}
           getRowKey={(row) => String(row.student_id)}
         />

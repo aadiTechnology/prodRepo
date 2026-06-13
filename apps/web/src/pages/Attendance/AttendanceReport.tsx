@@ -28,6 +28,7 @@ import { PageHeader, PageLayout } from "../../components/layout";
 import { EntityTableSection } from "../../components/reusable";
 import { AppCard } from "../../components/primitives";
 import { colorTokens } from "../../tokens/colors";
+import { formatClassDisplayLabel } from "../../utils/formatters";
 import schoolClassService, { SchoolClass, ClassDivision } from "../../api/services/schoolClassService";
 import academicYearService, { AcademicYear } from "../../api/services/academicYearService";
 import attendanceService, { AttendanceReportResponse } from "../../api/services/attendanceService";
@@ -840,7 +841,7 @@ const AttendanceReport = () => {
               <Typography variant="body2" color="text.secondary">All Classes</Typography>
             </MenuItem>
             {filteredClasses.map((cls) => (
-              <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
+              <MenuItem key={cls.id} value={cls.id}>{formatClassDisplayLabel(cls.name)}</MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -870,7 +871,7 @@ const AttendanceReport = () => {
               <Typography variant="body2" color="text.secondary">All Divisions</Typography>
             </MenuItem>
             {(isTeacher ? filteredDivisions : divisions).map((div) => (
-              <MenuItem key={div.id} value={div.id}>{div.division_name}</MenuItem>
+              <MenuItem key={div.id} value={div.id}>{formatClassDisplayLabel(div.division_name)}</MenuItem>
             ))}
           </Select>
         </FormControl>
