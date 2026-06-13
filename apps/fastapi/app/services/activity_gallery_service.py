@@ -35,6 +35,7 @@ from app.services.activity_gallery_access import (
     teacher_can_manage_class_division,
     user_can_create_gallery,
     user_can_delete_gallery,
+    user_can_download_gallery,
     user_can_edit_gallery,
     user_can_view_gallery,
     user_can_manage_galleries,
@@ -756,6 +757,7 @@ def get_my_gallery_permissions(db: Session, current_user: object) -> "GalleryAcc
         can_create=user_can_create_gallery(db, current_user),
         can_edit=user_can_edit_gallery(db, current_user),
         can_delete=user_can_delete_gallery(db, current_user),
+        can_download=user_can_download_gallery(db, current_user),
     )
 
 

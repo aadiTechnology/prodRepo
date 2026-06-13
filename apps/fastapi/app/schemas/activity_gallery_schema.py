@@ -173,3 +173,4 @@ class GalleryAccessPermissionsResponse(BaseModel):
     can_create: bool
     can_edit: bool
     can_delete: bool
+    can_download: bool

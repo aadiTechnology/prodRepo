@@ -192,17 +192,48 @@ def class_teacher_can_manage_class_division(
     return False
 
 
-def user_can_view_gallery(db: Session, current_user: object) -> bool:
-    if _gallery_menu_permission(db, int(current_user.id), "view"):
-        return True
-    return teacher_is_class_teacher(
-        db,
-        tenant_id=int(current_user.tenant_id),
-        user_id=int(current_user.id),
+def _is_gallery_consumer_user(db: Session, current_user: object) -> bool:
+    user_id = int(current_user.id)
+    legacy_role = getattr(current_user, "role", None)
+    return is_parent_user(db, user_id, legacy_role) or is_student_user(
+        db, user_id, legacy_role
     )
 
 
+def _consumer_has_gallery_scope(db: Session, current_user: object) -> bool:
+    if not _is_gallery_consumer_user(db, current_user):
+        return False
+    hw_ctx = resolve_homework_viewer_context(
+        db,
+        tenant_id=int(current_user.tenant_id),
+        user_id=int(current_user.id),
+        email=str(current_user.email),
+        legacy_role=getattr(current_user, "role", None),
+        teacher_id=None,
+    )
+    return hw_ctx.kind in ("parent", "student") and bool(hw_ctx.scopes)
+
+
+def user_can_view_gallery(db: Session, current_user: object) -> bool:
+    if _gallery_menu_permission(db, int(current_user.id), "view"):
+        return True
+    if teacher_is_class_teacher(
+        db,
+        tenant_id=int(current_user.tenant_id),
+        user_id=int(current_user.id),
+    ):
+        return True
+    return _consumer_has_gallery_scope(db, current_user)
+
+
+def user_can_download_gallery(db: Session, current_user: object) -> bool:
+    """Parents and students may view and download published gallery media only."""
+    return user_can_view_gallery(db, current_user)
+
+
 def user_can_create_gallery(db: Session, current_user: object) -> bool:
+    if _is_gallery_consumer_user(db, current_user):
+        return False
     if _gallery_menu_permission(db, int(current_user.id), "create"):
         return True
     return teacher_is_class_teacher(
@@ -213,6 +244,8 @@ def user_can_create_gallery(db: Session, current_user: object) -> bool:
 
 
 def user_can_edit_gallery(db: Session, current_user: object) -> bool:
+    if _is_gallery_consumer_user(db, current_user):
+        return False
     if _gallery_menu_permission(db, int(current_user.id), "edit"):
         return True
     return teacher_is_class_teacher(
@@ -223,6 +256,8 @@ def user_can_edit_gallery(db: Session, current_user: object) -> bool:
 
 
 def user_can_delete_gallery(db: Session, current_user: object) -> bool:
+    if _is_gallery_consumer_user(db, current_user):
+        return False
     if _gallery_menu_permission(db, int(current_user.id), "delete"):
         return True
     return teacher_is_class_teacher(
@@ -263,6 +298,9 @@ def assert_gallery_manage_access(
     division_id: int,
 ) -> None:
     """Raise ForbiddenException unless user may manage this class/division gallery."""
+    if is_parent_user(db, user_id, legacy_role) or is_student_user(db, user_id, legacy_role):
+        raise ForbiddenException("You are not authorized for this activity")
+
     if is_admin_like(db, user_id, legacy_role, tenant_id):
         return
 

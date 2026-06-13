@@ -190,7 +190,7 @@ export default function ActivityGalleryDetails() {
           homePath="/"
           actions={
             <Stack direction="row" spacing={1}>
-              {gallery.gallery_type === "Photo" ? (
+              {gallery.gallery_type === "Photo" && perms.canDownload ? (
                 <Button
                   variant="outlined"
                   startIcon={<DownloadIcon />}

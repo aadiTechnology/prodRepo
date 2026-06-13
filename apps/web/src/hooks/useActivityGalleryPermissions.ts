@@ -36,24 +36,31 @@ export function useActivityGalleryPermissions() {
 
   const canView =
     hasPermission("ACTIVITY_GALLERY_MGMT:view") || backendPerms?.can_view === true;
-  const canCreate =
-    hasPermission("ACTIVITY_GALLERY_MGMT:create") || backendPerms?.can_create === true;
-  const canEdit =
-    hasPermission("ACTIVITY_GALLERY_MGMT:edit") || backendPerms?.can_edit === true;
-  const canDelete =
-    hasPermission("ACTIVITY_GALLERY_MGMT:delete") || backendPerms?.can_delete === true;
+  const canDownload =
+    hasPermission("ACTIVITY_GALLERY_MGMT:view") || backendPerms?.can_download === true;
+
+  const canCreate = readOnlyAudience
+    ? false
+    : hasPermission("ACTIVITY_GALLERY_MGMT:create") || backendPerms?.can_create === true;
+  const canEdit = readOnlyAudience
+    ? false
+    : hasPermission("ACTIVITY_GALLERY_MGMT:edit") || backendPerms?.can_edit === true;
+  const canDelete = readOnlyAudience
+    ? false
+    : hasPermission("ACTIVITY_GALLERY_MGMT:delete") || backendPerms?.can_delete === true;
 
   return {
     canView,
     canCreate,
     canEdit,
     canDelete,
+    canDownload,
     readOnlyAudience,
     isLoading: !isInitialized || !backendLoaded,
-    /** @deprecated use canCreate — kept for callers that checked class-teacher bypass */
     classTeacherCanManage:
-      backendPerms?.can_create === true ||
-      backendPerms?.can_edit === true ||
-      backendPerms?.can_delete === true,
+      !readOnlyAudience &&
+      (backendPerms?.can_create === true ||
+        backendPerms?.can_edit === true ||
+        backendPerms?.can_delete === true),
   };
 }

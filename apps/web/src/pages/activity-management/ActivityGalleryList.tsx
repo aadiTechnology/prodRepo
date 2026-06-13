@@ -185,7 +185,7 @@ export default function ActivityGalleryList() {
                   )}
                 </IconButton>
               </Tooltip>
-              {galleryType === "Photo" ? (
+              {galleryType === "Photo" && perms.canDownload ? (
                 <Tooltip title="Download">
                   <IconButton
                     size="small"
