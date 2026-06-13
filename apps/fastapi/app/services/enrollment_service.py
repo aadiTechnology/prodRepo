@@ -253,8 +253,19 @@ class EnrollmentService:
             try:
                 from app.services import user_service
                 from app.schemas.user import UserCreate
-                
-                user_email = payload.email or f"{student.admission_no}@student.local"
+                from app.models.user import User
+                from app.utils.student_login_email import normalize_email, resolve_student_login_email
+
+                taken = {
+                    normalize_email(row[0])
+                    for row in self.db.query(User.email).filter(User.is_deleted == False).all()  # noqa: E712
+                    if row[0]
+                }
+                user_email = resolve_student_login_email(
+                    payload.email or student.email,
+                    student.admission_no or student.student_code or str(student.id),
+                    taken,
+                )
                 user_create = UserCreate(
                     email=user_email,
                     full_name=student.student_name,
