@@ -1,5 +1,5 @@
 from typing import List, Optional, Tuple
-from sqlalchemy import text
+from sqlalchemy import text, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from app.models.teacher import Teacher
@@ -113,10 +113,23 @@ def get_all_teachers(
                         t.created_at,
                         t.updated_at,
                         t.class_id AS legacy_class_id,
-                        t.class_division_id AS legacy_class_division_id
+                        t.class_division_id AS legacy_class_division_id,
+                        lc.name AS legacy_class_name,
+                        lcd.division_name AS legacy_division_name
                     FROM teachers t
+                    LEFT JOIN classes lc ON lc.id = t.class_id
+                    LEFT JOIN class_divisions lcd ON lcd.id = t.class_division_id
                     WHERE t.tenant_id = :tenant_id
                       AND t.is_deleted = 0
+                      AND (
+                            t.user_id IS NULL
+                            OR EXISTS (
+                                SELECT 1
+                                FROM users u
+                                WHERE u.id = t.user_id
+                                  AND u.is_deleted = 0
+                            )
+                      )
                       AND (
                             :status IS NULL
                             OR (:status = 'active' AND t.is_active = 1)
@@ -185,13 +198,19 @@ def get_all_teachers(
                 teacher_groups = grouped_by_teacher.get(teacher_dict["id"], [])
 
                 if not teacher_groups:
+                    legacy_class_id = teacher_dict.get("legacy_class_id")
+                    legacy_class_division_id = teacher_dict.get("legacy_class_division_id")
                     flattened.append({
                         **teacher_dict,
-                        "class_id": None,
-                        "class_division_id": None,
-                        "class_name": None,
-                        "division_name": None,
-                        "_division_ids": set(),
+                        "class_id": legacy_class_id,
+                        "class_division_id": legacy_class_division_id,
+                        "class_name": teacher_dict.get("legacy_class_name"),
+                        "division_name": teacher_dict.get("legacy_division_name"),
+                        "_division_ids": (
+                            {legacy_class_division_id}
+                            if legacy_class_division_id is not None
+                            else set()
+                        ),
                     })
                     continue
 
@@ -226,9 +245,14 @@ def get_all_teachers(
 
     try:
         # Fallback to legacy source when teacher_assignments is unavailable.
-        query = db.query(Teacher).filter(
-            Teacher.tenant_id == tenant_id,
-            Teacher.is_deleted == False
+        query = (
+            db.query(Teacher)
+            .outerjoin(User, Teacher.user_id == User.id)
+            .filter(
+                Teacher.tenant_id == tenant_id,
+                Teacher.is_deleted == False,
+                or_(Teacher.user_id.is_(None), User.is_deleted == False),
+            )
         )
 
         if search:

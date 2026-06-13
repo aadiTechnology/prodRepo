@@ -10,6 +10,22 @@ import TableRowActions from "../../components/reusable/TableRowActions";
 // Re-using same style options pattern
 type TeacherSortBy = "name" | "created_at";
 
+function formatTeacherClassName(t: TeacherResponse): string {
+  if (t.class_name) return t.class_name;
+  const fromAssignments = (t.assignment_rows ?? [])
+    .map((row) => row.class_name)
+    .filter(Boolean);
+  if (fromAssignments.length) return [...new Set(fromAssignments)].join(", ");
+  return "-";
+}
+
+function formatTeacherDivisionName(t: TeacherResponse): string {
+  if (t.division_name) return t.division_name;
+  const fromAssignments = (t.assignment_rows ?? []).flatMap((row) => row.division_names ?? []);
+  if (fromAssignments.length) return [...new Set(fromAssignments)].join(", ");
+  return "-";
+}
+
 type TeacherListConfigFactoryArgs = {
   navigate: NavigateFunction;
   onDeleteClick: (teacher: TeacherResponse) => void;
@@ -27,8 +43,8 @@ export function createTeacherListConfig({
     columns: [
       { id: "full_name", label: "Name", field: "full_name" },
       { id: "mobile_number", label: "Contact", field: "mobile_number" },
-      { id: "class", label: "Class", render: (t: TeacherResponse) => t.class_name || "-" },
-      { id: "division", label: "Division", render: (t: TeacherResponse) => t.division_name || "-" },
+      { id: "class", label: "Class", render: (t: TeacherResponse) => formatTeacherClassName(t) },
+      { id: "division", label: "Division", render: (t: TeacherResponse) => formatTeacherDivisionName(t) },
       {
         id: "status",
         label: "Status",
@@ -82,7 +98,7 @@ export function renderTeacherRowActions(args: {
   const { row, toggleLoadingId, onEdit, onDelete, onView, onToggleStatus } = args;
 
   return (
-    <Box sx={{ display: "flex", alignItems: "center" }}>
+    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
       <TableRowActions onView={onView} onEdit={onEdit} onDelete={onDelete} />
       {/* We could add an explicit toggle button here, but typically it is fine in TableRowActions or StatusChip. Since TableRowActions doesn't have onToggle by default in this repo's standard components, we might wait. Actually table actions are standardized, let's keep it simple. */}
     </Box>

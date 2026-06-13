@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models.user import User, UserRole
 from app.models.role import Role
+from app.models.teacher import Teacher
 from app.schemas.user import UserCreate, UserUpdate, ChangePasswordRequest
 from app.utils.security import hash_password, verify_password, validate_new_password
 from app.core.exceptions import NotFoundException, ConflictException
@@ -173,11 +174,23 @@ def update_user(
 
 
 def soft_delete_user(db: Session, user_id: int, deleted_by: int | None = None) -> None:
-    """Soft delete a user."""
+    """Soft delete a user and any linked teacher profiles."""
     db_user = get_user(db, user_id)  # This will raise NotFoundException if not found
     db_user.is_deleted = True
     db_user.deleted_at = datetime.utcnow()
     db_user.deleted_by = deleted_by
+
+    now = datetime.utcnow()
+    linked_teachers = (
+        db.query(Teacher)
+        .filter(Teacher.user_id == user_id, Teacher.is_deleted == False)  # noqa: E712
+        .all()
+    )
+    for teacher in linked_teachers:
+        teacher.is_deleted = True
+        teacher.deleted_at = now
+        teacher.deleted_by = deleted_by
+
     db.commit()
     logger.info(f"User soft-deleted: {db_user.email} (id={user_id})")
 

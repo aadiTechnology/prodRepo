@@ -243,7 +243,7 @@ export default function TeacherList() {
       )}
 
       <EntityTableSection<TeacherResponse>
-        label="Teacher Directory"
+        label=""
         totalRows={total}
         page={page}
         rowsPerPage={rowsPerPage}
