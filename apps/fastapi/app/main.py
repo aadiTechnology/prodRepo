@@ -36,6 +36,9 @@ from app.models import (  # noqa: F401
     DemoVideo,
     MarketingPlatform,
     MarketingSocialMediaLink,
+    ActivityGallery,
+    ActivityGalleryMedia,
+    ActivityGalleryClassMapping,
 )
 # Import FeePayment + FeePaymentAllocation so create_all creates fee_payment_allocations
 from app.models.fee_payment import FeePayment, FeePaymentAllocation  # noqa: F401
@@ -146,6 +149,8 @@ app.include_router(holiday.configuration_router)
 app.include_router(demo_video.router)
 from app.routers import marketing_hub
 app.include_router(marketing_hub.router)
+from app.routers import activity_gallery_router
+app.include_router(activity_gallery_router.router)
 
 
 
@@ -158,6 +163,10 @@ os.makedirs("static/enrollment-documents", exist_ok=True)
 app.mount("/enrollment-documents", StaticFiles(directory="static/enrollment-documents"), name="enrollment-documents")
 os.makedirs("static/homework-attachments", exist_ok=True)
 app.mount("/homework-attachments", StaticFiles(directory="static/homework-attachments"), name="homework-attachments")
+os.makedirs("static/activity-gallery-media", exist_ok=True)
+app.mount("/activity-gallery-media", StaticFiles(directory="static/activity-gallery-media"), name="activity-gallery-media")
+
+
 ensure_upload_directories()
 app.mount(
     "/notice-attachments",

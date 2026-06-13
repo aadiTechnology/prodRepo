@@ -81,6 +81,7 @@ def seed_rbac_data():
             {"code": "TEACHER_MGMT", "name": "Teacher Management", "category": "HR"},
             {"code": "COMMUNICATION_MGMT", "name": "Communication Management", "category": "Communication"},
             {"code": "HOMEWORK_MGMT", "name": "Homework Management", "category": "Academics"},
+            {"code": "ACTIVITY_GALLERY_MGMT", "name": "Activity Gallery Management", "category": "Academics"},
         ]
         
         feature_map = {}
@@ -135,6 +136,7 @@ def seed_rbac_data():
                     {"name": "Academic Calendar", "path": "/calendar/academic", "feature": "ACADEMIC_MGMT"},
                     {"name": "Homework", "path": "/homework", "feature": "HOMEWORK_MGMT"},
                     {"name": "Homework Details", "path": "/homework/:id", "feature": "HOMEWORK_MGMT"},
+                    {"name": "Photo / Video Gallery", "path": "/activity-management/photo-video-gallery", "feature": "ACTIVITY_GALLERY_MGMT"},
                 ]
             },
             {

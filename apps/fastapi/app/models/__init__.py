@@ -39,6 +39,11 @@ from app.models.holiday import Holiday
 from app.models.homework import Homework, HomeworkAttachment
 from app.models.demo_video import DemoVideo
 from app.models.marketing_hub import MarketingPlatform, MarketingSocialMediaLink
+from app.models.activity_gallery import (
+    ActivityGallery,
+    ActivityGalleryClassMapping,
+    ActivityGalleryMedia,
+)
 
 # Export all models for convenience
 __all__ = [
@@ -95,5 +100,8 @@ __all__ = [
     "DemoVideo",
     "MarketingPlatform",
     "MarketingSocialMediaLink",
+    "ActivityGallery",
+    "ActivityGalleryMedia",
+    "ActivityGalleryClassMapping",
 ]
 
