@@ -50,7 +50,7 @@ class UserPasswordUpdate(BaseModel):
 class UserResponse(BaseModel):
 
     id: int
-    email: EmailStr
+    email: str  # str not EmailStr — student accounts use @student.local
     full_name: str
     tenant_id: Optional[int] = None
     phone_number: Optional[str] = None
