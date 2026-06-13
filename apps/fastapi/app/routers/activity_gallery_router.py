@@ -20,12 +20,14 @@ from app.schemas.activity_gallery_schema import (
     ActivityGalleryYoutubeCreate,
     ClassOption,
     DivisionOption,
+    GalleryAccessPermissionsResponse,
     TeacherGalleryScopeResponse,
 )
 from app.services import activity_gallery_service
 from app.services.activity_gallery_access import (
     ACTIVITY_GALLERY_MENU_PATH,
     user_can_create_gallery,
+    user_can_delete_gallery,
     user_can_edit_gallery,
     user_can_manage_galleries,
 )
@@ -67,6 +69,15 @@ def _require_gallery_edit_permission(
     return current_user
 
 
+def _require_gallery_delete_permission(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> CurrentUser:
+    if not user_can_delete_gallery(db, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    return current_user
+
+
 def _require_gallery_upload_permission(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
@@ -89,6 +100,15 @@ def get_teacher_classes(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
     )
+
+
+@router.get("/my-permissions", response_model=GalleryAccessPermissionsResponse)
+def get_my_gallery_permissions(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Effective create/edit flags from role_menu_permissions (matches API authorization)."""
+    return activity_gallery_service.get_my_gallery_permissions(db, current_user)
 
 
 @router.get("/teacher-scope", response_model=TeacherGalleryScopeResponse)
@@ -201,9 +221,7 @@ def update_activity_gallery(
 def delete_activity_gallery(
     gallery_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(
-        require_menu_path_permission(ACTIVITY_GALLERY_MENU_PATH, "delete")
-    ),
+    current_user: CurrentUser = Depends(_require_gallery_delete_permission),
 ):
     return activity_gallery_service.delete_gallery(
         db,

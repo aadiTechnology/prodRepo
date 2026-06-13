@@ -128,3 +128,10 @@ export interface TeacherGalleryScopeResponse {
   default_targets: ActivityGalleryClassTarget[];
   classes: TeacherGalleryClassOption[];
 }
+
+export interface GalleryAccessPermissions {
+  can_view: boolean;
+  can_create: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+}

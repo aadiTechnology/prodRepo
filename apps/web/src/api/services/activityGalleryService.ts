@@ -10,6 +10,7 @@ import type {
   ClassOption,
   DivisionOption,
   TeacherGalleryScopeResponse,
+  GalleryAccessPermissions,
   GalleryType,
 } from "../../types/activityGallery";
 
@@ -104,6 +105,11 @@ const activityGalleryService = {
 
   getTeacherScope: async (): Promise<TeacherGalleryScopeResponse> => {
     const res = await apiClient.get(`${BASE}/teacher-scope`);
+    return res.data;
+  },
+
+  getMyPermissions: async (): Promise<GalleryAccessPermissions> => {
+    const res = await apiClient.get(`${BASE}/my-permissions`);
     return res.data;
   },
 

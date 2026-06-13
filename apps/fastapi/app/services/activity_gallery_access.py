@@ -5,6 +5,7 @@ from typing import Tuple
 
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import ForbiddenException
 from app.services.homework_access import (
     ClassDivisionScope,
     HomeworkViewerContext,
@@ -51,9 +52,21 @@ def resolve_gallery_viewer_context(
         legacy_role=legacy_role,
         teacher_id=teacher_id,
     )
+
+    scopes = hw_ctx.scopes
+    if hw_ctx.kind == "teacher" and not _gallery_menu_permission(db, user_id, "view"):
+        class_teacher_targets = resolve_class_teacher_targets(
+            db, tenant_id=tenant_id, user_id=user_id
+        )
+        if class_teacher_targets:
+            scopes = tuple(
+                ClassDivisionScope(class_id=class_id, class_division_id=division_id)
+                for class_id, division_id in class_teacher_targets
+            )
+
     return GalleryViewerContext(
         kind=hw_ctx.kind,
-        scopes=hw_ctx.scopes,
+        scopes=scopes,
         published_only=hw_ctx.published_only,
         manage=hw_ctx.kind == "admin" or (hw_ctx.kind == "teacher" and not hw_ctx.published_only),
     )
@@ -101,23 +114,25 @@ def _gallery_menu_permission(
     return perm is not None
 
 
-def teacher_is_class_teacher(
+def resolve_class_teacher_targets(
     db: Session,
     *,
     tenant_id: int,
     user_id: int,
-) -> bool:
+) -> list[tuple[int, int]]:
+    """Class/division pairs where the user is assigned as class teacher."""
     from sqlalchemy import text
 
     from app.models.teacher import Teacher
 
     teacher_id = homework_repository._resolve_teacher_id(db, tenant_id, user_id)
     if teacher_id is None:
-        return False
+        return []
 
+    targets: list[tuple[int, int]] = []
     class_teacher_sql = text(
         """
-        SELECT TOP 1 1 AS ok
+        SELECT DISTINCT ta.class_id, ta.class_division_id AS division_id
         FROM teacher_assignments ta
         WHERE ta.tenant_id = :tenant_id
           AND ta.teacher_id = :teacher_id
@@ -126,13 +141,13 @@ def teacher_is_class_teacher(
           AND ta.class_division_id IS NOT NULL
         """
     )
-    if (
-        db.execute(
-            class_teacher_sql, {"tenant_id": tenant_id, "teacher_id": teacher_id}
-        ).mappings().first()
-        is not None
-    ):
-        return True
+    for row in db.execute(
+        class_teacher_sql, {"tenant_id": tenant_id, "teacher_id": teacher_id}
+    ).mappings().all():
+        targets.append((int(row["class_id"]), int(row["division_id"])))
+
+    if targets:
+        return targets
 
     teacher_row = (
         db.query(Teacher)
@@ -143,10 +158,47 @@ def teacher_is_class_teacher(
         )
         .first()
     )
-    return bool(
+    if (
         teacher_row
         and teacher_row.class_id is not None
         and teacher_row.class_division_id is not None
+    ):
+        return [(int(teacher_row.class_id), int(teacher_row.class_division_id))]
+    return []
+
+
+def teacher_is_class_teacher(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+) -> bool:
+    return bool(resolve_class_teacher_targets(db, tenant_id=tenant_id, user_id=user_id))
+
+
+def class_teacher_can_manage_class_division(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    class_id: int,
+    division_id: int,
+) -> bool:
+    for assigned_class_id, assigned_division_id in resolve_class_teacher_targets(
+        db, tenant_id=tenant_id, user_id=user_id
+    ):
+        if assigned_class_id == class_id and assigned_division_id == division_id:
+            return True
+    return False
+
+
+def user_can_view_gallery(db: Session, current_user: object) -> bool:
+    if _gallery_menu_permission(db, int(current_user.id), "view"):
+        return True
+    return teacher_is_class_teacher(
+        db,
+        tenant_id=int(current_user.tenant_id),
+        user_id=int(current_user.id),
     )
 
 
@@ -162,6 +214,16 @@ def user_can_create_gallery(db: Session, current_user: object) -> bool:
 
 def user_can_edit_gallery(db: Session, current_user: object) -> bool:
     if _gallery_menu_permission(db, int(current_user.id), "edit"):
+        return True
+    return teacher_is_class_teacher(
+        db,
+        tenant_id=int(current_user.tenant_id),
+        user_id=int(current_user.id),
+    )
+
+
+def user_can_delete_gallery(db: Session, current_user: object) -> bool:
+    if _gallery_menu_permission(db, int(current_user.id), "delete"):
         return True
     return teacher_is_class_teacher(
         db,
@@ -186,7 +248,51 @@ def user_can_manage_galleries(db: Session, current_user: object) -> bool:
 
     if user_can_create_gallery(db, current_user) or user_can_edit_gallery(db, current_user):
         return True
+    if user_can_delete_gallery(db, current_user):
+        return True
     return False
+
+
+def assert_gallery_manage_access(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    legacy_role: object,
+    class_id: int,
+    division_id: int,
+) -> None:
+    """Raise ForbiddenException unless user may manage this class/division gallery."""
+    if is_admin_like(db, user_id, legacy_role, tenant_id):
+        return
+
+    uid = int(user_id)
+    has_rbac_manage = (
+        _gallery_menu_permission(db, uid, "create")
+        or _gallery_menu_permission(db, uid, "edit")
+        or _gallery_menu_permission(db, uid, "delete")
+    )
+    if has_rbac_manage:
+        if teacher_can_manage_class_division(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            legacy_role=legacy_role,
+            class_id=class_id,
+            division_id=division_id,
+        ):
+            return
+        raise ForbiddenException("You are not authorized for this activity")
+
+    if class_teacher_can_manage_class_division(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        class_id=class_id,
+        division_id=division_id,
+    ):
+        return
+    raise ForbiddenException("You are not authorized for this activity")
 
 
 def is_gallery_consumer(ctx: GalleryViewerContext) -> bool:

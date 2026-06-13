@@ -166,3 +166,10 @@ class TeacherGalleryScopeResponse(BaseModel):
     is_teacher: bool
     default_targets: list[ActivityGalleryClassTarget] = Field(default_factory=list)
     classes: list[TeacherGalleryClassOption] = Field(default_factory=list)
+
+
+class GalleryAccessPermissionsResponse(BaseModel):
+    can_view: bool
+    can_create: bool
+    can_edit: bool
+    can_delete: bool

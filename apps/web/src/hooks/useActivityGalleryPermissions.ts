@@ -3,24 +3,26 @@ import { useRBAC } from "../context/RBACContext";
 import { useAuth } from "../context/AuthContext";
 import { isHomeworkReadOnlyAudience } from "../utils/homeworkAudience";
 import activityGalleryService from "../api/services/activityGalleryService";
+import type { GalleryAccessPermissions } from "../types/activityGallery";
 
 export function useActivityGalleryPermissions() {
-  const { hasPermission, roles } = useRBAC();
+  const { hasPermission, roles, isInitialized } = useRBAC();
   const { user } = useAuth();
-  const [classTeacherCanManage, setClassTeacherCanManage] = useState(false);
+  const [backendPerms, setBackendPerms] = useState<GalleryAccessPermissions | null>(null);
+  const [backendLoaded, setBackendLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     activityGalleryService
-      .getTeacherScope()
-      .then((scope) => {
-        if (cancelled) return;
-        setClassTeacherCanManage(
-          scope.is_teacher && scope.default_targets.length > 0,
-        );
+      .getMyPermissions()
+      .then((perms) => {
+        if (!cancelled) setBackendPerms(perms);
       })
       .catch(() => {
-        if (!cancelled) setClassTeacherCanManage(false);
+        if (!cancelled) setBackendPerms(null);
+      })
+      .finally(() => {
+        if (!cancelled) setBackendLoaded(true);
       });
     return () => {
       cancelled = true;
@@ -32,12 +34,14 @@ export function useActivityGalleryPermissions() {
     [user?.role, roles],
   );
 
-  const canView = hasPermission("ACTIVITY_GALLERY_MGMT:view");
+  const canView =
+    hasPermission("ACTIVITY_GALLERY_MGMT:view") || backendPerms?.can_view === true;
   const canCreate =
-    hasPermission("ACTIVITY_GALLERY_MGMT:create") || classTeacherCanManage;
+    hasPermission("ACTIVITY_GALLERY_MGMT:create") || backendPerms?.can_create === true;
   const canEdit =
-    hasPermission("ACTIVITY_GALLERY_MGMT:edit") || classTeacherCanManage;
-  const canDelete = hasPermission("ACTIVITY_GALLERY_MGMT:delete");
+    hasPermission("ACTIVITY_GALLERY_MGMT:edit") || backendPerms?.can_edit === true;
+  const canDelete =
+    hasPermission("ACTIVITY_GALLERY_MGMT:delete") || backendPerms?.can_delete === true;
 
   return {
     canView,
@@ -45,6 +49,11 @@ export function useActivityGalleryPermissions() {
     canEdit,
     canDelete,
     readOnlyAudience,
-    classTeacherCanManage,
+    isLoading: !isInitialized || !backendLoaded,
+    /** @deprecated use canCreate — kept for callers that checked class-teacher bypass */
+    classTeacherCanManage:
+      backendPerms?.can_create === true ||
+      backendPerms?.can_edit === true ||
+      backendPerms?.can_delete === true,
   };
 }

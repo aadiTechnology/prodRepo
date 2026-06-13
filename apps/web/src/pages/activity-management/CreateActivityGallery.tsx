@@ -808,6 +808,14 @@ export default function CreateActivityGallery() {
     [associatedClassesSlot, uploadSlot],
   );
 
+  if (perms.isLoading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   if (!isAuthorized) {
     return (
       <Box sx={{ p: 4, textAlign: "center" }}>

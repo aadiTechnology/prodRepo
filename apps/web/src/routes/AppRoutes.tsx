@@ -8,6 +8,7 @@ import { Box, CircularProgress } from "@mui/material";
 import { Routes, Route, Outlet, Navigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
+import ActivityGalleryAccess from "../components/auth/ActivityGalleryAccess";
 import ChangePassword from "../pages/ChangePassword";
 import { AIReviewProvider } from "../features/aiReview";
 import FeeCategoryManagement from "../pages/Fees/FeeCategoryManagement";
@@ -457,43 +458,33 @@ export default function AppRoutes() {
           <Route
             path="/activity-management/photo-video-gallery"
             element={
-              <ProtectedRoute requiredPermissions="ACTIVITY_GALLERY_MGMT:view">
+              <ActivityGalleryAccess>
                 <ActivityGalleryList />
-              </ProtectedRoute>
+              </ActivityGalleryAccess>
             }
           />
           <Route
             path="/activity-management/photo-video-gallery/new"
             element={
-              <ProtectedRoute
-                requiredPermissions={[
-                  "ACTIVITY_GALLERY_MGMT:create",
-                  "ACTIVITY_GALLERY_MGMT:view",
-                ]}
-              >
+              <ActivityGalleryAccess requireCreate>
                 <CreateActivityGallery />
-              </ProtectedRoute>
+              </ActivityGalleryAccess>
             }
           />
           <Route
             path="/activity-management/photo-video-gallery/:id/edit"
             element={
-              <ProtectedRoute
-                requiredPermissions={[
-                  "ACTIVITY_GALLERY_MGMT:edit",
-                  "ACTIVITY_GALLERY_MGMT:view",
-                ]}
-              >
+              <ActivityGalleryAccess requireEdit>
                 <CreateActivityGallery />
-              </ProtectedRoute>
+              </ActivityGalleryAccess>
             }
           />
           <Route
             path="/activity-management/photo-video-gallery/:id"
             element={
-              <ProtectedRoute requiredPermissions="ACTIVITY_GALLERY_MGMT:view">
+              <ActivityGalleryAccess>
                 <ActivityGalleryDetails />
-              </ProtectedRoute>
+              </ActivityGalleryAccess>
             }
           />
 
