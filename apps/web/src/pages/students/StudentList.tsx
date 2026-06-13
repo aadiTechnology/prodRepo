@@ -17,6 +17,7 @@ import {
 import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import { useStudentListController } from "../../hooks/useStudentListController";
+import { useTeacherStudentListScope } from "../../hooks/useTeacherStudentListScope";
 import { createStudentListConfig, renderStudentRowActions } from "./StudentList.listConfig";
 
 const StudentList = () => {
@@ -31,9 +32,25 @@ const StudentList = () => {
         { title: "Student Management", path: "#" },
       ]
     : [{ title: "Student Management", path: "#" }];
-  // Fetch all class options from backend (schoolClassService)
+
+  const {
+    isTeacherScoped,
+    scopeReady,
+    defaultClassId,
+    teacherClassOptions,
+  } = useTeacherStudentListScope();
+
   const [classOptions, setClassOptions] = useState([{ value: '', label: 'All' }]);
   useEffect(() => {
+    if (isTeacherScoped) {
+      if (!scopeReady) return;
+      setClassOptions([
+        { value: '', label: 'All Classes' },
+        ...teacherClassOptions,
+      ]);
+      return;
+    }
+
     async function fetchClasses() {
       try {
         const schoolClassService = (await import("../../api/services/schoolClassService")).default;
@@ -47,7 +64,7 @@ const StudentList = () => {
       }
     }
     fetchClasses();
-  }, []);
+  }, [isTeacherScoped, scopeReady, teacherClassOptions]);
   const statusOptions = [
     { value: '', label: 'All' },
     { value: 'Active', label: 'Active' },
@@ -55,6 +72,17 @@ const StudentList = () => {
   ];
   const [selectedClass, setSelectedClass] = React.useState('');
   const [selectedStatus, setSelectedStatus] = React.useState('');
+  const [classFilterInitialized, setClassFilterInitialized] = React.useState(false);
+
+  useEffect(() => {
+    if (!scopeReady || classFilterInitialized) return;
+    if (isTeacherScoped && defaultClassId) {
+      setSelectedClass(defaultClassId);
+    }
+    setClassFilterInitialized(true);
+  }, [scopeReady, classFilterInitialized, isTeacherScoped, defaultClassId]);
+
+  const listReady = scopeReady && classFilterInitialized;
   const {
     listState: {
       search,
@@ -85,6 +113,7 @@ const StudentList = () => {
     navigate,
     classFilter: selectedClass,
     statusFilter: selectedStatus,
+    ready: listReady,
   });
 
   // Debug: log student data to verify roll_no is present

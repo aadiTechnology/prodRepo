@@ -11,6 +11,8 @@ type UseStudentListControllerOptions = {
   navigate: NavigateFunction;
   classFilter?: string;
   statusFilter?: string;
+  /** When false, defers the initial fetch until filters are ready (e.g. teacher class scope). */
+  ready?: boolean;
 };
 
 type UseStudentListControllerResult = {
@@ -35,6 +37,7 @@ export function useStudentListController({
   navigate,
   classFilter,
   statusFilter,
+  ready = true,
 }: UseStudentListControllerOptions): UseStudentListControllerResult {
   const [students, setStudents] = useState<Student[]>([]);
   const [totalStudents, setTotalStudents] = useState(0);
@@ -76,8 +79,9 @@ export function useStudentListController({
   }, [listState.page, listState.rowsPerPage, listState.search, classFilter, statusFilter]);
 
   useEffect(() => {
+    if (!ready) return;
     fetchStudents();
-  }, [fetchStudents]);
+  }, [fetchStudents, ready]);
 
   const openDeleteConfirm = (student: Student) => {
     setStudentToDelete(student);
