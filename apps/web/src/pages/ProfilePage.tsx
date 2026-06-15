@@ -48,6 +48,12 @@ const formatRole = (role: string): string =>
         .replace(/_/g, " ")
         .replace(/\b\w/g, (c) => c.toUpperCase());
 
+const PROFILE_PHOTO_FORMATS_LABEL = "JPEG, PNG, GIF, WebP";
+const PROFILE_PHOTO_ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+const PROFILE_PHOTO_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+const PROFILE_PHOTO_MAX_SIZE_BYTES = 5 * 1024 * 1024;
+const PROFILE_PHOTO_UPLOAD_TOOLTIP = `Allowed formats: ${PROFILE_PHOTO_FORMATS_LABEL}. Max size: 5 MB.`;
+
 // ─── Section Header ───────────────────────────────────────────────────────────
 
 function SectionHeader({ title, icon }: { title: string; icon: React.ReactNode }) {
@@ -177,20 +183,20 @@ const ProfilePage = () => {
     const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        const allowedMimeTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+        const allowedMimeTypes = PROFILE_PHOTO_ALLOWED_MIME_TYPES;
         if (!allowedMimeTypes.includes(file.type)) {
-            setSnack({ msg: "Please select a valid image file (JPEG, PNG, GIF, or WebP).", severity: "error" });
+            setSnack({ msg: `Please select a valid image file (${PROFILE_PHOTO_FORMATS_LABEL}).`, severity: "error" });
             setFileInputKey(prev => prev + 1); // Reset input
             return;
         }
         const fileName = file.name.toLowerCase();
-        const allowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+        const allowedExtensions = PROFILE_PHOTO_ALLOWED_EXTENSIONS;
         if (!allowedExtensions.some(ext => fileName.endsWith(ext))) {
-            setSnack({ msg: "Invalid file extension. Use JPEG, PNG, GIF, or WebP.", severity: "error" });
+            setSnack({ msg: `Invalid file extension. Use ${PROFILE_PHOTO_FORMATS_LABEL}.`, severity: "error" });
             setFileInputKey(prev => prev + 1); // Reset input
             return;
         }
-        if (file.size > 5 * 1024 * 1024) {
+        if (file.size > PROFILE_PHOTO_MAX_SIZE_BYTES) {
             setSnack({ msg: "Image must be smaller than 5 MB.", severity: "error" });
             setFileInputKey(prev => prev + 1); // Reset input
             return;
@@ -347,7 +353,14 @@ const ProfilePage = () => {
                                 />
 
                                 {/* Camera hover overlay */}
-                                <Tooltip title={profile?.profile_image_path ? "Change or remove photo" : "Upload photo"}>
+                                <Tooltip
+                                    arrow
+                                    title={
+                                        profile?.profile_image_path
+                                            ? `Change or remove photo. ${PROFILE_PHOTO_UPLOAD_TOOLTIP}`
+                                            : `Upload photo. ${PROFILE_PHOTO_UPLOAD_TOOLTIP}`
+                                    }
+                                >
                                     <Box
                                         onClick={isPhotoLoading ? undefined : handlePhotoButtonClick}
                                         sx={{
@@ -445,22 +458,26 @@ const ProfilePage = () => {
                             )}
                             <Divider sx={{ borderColor: colorTokens.border.default }} />
                             <Box sx={{ display: "flex", gap: 1.2, pt: 1 }}>
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    startIcon={isPhotoLoading ? <CircularProgress size={13} color="inherit" /> : <PhotoCameraIcon />}
-                                    onClick={isPhotoLoading ? undefined : handlePhotoButtonClick}
-                                    disabled={isPhotoLoading}
-                                    fullWidth
-                                    sx={{
-                                        borderRadius: 1,
-                                        textTransform: "none",
-                                        fontWeight: 600,
-                                        fontSize: "0.75rem",
-                                    }}
-                                >
-                                    {uploading ? "Uploading…" : "Upload"}
-                                </Button>
+                                <Tooltip arrow title={PROFILE_PHOTO_UPLOAD_TOOLTIP}>
+                                    <Box component="span" sx={{ display: "flex", flex: 1, minWidth: 0 }}>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={isPhotoLoading ? <CircularProgress size={13} color="inherit" /> : <PhotoCameraIcon />}
+                                            onClick={isPhotoLoading ? undefined : handlePhotoButtonClick}
+                                            disabled={isPhotoLoading}
+                                            fullWidth
+                                            sx={{
+                                                borderRadius: 1,
+                                                textTransform: "none",
+                                                fontWeight: 600,
+                                                fontSize: "0.75rem",
+                                            }}
+                                        >
+                                            {uploading ? "Uploading…" : "Upload"}
+                                        </Button>
+                                    </Box>
+                                </Tooltip>
                                 {profile?.profile_image_path && (
                                     <Button
                                         size="small"
@@ -696,7 +713,7 @@ const ProfilePage = () => {
                 key={fileInputKey}
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp"
                 style={{ display: "none" }}
                 onChange={handleImageChange}
             />
@@ -709,10 +726,12 @@ const ProfilePage = () => {
                 anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
                 transformOrigin={{ vertical: "top", horizontal: "center" }}
             >
-                <MenuItem onClick={handleChangePhoto} sx={{ fontSize: "0.875rem", py: 1.2, fontWeight: 600 }}>
-                    <ListItemIcon><PhotoCameraIcon fontSize="small" /></ListItemIcon>
-                    Change Photo
-                </MenuItem>
+                <Tooltip arrow title={PROFILE_PHOTO_UPLOAD_TOOLTIP} placement="right">
+                    <MenuItem onClick={handleChangePhoto} sx={{ fontSize: "0.875rem", py: 1.2, fontWeight: 600 }}>
+                        <ListItemIcon><PhotoCameraIcon fontSize="small" /></ListItemIcon>
+                        Change Photo
+                    </MenuItem>
+                </Tooltip>
                 <MenuItem onClick={openRemovePhotoConfirm} sx={{ color: colorTokens.error.main, fontSize: "0.875rem", py: 1.2, fontWeight: 600 }}>
                     <ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>
                     Remove Photo
