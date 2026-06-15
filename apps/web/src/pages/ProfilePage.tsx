@@ -32,6 +32,7 @@ import {
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { PageHeader, PageLayout } from "../components/layout";
+import ConfirmDialog from "../components/semantic/ConfirmDialog";
 import PrimaryActionButton from "../components/reusable/PrimaryActionButton";
 import { DetailFieldRow } from "../components/reusable";
 import profileService, { ProfileResponse } from "../api/services/profileService";
@@ -96,6 +97,7 @@ const ProfilePage = () => {
     const [snack, setSnack] = useState<{ msg: string; severity: "success" | "error" } | null>(null);
     const [isModified, setIsModified] = useState(false);
     const [photoMenuAnchor, setPhotoMenuAnchor] = useState<null | HTMLElement>(null);
+    const [removePhotoDialogOpen, setRemovePhotoDialogOpen] = useState(false);
     const [fileInputKey, setFileInputKey] = useState<number>(0);
     const [avatarKey, setAvatarKey] = useState<number>(0); // Force avatar re-render
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -212,13 +214,22 @@ const ProfilePage = () => {
     };
 
     // ── delete photo ───────────────────────────────────────────────────────
-    const handleDeletePhoto = async () => {
+    const openRemovePhotoConfirm = () => {
         handlePhotoMenuClose();
+        setRemovePhotoDialogOpen(true);
+    };
+
+    const closeRemovePhotoConfirm = () => {
+        if (!deleting) setRemovePhotoDialogOpen(false);
+    };
+
+    const handleDeletePhoto = async () => {
         setDeleting(true);
         try {
             const updated = await profileService.deleteImage();
             setProfile(updated);
             setAvatarKey(prev => prev + 1); // Force avatar re-render
+            setRemovePhotoDialogOpen(false);
             setSnack({ msg: "Profile photo removed.", severity: "success" });
             // Notify other components to refresh - both specific image update and full profile
             window.dispatchEvent(new Event("profile-image-updated"));
@@ -456,7 +467,7 @@ const ProfilePage = () => {
                                         variant="outlined"
                                         color="error"
                                         startIcon={deleting ? <CircularProgress size={13} color="inherit" /> : <DeleteIcon />}
-                                        onClick={isPhotoLoading ? undefined : handleDeletePhoto}
+                                        onClick={isPhotoLoading ? undefined : openRemovePhotoConfirm}
                                         disabled={isPhotoLoading}
                                         sx={{
                                             borderRadius: 1,
@@ -702,11 +713,21 @@ const ProfilePage = () => {
                     <ListItemIcon><PhotoCameraIcon fontSize="small" /></ListItemIcon>
                     Change Photo
                 </MenuItem>
-                <MenuItem onClick={handleDeletePhoto} sx={{ color: colorTokens.error.main, fontSize: "0.875rem", py: 1.2, fontWeight: 600 }}>
+                <MenuItem onClick={openRemovePhotoConfirm} sx={{ color: colorTokens.error.main, fontSize: "0.875rem", py: 1.2, fontWeight: 600 }}>
                     <ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>
                     Remove Photo
                 </MenuItem>
             </Menu>
+
+            <ConfirmDialog
+                open={removePhotoDialogOpen}
+                title="Please Confirm"
+                message="Are you sure you want to remove your profile photo?"
+                confirmLabel={deleting ? "Removing…" : "Confirm"}
+                onConfirm={handleDeletePhoto}
+                onClose={closeRemovePhotoConfirm}
+                loading={deleting}
+            />
 
             {/* ── Snackbar ── */}
             <Snackbar
