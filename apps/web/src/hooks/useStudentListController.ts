@@ -10,6 +10,7 @@ export type StudentListSortBy = "name" | "created_at";
 type UseStudentListControllerOptions = {
   navigate: NavigateFunction;
   classFilter?: string;
+  divisionFilter?: string;
   statusFilter?: string;
   /** When false, defers the initial fetch until filters are ready (e.g. teacher class scope). */
   ready?: boolean;
@@ -36,6 +37,7 @@ type UseStudentListControllerResult = {
 export function useStudentListController({
   navigate,
   classFilter,
+  divisionFilter,
   statusFilter,
   ready = true,
 }: UseStudentListControllerOptions): UseStudentListControllerResult {
@@ -68,6 +70,9 @@ export function useStudentListController({
       if (classFilter) {
         params.class_id = classFilter;
       }
+      if (divisionFilter) {
+        params.division_id = divisionFilter;
+      }
       const { items, total } = await studentService.list(params);
       setStudents(items);
       setTotalStudents(total);
@@ -76,7 +81,7 @@ export function useStudentListController({
     } finally {
       setLoading(false);
     }
-  }, [listState.page, listState.rowsPerPage, listState.search, classFilter, statusFilter]);
+  }, [listState.page, listState.rowsPerPage, listState.search, classFilter, divisionFilter, statusFilter]);
 
   useEffect(() => {
     if (!ready) return;
