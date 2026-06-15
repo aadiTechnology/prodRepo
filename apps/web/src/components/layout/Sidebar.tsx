@@ -384,18 +384,18 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
       };
     });
 
-    const hasMarketingHub = menus.some(node => (node.path || "").toLowerCase().includes("marketing"));
-    const isAdmin = rbacRoles.some(role => role.toLowerCase().includes("admin"));
-    if (isAdmin && !hasMarketingHub) {
-      items.push({
-        id: "digital-marketing-hub",
-        label: "Marketing Hub",
-        icon: bloggerIcon,
-        path: "/marketing/hub",
-        color: colorTokens.menuColors.students,
-        children: undefined,
-      });
-    }
+    // const hasMarketingHub = menus.some(node => (node.path || "").toLowerCase().includes("marketing"));
+    // const isAdmin = rbacRoles.some(role => role.toLowerCase().includes("admin"));
+    // if (isAdmin && !hasMarketingHub) {
+    //   items.push({
+    //     id: "digital-marketing-hub",
+    //     label: "Marketing Hub",
+    //     icon: bloggerIcon,
+    //     path: "/marketing/hub",
+    //     color: colorTokens.menuColors.students,
+    //     children: undefined,
+    //   });
+    // }
 
     return items;
   }, [menus, user, rbacRoles]);
