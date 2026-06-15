@@ -284,7 +284,7 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
       { id: "my-tasks-effort", label: "My Tasks — Effort Entry", path: "/my-tasks/effort-entry" },
       { id: "sprints", label: "Sprints", path: "/sprints" },
       { id: "demo-setup-videos", label: "Demo Setup Videos", path: "/demo-setup-videos" },
-      { id: "digital-marketing-hub", label: "Digital Marketing Hub", path: "/marketing/hub" }
+      // { id: "digital-marketing-hub", label: "Digital Marketing Hub", path: "/marketing/hub" }
     ]
   }
 ];
