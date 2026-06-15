@@ -1117,12 +1117,15 @@ export default function HomeworkList() {
                         value: controller.classFilter,
                         onChange: controller.setClassFilter,
                         options: controller.classOptions,
+                        disabled: controller.lockClassFilter,
                       },
                       {
                         label: "Division",
                         value: controller.divisionFilter,
                         onChange: controller.setDivisionFilter,
                         options: controller.divisionOptions,
+                        disabled:
+                          controller.lockDivisionFilter || !controller.classFilter,
                       },
                       {
                         label: "Status",
