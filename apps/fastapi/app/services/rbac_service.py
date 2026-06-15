@@ -24,6 +24,20 @@ logger = get_logger(__name__)
 SYSTEM_ADMIN_ROLE_CODE = "SYSTEM_ADMIN"
 TENANT_ADMIN_ROLE_CODE = "TENANT_ADMIN"
 
+# Menus that may lack feature_id in the catalog but still map to a feature for permission codes.
+MENU_PATH_FEATURE_CODES: dict[str, str] = {
+    "/communication/notices": "COMMUNICATION_MGMT",
+}
+
+
+def _feature_code_for_menu(menu: Menu) -> str | None:
+    if menu.feature_id and menu.feature:
+        return str(menu.feature.code)
+    path = (menu.path or "").strip()
+    if path:
+        return MENU_PATH_FEATURE_CODES.get(path)
+    return None
+
 
 class RoleScope(str, Enum):
     PLATFORM = "PLATFORM"
@@ -426,12 +440,15 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
                 if not a_perm or not a_perm["can_view"]:
                     continue  # Admin doesn't have view access, so user doesn't either
                 
+                # View requires tenant admin view (module enabled). Create/edit/delete follow
+                # the user's role grant once the module is visible to the tenant.
+                tenant_module_enabled = bool(a_perm["can_view"])
                 effective_menu_perms[menu_id] = {
-                    "can_view": u_perm["can_view"] and a_perm["can_view"],
-                    "can_create": u_perm["can_create"] and a_perm["can_create"],
-                    "can_edit": u_perm["can_edit"] and a_perm["can_edit"],
-                    "can_delete": u_perm["can_delete"] and a_perm["can_delete"],
-                    "menu": u_perm["menu"]
+                    "can_view": u_perm["can_view"] and tenant_module_enabled,
+                    "can_create": u_perm["can_create"] and tenant_module_enabled,
+                    "can_edit": u_perm["can_edit"] and tenant_module_enabled,
+                    "can_delete": u_perm["can_delete"] and tenant_module_enabled,
+                    "menu": u_perm["menu"],
                 }
             else:
                 effective_menu_perms[menu_id] = u_perm
@@ -465,8 +482,8 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
             ):
                 continue
 
-            if m.feature_id and m.feature:
-                f_code = m.feature.code
+            f_code = _feature_code_for_menu(m)
+            if f_code:
                 if ep["can_view"]:
                     permission_codes.add(f"{f_code}:view")
                 if ep["can_create"]:

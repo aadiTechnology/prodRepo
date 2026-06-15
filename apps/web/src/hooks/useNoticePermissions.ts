@@ -7,33 +7,44 @@ import {
 } from "../utils/noticeAudience";
 import { useAuth } from "../context/AuthContext";
 
+const NOTICE_MENU_PATH = "/communication/notices";
+
 export function useNoticePermissions() {
-  const { hasPermission, roles } = useRBAC();
+  const { hasPermission, roles, grantedMenuPaths } = useRBAC();
   const { user } = useAuth();
 
-  const canView = hasPermission("COMMUNICATION_MGMT:view");
+  const hasNoticesMenuAccess = grantedMenuPaths.has(NOTICE_MENU_PATH);
+
+  const canView =
+    hasPermission("COMMUNICATION_MGMT:view") || hasNoticesMenuAccess;
   const canCreate = hasPermission("COMMUNICATION_MGMT:create");
   const canEdit = hasPermission("COMMUNICATION_MGMT:edit");
   const canDelete = hasPermission("COMMUNICATION_MGMT:delete");
+  const canManage = canCreate || canEdit || canDelete;
+
   const readOnlyAudience = useMemo(
     () => isNoticeReadOnlyAudience(user?.role, roles),
     [user?.role, roles],
   );
-  const isViewOnly = canView && !canCreate && !canEdit && !canDelete;
+
   const isNoticeConsumerView = useMemo(() => {
-    if (!isViewOnly) return false;
+    if (canManage) return false;
+    if (!canView) return false;
     return (
       readOnlyAudience ||
       isTeacherNoticeUser(user?.role, roles) ||
       isStudentNoticeUser(user?.role, roles)
     );
-  }, [isViewOnly, readOnlyAudience, user?.role, roles]);
+  }, [canManage, canView, readOnlyAudience, user?.role, roles]);
+
+  const isViewOnly = canView && !canManage;
 
   return {
     canView,
     canCreate,
     canEdit,
     canDelete,
+    canManage,
     readOnlyAudience,
     isViewOnly,
     isNoticeConsumerView,
