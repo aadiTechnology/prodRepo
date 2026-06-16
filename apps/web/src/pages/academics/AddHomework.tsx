@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useRBAC } from "../../context/RBACContext";
+import { useAuth } from "../../context/AuthContext";
 import {
   Box,
   Button,
@@ -32,6 +33,7 @@ import {
 import { colorTokens } from "../../tokens/colors";
 import { useSnackbar } from "notistack";
 import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
+import { isTeacherNoticeUser } from "../../utils/noticeAudience";
 
 type DropdownOption = { label: string; value: string };
 
@@ -62,11 +64,16 @@ export default function AddHomework() {
   const isEditMode = Boolean(id && id !== "new");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { enqueueSnackbar } = useSnackbar();
-  const { hasPermission } = useRBAC();
+  const { user } = useAuth();
+  const { hasPermission, roles, hasAnyRole } = useRBAC();
 
   const canCreate = hasPermission("HOMEWORK_MGMT:create");
   const canEdit = hasPermission("HOMEWORK_MGMT:edit");
   const canDelete = hasPermission("HOMEWORK_MGMT:delete");
+  const isTeacherScoped = useMemo(() => {
+    const isAdminLike = hasAnyRole(["ADMIN", "SUPER_ADMIN", "SYSTEM_ADMIN"]);
+    return !isAdminLike && isTeacherNoticeUser(user?.role, roles);
+  }, [hasAnyRole, roles, user?.role]);
 
   const isAuthorized = isEditMode ? canEdit : canCreate;
 
@@ -141,14 +148,16 @@ export default function AddHomework() {
   useEffect(() => {
     homeworkService
       .getTeacherClasses()
-      .then((classes) =>
-        setClassOptions(
-          classes.map((c) => ({
-            label: formatHomeworkClassLabel(c.name),
-            value: String(c.id),
-          })),
-        ),
-      )
+      .then((classes) => {
+        const nextClassOptions = classes.map((c) => ({
+          label: formatHomeworkClassLabel(c.name),
+          value: String(c.id),
+        }));
+        setClassOptions(nextClassOptions);
+        if (!isEditMode && isTeacherScoped && nextClassOptions.length > 0) {
+          handleFieldValueChange("class_id", nextClassOptions[0].value);
+        }
+      })
       .catch(() => {});
 
     academicYearService
@@ -163,7 +172,7 @@ export default function AddHomework() {
       })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditMode]);
+  }, [isEditMode, isTeacherScoped, handleFieldValueChange]);
 
   // When class changes — reload divisions and subjects
   useEffect(() => {
@@ -177,14 +186,16 @@ export default function AddHomework() {
     // Load divisions via homework-specific endpoint (accessible to teachers)
     homeworkService
       .getDivisionsForClass(Number(classId))
-      .then((divs) =>
-        setDivisionOptions(
-          divs.map((d) => ({
-            label: formatHomeworkClassLabel(d.division_name),
-            value: String(d.id),
-          })),
-        ),
-      )
+      .then((divs) => {
+        const nextDivisionOptions = divs.map((d) => ({
+          label: formatHomeworkClassLabel(d.division_name),
+          value: String(d.id),
+        }));
+        setDivisionOptions(nextDivisionOptions);
+        if (!isEditMode && isTeacherScoped) {
+          handleFieldValueChange("class_division_id", nextDivisionOptions[0]?.value ?? "");
+        }
+      })
       .catch(() => setDivisionOptions([]));
 
     // Load subjects for this teacher + class
@@ -205,7 +216,7 @@ export default function AddHomework() {
       handleFieldValueChange("subject_id", "");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.class_id]);
+  }, [formData.class_id, isEditMode, isTeacherScoped, handleFieldValueChange]);
 
   // Load existing homework data in edit mode
   useEffect(() => {
