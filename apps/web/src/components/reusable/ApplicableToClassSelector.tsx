@@ -26,6 +26,8 @@ type Props = {
   onDivisionToggle: (classId: number, divisionId: number, checked: boolean) => void;
   /** When true, hides Admin/Teacher/Student role checkboxes (audience is chosen elsewhere). */
   hideApplicableRoleControls?: boolean;
+  /** When true, class/division checkboxes are read-only (e.g. teacher notice scope). */
+  disableSelection?: boolean;
 };
 
 export default function ApplicableToClassSelector({
@@ -42,6 +44,7 @@ export default function ApplicableToClassSelector({
   onClassToggle,
   onDivisionToggle,
   hideApplicableRoleControls = false,
+  disableSelection = false,
 }: Props) {
   const showClassTargetSection = hideApplicableRoleControls || applicableTo.student;
 
@@ -123,6 +126,7 @@ export default function ApplicableToClassSelector({
               size="small"
               checked={isClassSelectAll}
               onChange={(e) => onClassSelectAll(e.target.checked)}
+              disabled={disableSelection}
             />
           </Box>
           <Box
@@ -158,6 +162,7 @@ export default function ApplicableToClassSelector({
                     size="small"
                     checked={selectedClassIds.includes(cls.id)}
                     onChange={(e) => onClassToggle(cls.id, e.target.checked)}
+                    disabled={disableSelection}
                   />
                   <Typography variant="body2" sx={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>
                     {cls.name}
@@ -173,6 +178,7 @@ export default function ApplicableToClassSelector({
                         size="small"
                         checked={selectedDivisionIds.includes(division.id)}
                         onChange={(e) => onDivisionToggle(cls.id, division.id, e.target.checked)}
+                        disabled={disableSelection}
                       />
                       <Typography variant="body2" sx={{ fontSize: 13 }}>
                         {division.name}

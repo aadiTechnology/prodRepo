@@ -19,6 +19,7 @@ type Args = {
   onDeleteClick: (row: ActivityGalleryListItem) => void;
   canEdit?: boolean;
   canDelete?: boolean;
+  showStatus?: boolean;
 };
 
 function formatClassLabel(row: ActivityGalleryListItem): string {
@@ -39,6 +40,7 @@ export function createActivityGalleryListConfig({
   onDeleteClick,
   canEdit = true,
   canDelete = true,
+  showStatus = true,
 }: Args): ListConfig<ActivityGalleryListItem, GalleryListSortBy> {
   const columns: ListConfig<ActivityGalleryListItem, GalleryListSortBy>["columns"] = [
     {
@@ -72,13 +74,15 @@ export function createActivityGalleryListConfig({
                 {row.gallery_name}
               </Typography>
             </Tooltip>
-            <Chip
-              size="small"
-              label={row.is_published ? "Published" : "Draft"}
-              color={row.is_published ? "success" : "default"}
-              variant={row.is_published ? "filled" : "outlined"}
-              sx={{ mt: 0.5, height: 22, fontSize: "0.7rem", fontWeight: 600 }}
-            />
+            {showStatus ? (
+              <Chip
+                size="small"
+                label={row.is_published ? "Published" : "Draft"}
+                color={row.is_published ? "success" : "default"}
+                variant={row.is_published ? "filled" : "outlined"}
+                sx={{ mt: 0.5, height: 22, fontSize: "0.7rem", fontWeight: 600 }}
+              />
+            ) : null}
           </Box>
         </Box>
       ),

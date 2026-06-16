@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import NotFoundException, ValidationException
 from app.repositories import notice_repository
 from app.services.homework_access import HomeworkViewerContext
-from app.services.notice_access import NoticeViewerContext, is_notice_consumer, resolve_notice_viewer_context
+from app.services.notice_access import (
+    NoticeViewerContext,
+    assert_teacher_notice_targets_allowed,
+    is_notice_consumer,
+    resolve_notice_viewer_context,
+)
 from app.services.notice_attachment_storage import (
     disk_path_for_attachment,
     save_notice_attachment_file,
@@ -309,6 +314,7 @@ def create_notice(
     *,
     tenant_id: int,
     user_id: int,
+    legacy_role: object,
     payload: NoticeCreateRequest,
 ) -> NoticeResponse:
     publish_date = payload.publish_date or datetime.utcnow()
@@ -336,6 +342,14 @@ def create_notice(
         expiry_date=payload.expiry_date,
         targets=targets,
         attachments=attachments,
+    )
+    assert_teacher_notice_targets_allowed(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        legacy_role=legacy_role,
+        audience_type=audience_type,
+        targets=targets,
     )
 
     notice_id = notice_repository.insert_notice(
@@ -456,6 +470,7 @@ def update_notice(
     tenant_id: int,
     notice_id: int,
     user_id: int,
+    legacy_role: object,
     payload: NoticeUpdateRequest,
 ) -> NoticeResponse:
     existing = notice_repository.get_notice_by_id(db, tenant_id=tenant_id, notice_id=notice_id)
@@ -488,6 +503,11 @@ def update_notice(
     normalized_targets = targets
     normalized_attachments = attachments
 
+    effective_targets = (
+        normalized_targets
+        if normalized_targets is not None
+        else notice_repository.get_notice_targets(db, notice_id=notice_id)
+    )
     _validate_notice_input(
         title=update_data.get("title", existing["title"]),
         description=update_data.get("description", existing["description"]),
@@ -495,10 +515,16 @@ def update_notice(
         notice_type=next_notice_type,
         publish_date=next_publish_date,
         expiry_date=next_expiry_date,
-        targets=normalized_targets
-        if normalized_targets is not None
-        else notice_repository.get_notice_targets(db, notice_id=notice_id),
+        targets=effective_targets,
         attachments=normalized_attachments,
+    )
+    assert_teacher_notice_targets_allowed(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        legacy_role=legacy_role,
+        audience_type=str(next_audience_type).upper(),
+        targets=effective_targets,
     )
 
     existing_status = str(existing.get("status") or "DRAFT").upper()

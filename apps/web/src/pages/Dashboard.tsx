@@ -373,7 +373,7 @@ const GenderCountChip = ({
         component="span"
         onClick={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
-        sx={{ display: "inline-flex", cursor: "help" }}
+        sx={{ display: "inline-flex", cursor: "default" }}
       >
         <Chip
           label={label}

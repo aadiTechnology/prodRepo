@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Autocomplete, Button, TextField, Typography, Box, FormHeaderIconAction } from "../../components/primitives";
 import { useNoticePermissions } from "../../hooks/useNoticePermissions";
+import { useTeacherStudentListScope } from "../../hooks/useTeacherStudentListScope";
+import { useAuth } from "../../context/AuthContext";
+import { useRBAC } from "../../context/RBACContext";
+import { isTeacherNoticeUser } from "../../utils/noticeAudience";
 import ApplicableToClassSelector from "../../components/reusable/ApplicableToClassSelector";
 import BaseForm from "../../components/reusable/BaseForm";
 import { useFormManager } from "../../hooks/useFormManager";
@@ -78,6 +82,16 @@ export default function CreateNotice() {
   const editId = editIdParam ? Number(editIdParam) : NaN;
   const isEditMode = Number.isFinite(editId);
   const perms = useNoticePermissions();
+  const { user } = useAuth();
+  const { roles, hasAnyRole } = useRBAC();
+  const teacherScope = useTeacherStudentListScope();
+
+  const isAdminLike = hasAnyRole(["ADMIN", "SUPER_ADMIN", "SYSTEM_ADMIN", "TENANT_ADMIN"]);
+  const isTeacherNoticeManager =
+    perms.canManage &&
+    !isAdminLike &&
+    isTeacherNoticeUser(user?.role, roles) &&
+    teacherScope.isTeacherScoped;
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -150,6 +164,28 @@ export default function CreateNotice() {
   });
 
   useEffect(() => {
+    if (isTeacherNoticeManager) {
+      if (!teacherScope.scopeReady) return;
+      const classes = teacherScope.teacherClasses;
+      setClassOptions(
+        classes.map((cls) => ({
+          id: String(cls.id),
+          value: String(cls.id),
+          label: cls.name,
+        }))
+      );
+      const flatDivisions = classes.flatMap((cls) =>
+        (cls.divisions || []).map((division) => ({
+          id: String(division.id),
+          value: String(division.id),
+          label: `${cls.name} - ${division.division_name}`,
+          classId: cls.id,
+        }))
+      );
+      setDivisionOptions(flatDivisions);
+      return;
+    }
+
     schoolClassService
       .getAll()
       .then((classes) => {
@@ -174,7 +210,7 @@ export default function CreateNotice() {
         setClassOptions([]);
         setDivisionOptions([]);
       });
-  }, []);
+  }, [isTeacherNoticeManager, teacherScope.scopeReady, teacherScope.teacherClasses]);
 
   useEffect(() => {
     let cancelled = false;
@@ -264,6 +300,36 @@ export default function CreateNotice() {
       cancelled = true;
     };
   }, [editId, isEditMode, navigate, resetForm]);
+
+  const [teacherTargetsInitialized, setTeacherTargetsInitialized] = useState(false);
+
+  useEffect(() => {
+    if (!isTeacherNoticeManager || !teacherScope.scopeReady || teacherTargetsInitialized || isEditMode) return;
+    const defaultClassId = Number(teacherScope.defaultClassId);
+    const defaultDivisionId = Number(teacherScope.defaultDivisionId);
+    setFormData((prev) => ({
+      ...prev,
+      audience_type: "STUDENT",
+      class_ids: defaultClassId ? [defaultClassId] : [],
+      division_ids: defaultDivisionId ? [defaultDivisionId] : [],
+    }));
+    setTeacherTargetsInitialized(true);
+  }, [
+    isTeacherNoticeManager,
+    teacherScope.scopeReady,
+    teacherScope.defaultClassId,
+    teacherScope.defaultDivisionId,
+    teacherTargetsInitialized,
+    isEditMode,
+    setFormData,
+  ]);
+
+  useEffect(() => {
+    if (!isTeacherNoticeManager) return;
+    if (formData.audience_type !== "STUDENT") {
+      setFormData((prev) => ({ ...prev, audience_type: "STUDENT" }));
+    }
+  }, [formData.audience_type, isTeacherNoticeManager, setFormData]);
 
   const classDivisionMap = useMemo(() => {
     const map = new Map<number, { id: number; name: string; divisions: { id: number; name: string }[] }>();
@@ -546,6 +612,20 @@ export default function CreateNotice() {
 
   const attachmentDisplayName = pendingFile?.name ?? savedAttachment?.file_name ?? null;
 
+  const audienceOptionsForForm = useMemo(() => {
+    if (!isTeacherNoticeManager) return dropdownAudienceTypes;
+    return dropdownAudienceTypes.filter((option) => option.value === "STUDENT");
+  }, [dropdownAudienceTypes, isTeacherNoticeManager]);
+
+  const lockTeacherClassSelection = useMemo(() => {
+    if (!isTeacherNoticeManager) return false;
+    const scopedDivisionCount = classDivisionMap.reduce(
+      (count, cls) => count + cls.divisions.length,
+      0
+    );
+    return scopedDivisionCount <= 1;
+  }, [classDivisionMap, isTeacherNoticeManager]);
+
   const usesClassAudience = formData.audience_type === "STUDENT" || formData.audience_type === "ALL";
 
   const applicableSelectionRenderer = useMemo(
@@ -566,10 +646,13 @@ export default function CreateNotice() {
             onClassToggle={handleClassToggle}
             onDivisionToggle={handleDivisionToggle}
             hideApplicableRoleControls
+            disableSelection={lockTeacherClassSelection}
           />
         ) : (
           <Typography variant="body2" color="text.secondary">
-            Class and division selection is available when audience is All or Students.
+            {isTeacherNoticeManager
+              ? "Class and division are set to your assigned class teacher scope."
+              : "Class and division selection is available when audience is All or Students."}
           </Typography>
         )}
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -614,6 +697,8 @@ export default function CreateNotice() {
       handleDivisionToggle,
       isApplicableSelectAll,
       isClassSelectAll,
+      isTeacherNoticeManager,
+      lockTeacherClassSelection,
       loading,
       onAttachmentSelect,
       usesClassAudience,
@@ -623,25 +708,35 @@ export default function CreateNotice() {
   const audienceTypeRenderer = useMemo(
     () => (
       <Autocomplete<SelectOption, false, false, false>
-        options={dropdownAudienceTypes}
-        value={dropdownAudienceTypes.find((o) => o.value === formData.audience_type) ?? null}
+        options={audienceOptionsForForm}
+        value={audienceOptionsForForm.find((o) => o.value === formData.audience_type) ?? null}
         onChange={(_, option) => {
           handleFieldValueChange("audience_type", (option?.value ?? "STUDENT") as NoticeAudienceType);
         }}
         getOptionLabel={(option) => option.label}
         isOptionEqualToValue={(a, b) => a.value === b.value}
+        readOnly={isTeacherNoticeManager}
         renderInput={(params) => (
           <TextField
             {...params}
             label="Audience"
             required
             error={Boolean(fieldErrors.audience_type)}
-            helperText={fieldErrors.audience_type}
+            helperText={
+              fieldErrors.audience_type ||
+              (isTeacherNoticeManager ? "Teachers can send notices to their assigned students only." : undefined)
+            }
           />
         )}
       />
     ),
-    [dropdownAudienceTypes, fieldErrors.audience_type, formData.audience_type, handleFieldValueChange]
+    [
+      audienceOptionsForForm,
+      fieldErrors.audience_type,
+      formData.audience_type,
+      handleFieldValueChange,
+      isTeacherNoticeManager,
+    ]
   );
 
   const noticeTypeRenderer = useMemo(
@@ -671,7 +766,7 @@ export default function CreateNotice() {
   const formConfig = useMemo(
     () =>
       createNoticeFormConfig({
-        audienceOptions: dropdownAudienceTypes,
+        audienceOptions: audienceOptionsForForm,
         noticeTypeOptions: dropdownNoticeTypes,
         applicableSelectionRenderer,
         audienceTypeRenderer,
@@ -680,7 +775,7 @@ export default function CreateNotice() {
     [
       applicableSelectionRenderer,
       audienceTypeRenderer,
-      dropdownAudienceTypes,
+      audienceOptionsForForm,
       dropdownNoticeTypes,
       noticeTypeRenderer,
     ]

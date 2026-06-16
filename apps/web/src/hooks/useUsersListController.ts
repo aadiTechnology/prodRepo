@@ -189,9 +189,14 @@ export function useUsersListController({
         applyLoginContextResponse(response);
         enqueueSnackbar("Logged in as user successfully", { variant: "success" });
         navigate("/");
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Failed to login as user:", err);
-        enqueueSnackbar("Failed to login as user", { variant: "error" });
+        const apiDetail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+        const message =
+          typeof apiDetail === "string" && apiDetail.trim()
+            ? apiDetail
+            : "Failed to login as user";
+        enqueueSnackbar(message, { variant: "error" });
       } finally {
         setImpersonationLoading(null);
       }

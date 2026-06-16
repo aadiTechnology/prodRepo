@@ -17,6 +17,8 @@ import {
   alpha,
   IconButton,
   Tooltip,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import {
@@ -39,6 +41,7 @@ import {
   ListPageLayout,
   ListPageToolbar,
   EntityTableSection,
+  TablePaginationBar,
 } from "../../components/reusable";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { useHomeworkListController } from "../../hooks/useHomeworkListController";
@@ -52,6 +55,7 @@ import {
 } from "../../utils/homeworkAudience";
 import {
   createHomeworkListConfig,
+  renderHomeworkRowActions,
   type HomeworkRow,
 } from "./HomeworkList.listConfig";
 
@@ -84,6 +88,8 @@ function formatDate(dateStr: string | null | undefined): string {
 
 export default function HomeworkList() {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isCompactTable = useMediaQuery(theme.breakpoints.down("lg"));
   const controller = useHomeworkListController();
   const { enqueueSnackbar } = useSnackbar();
   const { hasPermission, roles } = useRBAC();
@@ -116,9 +122,13 @@ export default function HomeworkList() {
   const [children, setChildren] = useState<any[]>([]);
   const [selectedChild, setSelectedChild] = useState<any | null>(null);
   const [tabValue, setTabValue] = useState(0); // 0: All, 1: Active, 2: Overdue
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [listPage, setListPage] = useState(0);
   const [listRowsPerPage, setListRowsPerPage] = useState(10);
+
+  useEffect(() => {
+    setListPage(0);
+  }, [selectedChild?.id]);
 
   // Fetch student profile or parent's children info
   useEffect(() => {
@@ -274,6 +284,26 @@ export default function HomeworkList() {
     });
   }, [filteredHomeworkByChild, tabValue]);
 
+  const paginatedHomeworkList = useMemo(() => {
+    const start = listPage * listRowsPerPage;
+    return finalHomeworkList.slice(start, start + listRowsPerPage);
+  }, [finalHomeworkList, listPage, listRowsPerPage]);
+
+  const showAudiencePagination = finalHomeworkList.length > 10;
+
+  const audiencePaginationBar = showAudiencePagination ? (
+    <TablePaginationBar
+      page={listPage}
+      rowsPerPage={listRowsPerPage}
+      totalRows={finalHomeworkList.length}
+      onPageChange={setListPage}
+      onRowsPerPageChange={(value) => {
+        setListRowsPerPage(value);
+        setListPage(0);
+      }}
+    />
+  ) : null;
+
   const listConfig = createHomeworkListConfig({
     navigate,
     onDeleteClick: controller.handleDeleteClick,
@@ -283,6 +313,22 @@ export default function HomeworkList() {
       ? "No homework assigned for your class yet."
       : "No homework found. Click 'Assign Homework' to create one.",
   });
+
+  const tableColumns = useMemo(() => {
+    if (!isCompactTable) return listConfig.columns;
+    return listConfig.columns.filter(
+      (column) => column.id !== "teacher_name" && column.id !== "assigned_date",
+    );
+  }, [isCompactTable, listConfig.columns]);
+
+  const renderHomeworkActions = (row: HomeworkRow) => {
+    const actions = listConfig.actions.rowActions?.(row);
+    return renderHomeworkRowActions({
+      onView: actions?.onView ?? (() => navigate(`/homework/${row.id}`)),
+      onEdit: actions?.onEdit,
+      onDelete: actions?.onDelete,
+    });
+  };
 
   if (!canView) {
     return (
@@ -396,7 +442,11 @@ export default function HomeworkList() {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(auto-fit, minmax(200px, 1fr))" },
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, 1fr)",
+                md: "repeat(3, 1fr)",
+              },
               gap: { xs: 1.5, sm: 2 },
             }}
           >
@@ -599,14 +649,19 @@ export default function HomeworkList() {
                 onChange={(e, v) => { setTabValue(v); setListPage(0); }}
                 textColor="primary"
                 indicatorColor="primary"
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
                 sx={{
+                  width: { xs: "100%", md: "auto" },
+                  maxWidth: "100%",
                   "& .MuiTab-root": {
                     fontWeight: 700,
-                    px: 2,
-                    fontSize: "0.9rem",
+                    px: { xs: 1.25, sm: 2 },
+                    fontSize: { xs: "0.8rem", sm: "0.9rem" },
                     color: colorTokens.text.secondary,
                     textTransform: "none",
-                    minWidth: 100,
+                    minWidth: { xs: 88, sm: 100 },
                   },
                   "& .Mui-selected": { color: `${colorTokens.primary.main} !important` },
                   "& .MuiTabs-indicator": {
@@ -684,19 +739,7 @@ export default function HomeworkList() {
             </Box>
 
             {/* Main Homework List view */}
-            {controller.loading ? (
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  flexGrow: 1,
-                  py: 8,
-                }}
-              >
-                <CircularProgress size={48} thickness={4} />
-              </Box>
-            ) : finalHomeworkList.length === 0 ? (
+            {!controller.tableLoading && finalHomeworkList.length === 0 ? (
               <Box
                 sx={{
                   textAlign: "center",
@@ -750,7 +793,8 @@ export default function HomeworkList() {
                 sx={{
                   display: "flex",
                   flexDirection: "column",
-                  overflow: "hidden",
+                  overflowX: "auto",
+                  WebkitOverflowScrolling: "touch",
                   borderRadius: "14px",
                   border: `1px solid ${colorTokens.border.default}`,
                   boxShadow: "0 4px 14px rgba(0, 0, 0, 0.03)",
@@ -762,15 +806,19 @@ export default function HomeworkList() {
                   page={listPage}
                   rowsPerPage={listRowsPerPage}
                   onPageChange={setListPage}
-                  onRowsPerPageChange={setListRowsPerPage}
-                  columns={listConfig.columns}
-                  data={finalHomeworkList.slice(listPage * listRowsPerPage, listPage * listRowsPerPage + listRowsPerPage)}
-                  loading={controller.loading}
+                  onRowsPerPageChange={(value) => {
+                    setListRowsPerPage(value);
+                    setListPage(0);
+                  }}
+                  columns={tableColumns}
+                  data={paginatedHomeworkList}
+                  loading={controller.tableLoading}
                   emptyMessage="No tasks found."
-                  rowActions={listConfig.actions.rowActions}
+                  getRowKey={(row) => row.id}
+                  renderRowActions={renderHomeworkActions}
                   stickyHeader
                   size="small"
-                  showPagination={true}
+                  showPagination={showAudiencePagination}
                   showInfoBar={false}
                 />
               </AppCard>
@@ -778,17 +826,30 @@ export default function HomeworkList() {
               <Card
                 variant="outlined"
                 sx={{
-                  p: { xs: 2.5, md: 4 },
-                  borderRadius: "24px",
+                  p: { xs: 1.5, sm: 2.5, md: 3 },
+                  borderRadius: { xs: "16px", md: "24px" },
                   borderColor: colorTokens.border.default,
                   background: colorTokens.surface.card,
                   boxShadow: "0 4px 16px rgba(0, 0, 0, 0.04)",
                   display: "flex",
                   flexDirection: "column",
+                  overflow: "hidden",
                 }}
               >
-                <Grid container spacing={2.5}>
-                {finalHomeworkList.map((hw) => {
+                {controller.tableLoading ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      py: 8,
+                    }}
+                  >
+                    <CircularProgress size={48} thickness={4} />
+                  </Box>
+                ) : (
+                <Grid container spacing={{ xs: 1.5, sm: 2, md: 2.5 }}>
+                {paginatedHomeworkList.map((hw) => {
                   const isOverdue = new Date(hw.submission_date) < new Date();
                   const subColor = getSubjectColor(hw.subject_name);
 
@@ -1024,6 +1085,8 @@ export default function HomeworkList() {
                   );
                 })}
               </Grid>
+                )}
+              {audiencePaginationBar}
             </Card>
             )}
           </Box>
@@ -1035,70 +1098,86 @@ export default function HomeworkList() {
   // Standard Admin/Teacher Grid Table View
   return (
     <ListPageLayout
-      pageBackground
-      contentPaddingSize="none"
       header={
         <PageHeader
           links={[{ title: "Homework", path: "#" }]}
           homePath="/"
           actions={
-            <ListPageToolbar
-              searchValue={controller.search}
-              onSearchChange={controller.setSearch}
-              searchPlaceholder="Search homework by title..."
-              filters={
-                controller.readOnlyAudience
-                  ? []
-                  : [
-                    {
-                      label: "Class",
-                      value: controller.classFilter,
-                      onChange: controller.setClassFilter,
-                      options: controller.classOptions,
-                    },
-                    {
-                      label: "Division",
-                      value: controller.divisionFilter,
-                      onChange: controller.setDivisionFilter,
-                      options: controller.divisionOptions,
-                    },
-                    {
-                      label: "Status",
-                      value: controller.statusFilter,
-                      onChange: controller.setStatusFilter,
-                      options: controller.statusOptions,
-                    },
-                  ]
-              }
-              {...(hasPermission("HOMEWORK_MGMT:create")
-                ? {
-                  onAddClick: () => navigate("/homework/new"),
-                  addLabel: "Assign Homework",
-                  addIcon: <AddIcon sx={{ fontSize: 24 }} />,
+            <Box sx={{ width: "100%", minWidth: 0, maxWidth: "100%" }}>
+              <ListPageToolbar
+                searchValue={controller.search}
+                onSearchChange={controller.setSearch}
+                searchPlaceholder="Search homework by title..."
+                filters={
+                  controller.readOnlyAudience
+                    ? []
+                    : [
+                      {
+                        label: "Class",
+                        value: controller.classFilter,
+                        onChange: controller.setClassFilter,
+                        options: controller.classOptions,
+                        disabled: controller.lockClassFilter,
+                      },
+                      {
+                        label: "Division",
+                        value: controller.divisionFilter,
+                        onChange: controller.setDivisionFilter,
+                        options: controller.divisionOptions,
+                        disabled:
+                          controller.lockDivisionFilter || !controller.classFilter,
+                      },
+                      {
+                        label: "Status",
+                        value: controller.statusFilter,
+                        onChange: controller.setStatusFilter,
+                        options: controller.statusOptions,
+                      },
+                    ]
                 }
-                : {})}
-            />
+                {...(hasPermission("HOMEWORK_MGMT:create")
+                  ? {
+                    onAddClick: () => navigate("/homework/new"),
+                    addLabel: "Assign Homework",
+                    addIcon: <AddIcon sx={{ fontSize: 24 }} />,
+                  }
+                  : {})}
+              />
+            </Box>
           }
         />
       }
     >
-      <EntityTableSection<HomeworkRow>
-        label=""
-        totalRows={controller.total}
-        page={controller.page}
-        rowsPerPage={controller.rowsPerPage}
-        onPageChange={controller.setPage}
-        onRowsPerPageChange={controller.setRowsPerPage}
-        columns={listConfig.columns}
-        data={controller.homework}
-        loading={controller.loading}
-        emptyMessage={listConfig.uiPolicy.emptyMessage}
-        rowActions={listConfig.actions.rowActions}
-        stickyHeader
-        size="small"
-        showPagination={true}
-        showInfoBar={false}
-      />
+      <Box
+        sx={{
+          minWidth: 0,
+          width: "100%",
+          overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        <EntityTableSection<HomeworkRow>
+          label=""
+          totalRows={controller.total}
+          page={controller.page}
+          rowsPerPage={controller.rowsPerPage}
+          onPageChange={controller.setPage}
+          onRowsPerPageChange={(value) => {
+            controller.setRowsPerPage(value);
+            controller.setPage(0);
+          }}
+          columns={tableColumns}
+          data={controller.homework}
+          loading={controller.tableLoading}
+          emptyMessage={listConfig.uiPolicy.emptyMessage}
+          getRowKey={(row) => row.id}
+          renderRowActions={renderHomeworkActions}
+          stickyHeader
+          size="small"
+          showPagination={controller.total > 10}
+          showInfoBar={false}
+        />
+      </Box>
 
       <ConfirmDialog
         open={controller.deleteDialogOpen}

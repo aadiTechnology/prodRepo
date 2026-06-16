@@ -1,6 +1,7 @@
-import { Chip } from "@mui/material";
+import { Box, Chip } from "@mui/material";
 import { colorTokens } from "../../tokens/colors";
 import type { ListConfig } from "../../components/reusable/listFramework.types";
+import TableRowActions from "../../components/reusable/TableRowActions";
 import type { HomeworkResponse } from "../../api/services/homeworkService";
 import { formatHomeworkClassLabel } from "./AddHomework.formConfig";
 
@@ -53,21 +54,20 @@ export const createHomeworkListConfig = ({
     {
       id: "title",
       label: "Title",
-      width: "22%",
       render: (row: HomeworkRow) => (
-        <span style={{ fontWeight: 600, color: colorTokens.text.primary }}>{row.title}</span>
+        <Box sx={{ fontWeight: 600, color: colorTokens.text.primary, whiteSpace: "nowrap" }}>
+          {row.title}
+        </Box>
       ),
     },
     {
       id: "subject_name",
       label: "Subject",
-      width: "13%",
       render: (row: HomeworkRow) => row.subject_name ?? "—",
     },
     {
       id: "class_name",
       label: "Class",
-      width: "10%",
       render: (row: HomeworkRow) => {
         const classLabel = row.class_name
           ? formatHomeworkClassLabel(row.class_name)
@@ -81,20 +81,18 @@ export const createHomeworkListConfig = ({
     {
       id: "assigned_date",
       label: "Assigned",
-      width: "11%",
       render: (row: HomeworkRow) => formatDate(row.assigned_date),
     },
     {
       id: "submission_date",
       label: "Submission",
-      width: "11%",
       render: (row: HomeworkRow) => formatDate(row.submission_date),
     },
     {
       id: "status",
       label: "Status",
-      width: "10%",
       align: "center",
+      headerAlign: "center",
       render: (row: HomeworkRow) => {
         const { label, color, variant } = computeDisplayStatus(row);
         return (
@@ -110,7 +108,6 @@ export const createHomeworkListConfig = ({
     {
       id: "teacher_name",
       label: "Teacher",
-      width: "13%",
       render: (row: HomeworkRow) => row.teacher_name ?? "—",
     },
   ],
@@ -138,3 +135,24 @@ export const createHomeworkListConfig = ({
     }),
   },
 });
+
+export function renderHomeworkRowActions(args: {
+  onView: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}) {
+  const { onView, onEdit, onDelete } = args;
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexWrap: "nowrap",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <TableRowActions onView={onView} onEdit={onEdit} onDelete={onDelete} />
+    </Box>
+  );
+}

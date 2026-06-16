@@ -66,6 +66,7 @@ export default function ActivityGalleryList() {
         onDeleteClick: c.openDeleteConfirm,
         canEdit: perms.canEdit && !perms.readOnlyAudience,
         canDelete: perms.canDelete && !perms.readOnlyAudience,
+        showStatus: !perms.readOnlyAudience,
       }),
     [
       c.openDeleteConfirm,
@@ -185,7 +186,7 @@ export default function ActivityGalleryList() {
                   )}
                 </IconButton>
               </Tooltip>
-              {galleryType === "Photo" ? (
+              {galleryType === "Photo" && perms.canDownload ? (
                 <Tooltip title="Download">
                   <IconButton
                     size="small"

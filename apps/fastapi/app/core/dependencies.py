@@ -407,23 +407,30 @@ def _enforce_menu_permission(
                 )
                 raise ForbiddenException("Access denied: Tenant has no active administrator role.")
 
+            # Tenant admin must have enabled the module (view). Sub-roles may hold
+            # create/edit/delete without the admin role mirroring every action.
+            tenant_admin_action_col = (
+                action_col_name
+                if action == PermissionAction.VIEW.value
+                else "can_view"
+            )
             tenant_admin_perm = (
                 db.query(RoleMenuPermission)
                 .join(Menu, RoleMenuPermission.menu_id == Menu.id)
                 .filter(
                     RoleMenuPermission.role_id == tenant_admin_role.id,
                     *menu_filters,
-                    getattr(RoleMenuPermission, action_col_name) == True,
+                    getattr(RoleMenuPermission, tenant_admin_action_col) == True,
                 )
                 .first()
             )
             if not tenant_admin_perm:
                 logger.warning(
                     f"User {current_user.email} denied: Tenant ADMIN role (id={tenant_admin_role.id}) "
-                    f"does not have '{action}' permission on '{label}'"
+                    f"does not have module access for '{action}' on '{label}'"
                 )
                 raise ForbiddenException(
-                    f"Access denied: Tenant administrator does not have '{action}' permission on '{label}'."
+                    f"Access denied: Tenant administrator has not enabled '{label}' for this tenant."
                 )
 
     return current_user

@@ -16,6 +16,7 @@ export interface ToolbarFilter {
   onChange: (value: string) => void;
   label: string;
   options: { label: string; value: string }[];
+  disabled?: boolean;
 }
 
 export interface ListPageToolbarProps {
@@ -78,6 +79,7 @@ export default function ListPageToolbar({
               value={filter.value}
               onChange={(e) => filter.onChange(e.target.value as string)}
               displayEmpty
+              disabled={filter.disabled}
               size="small"
               sx={{
                 minWidth: { xs: "100%", sm: 160 },

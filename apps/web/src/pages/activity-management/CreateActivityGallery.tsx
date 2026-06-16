@@ -3,21 +3,20 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Box,
   Button,
+  CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   IconButton,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
   Stack,
   Typography,
   alpha,
-  CircularProgress,
 } from "@mui/material";
 import {
   Add as AddIcon,
   DeleteOutline as DeleteOutlineIcon,
-  InsertDriveFile as InsertDriveFileIcon,
   UploadFile as UploadFileIcon,
+  Visibility as VisibilityIcon,
 } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
 import BaseForm from "../../components/reusable/BaseForm";
@@ -28,6 +27,7 @@ import { FormHeaderIconAction } from "../../components/primitives";
 import TextFieldInput from "../../components/semantic/TextFieldInput";
 import { useFormManager } from "../../hooks/useFormManager";
 import { useActivityGalleryPermissions } from "../../hooks/useActivityGalleryPermissions";
+import { useGalleryMediaSrc } from "../../hooks/useGalleryMediaSrc";
 import activityGalleryService from "../../api/services/activityGalleryService";
 import schoolClassService from "../../api/services/schoolClassService";
 import type {
@@ -42,7 +42,8 @@ import {
   type CreateActivityGalleryFormData,
 } from "./CreateActivityGallery.formConfig";
 import { colorTokens } from "../../tokens/colors";
-import { extractYoutubeVideoId } from "../../utils/youtube";
+import { apiBaseUrl } from "../../config";
+import { extractYoutubeVideoId, buildYoutubeEmbedUrl, isYoutubeUrl } from "../../utils/youtube";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
 const PERSIST_VALIDATION_MESSAGE = "Please complete all required fields before saving.";
@@ -67,6 +68,81 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function buildMediaUrl(filePath: string): string {
+  if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
+  if (filePath.includes("/media/") && filePath.endsWith("/content")) {
+    return "";
+  }
+  return `${apiBaseUrl}${filePath}`;
+}
+
+function GalleryMediaPreviewDialog({
+  media,
+  galleryType,
+  open,
+  onClose,
+}: {
+  media: ActivityGalleryMedia | null;
+  galleryType: GalleryType;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const photoSrc = useGalleryMediaSrc(
+    open && galleryType === "Photo" ? media?.file_path : undefined,
+  );
+
+  if (!media) return null;
+
+  const title = media.original_file_name || media.file_name;
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle sx={{ pr: 6 }}>{title}</DialogTitle>
+      <DialogContent>
+        {galleryType === "Photo" ? (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 280,
+              bgcolor: alpha(colorTokens.text.primary, 0.04),
+              borderRadius: 2,
+            }}
+          >
+            {photoSrc ? (
+              <Box
+                component="img"
+                src={photoSrc}
+                alt={title}
+                sx={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }}
+              />
+            ) : (
+              <CircularProgress />
+            )}
+          </Box>
+        ) : isYoutubeUrl(media.file_path) ? (
+          <Box
+            component="iframe"
+            src={buildYoutubeEmbedUrl(media.file_path)}
+            title={title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            sx={{ width: "100%", minHeight: 420, border: 0, display: "block", borderRadius: 2 }}
+          />
+        ) : (
+          <Box
+            component="video"
+            src={buildMediaUrl(media.file_path)}
+            controls
+            sx={{ width: "100%", maxHeight: "70vh", display: "block", borderRadius: 2 }}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function galleryToForm(gallery: ActivityGallery): CreateActivityGalleryFormData {
@@ -124,6 +200,7 @@ export default function CreateActivityGallery() {
   >([]);
   const [savedMedia, setSavedMedia] = useState<ActivityGalleryMedia[]>([]);
   const [deletingMediaId, setDeletingMediaId] = useState<number | null>(null);
+  const [previewMedia, setPreviewMedia] = useState<ActivityGalleryMedia | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState("");
 
   const today = new Date().toISOString().split("T")[0];
@@ -600,6 +677,45 @@ export default function CreateActivityGallery() {
     [effectiveGalleryId, enqueueSnackbar],
   );
 
+  const renderUploadedMediaRow = useCallback(
+    (item: ActivityGalleryMedia, label: string) => (
+      <Box
+        key={item.id}
+        sx={{ display: "flex", alignItems: "center", mt: 0.5, minHeight: 24, gap: 0.25 }}
+      >
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+        >
+          {label}
+        </Typography>
+        <IconButton
+          size="small"
+          color="primary"
+          aria-label="View media"
+          onClick={() => setPreviewMedia(item)}
+          sx={{ p: 0.5 }}
+        >
+          <VisibilityIcon sx={{ fontSize: 18 }} />
+        </IconButton>
+        {perms.canEdit ? (
+          <IconButton
+            size="small"
+            color="error"
+            aria-label="Delete media"
+            onClick={() => void onDeleteMedia(item.id)}
+            disabled={deletingMediaId === item.id}
+            sx={{ p: 0.5 }}
+          >
+            <DeleteOutlineIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        ) : null}
+      </Box>
+    ),
+    [deletingMediaId, onDeleteMedia, perms.canEdit],
+  );
+
   const photoUploadSlot = (
     <Box sx={{ mt: 2 }}>
       <FormSectionLabel title="Upload Photos" icon={<UploadFileIcon fontSize="small" />} />
@@ -644,32 +760,16 @@ export default function CreateActivityGallery() {
         </Typography>
       ) : null}
       {savedMedia.length > 0 ? (
-        <List dense sx={{ mt: 1 }}>
-          {savedMedia.map((item) => (
-            <ListItem
-              key={item.id}
-              secondaryAction={
-                perms.canEdit ? (
-                  <IconButton
-                    edge="end"
-                    onClick={() => void onDeleteMedia(item.id)}
-                    disabled={deletingMediaId === item.id}
-                  >
-                    <DeleteOutlineIcon />
-                  </IconButton>
-                ) : null
-              }
-            >
-              <ListItemIcon>
-                <InsertDriveFileIcon />
-              </ListItemIcon>
-              <ListItemText
-                primary={item.original_file_name || item.file_name}
-                secondary={item.file_size ? formatBytes(item.file_size) : undefined}
-              />
-            </ListItem>
-          ))}
-        </List>
+        <Box sx={{ mt: 1 }}>
+          {savedMedia.map((item) =>
+            renderUploadedMediaRow(
+              item,
+              item.file_size
+                ? `${item.original_file_name || item.file_name} (${formatBytes(item.file_size)})`
+                : item.original_file_name || item.file_name,
+            ),
+          )}
+        </Box>
       ) : null}
     </Box>
   );
@@ -728,32 +828,14 @@ export default function CreateActivityGallery() {
         </Typography>
       ) : null}
       {savedMedia.length > 0 ? (
-        <List dense sx={{ mt: 1 }}>
-          {savedMedia.map((item, index) => (
-            <ListItem
-              key={item.id}
-              secondaryAction={
-                perms.canEdit ? (
-                  <IconButton
-                    edge="end"
-                    onClick={() => void onDeleteMedia(item.id)}
-                    disabled={deletingMediaId === item.id}
-                  >
-                    <DeleteOutlineIcon />
-                  </IconButton>
-                ) : null
-              }
-            >
-              <ListItemIcon>
-                <InsertDriveFileIcon />
-              </ListItemIcon>
-              <ListItemText
-                primary={`Video ${index + 1}`}
-                secondary={item.original_file_name || item.file_path}
-              />
-            </ListItem>
-          ))}
-        </List>
+        <Box sx={{ mt: 1 }}>
+          {savedMedia.map((item, index) =>
+            renderUploadedMediaRow(
+              item,
+              `Video ${index + 1}: ${item.original_file_name || item.file_path}`,
+            ),
+          )}
+        </Box>
       ) : null}
     </Box>
   );
@@ -808,6 +890,14 @@ export default function CreateActivityGallery() {
     [associatedClassesSlot, uploadSlot],
   );
 
+  if (perms.isLoading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   if (!isAuthorized) {
     return (
       <Box sx={{ p: 4, textAlign: "center" }}>
@@ -826,6 +916,12 @@ export default function CreateActivityGallery() {
 
   return (
     <>
+      <GalleryMediaPreviewDialog
+        media={previewMedia}
+        galleryType={effectiveGalleryType}
+        open={previewMedia !== null}
+        onClose={() => setPreviewMedia(null)}
+      />
       <BaseForm
         formConfig={formConfig}
         formData={formData}

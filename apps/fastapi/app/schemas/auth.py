@@ -40,7 +40,7 @@ class TenantInfo(BaseModel):
 class UserWithRole(BaseModel):
     """User response with role."""
     id: int
-    email: EmailStr
+    email: str  # str not EmailStr — student accounts use @student.local
     full_name: str
     role: UserRole
     tenant_id: Optional[int] = None
@@ -55,7 +55,7 @@ class UserWithRole(BaseModel):
 class CurrentUser(BaseModel):
     """Current authenticated user."""
     id: int
-    email: EmailStr
+    email: str  # str not EmailStr — student accounts use @student.local
     full_name: str
     role: UserRole
     tenant_id: Optional[int] = None

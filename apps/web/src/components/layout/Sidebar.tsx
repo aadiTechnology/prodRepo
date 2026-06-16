@@ -284,7 +284,7 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
       { id: "my-tasks-effort", label: "My Tasks — Effort Entry", path: "/my-tasks/effort-entry" },
       { id: "sprints", label: "Sprints", path: "/sprints" },
       { id: "demo-setup-videos", label: "Demo Setup Videos", path: "/demo-setup-videos" },
-      { id: "digital-marketing-hub", label: "Digital Marketing Hub", path: "/marketing/hub" }
+      // { id: "digital-marketing-hub", label: "Digital Marketing Hub", path: "/marketing/hub" }
     ]
   }
 ];
@@ -384,18 +384,18 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
       };
     });
 
-    const hasMarketingHub = menus.some(node => (node.path || "").toLowerCase().includes("marketing"));
-    const isAdmin = rbacRoles.some(role => role.toLowerCase().includes("admin"));
-    if (isAdmin && !hasMarketingHub) {
-      items.push({
-        id: "digital-marketing-hub",
-        label: "Marketing Hub",
-        icon: bloggerIcon,
-        path: "/marketing/hub",
-        color: colorTokens.menuColors.students,
-        children: undefined,
-      });
-    }
+    // const hasMarketingHub = menus.some(node => (node.path || "").toLowerCase().includes("marketing"));
+    // const isAdmin = rbacRoles.some(role => role.toLowerCase().includes("admin"));
+    // if (isAdmin && !hasMarketingHub) {
+    //   items.push({
+    //     id: "digital-marketing-hub",
+    //     label: "Marketing Hub",
+    //     icon: bloggerIcon,
+    //     path: "/marketing/hub",
+    //     color: colorTokens.menuColors.students,
+    //     children: undefined,
+    //   });
+    // }
 
     return items;
   }, [menus, user, rbacRoles]);

@@ -107,6 +107,7 @@ async def create_notice(
         db,
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
+        legacy_role=current_user.role,
         payload=payload,
     )
 
@@ -123,6 +124,7 @@ async def update_notice(
         tenant_id=current_user.tenant_id,
         notice_id=notice_id,
         user_id=current_user.id,
+        legacy_role=current_user.role,
         payload=payload,
     )
 

@@ -111,7 +111,12 @@ def list_homework(
         query = query.filter(Homework.subject_id == subject_id)
     if academic_year_id is not None:
         query = query.filter(Homework.academic_year_id == academic_year_id)
-    if hw_status:
+    if hw_status == "Overdue":
+        query = query.filter(
+            Homework.status == "Published",
+            Homework.submission_date < date.today(),
+        )
+    elif hw_status:
         query = query.filter(Homework.status == hw_status)
     if search:
         query = query.filter(Homework.title.ilike(f"%{search}%"))

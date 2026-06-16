@@ -1,11 +1,11 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 class ProfileResponse(BaseModel):
     full_name: str
-    email: EmailStr
+    email: str  # str not EmailStr — student accounts use @student.local
     role: str
     is_active: bool
     profile_image_path: Optional[str] = None

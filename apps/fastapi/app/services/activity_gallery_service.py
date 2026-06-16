@@ -29,9 +29,15 @@ from app.services.activity_gallery_access import (
     MAX_PHOTO_GALLERY_TOTAL_BYTES,
     MAX_PHOTO_GALLERY_TOTAL_MB,
     GalleryViewerContext,
+    assert_gallery_manage_access,
     gallery_visible_to_viewer,
     resolve_gallery_viewer_context,
     teacher_can_manage_class_division,
+    user_can_create_gallery,
+    user_can_delete_gallery,
+    user_can_download_gallery,
+    user_can_edit_gallery,
+    user_can_view_gallery,
     user_can_manage_galleries,
 )
 from app.services.activity_gallery_media_storage import (
@@ -79,15 +85,14 @@ def _assert_manage_access(
     class_id: int,
     division_id: int,
 ) -> None:
-    if not teacher_can_manage_class_division(
+    assert_gallery_manage_access(
         db,
         tenant_id=tenant_id,
         user_id=user_id,
         legacy_role=legacy_role,
         class_id=class_id,
         division_id=division_id,
-    ):
-        raise ForbiddenException("You are not authorized for this activity")
+    )
 
 
 def _to_media_response(row: dict) -> ActivityGalleryMediaResponse:
@@ -742,6 +747,18 @@ def get_divisions_for_class(
 
 def user_can_manage(db: Session, current_user: object) -> bool:
     return user_can_manage_galleries(db, current_user)
+
+
+def get_my_gallery_permissions(db: Session, current_user: object) -> "GalleryAccessPermissionsResponse":
+    from app.schemas.activity_gallery_schema import GalleryAccessPermissionsResponse
+
+    return GalleryAccessPermissionsResponse(
+        can_view=user_can_view_gallery(db, current_user),
+        can_create=user_can_create_gallery(db, current_user),
+        can_edit=user_can_edit_gallery(db, current_user),
+        can_delete=user_can_delete_gallery(db, current_user),
+        can_download=user_can_download_gallery(db, current_user),
+    )
 
 
 def get_teacher_gallery_scope(

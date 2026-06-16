@@ -95,7 +95,7 @@ export interface HomeworkListParams {
   class_division_id?: number;
   subject_id?: number;
   academic_year_id?: number;
-  status?: "Draft" | "Published";
+  status?: "Draft" | "Published" | "Overdue";
   teacher_id?: number;
 }
 

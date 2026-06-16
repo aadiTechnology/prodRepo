@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useGalleryMediaSrc } from "../../hooks/useGalleryMediaSrc";
 import {
   Alert,
   Box,
@@ -37,42 +38,6 @@ function buildMediaUrl(filePath: string): string {
     return "";
   }
   return `${apiBaseUrl}${filePath}`;
-}
-
-function useGalleryMediaSrc(filePath: string | undefined): string | undefined {
-  const [src, setSrc] = useState<string | undefined>();
-
-  useEffect(() => {
-    if (!filePath) {
-      setSrc(undefined);
-      return;
-    }
-    if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
-      setSrc(filePath);
-      return;
-    }
-    if (filePath.includes("/media/") && filePath.endsWith("/content")) {
-      let objectUrl: string | undefined;
-      let cancelled = false;
-      activityGalleryService
-        .fetchMediaContent(filePath)
-        .then((blob) => {
-          if (cancelled) return;
-          objectUrl = URL.createObjectURL(blob);
-          setSrc(objectUrl);
-        })
-        .catch(() => {
-          if (!cancelled) setSrc(undefined);
-        });
-      return () => {
-        cancelled = true;
-        if (objectUrl) URL.revokeObjectURL(objectUrl);
-      };
-    }
-    setSrc(`${apiBaseUrl}${filePath}`);
-  }, [filePath]);
-
-  return src;
 }
 
 export default function ActivityGalleryDetails() {
@@ -190,7 +155,7 @@ export default function ActivityGalleryDetails() {
           homePath="/"
           actions={
             <Stack direction="row" spacing={1}>
-              {gallery.gallery_type === "Photo" ? (
+              {gallery.gallery_type === "Photo" && perms.canDownload ? (
                 <Button
                   variant="outlined"
                   startIcon={<DownloadIcon />}
@@ -238,14 +203,16 @@ export default function ActivityGalleryDetails() {
               {gallery.media_count}
             </Typography>
           </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Typography variant="caption" color="text.secondary">
-              Status
-            </Typography>
-            <Typography variant="body2" fontWeight={700}>
-              {gallery.is_published ? "Published" : "Draft"}
-            </Typography>
-          </Grid>
+          {!perms.readOnlyAudience ? (
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Typography variant="caption" color="text.secondary">
+                Status
+              </Typography>
+              <Typography variant="body2" fontWeight={700}>
+                {gallery.is_published ? "Published" : "Draft"}
+              </Typography>
+            </Grid>
+          ) : null}
         </Grid>
 
         {gallery.description ? (

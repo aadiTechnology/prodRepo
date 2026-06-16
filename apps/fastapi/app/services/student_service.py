@@ -220,8 +220,19 @@ class StudentService:
             try:
                 from app.services import user_service
                 from app.schemas.user import UserCreate
-                
-                user_email = req.email or f"{student.student_code}@student.local"
+                from app.models.user import User
+                from app.utils.student_login_email import normalize_email, resolve_student_login_email
+
+                taken = {
+                    normalize_email(row[0])
+                    for row in self.db.query(User.email).filter(User.is_deleted == False).all()  # noqa: E712
+                    if row[0]
+                }
+                user_email = resolve_student_login_email(
+                    req.email or getattr(req.parent, "email", None) or student.email,
+                    student.admission_no or student.student_code or str(student.id),
+                    taken,
+                )
                 user_create = UserCreate(
                     email=user_email,
                     full_name=student.student_name,
