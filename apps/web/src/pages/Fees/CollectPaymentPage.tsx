@@ -760,6 +760,9 @@ export default function CollectPaymentPage() {
   // ─── Render ────────────────────────────────────────────────────────────
   return (
     <BaseForm<CollectPaymentFormData>
+      pageTestId="page-collect-payment"
+      formTestId="form-collect-payment"
+      confirmDialogTestId="dialog-confirm-payment"
       formConfig={formConfig}
       formData={formData}
       setFormData={setFormData}
@@ -791,6 +794,7 @@ export default function CollectPaymentPage() {
             <span style={{ display: "inline-flex" }}>
               <IconButton
                 aria-label="Save and Print"
+                data-testid="btn-save-and-print"
                 onClick={(e) => handleSubmit(e, handleCollectPayment)}
                 disabled={loading}
                 sx={{

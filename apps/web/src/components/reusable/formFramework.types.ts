@@ -129,4 +129,10 @@ export type BaseFormProps<T extends Record<string, unknown>> = {
   useErrorSnackbar?: boolean;
   /** MUI Grid spacing between form field blocks (default 2). */
   gridSpacing?: number;
+  /** Stable test hook for the page root container. */
+  pageTestId?: string;
+  /** Stable test hook for the form element. */
+  formTestId?: string;
+  /** Stable test hook for the confirmation dialog. */
+  confirmDialogTestId?: string;
 };

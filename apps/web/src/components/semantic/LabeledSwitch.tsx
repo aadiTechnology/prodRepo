@@ -18,6 +18,8 @@ export interface LabeledSwitchProps {
   color?: "primary" | "secondary" | "error" | "info" | "success" | "warning" | "default";
   /** Optional sx for the outer container. */
   sx?: SxProps<Theme>;
+  /** Stable test hook for the underlying switch input. */
+  inputTestId?: string;
 }
 
 export default function LabeledSwitch({
@@ -29,6 +31,7 @@ export default function LabeledSwitch({
   size = "small",
   color = "primary",
   sx,
+  inputTestId,
 }: LabeledSwitchProps) {
   const rootSx: SxProps<Theme> = (theme) => ({
     p: 2,
@@ -62,6 +65,7 @@ export default function LabeledSwitch({
         disabled={disabled}
         size={size}
         color={color}
+        data-testid={inputTestId}
       />
     </Box>
   );

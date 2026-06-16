@@ -13,6 +13,9 @@ export interface PrimaryActionButtonProps {
   label: string;
   "aria-label"?: string;
   disabled?: boolean;
+  size?: "small" | "medium";
+  /** Stable test hook for the add action button. */
+  "data-testid"?: string;
 }
 
 export default function PrimaryActionButton({
@@ -21,12 +24,14 @@ export default function PrimaryActionButton({
   label,
   "aria-label": ariaLabel = label,
   disabled = false,
+  "data-testid": dataTestId,
 }: PrimaryActionButtonProps) {
   const button = (
     <IconButton
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
+      data-testid={dataTestId}
       sx={(theme) => ({
         background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
         color: colorTokens.primary.contrast,

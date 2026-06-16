@@ -50,6 +50,14 @@ export interface DataTableProps<T> {
   getRowKey?: (row: T, index: number) => Key;
   /** Optional function to return custom styles for a row. */
   getRowSx?: (row: T) => any;
+  /** Stable test hook for the table wrapper. */
+  "data-testid"?: string;
+  /** Returns a stable row test hook (e.g. grid-invoices-row-42). */
+  rowTestId?: (row: T, index: number) => string | undefined;
+  /** Test hook for the empty state row. */
+  emptyTestId?: string;
+  /** Test hook for the loading state container. */
+  loadingTestId?: string;
 }
 
 function getCellValue<T>(row: T, field: keyof T | string): ReactNode {
@@ -70,12 +78,17 @@ export default function DataTable<T extends object>({
   onRowClick,
   getRowKey,
   getRowSx,
+  "data-testid": dataTestId,
+  rowTestId,
+  emptyTestId,
+  loadingTestId,
 }: DataTableProps<T>) {
   const hasActions = renderRowActions != null;
   // Defensive: always use an array
   const safeData = Array.isArray(data) ? data : [];
   return (
     <TableContainer
+      data-testid={dataTestId}
       sx={{
         flex: 1,
         minHeight: 0,
@@ -88,7 +101,7 @@ export default function DataTable<T extends object>({
       }}
     >
       {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+        <Box data-testid={loadingTestId} sx={{ display: "flex", justifyContent: "center", p: 4 }}>
           <CircularProgress sx={(t) => ({ color: t.palette.primary.main })} />
         </Box>
       ) : (
@@ -139,7 +152,7 @@ export default function DataTable<T extends object>({
           </TableHead>
           <TableBody>
             {safeData.length === 0 ? (
-              <TableRow>
+              <TableRow data-testid={emptyTestId}>
                 <TableCell colSpan={columns.length + (hasActions ? 1 : 0)} align="center" sx={{ py: 8 }}>
                   {emptyMessage}
                 </TableCell>
@@ -148,6 +161,7 @@ export default function DataTable<T extends object>({
               safeData.map((row, idx) => (
                 <TableRow
                   key={getRowKey ? getRowKey(row, idx) : idx}
+                  data-testid={rowTestId?.(row, idx)}
                   hover
                   sx={(theme) => ({
                     "&.MuiTableRow-hover:hover": {

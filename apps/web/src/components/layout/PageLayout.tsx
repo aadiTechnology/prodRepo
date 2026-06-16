@@ -18,6 +18,8 @@ export interface PageLayoutProps {
   maxWidth?: "xs" | "sm" | "md" | "lg" | "xl" | false;
   /** Gap between header and content (theme.spacing multiplier). Default 3. */
   spacing?: number;
+  /** Stable test hook for the page root container. */
+  "data-testid"?: string;
 }
 
 export default function PageLayout({
@@ -26,9 +28,10 @@ export default function PageLayout({
   pageBackground = false,
   maxWidth = "lg",
   spacing = 3,
+  "data-testid": dataTestId,
 }: PageLayoutProps) {
   return (
-    <PageContainer maxWidth={maxWidth} pageBackground={pageBackground}>
+    <PageContainer maxWidth={maxWidth} pageBackground={pageBackground} data-testid={dataTestId}>
       <Stack
         direction="column"
         spacing={spacing}

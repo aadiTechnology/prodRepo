@@ -32,6 +32,7 @@ export default function FeeDueListV2() {
 
   return (
     <ListPageLayout
+      data-testid="page-fee-due-list"
       header={
         <>
           <PageHeader
@@ -49,6 +50,7 @@ export default function FeeDueListV2() {
                       onChange={(e) => controller.setClassId(e.target.value)}
                       displayEmpty
                       size="small"
+                      data-testid="input-class"
                       sx={{ minWidth: { xs: "100%", sm: 150 } }}
                     >
                       <MenuItem value="">All Classes</MenuItem>
@@ -63,6 +65,7 @@ export default function FeeDueListV2() {
                       onChange={(e) => controller.setInstallment(e.target.value)}
                       displayEmpty
                       size="small"
+                      data-testid="input-installment"
                       sx={{ minWidth: { xs: "100%", sm: 150 } }}
                     >
                       <MenuItem value="">All Installments</MenuItem>
@@ -76,6 +79,7 @@ export default function FeeDueListV2() {
                       value={controller.status}
                       onChange={(e) => controller.setStatus(e.target.value as FeeDueStatusFilter)}
                       size="small"
+                      data-testid="input-status"
                       sx={{ minWidth: { xs: "100%", sm: 150 } }}
                     >
                       {FEE_DUE_STATUS_OPTIONS.map((item) => (
@@ -110,6 +114,7 @@ export default function FeeDueListV2() {
             variant="outlined"
             color="error"
             size="small"
+            data-testid="btn-retry"
             onClick={controller.refetch}
             sx={{ alignSelf: { xs: "flex-start", sm: "center" }, width: { xs: "100%", sm: "auto" } }}
           >
@@ -120,6 +125,12 @@ export default function FeeDueListV2() {
       <Box sx={{ mt: 3 }}>
         <EntityTableSection<FeeDueTableRow>
           label="Fee Due Records"
+          data-testid="grid-fee-due"
+          emptyTestId="grid-fee-due-empty"
+          loadingTestId="grid-fee-due-loading"
+          rowTestId={(row) =>
+            row.__skeleton ? undefined : `grid-fee-due-row-${row.invoice_row_id ?? row.__key}`
+          }
           totalRows={controller.total}
           page={controller.page}
           rowsPerPage={controller.rowsPerPage}
@@ -138,6 +149,7 @@ export default function FeeDueListV2() {
                 <IconButton
                   size="small"
                   aria-label="view invoice details"
+                  data-testid="btn-view-row"
                   onClick={() => navigate(`/fees/invoices/${row.invoice_row_id}/detail`)}
                 >
                   <VisibilityIcon fontSize="small" />

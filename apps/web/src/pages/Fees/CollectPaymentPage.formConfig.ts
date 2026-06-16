@@ -70,6 +70,7 @@ export function createCollectPaymentFormConfig({
             min: 0,
             step: 1,
             max: maxBalance,
+            "data-testid": "input-amount-to-collect",
           },
           disabled: collectFullBalance,
         },
@@ -86,6 +87,7 @@ export function createCollectPaymentFormConfig({
             { label: "UPI", value: "UPI" },
             { label: "Bank Transfer", value: "BANK_TRANSFER" },
           ],
+          "data-testid": "input-payment-method",
         },
       },
 
@@ -98,6 +100,7 @@ export function createCollectPaymentFormConfig({
         helperText: referenceFieldConfig.helperText,
         props: {
           disabled: isCashPayment,
+          htmlInput: { "data-testid": "input-reference-no" },
         },
       },
 
@@ -106,6 +109,9 @@ export function createCollectPaymentFormConfig({
         label: "Payment Date",
         type: "date" as const,
         required: true,
+        props: {
+          htmlInput: { "data-testid": "input-payment-date" },
+        },
       },
 
       bank_account_holder_name: {
@@ -117,6 +123,7 @@ export function createCollectPaymentFormConfig({
         helperText: "Required for bank transfer payments",
         props: {
           disabled: !isBankTransfer,
+          htmlInput: { "data-testid": "input-bank-account-holder-name" },
         },
       },
 
@@ -129,6 +136,7 @@ export function createCollectPaymentFormConfig({
         helperText: "Required for bank transfer payments",
         props: {
           disabled: !isBankTransfer,
+          htmlInput: { "data-testid": "input-bank-account-no" },
         },
       },
 
@@ -142,6 +150,7 @@ export function createCollectPaymentFormConfig({
         props: {
           disabled: !isBankTransfer,
           maxLength: 11,
+          htmlInput: { "data-testid": "input-ifsc-code" },
         },
       },
 
@@ -155,6 +164,7 @@ export function createCollectPaymentFormConfig({
         props: {
           multiline: true,
           rows: 3,
+          htmlInput: { "data-testid": "input-notes" },
         },
       },
 
@@ -163,6 +173,9 @@ export function createCollectPaymentFormConfig({
         label: "Allocation Mode",
         type: "switch" as const,
         helperText: "Toggle to collect full balance or custom amount",
+        props: {
+          inputTestId: "input-allocation-mode",
+        },
       },
     },
 

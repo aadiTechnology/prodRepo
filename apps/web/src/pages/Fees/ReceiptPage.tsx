@@ -303,6 +303,7 @@ export default function ReceiptPage() {
 
   return (
     <ListPageLayout
+      data-testid="page-receipt-details"
       header={
         <PageHeader
           links={[
@@ -317,6 +318,7 @@ export default function ReceiptPage() {
                 icon={<PrintIcon sx={{ fontSize: 20 }} />}
                 onClick={onPrint}
                 aria-label="Print receipt"
+                data-testid="btn-print"
                 sx={receiptActionButtonSx}
               />
               <HeaderIconAction
@@ -324,6 +326,7 @@ export default function ReceiptPage() {
                 icon={<DownloadIcon sx={{ fontSize: 20 }} />}
                 onClick={onDownloadPdf}
                 aria-label="Download receipt PDF"
+                data-testid="btn-export"
                 sx={receiptActionButtonSx}
               />
               <HeaderIconAction
@@ -331,6 +334,7 @@ export default function ReceiptPage() {
                 icon={<ShareIcon sx={{ fontSize: 20 }} />}
                 onClick={onShare}
                 aria-label="Share receipt"
+                data-testid="btn-share"
                 sx={receiptActionButtonSx}
               />
             </Box>
@@ -518,6 +522,7 @@ export default function ReceiptPage() {
                   </Typography>
                   <Table
                     size="small"
+                    data-testid="grid-receipt-fee-details"
                     sx={{
                       mb: 2,
                       border: `1px solid ${colorTokens.border.default}`,
@@ -596,6 +601,7 @@ export default function ReceiptPage() {
               </Typography>
               <Table
                 size="small"
+                data-testid="grid-receipt-payment-details"
                 sx={{
                   border: `1px solid ${colorTokens.border.default}`,
                 }}

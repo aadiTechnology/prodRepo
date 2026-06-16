@@ -63,6 +63,7 @@ export function generateInvoiceFormConfig({
           emptyOptionLabel: "Select Academic Year",
           disabled: academicYearsLoading,
           coerceToNumber: true,
+          "data-testid": "input-academic-year-id",
         },
       },
       class_id: {
@@ -76,6 +77,7 @@ export function generateInvoiceFormConfig({
           emptyOptionLabel: "Select Class",
           disabled: disableClass,
           coerceToNumber: true,
+          "data-testid": "input-class-id",
         },
       },
       division_id: {
@@ -89,6 +91,7 @@ export function generateInvoiceFormConfig({
           emptyOptionLabel: "Select Division",
           disabled: disableDivision,
           coerceToNumber: true,
+          "data-testid": "input-division-id",
         },
       },
       fee_structure_id: {
@@ -102,6 +105,7 @@ export function generateInvoiceFormConfig({
           emptyOptionLabel: "Select Fee Structure",
           disabled: disableFeeStructure,
           coerceToNumber: true,
+          "data-testid": "input-fee-structure-id",
         },
       },
       installment_name: {
@@ -113,6 +117,7 @@ export function generateInvoiceFormConfig({
           options: installmentOptions,
           emptyOptionLabel: "Select Installment",
           disabled: disableInstallment,
+          "data-testid": "input-installment-name",
         },
       },
       payable_amount: {
@@ -124,6 +129,7 @@ export function generateInvoiceFormConfig({
         props: {
           disabled: disablePayableAmount,
           readOnly: true,
+          htmlInput: { "data-testid": "input-payable-amount" },
           sx: {
             "& .MuiOutlinedInput-root.Mui-disabled .MuiInputBase-input.Mui-disabled": {
               WebkitTextFillColor: "rgba(0, 0, 0, 0.87) !important",
@@ -143,6 +149,7 @@ export function generateInvoiceFormConfig({
         required: true,
         props: {
           disabled: disableDates,
+          htmlInput: { "data-testid": "input-invoice-date" },
         },
       },
       due_date: {
@@ -152,6 +159,7 @@ export function generateInvoiceFormConfig({
         required: true,
         props: {
           disabled: disableDates,
+          htmlInput: { "data-testid": "input-due-date" },
         },
       },
   };

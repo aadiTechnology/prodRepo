@@ -26,6 +26,7 @@ export default function InvoiceList() {
 
   return (
     <ListPageLayout
+      data-testid="page-invoice-list"
       header={
         <>
           <PageHeader
@@ -47,6 +48,7 @@ export default function InvoiceList() {
                 }
                 addLabel="Generate Invoice"
                 addIcon={<AddIcon sx={{ fontSize: 24 }} />}
+                addButtonTestId="btn-generate-invoice"
                 renderActions={
                   perms.readOnlyAudience ? undefined : (
                   <>
@@ -55,6 +57,7 @@ export default function InvoiceList() {
                       onChange={(e) => controller.setClassId(e.target.value as string)}
                       displayEmpty
                       size="small"
+                      data-testid="input-class"
                       sx={{ minWidth: { xs: "100%", sm: 140 } }}
                     >
                       <MenuItem value="">
@@ -73,6 +76,7 @@ export default function InvoiceList() {
                       onChange={(e) => controller.setStatus(e.target.value as string)}
                       displayEmpty
                       size="small"
+                      data-testid="input-status"
                       sx={{ minWidth: { xs: "100%", sm: 140 } }}
                     >
                       <MenuItem value="">
@@ -91,6 +95,7 @@ export default function InvoiceList() {
                       onChange={(e) => controller.setInstallment(e.target.value as string)}
                       displayEmpty
                       size="small"
+                      data-testid="input-installment"
                       sx={{ minWidth: { xs: "100%", sm: 180 } }}
                     >
                       <MenuItem value="">
@@ -120,6 +125,10 @@ export default function InvoiceList() {
     >
       <EntityTableSection
         label="Invoice Directory"
+        data-testid="grid-invoices"
+        emptyTestId="grid-invoices-empty"
+        loadingTestId="grid-invoices-loading"
+        rowTestId={(invoice) => `grid-invoices-row-${invoice.id}`}
         totalRows={controller.totalRows}
         page={controller.page}
         rowsPerPage={controller.rowsPerPage}

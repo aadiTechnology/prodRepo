@@ -32,6 +32,8 @@ export interface ConfirmDialogProps {
   cancelLabel?: string;
   /** Disable buttons and show loading state on confirm. */
   loading?: boolean;
+  /** Stable test hook for the dialog root. */
+  "data-testid"?: string;
 }
 
 export default function ConfirmDialog({
@@ -45,12 +47,14 @@ export default function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   loading = false,
+  "data-testid": dataTestId,
 }: ConfirmDialogProps) {
   return (
     <Dialog
       open={open}
       onClose={onClose}
       disableRestoreFocus
+      data-testid={dataTestId}
       PaperProps={{
         sx: {
           borderRadius: 3,
@@ -83,6 +87,7 @@ export default function ConfirmDialog({
           aria-label="close"
           onClick={onClose}
           disabled={loading}
+          data-testid="btn-close"
           sx={{ color: "white", bgcolor: "transparent", borderRadius: 2 }}
         >
           <CancelIcon sx={{ fontSize: 28 }} />
@@ -153,13 +158,14 @@ export default function ConfirmDialog({
             mt: 0.5,
           }}
         >
-          <CancelButton onClick={onClose} disabled={loading}>
+          <CancelButton onClick={onClose} disabled={loading} data-testid="btn-cancel">
             {cancelLabel}
           </CancelButton>
           <Button
             autoFocus
             onClick={onConfirm}
             disabled={loading}
+            data-testid="btn-confirm"
             sx={(theme) => ({
             color: theme.palette.success.main,
             backgroundColor: "transparent",

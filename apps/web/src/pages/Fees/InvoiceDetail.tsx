@@ -112,6 +112,7 @@ export default function InvoiceDetail() {
               component="button"
               type="button"
               variant="body2"
+              data-testid={`btn-receipt-${paymentId}`}
               onClick={() => controller.onOpenReceiptForFeeLine(paymentId)}
               sx={{
                 fontWeight: 700,
@@ -141,6 +142,7 @@ export default function InvoiceDetail() {
   return (
     <Fragment>
       <ListPageLayout
+        data-testid="page-invoice-detail"
         header={
           <>
             <PageHeader
@@ -183,6 +185,9 @@ export default function InvoiceDetail() {
                 Fee Details
               </Typography>
               <DataTable<InvoiceFeeBreakdownItem>
+                data-testid="grid-fee-breakdown"
+                rowTestId={(row) => `grid-fee-breakdown-row-${row.id}`}
+                emptyTestId="grid-fee-breakdown-empty"
                 columns={feeBreakdownColumns}
                 data={detail.fee_breakdown}
                 emptyMessage="No fee breakup available"
@@ -198,6 +203,7 @@ export default function InvoiceDetail() {
               <Button
                 variant="outlined"
                 sx={{ textTransform: "none" }}
+                data-testid="btn-full-receipt"
                 onClick={controller.onOpenFullReceipt}
                 disabled={Number(detail.payment_summary.paid_amount || 0) <= 0}
               >
@@ -206,6 +212,7 @@ export default function InvoiceDetail() {
               <Button
                 variant="contained"
                 sx={{ textTransform: "none" }}
+                data-testid="btn-pay-now"
                 onClick={controller.onPayNow}
                 disabled={!detail.available_actions.includes("pay_now")}
               >

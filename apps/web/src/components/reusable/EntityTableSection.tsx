@@ -26,6 +26,11 @@ export interface EntityTableSectionProps<T extends object> {
   rowActions?: RowActionsFactory<T>;
   showInfoBar?: boolean;
   showPagination?: boolean;
+  /** Stable test hook for the table wrapper. */
+  "data-testid"?: string;
+  rowTestId?: DataTableProps<T>["rowTestId"];
+  emptyTestId?: string;
+  loadingTestId?: string;
 }
 
 export default function EntityTableSection<T extends object>({
@@ -48,6 +53,10 @@ export default function EntityTableSection<T extends object>({
   rowActions,
   showInfoBar,
   showPagination,
+  "data-testid": dataTestId,
+  rowTestId,
+  emptyTestId,
+  loadingTestId,
 }: EntityTableSectionProps<T>) {
   const rangeStart = totalRows > 0 ? Math.min(page * rowsPerPage + 1, totalRows) : 0;
   const rangeEnd = Math.min((page + 1) * rowsPerPage, totalRows);
@@ -69,6 +78,10 @@ export default function EntityTableSection<T extends object>({
         <DirectoryInfoBar label={label} rangeStart={rangeStart} rangeEnd={rangeEnd} total={totalRows} />
       )}
       <DataTable<T>
+        data-testid={dataTestId}
+        rowTestId={rowTestId}
+        emptyTestId={emptyTestId}
+        loadingTestId={loadingTestId}
         columns={columns}
         data={data}
         loading={loading}

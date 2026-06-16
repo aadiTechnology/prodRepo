@@ -597,7 +597,7 @@ export default function GenerateInvoice() {
               checked={isAllSelected}
               indeterminate={!isAllSelected && selectedStudentIds.length > 0}
               onChange={(e) => handleSelectAll(e.target.checked)}
-              inputProps={{ "aria-label": "Select all students" }}
+              inputProps={{ "aria-label": "Select all students", "data-testid": "input-select-all-students" }}
             />
           ),
         width: 90,
@@ -606,6 +606,7 @@ export default function GenerateInvoice() {
             checked={selectedStudentIds.includes(student.id)}
             onChange={(e) => handleToggleStudent(student.id, e.target.checked)}
             disabled={student.is_invoice_generated}
+            inputProps={{ "data-testid": `input-student-${student.id}` }}
           />
         ),
       },
@@ -684,6 +685,9 @@ export default function GenerateInvoice() {
       ) : (
         <EntityTableSection
           label="Student Selection"
+          data-testid="grid-student-selection"
+          emptyTestId="grid-student-selection-empty"
+          rowTestId={(student) => `grid-student-selection-row-${student.id}`}
           totalRows={students.length}
           page={studentsPage}
           rowsPerPage={studentsRowsPerPage}
@@ -797,6 +801,9 @@ export default function GenerateInvoice() {
 
   return (
     <BaseForm<GenerateInvoiceFormData>
+      pageTestId={isEditMode ? "page-edit-invoice" : "page-generate-invoice"}
+      formTestId={isEditMode ? "form-edit-invoice" : "form-generate-invoice"}
+      confirmDialogTestId={isEditMode ? "dialog-confirm-update-invoice" : "dialog-confirm-generate-invoice"}
       formConfig={formConfig}
       formData={formData}
       setFormData={setFormData}

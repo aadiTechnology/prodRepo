@@ -15,6 +15,9 @@ export interface TableRowActionsProps {
   viewAsRedirect?: boolean;
   disabled?: boolean;
   size?: "small" | "medium";
+  viewTestId?: string;
+  editTestId?: string;
+  deleteTestId?: string;
 }
 
 export default function TableRowActions({
@@ -24,6 +27,9 @@ export default function TableRowActions({
   viewAsRedirect = false,
   disabled = false,
   size = "small",
+  viewTestId = "btn-view-row",
+  editTestId = "btn-edit-row",
+  deleteTestId = "btn-delete-row",
 }: TableRowActionsProps) {
   const viewColor = viewAsRedirect
     ? colorTokens.primary.main
@@ -37,6 +43,7 @@ export default function TableRowActions({
             size={size} 
             onClick={onView} 
             disabled={disabled}
+            data-testid={viewTestId}
             sx={{ 
               color: viewColor,
               "&:hover": { 
@@ -60,6 +67,7 @@ export default function TableRowActions({
             size={size} 
             onClick={onEdit} 
             disabled={disabled}
+            data-testid={editTestId}
             sx={{ 
               color: colorTokens.preschool.turquoise.main,
               "&:hover": { 
@@ -79,6 +87,7 @@ export default function TableRowActions({
             size={size} 
             onClick={onDelete} 
             disabled={disabled}
+            data-testid={deleteTestId}
             sx={{ 
               color: colorTokens.preschool.coral.main,
               "&:hover": { 

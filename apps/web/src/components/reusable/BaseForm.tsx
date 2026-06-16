@@ -55,6 +55,9 @@ export default function BaseForm<T extends Record<string, unknown>>({
   footerActionOrder = "cancel-first",
   useErrorSnackbar = false,
   gridSpacing = 2,
+  pageTestId,
+  formTestId,
+  confirmDialogTestId,
 }: BaseFormProps<T>) {
   const formId = useId();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -116,6 +119,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
         pageBackground={true}
         contentPaddingSize="none"
         scrollableFormContent
+        data-testid={pageTestId}
         header={
           <Box sx={{ mb: 2 }}>
             <PageHeader
@@ -159,7 +163,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
           </Box>
         }
       >
-        <form id={formId} onSubmit={handleFormSubmit} autoComplete="off">
+        <form id={formId} onSubmit={handleFormSubmit} autoComplete="off" data-testid={formTestId}>
           {formTopSlot ? (
             <Box sx={{ mb: 2, px: { xs: 0, sm: 1 } }}>{formTopSlot}</Box>
           ) : null}
@@ -210,19 +214,19 @@ export default function BaseForm<T extends Record<string, unknown>>({
             >
               {footerActionOrder === "cancel-first" ? (
                 <>
-                  <CancelButton onClick={onCancelNavigate} disabled={loading}>
+                  <CancelButton onClick={onCancelNavigate} disabled={loading} data-testid="btn-cancel">
                     Cancel
                   </CancelButton>
-                  <SaveButton type="submit" disabled={!canSubmit} loading={loading}>
+                  <SaveButton type="submit" disabled={!canSubmit} loading={loading} data-testid="btn-save">
                     {isEditMode ? submitLabelEdit : submitLabelCreate}
                   </SaveButton>
                 </>
               ) : (
                 <>
-                  <SaveButton type="submit" disabled={!canSubmit} loading={loading}>
+                  <SaveButton type="submit" disabled={!canSubmit} loading={loading} data-testid="btn-save">
                     {isEditMode ? submitLabelEdit : submitLabelCreate}
                   </SaveButton>
-                  <CancelButton onClick={onCancelNavigate} disabled={loading}>
+                  <CancelButton onClick={onCancelNavigate} disabled={loading} data-testid="btn-cancel">
                     Cancel
                   </CancelButton>
                 </>
@@ -255,6 +259,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
         message={confirmText}
         confirmLabel="Confirm"
         loading={loading}
+        data-testid={confirmDialogTestId}
       />
     </>
   );

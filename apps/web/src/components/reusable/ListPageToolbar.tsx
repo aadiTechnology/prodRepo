@@ -34,6 +34,10 @@ export interface ListPageToolbarProps {
    * Default (false) keeps original behaviour: renderActions before search.
    */
   actionsAfterSearch?: boolean;
+  /** Stable test hook for the search input. */
+  searchTestId?: string;
+  /** Stable test hook for the primary add action button. */
+  addButtonTestId?: string;
 }
 
 export default function ListPageToolbar({
@@ -46,6 +50,8 @@ export default function ListPageToolbar({
   renderActions,
   filters,
   actionsAfterSearch = false,
+  searchTestId = "input-search",
+  addButtonTestId = "btn-add",
 }: ListPageToolbarProps) {
   return (
     /* 
@@ -114,6 +120,7 @@ export default function ListPageToolbar({
         variant="outlined"
         size="small"
         fullWidth={false}
+        inputProps={{ "data-testid": searchTestId }}
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
@@ -150,6 +157,7 @@ export default function ListPageToolbar({
           onClick={onAddClick}
           icon={addIcon ?? <AddIcon sx={{ fontSize: 24 }} />}
           label={addLabel}
+          data-testid={addButtonTestId}
         />
       )}
     </Box>

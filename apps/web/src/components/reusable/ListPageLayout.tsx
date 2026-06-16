@@ -29,6 +29,8 @@ export interface ListPageLayoutProps {
   scrollableFormContent?: boolean;
   /** Merged after inner preset (e.g. maxWidth, fixed height for split forms). */
   contentSx?: SxProps<Theme>;
+  /** Stable test hook for the page root container. */
+  "data-testid"?: string;
 }
 
 export default function ListPageLayout({
@@ -39,6 +41,7 @@ export default function ListPageLayout({
   maxWidth = "lg",
   scrollableFormContent = false,
   contentSx,
+  "data-testid": dataTestId,
 }: ListPageLayoutProps) {
   const innerSx: SxProps<Theme> = scrollableFormContent
     ? {
@@ -62,7 +65,7 @@ export default function ListPageLayout({
       };
 
   return (
-    <PageLayout header={header} pageBackground={pageBackground} maxWidth={maxWidth}>
+    <PageLayout header={header} pageBackground={pageBackground} maxWidth={maxWidth} data-testid={dataTestId}>
       <AppCard
         paddingSize={contentPaddingSize}
         sx={{
