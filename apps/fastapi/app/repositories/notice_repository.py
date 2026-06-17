@@ -48,6 +48,38 @@ def _append_effective_status_filter(
         where_sql.append(f"{table}.status = :status")
 
 
+def _build_target_scope_exists_clauses(
+    scopes: tuple,
+    params: dict,
+    *,
+    param_prefix: str,
+) -> list[str]:
+    scope_clauses: list[str] = []
+    for idx, scope in enumerate(scopes):
+        params[f"{param_prefix}_{idx}_class"] = scope.class_id
+        if scope.class_division_id is not None:
+            params[f"{param_prefix}_{idx}_div"] = scope.class_division_id
+            scope_clauses.append(
+                f"""EXISTS (
+                  SELECT 1 FROM communication_notice_targets t
+                  WHERE t.notice_id = n.id AND t.is_deleted = 0
+                  AND (
+                    t.division_id = :{param_prefix}_{idx}_div
+                    OR (t.class_id = :{param_prefix}_{idx}_class AND t.division_id IS NULL)
+                  )
+                )"""
+            )
+        else:
+            scope_clauses.append(
+                f"""EXISTS (
+                  SELECT 1 FROM communication_notice_targets t
+                  WHERE t.notice_id = n.id AND t.is_deleted = 0
+                  AND t.class_id = :{param_prefix}_{idx}_class
+                )"""
+            )
+    return scope_clauses
+
+
 def _apply_consumer_visibility(
     where_sql: list[str],
     params: dict,
@@ -56,43 +88,29 @@ def _apply_consumer_visibility(
     if not viewer_context or not is_notice_consumer(viewer_context):
         return
 
-    now = datetime.utcnow()
-    params["viewer_now"] = now
-    where_sql.append("n.status = 'PUBLISHED'")
-    where_sql.append("n.is_published = 1")
-    where_sql.append("(n.expiry_date IS NULL OR n.expiry_date >= :viewer_now)")
+    if viewer_context.published_only:
+        now = datetime.utcnow()
+        params["viewer_now"] = now
+        where_sql.append("n.status = 'PUBLISHED'")
+        where_sql.append("n.is_published = 1")
+        where_sql.append("(n.expiry_date IS NULL OR n.expiry_date >= :viewer_now)")
 
     if viewer_context.kind == "teacher":
-        where_sql.append("n.audience_type IN ('TEACHER', 'ALL')")
+        visibility_parts = ["n.audience_type = 'TEACHER'"]
+        scopes = viewer_context.scopes
+        if scopes:
+            scope_clauses = _build_target_scope_exists_clauses(scopes, params, param_prefix="tc")
+            visibility_parts.append(
+                f"(n.audience_type IN ('STUDENT', 'ALL') AND ({' OR '.join(scope_clauses)}))"
+            )
+        where_sql.append(f"({' OR '.join(visibility_parts)})")
     elif viewer_context.kind in ("student", "parent"):
         where_sql.append("n.audience_type IN ('STUDENT', 'ALL')")
         scopes = viewer_context.scopes
         if not scopes:
             where_sql.append("1 = 0")
             return
-        scope_clauses: list[str] = []
-        for idx, scope in enumerate(scopes):
-            params[f"vc_{idx}_class"] = scope.class_id
-            if scope.class_division_id is not None:
-                params[f"vc_{idx}_div"] = scope.class_division_id
-                scope_clauses.append(
-                    f"""EXISTS (
-                      SELECT 1 FROM communication_notice_targets t
-                      WHERE t.notice_id = n.id AND t.is_deleted = 0
-                      AND (
-                        t.division_id = :vc_{idx}_div
-                        OR (t.class_id = :vc_{idx}_class AND t.division_id IS NULL)
-                      )
-                    )"""
-                )
-            else:
-                scope_clauses.append(
-                    f"""EXISTS (
-                      SELECT 1 FROM communication_notice_targets t
-                      WHERE t.notice_id = n.id AND t.is_deleted = 0
-                      AND t.class_id = :vc_{idx}_class
-                    )"""
-                )
+        scope_clauses = _build_target_scope_exists_clauses(scopes, params, param_prefix="vc")
         where_sql.append(f"({' OR '.join(scope_clauses)})")
 
 

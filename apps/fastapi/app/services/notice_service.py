@@ -6,12 +6,13 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ValidationException
 from app.repositories import notice_repository
-from app.services.homework_access import HomeworkViewerContext
+from app.services.homework_access import ClassDivisionScope, HomeworkViewerContext, is_admin_like
 from app.services.notice_access import (
     NoticeViewerContext,
     assert_teacher_notice_targets_allowed,
     is_notice_consumer,
     resolve_notice_viewer_context,
+    resolve_teacher_notice_target_pairs,
 )
 from app.services.notice_attachment_storage import (
     disk_path_for_attachment,
@@ -162,14 +163,30 @@ def get_viewer_context(
     legacy_role: object,
     manage: bool = False,
 ) -> NoticeViewerContext:
-    if manage:
+    if manage and is_admin_like(db, user_id, legacy_role, tenant_id):
         return HomeworkViewerContext(kind="admin", scopes=(), published_only=False)
-    return resolve_notice_viewer_context(
+
+    ctx = resolve_notice_viewer_context(
         db,
         tenant_id=tenant_id,
         user_id=user_id,
         email=email,
         legacy_role=legacy_role,
+    )
+    if ctx.kind != "teacher":
+        return ctx
+
+    class_teacher_targets = resolve_teacher_notice_target_pairs(
+        db, tenant_id=tenant_id, user_id=user_id
+    )
+    scopes = tuple(
+        ClassDivisionScope(class_id=class_id, class_division_id=division_id)
+        for class_id, division_id in class_teacher_targets
+    )
+    return HomeworkViewerContext(
+        kind="teacher",
+        scopes=scopes,
+        published_only=not manage,
     )
 
 
@@ -225,7 +242,7 @@ def list_notices(
     is_published: bool | None = None,
     viewer_context: NoticeViewerContext | None = None,
 ) -> NoticeListResponse:
-    if viewer_context and is_notice_consumer(viewer_context):
+    if viewer_context and is_notice_consumer(viewer_context) and viewer_context.published_only:
         status = None
         is_published = None
 
@@ -249,30 +266,45 @@ def list_notices(
     )
 
 
+def _targets_match_scopes(targets: list[dict], scopes: tuple[ClassDivisionScope, ...]) -> bool:
+    for scope in scopes:
+        for target in targets:
+            div_id = target.get("division_id")
+            class_id = target.get("class_id")
+            if div_id is not None and scope.class_division_id == div_id:
+                return True
+            if class_id is not None and scope.class_id == class_id and div_id is None:
+                return True
+    return False
+
+
 def _consumer_can_view_notice(
     row: dict,
     targets: list[dict],
     viewer_context: NoticeViewerContext,
 ) -> bool:
-    if _effective_notice_status(row) != "PUBLISHED" or not bool(row.get("is_published")):
-        return False
+    if viewer_context.published_only:
+        if _effective_notice_status(row) != "PUBLISHED" or not bool(row.get("is_published")):
+            return False
+        expiry_date = _coerce_naive_utc(row.get("expiry_date"))
+        if expiry_date and expiry_date < datetime.utcnow():
+            return False
+
     audience = str(row.get("audience_type") or "")
     if viewer_context.kind == "teacher":
-        return audience in {"TEACHER", "ALL"}
+        if audience == "TEACHER":
+            return True
+        if audience not in {"STUDENT", "ALL"}:
+            return False
+        if not viewer_context.scopes:
+            return False
+        return _targets_match_scopes(targets, viewer_context.scopes)
     if viewer_context.kind in ("student", "parent"):
         if audience not in {"STUDENT", "ALL"}:
             return False
         if not viewer_context.scopes:
             return False
-        for scope in viewer_context.scopes:
-            for target in targets:
-                div_id = target.get("division_id")
-                class_id = target.get("class_id")
-                if div_id is not None and scope.class_division_id == div_id:
-                    return True
-                if class_id is not None and scope.class_id == class_id and div_id is None:
-                    return True
-        return False
+        return _targets_match_scopes(targets, viewer_context.scopes)
     return True
 
 
