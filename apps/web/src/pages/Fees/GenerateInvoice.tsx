@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
 import {
   Box,
   Checkbox,
@@ -72,7 +73,7 @@ export default function GenerateInvoice() {
   const [editInvoiceStudentId, setEditInvoiceStudentId] = useState<number | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [studentsPage, setStudentsPage] = useState(0);
-  const [studentsRowsPerPage, setStudentsRowsPerPage] = useState(10);
+  const [studentsRowsPerPage, setStudentsRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const prevAcademicYearRef = useRef<number | null | undefined>(undefined);
   const prevClassIdRef = useRef<number | null | undefined>(undefined);
   const prevDivisionIdRef = useRef<number | null | undefined>(undefined);

@@ -26,29 +26,20 @@ import { ListPageLayout } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
 import { useRBAC } from "../../context/RBACContext";
 import { homeworkService, type HomeworkResponse } from "../../api/services/homeworkService";
+import { isDraftHomeworkStatus } from "../../utils/homeworkStatus";
 import { apiBaseUrl } from "../../config/env";
 import { colorTokens } from "../../tokens/colors";
 
 // Status helpers
-type DisplayStatus = "Draft" | "Active" | "Overdue";
+type DisplayStatus = "Draft" | "Active";
 
 function computeDisplayStatus(hw: HomeworkResponse): DisplayStatus {
-  if (hw.status === "Draft") return "Draft";
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const submission = new Date(hw.submission_date);
-  return submission < today ? "Overdue" : "Active";
+  if (isDraftHomeworkStatus(hw.status)) return "Draft";
+  return "Active";
 }
 
-function statusChipColor(ds: DisplayStatus): "default" | "success" | "error" {
-  switch (ds) {
-    case "Draft":
-      return "default";
-    case "Active":
-      return "success";
-    case "Overdue":
-      return "error";
-  }
+function statusChipColor(ds: DisplayStatus): "default" | "success" {
+  return ds === "Draft" ? "default" : "success";
 }
 
 function formatDate(dateStr: string | null | undefined): string {

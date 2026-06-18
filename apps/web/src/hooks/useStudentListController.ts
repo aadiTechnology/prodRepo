@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import { enqueueSnackbar } from "notistack";
 import type { NavigateFunction } from "react-router-dom";
 import studentService from "../api/services/studentService";
@@ -54,7 +55,7 @@ export function useStudentListController({
     initialFilters: {},
     initialSortBy: "created_at",
     initialSortOrder: "desc",
-    initialRowsPerPage: 10,
+    initialRowsPerPage: DEFAULT_LIST_ROWS_PER_PAGE,
   });
 
   const fetchStudents = useCallback(async () => {

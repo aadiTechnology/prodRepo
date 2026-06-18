@@ -1,12 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import { homeworkService, type HomeworkResponse } from "../api/services/homeworkService";
 import { academicYearService } from "../api/services/dropdownServices";
 import { formatHomeworkClassLabel } from "../pages/academics/AddHomework.formConfig";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 import { isHomeworkReadOnlyAudience } from "../utils/homeworkAudience";
+import {
+  homeworkEditDeleteLockMessage,
+  isHomeworkEditDeleteAllowed,
+} from "../utils/homeworkEditWindow";
 import { isTeacherNoticeUser } from "../utils/noticeAudience";
 import { resolveCurrentAcademicYearId } from "../utils/academicYear";
+import { HOMEWORK_STATUS_ACTIVE } from "../utils/homeworkStatus";
 
 export function useHomeworkListController() {
   const { user } = useAuth();
@@ -25,7 +31,7 @@ export function useHomeworkListController() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [total, setTotal] = useState(0);
 
   const [search, setSearch] = useState("");
@@ -175,8 +181,8 @@ export function useHomeworkListController() {
         academic_year_id:
           readOnlyAudience || !academicYearFilter ? undefined : Number(academicYearFilter),
         status: readOnlyAudience
-          ? "Published"
-          : (statusFilter as "Draft" | "Published" | "Overdue") || undefined,
+          ? HOMEWORK_STATUS_ACTIVE
+          : (statusFilter as "Draft" | "Active") || undefined,
       });
       setHomework(response.data);
       setTotal(response.total);
@@ -212,6 +218,10 @@ export function useHomeworkListController() {
   }, [search, statusFilter, classFilter, divisionFilter, subjectFilter, academicYearFilter]);
 
   const handleDeleteClick = (row: HomeworkResponse) => {
+    if (!isHomeworkEditDeleteAllowed(row)) {
+      setError(homeworkEditDeleteLockMessage());
+      return;
+    }
     setSelectedRow(row);
     setDeleteDialogOpen(true);
   };
@@ -267,8 +277,7 @@ export function useHomeworkListController() {
     deleteLoading,
     statusOptions: [
       { label: "Draft", value: "Draft" },
-      { label: "Published", value: "Published" },
-      { label: "Overdue", value: "Overdue" },
+      { label: "Active", value: "Active" },
     ],
     readOnlyAudience,
     isTeacherScoped,

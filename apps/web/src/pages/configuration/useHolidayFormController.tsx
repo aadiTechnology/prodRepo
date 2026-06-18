@@ -25,6 +25,7 @@ import {
   type HolidayFormData,
 } from "./holidayForm.config";
 import { createHolidayFormConfig } from "./HolidayForm.formConfig";
+import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
 
 const HOLIDAY_DATE_FIELD_PAIR: readonly DependentFieldPair<HolidayFormData>[] = [
   ["start_date", "end_date"],
@@ -75,16 +76,21 @@ export function useHolidayFormController() {
   });
   const academicYears = academicYearsQuery.data ?? [];
 
+  const resolvedDefaultAcademicYearId = useMemo(() => {
+    const currentYearId = resolveCurrentAcademicYearId(academicYears);
+    return currentYearId ? Number(currentYearId) : null;
+  }, [academicYears]);
+
   const holidayQuery = useQuery({
-    queryKey: ["holidays", "detail", holidayId, academicYearFromUrl, academicYears[0]?.id],
+    queryKey: ["holidays", "detail", holidayId, academicYearFromUrl, resolvedDefaultAcademicYearId],
     queryFn: () => {
-      const yearId = academicYearFromUrl ?? academicYears[0]?.id;
+      const yearId = academicYearFromUrl ?? resolvedDefaultAcademicYearId ?? undefined;
       if (!yearId) {
         throw new Error("Academic year is required to load this holiday.");
       }
       return holidayApi.getById(Number(holidayId), { academic_year_id: yearId });
     },
-    enabled: isEditMode && !!holidayId && (!!academicYearFromUrl || academicYears.length > 0),
+    enabled: isEditMode && !!holidayId && (!!academicYearFromUrl || resolvedDefaultAcademicYearId != null),
   });
 
   useEffect(() => {
@@ -242,7 +248,7 @@ export function useHolidayFormController() {
       const yearId =
         academicYearFromUrl != null && academicYears.some((y) => y.id === academicYearFromUrl)
           ? academicYearFromUrl
-          : prev.academic_year_id ?? academicYears[0].id;
+          : prev.academic_year_id ?? resolvedDefaultAcademicYearId ?? academicYears[0].id;
       const ay = academicYears.find((y) => y.id === yearId);
       let start = prev.start_date;
       let end = prev.end_date;
@@ -263,7 +269,7 @@ export function useHolidayFormController() {
       }
       return next;
     });
-  }, [isEditMode, academicYears, academicYearFromUrl, startDateFromUrl, endDateFromUrl, setFormData]);
+  }, [isEditMode, academicYears, academicYearFromUrl, startDateFromUrl, endDateFromUrl, setFormData, resolvedDefaultAcademicYearId]);
 
   useEffect(() => {
     if (academicYears.length === 0) return;
@@ -271,11 +277,12 @@ export function useHolidayFormController() {
     setFormData((prev) => {
       if (prev.academic_year_id == null) return prev;
       if (validIds.has(prev.academic_year_id)) return prev;
-      const next = { ...prev, academic_year_id: academicYears[0].id };
+      const fallbackYearId = resolvedDefaultAcademicYearId ?? academicYears[0].id;
+      const next = { ...prev, academic_year_id: fallbackYearId };
       baselineSerialized.current = serializeHolidayFormSnapshot(next);
       return next;
     });
-  }, [academicYears, setFormData]);
+  }, [academicYears, setFormData, resolvedDefaultAcademicYearId]);
 
   useEffect(() => {
     if (!holidayQuery.data) return;

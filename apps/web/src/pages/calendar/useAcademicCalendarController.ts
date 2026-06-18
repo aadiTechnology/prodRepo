@@ -17,6 +17,7 @@ import {
   parseISODateOnly,
   type CalendarCell,
 } from "./academicCalendar.utils";
+import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
 
 export function useAcademicCalendarController() {
   const navigate = useNavigate();
@@ -51,10 +52,12 @@ export function useAcademicCalendarController() {
       const ok = academicYears.some((y) => y.id === academicYearId);
       if (ok) return;
     }
-    const preferred = academicYears.find((y) => y.is_active) ?? academicYears[0];
-    if (preferred) {
-      setAcademicYearId(preferred.id);
+    const currentYearId = resolveCurrentAcademicYearId(academicYears);
+    if (currentYearId) {
+      setAcademicYearId(Number(currentYearId));
+      return;
     }
+    setAcademicYearId(academicYears[0].id);
   }, [academicYears, academicYearId]);
 
   const selectedAcademicYear = useMemo(

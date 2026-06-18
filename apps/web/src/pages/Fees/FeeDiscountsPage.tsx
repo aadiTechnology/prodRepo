@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
 import {
     Box,
     Alert,
@@ -47,7 +48,7 @@ const FeeDiscountsPage = () => {
 
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
     const [totalDiscounts, setTotalDiscounts] = useState(0);
 
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);

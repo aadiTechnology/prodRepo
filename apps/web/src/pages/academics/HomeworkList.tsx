@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
 import { useNavigate } from "react-router-dom";
 import {
   Alert,
@@ -28,7 +29,6 @@ import {
   Book as SubjectIcon,
   Person as PersonIcon,
   CheckCircle as ActiveIcon,
-  Warning as OverdueIcon,
   ChevronRight as ViewIcon,
   Download as DownloadIcon,
   ViewList as ListIcon,
@@ -58,6 +58,7 @@ import {
   renderHomeworkRowActions,
   type HomeworkRow,
 } from "./HomeworkList.listConfig";
+import { isDraftHomeworkStatus } from "../../utils/homeworkStatus";
 
 // Subject pill color helper
 const getSubjectColor = (subjectName: string | null) => {
@@ -121,10 +122,10 @@ export default function HomeworkList() {
 
   const [children, setChildren] = useState<any[]>([]);
   const [selectedChild, setSelectedChild] = useState<any | null>(null);
-  const [tabValue, setTabValue] = useState(0); // 0: All, 1: Active, 2: Overdue
+  const [tabValue, setTabValue] = useState(0); // 0: All, 1: Active
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [listPage, setListPage] = useState(0);
-  const [listRowsPerPage, setListRowsPerPage] = useState(10);
+  const [listRowsPerPage, setListRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
 
   useEffect(() => {
     setListPage(0);
@@ -239,22 +240,14 @@ export default function HomeworkList() {
     const totalCount = list.length;
 
     let activeCount = 0;
-    let overdueCount = 0;
     const subjects = new Set<string>();
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
     list.forEach((h) => {
       if (h.subject_name) {
         subjects.add(h.subject_name);
       }
-
-      const submission = new Date(h.submission_date);
-      if (submission < today) {
-        overdueCount++;
-      } else {
-        activeCount++;
+      if (!isDraftHomeworkStatus(h.status)) {
+        activeCount += 1;
       }
     });
 
@@ -263,23 +256,15 @@ export default function HomeworkList() {
     return {
       total: totalCount,
       active: activeCount,
-      overdue: overdueCount,
       subjectsCount: subjects.size,
       activeRatio,
     };
   }, [filteredHomeworkByChild]);
 
-  // Filter homework by tab (All, Active, Overdue)
+  // Filter homework by tab (All, Active)
   const finalHomeworkList = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     return filteredHomeworkByChild.filter((h) => {
-      const submission = new Date(h.submission_date);
-      const isOverdue = submission < today;
-
-      if (tabValue === 1) return !isOverdue;
-      if (tabValue === 2) return isOverdue;
+      if (tabValue === 1) return !isDraftHomeworkStatus(h.status);
       return true;
     });
   }, [filteredHomeworkByChild, tabValue]);
@@ -445,7 +430,6 @@ export default function HomeworkList() {
               gridTemplateColumns: {
                 xs: "1fr",
                 sm: "repeat(2, 1fr)",
-                md: "repeat(3, 1fr)",
               },
               gap: { xs: 1.5, sm: 2 },
             }}
@@ -565,64 +549,6 @@ export default function HomeworkList() {
                 </Box>
               </Stack>
             </AppCard>
-
-            {/* Overdue Card */}
-            <AppCard
-              sx={{
-                height: "100%",
-                background: `linear-gradient(135deg, ${alpha(colorTokens.error.main, 0.14)} 0%, ${alpha(colorTokens.error.main, 0.06)} 100%)`,
-                border: `1.5px solid ${alpha(colorTokens.error.main, 0.35)}`,
-                position: "relative",
-                overflow: "hidden",
-                transition: "all 0.25s ease",
-                "&:hover": {
-                  transform: "translateY(-4px)",
-                  boxShadow: `0 12px 24px ${alpha(colorTokens.error.main, 0.2)}`,
-                  borderColor: alpha(colorTokens.error.main, 0.45),
-                },
-                "&::before": {
-                  content: '""',
-                  position: "absolute",
-                  top: 0,
-                  right: 0,
-                  width: "100px",
-                  height: "100px",
-                  background: `radial-gradient(circle at top right, ${alpha(colorTokens.error.main, 0.15)}, transparent 70%)`,
-                  pointerEvents: "none",
-                }
-              }}
-              paddingSize="dense"
-            >
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Box
-                  sx={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: "16px",
-                    bgcolor: alpha(colorTokens.error.main, 0.22),
-                    color: colorTokens.error.main,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: `inset 0 0 0 1.5px ${alpha(colorTokens.error.main, 0.3)}`,
-                    flexShrink: 0,
-                  }}
-                >
-                  <OverdueIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
-                </Box>
-                <Box flex={1} minWidth={0}>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', fontSize: '0.65rem' }}>
-                    Overdue
-                  </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 0.5, fontSize: '1.65rem', lineHeight: 1.1 }}>
-                    {stats.overdue}
-                  </Typography>
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.error.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
-                    Past due
-                  </Typography>
-                </Box>
-              </Stack>
-            </AppCard>
           </Box>
 
           {/* Homework list container */}
@@ -672,7 +598,6 @@ export default function HomeworkList() {
               >
                 <Tab label="All Tasks" />
                 <Tab label={`Active (${stats.active})`} />
-                <Tab label={`Overdue (${stats.overdue})`} />
               </Tabs>
               <Box
                 sx={{
@@ -767,11 +692,7 @@ export default function HomeworkList() {
                     mb: 1,
                   }}
                 >
-                  {tabValue === 1
-                    ? "No Active Tasks"
-                    : tabValue === 2
-                      ? "No Overdue Tasks"
-                      : "No Tasks Yet"}
+                  {tabValue === 1 ? "No Active Tasks" : "No Tasks Yet"}
                 </Typography>
                 <Typography
                   variant="body2"
@@ -782,9 +703,7 @@ export default function HomeworkList() {
                 >
                   {tabValue === 1
                     ? "Great! You have no pending homework tasks."
-                    : tabValue === 2
-                      ? "Awesome! No overdue homework to worry about."
-                      : "No homework has been assigned yet."}
+                    : "No homework has been assigned yet."}
                 </Typography>
               </Box>
             ) : viewMode === "list" ? (
@@ -850,7 +769,7 @@ export default function HomeworkList() {
                 ) : (
                 <Grid container spacing={{ xs: 1.5, sm: 2, md: 2.5 }}>
                 {paginatedHomeworkList.map((hw) => {
-                  const isOverdue = new Date(hw.submission_date) < new Date();
+                  const statusLabel = isDraftHomeworkStatus(hw.status) ? "Draft" : "Active";
                   const subColor = getSubjectColor(hw.subject_name);
 
                   return (
@@ -904,18 +823,20 @@ export default function HomeworkList() {
                               }}
                             />
                             <Chip
-                              label={isOverdue ? "Overdue" : "Active"}
+                              label={statusLabel}
                               size="small"
                               sx={{
                                 fontWeight: 700,
                                 fontSize: "0.7rem",
                                 borderRadius: "8px",
-                                bgcolor: isOverdue
-                                  ? alpha(colorTokens.error.main, 0.1)
-                                  : alpha(colorTokens.success.main, 0.1),
-                                color: isOverdue
-                                  ? colorTokens.error.main
-                                  : colorTokens.success.main,
+                                bgcolor:
+                                  statusLabel === "Draft"
+                                    ? alpha(colorTokens.text.secondary, 0.1)
+                                    : alpha(colorTokens.success.main, 0.1),
+                                color:
+                                  statusLabel === "Draft"
+                                    ? colorTokens.text.secondary
+                                    : colorTokens.success.main,
                                 height: 24,
                               }}
                             />
@@ -987,34 +908,32 @@ export default function HomeworkList() {
                                 Assigned: {formatDate(hw.assigned_date)}
                               </Typography>
                             </Box>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <CalendarIcon
+                            {hw.submission_date ? (
+                              <Box
                                 sx={{
-                                  fontSize: 18,
-                                  color: isOverdue
-                                    ? colorTokens.error.main
-                                    : colorTokens.warning.dark,
-                                }}
-                              />
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  color: isOverdue
-                                    ? colorTokens.error.main
-                                    : colorTokens.warning.dark,
-                                  fontWeight: 700,
-                                  fontSize: "0.8rem",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
                                 }}
                               >
-                                Due: {formatDate(hw.submission_date)}
-                              </Typography>
-                            </Box>
+                                <CalendarIcon
+                                  sx={{
+                                    fontSize: 18,
+                                    color: colorTokens.warning.dark,
+                                  }}
+                                />
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: colorTokens.warning.dark,
+                                    fontWeight: 700,
+                                    fontSize: "0.8rem",
+                                  }}
+                                >
+                                  Due: {formatDate(hw.submission_date)}
+                                </Typography>
+                              </Box>
+                            ) : null}
                           </Stack>
 
                           {/* Attachment Indicator */}

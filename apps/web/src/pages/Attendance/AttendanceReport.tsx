@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
 import {
   Box,
   Typography,
@@ -52,6 +53,7 @@ import {
   type AttendanceCalendarStatus,
 } from "./components/AttendanceMonthCalendar";
 import holidayApi, { parseHolidayDateRange } from "../../services/holidayApi";
+import { isWeekendIso } from "../calendar/academicCalendar.utils";
 
 const STUDENT_REPORT_LIMIT = 500;
 const EXPORT_REPORT_LIMIT = 10000;
@@ -248,7 +250,7 @@ const AttendanceReport = () => {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [holidayDates, setHolidayDates] = useState<Set<string>>(new Set());
 
@@ -728,8 +730,26 @@ const AttendanceReport = () => {
     for (const iso of holidayDates) {
       if (!map[iso]) map[iso] = "Holiday";
     }
+
+    if (isStudent) {
+      const { start: monthStart, end: monthEnd } = monthBounds(calendarMonth);
+      const rangeStart = monthStart > filters.from_date ? monthStart : filters.from_date;
+      const rangeEnd = monthEnd < filters.to_date ? monthEnd : filters.to_date;
+      if (rangeStart <= rangeEnd) {
+        let cursor = parseIsoDate(rangeStart);
+        const end = parseIsoDate(rangeEnd);
+        while (cursor <= end) {
+          const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+          if (!map[iso] && isWeekendIso(iso)) {
+            map[iso] = "Weekend";
+          }
+          cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
+        }
+      }
+    }
+
     return map;
-  }, [reportData, holidayDates]);
+  }, [reportData, holidayDates, isStudent, calendarMonth, filters.from_date, filters.to_date]);
 
   const dateFieldSx = {
     minWidth: { xs: "100%", sm: 160 },

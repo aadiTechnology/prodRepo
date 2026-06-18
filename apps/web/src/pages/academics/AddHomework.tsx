@@ -24,6 +24,10 @@ import { useFormManager } from "../../hooks/useFormManager";
 import BaseForm from "../../components/reusable/BaseForm";
 import { FormSectionLabel } from "../../components/reusable";
 import { homeworkService, type HomeworkAttachment } from "../../api/services/homeworkService";
+import {
+  homeworkEditDeleteLockMessage,
+  isHomeworkEditDeleteAllowed,
+} from "../../utils/homeworkEditWindow";
 import { academicYearService } from "../../api/services/dropdownServices";
 import {
   createHomeworkFormConfig,
@@ -34,6 +38,7 @@ import { colorTokens } from "../../tokens/colors";
 import { useSnackbar } from "notistack";
 import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
 import { isTeacherNoticeUser } from "../../utils/noticeAudience";
+import { HOMEWORK_STATUS_ACTIVE, HOMEWORK_STATUS_DRAFT } from "../../utils/homeworkStatus";
 
 type DropdownOption = { label: string; value: string };
 
@@ -97,6 +102,7 @@ export default function AddHomework() {
   const [savedAttachments, setSavedAttachments] = useState<HomeworkAttachment[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const [deletingAttId, setDeletingAttId] = useState<number | null>(null);
+  const [editLocked, setEditLocked] = useState(false);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -111,7 +117,7 @@ export default function AddHomework() {
       assigned_date: today,
       submission_date: "",
       notify_parents: false,
-      status: "Published",
+      status: HOMEWORK_STATUS_DRAFT,
     }),
     [today],
   );
@@ -122,7 +128,6 @@ export default function AddHomework() {
       subject_id: [{ type: "required", message: "Please select subject" }],
       title: [{ type: "required", message: "Please enter homework title" }],
       assigned_date: [{ type: "required", message: "Please select assigned date" }],
-      submission_date: [{ type: "required", message: "Please select submission date" }],
     }),
     [],
   );
@@ -225,6 +230,9 @@ export default function AddHomework() {
     homeworkService
       .getById(Number(id))
       .then((hw) => {
+        if (!isHomeworkEditDeleteAllowed(hw)) {
+          setEditLocked(true);
+        }
         const snapshot: AddHomeworkFormData = {
           academic_year_id: String(hw.academic_year_id),
           class_id: String(hw.class_id),
@@ -233,7 +241,7 @@ export default function AddHomework() {
           title: hw.title,
           instructions: hw.instructions ?? "",
           assigned_date: hw.assigned_date,
-          submission_date: hw.submission_date,
+          submission_date: hw.submission_date ?? "",
           notify_parents: false,
           status: hw.status,
         };
@@ -309,7 +317,7 @@ export default function AddHomework() {
     return true;
   };
 
-  const buildPayload = (statusOverride: "Draft" | "Published") => ({
+  const buildPayload = (statusOverride: typeof HOMEWORK_STATUS_DRAFT | typeof HOMEWORK_STATUS_ACTIVE) => ({
     academic_year_id: Number(formData.academic_year_id),
     class_id: Number(formData.class_id),
     class_division_id: formData.class_division_id ? Number(formData.class_division_id) : null,
@@ -317,19 +325,19 @@ export default function AddHomework() {
     title: formData.title.trim(),
     instructions: formData.instructions.trim() || null,
     assigned_date: formData.assigned_date,
-    submission_date: formData.submission_date,
+    submission_date: formData.submission_date.trim() ? formData.submission_date : null,
     notify_parents: false,
     status: statusOverride,
   });
 
   const submitHomework = useCallback(
-    async (statusOverride: "Draft" | "Published") => {
+    async (statusOverride: typeof HOMEWORK_STATUS_DRAFT | typeof HOMEWORK_STATUS_ACTIVE) => {
       if (!formData.academic_year_id) {
         setError("Unable to resolve the current academic year. Please refresh and try again.");
         return;
       }
       if (!validateDates()) return;
-      const isDraft = statusOverride === "Draft";
+      const isDraft = statusOverride === HOMEWORK_STATUS_DRAFT;
       try {
         if (isDraft) {
           setLoading(true);
@@ -352,7 +360,7 @@ export default function AddHomework() {
           const hw = await homeworkService.create(buildPayload(statusOverride));
           homeworkId = hw.id;
           enqueueSnackbar(
-            statusOverride === "Published"
+            statusOverride === HOMEWORK_STATUS_ACTIVE
               ? "Homework assigned successfully"
               : "Homework saved as draft",
             {
@@ -437,16 +445,13 @@ export default function AddHomework() {
   );
 
   const handleConfirmDraft = useCallback(async () => {
-    if (!formData.submission_date) {
-      setFormData((prev) => ({ ...prev, submission_date: formData.assigned_date }));
-    }
-    await submitHomework("Draft");
-  }, [formData.assigned_date, formData.submission_date, setFormData, submitHomework]);
+    await submitHomework(HOMEWORK_STATUS_DRAFT);
+  }, [submitHomework]);
 
   const handlePublish = useCallback(() => {
     setHasAttemptedSubmit(true);
     baseHandleSubmit({ preventDefault: () => {} } as FormEvent, () => {
-      void submitHomework("Published");
+      void submitHomework(HOMEWORK_STATUS_ACTIVE);
     });
   }, [baseHandleSubmit, submitHomework]);
 
@@ -661,6 +666,22 @@ export default function AddHomework() {
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
           You do not have permission to {isEditMode ? "edit" : "create"} homework.
+        </Typography>
+        <Button variant="contained" onClick={() => navigate("/homework")}>
+          Back to Homework List
+        </Button>
+      </Box>
+    );
+  }
+
+  if (isEditMode && editLocked) {
+    return (
+      <Box sx={{ p: 4, textAlign: "center" }}>
+        <Typography variant="h6" color="text.primary" gutterBottom>
+          Editing no longer available
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          {homeworkEditDeleteLockMessage()}
         </Typography>
         <Button variant="contained" onClick={() => navigate("/homework")}>
           Back to Homework List

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
 import {
   Alert,
   AlertTitle,
@@ -25,6 +26,7 @@ import { colorTokens } from "../../tokens/colors";
 import { academicYearService } from "../../api/services/academicYearService";
 import holidayApi, { HolidayListItem, holidayInclusiveDayCount, parseHolidayDateRange } from "../../services/holidayApi";
 import { useAuth } from "../../context/AuthContext";
+import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
 
 function createHolidayTableColumns() {
   return [
@@ -67,7 +69,7 @@ function useHolidayListController() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<number | "">("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [deleteTarget, setDeleteTarget] = useState<HolidayListItem | null>(null);
   /** Last holiday id passed to delete API — used for snackbar retry so it stays valid if dialog closes. */
   const lastDeleteAttemptIdRef = useRef<number | null>(null);
@@ -92,12 +94,14 @@ function useHolidayListController() {
   useEffect(() => {
     if (academicYears.length === 0) return;
     const validIds = new Set(academicYears.map((y) => y.id));
+    const currentYearId = resolveCurrentAcademicYearId(academicYears);
+    const defaultYearId = currentYearId ? Number(currentYearId) : academicYears[0].id;
     if (selectedAcademicYearId === "") {
-      setSelectedAcademicYearId(academicYears[0].id);
+      setSelectedAcademicYearId(defaultYearId);
       return;
     }
     if (typeof selectedAcademicYearId === "number" && !validIds.has(selectedAcademicYearId)) {
-      setSelectedAcademicYearId(academicYears[0].id);
+      setSelectedAcademicYearId(defaultYearId);
     }
   }, [academicYears, selectedAcademicYearId]);
 

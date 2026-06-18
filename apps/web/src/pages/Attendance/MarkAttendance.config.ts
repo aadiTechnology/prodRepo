@@ -4,8 +4,6 @@ import { AttendanceResponse } from "../../api/services/attendanceService";
 export const ATTENDANCE_STATUSES = [
   { id: 'Present', label: 'Present', color: 'success', short: 'P' },
   { id: 'Absent', label: 'Absent', color: 'error', short: 'A' },
-  { id: 'Half Day', label: 'Half Day', color: 'warning', short: 'HD' },
-  { id: 'Leave', label: 'Leave', color: 'info', short: 'L' },
 ] as const;
 
 export interface MarkAttendanceColumnsProps {
@@ -29,7 +27,7 @@ export const createMarkAttendanceColumns = (
   },
   {
     id: "status",
-    label: "Status (P/A/HD/L)",
+    label: "Status (P/A)",
     align: "center",
     width: "320px",
     // Rendering logic will be handled inside the component or a dedicated cell component

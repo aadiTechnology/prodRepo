@@ -4,6 +4,8 @@ import type { ListConfig } from "../../components/reusable/listFramework.types";
 import TableRowActions from "../../components/reusable/TableRowActions";
 import type { HomeworkResponse } from "../../api/services/homeworkService";
 import { formatHomeworkClassLabel } from "./AddHomework.formConfig";
+import { isHomeworkEditDeleteAllowed } from "../../utils/homeworkEditWindow";
+import { isDraftHomeworkStatus } from "../../utils/homeworkStatus";
 
 export type HomeworkRow = HomeworkResponse;
 
@@ -21,14 +23,8 @@ function computeDisplayStatus(row: HomeworkRow): {
   color: "default" | "success" | "error" | "warning";
   variant: "filled" | "outlined";
 } {
-  if (row.status === "Draft") {
+  if (isDraftHomeworkStatus(row.status)) {
     return { label: "Draft", color: "default", variant: "outlined" };
-  }
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const submission = new Date(row.submission_date);
-  if (submission < today) {
-    return { label: "Overdue", color: "error", variant: "filled" };
   }
   return { label: "Active", color: "success", variant: "filled" };
 }
@@ -126,13 +122,20 @@ export const createHomeworkListConfig = ({
   },
 
   actions: {
-    rowActions: (row: HomeworkRow) => ({
-      onView: onViewClick
-        ? () => onViewClick(row)
-        : () => navigate(`/homework/${row.id}`),
-      onEdit: canEdit ? () => navigate(`/homework/${row.id}/edit`) : undefined,
-      onDelete: canDelete && onDeleteClick ? () => onDeleteClick(row) : undefined,
-    }),
+    rowActions: (row: HomeworkRow) => {
+      const withinEditWindow = isHomeworkEditDeleteAllowed(row);
+      return {
+        onView: onViewClick
+          ? () => onViewClick(row)
+          : () => navigate(`/homework/${row.id}`),
+        onEdit:
+          canEdit && withinEditWindow ? () => navigate(`/homework/${row.id}/edit`) : undefined,
+        onDelete:
+          canDelete && withinEditWindow && onDeleteClick
+            ? () => onDeleteClick(row)
+            : undefined,
+      };
+    },
   },
 });
 

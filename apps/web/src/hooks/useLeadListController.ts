@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import leadService from "../api/services/leadService";
 import type { Lead, LeadSource, LeadStatus } from "../types/lead";
 
@@ -8,7 +9,7 @@ export function useLeadListController() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [totalLeads, setTotalLeads] = useState(0);
   const [snackbar, setSnackbar] = useState<string | null>(null);
 

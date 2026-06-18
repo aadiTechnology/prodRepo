@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import activityGalleryService from "../api/services/activityGalleryService";
 import type { ActivityGalleryListItem, GalleryType } from "../types/activityGallery";
 
@@ -10,7 +11,7 @@ export function useActivityGalleryListController(galleryType: GalleryType) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [galleryToDelete, setGalleryToDelete] = useState<ActivityGalleryListItem | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);

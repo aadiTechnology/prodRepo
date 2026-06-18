@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
 import {
   Box,
   Typography,
@@ -145,7 +146,7 @@ const LegendItem = ({
 // ── Main Component ────────────────────────────────────────────────────────────
 const MarkAttendance = () => {
   const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(10);
+  const [rowsPerPage, setRowsPerPage] = React.useState(DEFAULT_LIST_ROWS_PER_PAGE);
 
   const controller = useMarkAttendanceController();
 
@@ -171,6 +172,8 @@ const MarkAttendance = () => {
     disableClassUntilTeacherSelected,
     hasClassTeacherAttendanceScope,
     classTeacherAttendancePairCount,
+    dateLockInfo,
+    handleAttendanceDateChange,
   } = controller;
 
   const allRowsPresent = students.length > 0 && students.every((s) => s.status === "Present");
@@ -219,10 +222,10 @@ const MarkAttendance = () => {
                 const isSelected = row.status === status.id;
                 let color: string = colorTokens.text.secondary;
                 if (isSelected) {
-                  if (status.id === "Present") color = colorTokens.preschool.mint.main;
-                  else if (status.id === "Absent") color = colorTokens.preschool.coral.main;
-                  else if (status.id === "Half Day") color = colorTokens.preschool.peach.main;
-                  else if (status.id === "Leave") color = colorTokens.preschool.lavender.main;
+                  color =
+                    status.id === "Present"
+                      ? colorTokens.preschool.mint.main
+                      : colorTokens.preschool.coral.main;
                 }
 
                 return (
@@ -362,10 +365,19 @@ const MarkAttendance = () => {
           type="date"
           size="small"
           value={filters.attendance_date}
-          onChange={(e) =>
-            setFilters((prev) => ({ ...prev, attendance_date: e.target.value }))
-          }
+          onChange={(e) => handleAttendanceDateChange(e.target.value)}
           InputLabelProps={{ shrink: true }}
+          helperText={
+            dateLockInfo.locked
+              ? dateLockInfo.message
+              : "Weekends and holidays are not available for attendance"
+          }
+          FormHelperTextProps={{
+            sx: {
+              color: dateLockInfo.locked ? colorTokens.preschool.coral.main : colorTokens.text.secondary,
+              fontWeight: dateLockInfo.locked ? 600 : 400,
+            },
+          }}
           inputProps={{
             max: new Date().toISOString().split("T")[0],
           }}
@@ -452,8 +464,6 @@ const MarkAttendance = () => {
         >
           <LegendItem label="Present" short="P" color={colorTokens.preschool.mint.main} />
           <LegendItem label="Absent" short="A" color={colorTokens.preschool.coral.main} />
-          <LegendItem label="Half Day" short="HD" color={colorTokens.preschool.peach.main} />
-          <LegendItem label="Leave" short="L" color={colorTokens.preschool.lavender.main} />
         </Stack>
       </Stack>
     </AppCard>

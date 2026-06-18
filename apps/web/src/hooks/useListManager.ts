@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 
 export type SortOrder = "asc" | "desc";
 
@@ -43,7 +44,7 @@ export function useListManager<
 >({
   initialSearch = "",
   initialPage = 0,
-  initialRowsPerPage = 10,
+  initialRowsPerPage = DEFAULT_LIST_ROWS_PER_PAGE,
   initialFilters,
   initialSortBy,
   initialSortOrder = "asc",

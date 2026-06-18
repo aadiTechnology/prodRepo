@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
@@ -30,7 +31,7 @@ export function useTeacherAssignmentsController() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [snackbarSeverity, setSnackbarSeverity] = useState<TeacherAssignmentsSnackbarSeverity>("success");
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);

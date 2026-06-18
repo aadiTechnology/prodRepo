@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
 import { Alert, Snackbar } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { classFeeStructureAssignmentService } from "../../api/services/classFeeStructureAssignmentService";
@@ -16,6 +17,7 @@ import StatusChip from "../../components/roles/StatusChip";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { ClassFeeStructureAssignment } from "../../api/services/classFeeStructureAssignmentService";
 import { classService, academicYearService, feeStructureService } from "../../api/services/dropdownServices";
+import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
  // Removed unused AssignmentModal import
 
 const ClassFeeStructureAssignmentList = () => {
@@ -31,7 +33,7 @@ const ClassFeeStructureAssignmentList = () => {
     const [error, setError] = useState<string | null>(null);
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
     const [totalAssignments, setTotalAssignments] = useState(0);
     // Removed modalOpen and editAssignment state, navigation will be used for edit
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -57,7 +59,9 @@ const ClassFeeStructureAssignmentList = () => {
                 setClassList(classRes.data || classRes || []);
                 setAcademicYearList(yearRes.data || yearRes || []);
                 // For initial load, use the first academic year and class if available, and a dummy tenantId (or get from user context)
-                const academicYear = (yearRes.data?.[0]?.id || yearRes?.[0]?.id || "");
+                const years = (yearRes.data || yearRes || []);
+                const currentYearId = resolveCurrentAcademicYearId(years);
+                const academicYear = currentYearId || (years?.[0]?.id || "");
                 const classId = (classRes.data?.[0]?.id || classRes?.[0]?.id || "");
                 // Use tenantId from user context, show error if missing
                 const tenantId = user?.tenant_id;

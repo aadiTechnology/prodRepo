@@ -29,6 +29,7 @@ import feeDiscountService from "../../api/services/feeDiscountService";
 import apiClient from "../../api/client";
 import { createEnrollmentFormConfig, type EnrollmentFormData } from "./EnrollmentPage.formConfig";
 import StudentDetailsView from "./StudentDetailsView";
+import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
 
 interface LeadOption {
   id: number;
@@ -94,14 +95,6 @@ const sectionTitleSx = { mt: 1.25 } as const;
 
 const MAX_ENROLLMENT_DOCUMENT_BYTES = 5 * 1024 * 1024;
 const ENROLLMENT_DOCUMENT_SIZE_HINT = "Document should be 5MB or less.";
-
-const resolveCurrentAcademicYearId = (
-  years: { id?: number | string; is_current?: boolean | number }[]
-): string => {
-  const current =
-    years.find((y) => y.is_current === true || y.is_current === 1) ?? years[0];
-  return current?.id != null ? String(current.id) : "";
-};
 
 const emptyForm = (): EnrollmentFormData => ({
   student_name: "",

@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Box, Typography, alpha } from "@mui/material";
 
 import BaseForm from "../../components/reusable/BaseForm";
+import ApplicableToClassSelector from "../../components/reusable/ApplicableToClassSelector";
 import type { AssignTeacherFormData } from "../../formConfig/assignTeacherFormConfig";
 import { colorTokens } from "../../tokens/colors";
 import { useAssignTeacherController } from "./useAssignTeacherController";
@@ -19,6 +21,13 @@ export default function AssignTeacher() {
     canShowAssignmentHint,
     assignmentHintLabel,
     isClassTeacherMode,
+    useSubjectMultiClassSelector,
+    subjectClassDivisionMap,
+    selectedSubjectClassIds,
+    isSubjectScopeClassSelectAll,
+    handleSubjectScopeClassToggle,
+    handleSubjectScopeDivisionToggle,
+    handleSubjectScopeClassSelectAll,
     handleConfirmSubmit,
     assignTeacherPending,
     isEditMode,
@@ -29,9 +38,70 @@ export default function AssignTeacher() {
     clearForm,
   } = useAssignTeacherController();
 
+  const formConfigWithSubjectScope = useMemo(() => {
+    if (!useSubjectMultiClassSelector) {
+      return formConfig;
+    }
+
+    return {
+      ...formConfig,
+      layoutRows: [
+        ...formConfig.layoutRows,
+        {
+          kind: "custom" as const,
+          grid: { xs: 12 },
+          render: () => (
+            <Box
+              sx={{
+                border: `1px solid ${colorTokens.border.default}`,
+                borderRadius: "12px",
+                p: 2,
+                bgcolor: alpha(colorTokens.primary.main, 0.02),
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                Classes & divisions for this subject
+              </Typography>
+              {subjectClassDivisionMap.length === 0 ? (
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  No class/division mappings found for the selected subject in this academic year.
+                </Typography>
+              ) : (
+                <ApplicableToClassSelector
+                  applicableTo={{ student: true, teacher: false, admin: false }}
+                  isApplicableSelectAll={isSubjectScopeClassSelectAll}
+                  isClassSelectAll={isSubjectScopeClassSelectAll}
+                  classDivisionMap={subjectClassDivisionMap}
+                  selectedClassIds={selectedSubjectClassIds}
+                  selectedDivisionIds={formData.class_division_ids}
+                  onApplicableSelectAll={handleSubjectScopeClassSelectAll}
+                  onApplicableRoleToggle={() => undefined}
+                  onClassSelectAll={handleSubjectScopeClassSelectAll}
+                  onClassToggle={handleSubjectScopeClassToggle}
+                  onDivisionToggle={handleSubjectScopeDivisionToggle}
+                  hideApplicableRoleControls
+                />
+              )}
+            </Box>
+          ),
+        },
+      ],
+    };
+  }, [
+    formConfig,
+    useSubjectMultiClassSelector,
+    subjectClassDivisionMap,
+    isSubjectScopeClassSelectAll,
+    selectedSubjectClassIds,
+    formData.class_division_ids,
+    handleSubjectScopeClassSelectAll,
+    handleSubjectScopeClassToggle,
+    handleSubjectScopeDivisionToggle,
+  ]);
+
   return (
     <BaseForm<AssignTeacherFormData>
-      formConfig={formConfig}
+      formConfig={formConfigWithSubjectScope}
       formData={formData}
       setFormData={setFormData}
       fieldErrors={fieldErrors}
@@ -107,8 +177,7 @@ export default function AssignTeacher() {
         <Box sx={{ px: 1, py: 0.5, display: "flex", flexDirection: "column", gap: 1 }}>
           <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.85rem", lineHeight: 1.5 }}>
             One teacher can be class teacher and subject teacher at the same time. Save each role separately.
-            Subject teachers need one division per save; you can assign the same teacher to different class/division/subject
-            combinations (e.g. Nursery EVS, then Std 2 Div B Math).
+            For subject teachers, select the subject and then choose multiple classes/divisions in one save.
           </Typography>
           {canShowAssignmentHint && assignmentCheck?.is_assigned ? (
             <Typography

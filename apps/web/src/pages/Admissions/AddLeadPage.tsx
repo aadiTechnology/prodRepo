@@ -15,6 +15,7 @@ import {
 import academicYearService from "../../api/services/academicYearService";
 import schoolClassService from "../../api/services/schoolClassService";
 import userService from "../../api/services/userService";
+import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
 import AsyncFreeSoloAutocomplete from "../../components/reusable/AsyncFreeSoloAutocomplete";
 import FormSectionLabel from "../../components/reusable/FormSectionLabel";
 import PersonIcon from "@mui/icons-material/Person";
@@ -118,6 +119,16 @@ export default function AddLeadPage() {
           value: String(y.id),
         }))
       );
+      if (!isEditMode) {
+        const currentYearId = resolveCurrentAcademicYearId(items);
+        if (currentYearId) {
+          setFormData((prev) =>
+            prev.preferred_academic_year_id
+              ? prev
+              : { ...prev, preferred_academic_year_id: currentYearId }
+          );
+        }
+      }
     }).catch(() => {});
 
     userService.getAllUsers().then((data: any) => {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
 import { Alert, Snackbar } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import feeDiscountService from "../../api/services/feeDiscountService";
@@ -34,7 +35,7 @@ const FeeDiscountList = () => {
 
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
     const [totalDiscounts, setTotalDiscounts] = useState(0);
 
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);

@@ -23,7 +23,8 @@ export type AttendanceCalendarStatus =
   | "Absent"
   | "Half Day"
   | "Leave"
-  | "Holiday";
+  | "Holiday"
+  | "Weekend";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
@@ -36,6 +37,7 @@ const STATUS_META: Record<
   "Half Day": { color: colorTokens.preschool.peach.main, Icon: WarningIcon },
   Leave: { color: colorTokens.preschool.lavender.main, Icon: EventNoteIcon },
   Holiday: { color: colorTokens.text.secondary, Icon: DotIcon },
+  Weekend: { color: colorTokens.text.secondary, Icon: DotIcon },
 };
 
 const toIsoDate = (year: number, month: number, day: number) =>

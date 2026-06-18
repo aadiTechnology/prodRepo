@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
@@ -6,12 +6,15 @@ import { useFormManager } from "../../hooks/useFormManager";
 import type { FormValidationConfig } from "../../utils/formValidation";
 import type { SelectItemOption } from "../../components/semantic";
 import { useAuth } from "../../context/AuthContext";
-import teacherAssignmentApi from "../../api/teacherAssignmentApi";
+import teacherAssignmentApi, {
+  type SubjectOption,
+} from "../../api/teacherAssignmentApi";
 import type { ApiError } from "../../api/client";
 import {
   assignTeacherFormConfig,
   type AssignTeacherFormData,
 } from "../../formConfig/assignTeacherFormConfig";
+import type { ClassDivisionColumn } from "../../components/reusable/ApplicableToClassSelector";
 
 const emptyFormValues = (): AssignTeacherFormData => ({
   academic_year_id: null,
@@ -31,6 +34,90 @@ const resolveCurrentAcademicYearId = (
   return current?.id ?? null;
 };
 
+function buildSubjectClassDivisionMap(
+  subjects: SubjectOption[],
+  subjectName: string,
+  academicYearId: number
+): ClassDivisionColumn[] {
+  const subjectNameKey = subjectName.trim().toLowerCase();
+  const relatedSubjects = subjects.filter(
+    (subject) => subject.name.trim().toLowerCase() === subjectNameKey
+  );
+  const map = new Map<number, ClassDivisionColumn>();
+
+  for (const subject of relatedSubjects) {
+    for (const mapping of subject.classes || []) {
+      if (mapping.academic_year_id && mapping.academic_year_id !== academicYearId) {
+        continue;
+      }
+      if (mapping.class_division_id == null) {
+        continue;
+      }
+
+      const classId = mapping.class_id;
+      const className = mapping.class_name?.trim() || `Class ${classId}`;
+      if (!map.has(classId)) {
+        map.set(classId, { id: classId, name: className, divisions: [] });
+      }
+
+      const column = map.get(classId)!;
+      if (!column.divisions.some((division) => division.id === mapping.class_division_id)) {
+        column.divisions.push({
+          id: mapping.class_division_id,
+          name: mapping.division_name?.trim() || `Division ${mapping.class_division_id}`,
+        });
+      }
+    }
+  }
+
+  return Array.from(map.values())
+    .map((column) => ({
+      ...column,
+      divisions: [...column.divisions].sort((a, b) => a.name.localeCompare(b.name)),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function resolveSubjectAssignmentTargets(
+  subjects: SubjectOption[],
+  subjectName: string,
+  academicYearId: number,
+  selectedDivisionIds: number[]
+): Array<{ class_id: number; division_id: number; subject_id: number }> {
+  const subjectNameKey = subjectName.trim().toLowerCase();
+  const relatedSubjects = subjects.filter(
+    (subject) => subject.name.trim().toLowerCase() === subjectNameKey
+  );
+  const selectedSet = new Set(selectedDivisionIds);
+  const targets: Array<{ class_id: number; division_id: number; subject_id: number }> = [];
+  const seen = new Set<string>();
+
+  for (const subject of relatedSubjects) {
+    for (const mapping of subject.classes || []) {
+      if (mapping.academic_year_id && mapping.academic_year_id !== academicYearId) {
+        continue;
+      }
+      const divisionId = mapping.class_division_id;
+      if (divisionId == null || !selectedSet.has(divisionId)) {
+        continue;
+      }
+
+      const key = `${mapping.class_id}-${divisionId}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      targets.push({
+        class_id: mapping.class_id,
+        division_id: divisionId,
+        subject_id: subject.id,
+      });
+    }
+  }
+
+  return targets;
+}
+
 export function useAssignTeacherController() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -44,8 +131,6 @@ export function useAssignTeacherController() {
   const validationConfig = useMemo<FormValidationConfig<AssignTeacherFormData>>(
     () => ({
       academic_year_id: [{ type: "required", message: "Academic Year is required" }],
-      class_id: [{ type: "required", message: "Class is required" }],
-      class_division_ids: [{ type: "required", message: "At least one division is required" }],
       teacher_id: [{ type: "required", message: "Teacher is required" }],
     }),
     []
@@ -327,11 +412,27 @@ export function useAssignTeacherController() {
     enabled: effectiveTenantId != null,
   });
 
-  const { data: subjects = [], isLoading: subjectsLoading } = useQuery({
+  const isClassTeacherMode = formData.subject_id == null;
+  const useSubjectMultiClassSelector =
+    !isClassTeacherMode && !(isEditMode && assignmentId);
+
+  const { data: subjectsWithMappings = [], isLoading: subjectsLoading } = useQuery({
+    queryKey: ["assign-teacher", "subjects", formData.academic_year_id],
+    queryFn: () => teacherAssignmentApi.getSubjects(formData.academic_year_id as number),
+    enabled: !!formData.academic_year_id,
+  });
+
+  const { data: subjects = [], isLoading: legacySubjectsLoading } = useQuery({
     queryKey: ["assign-teacher", "subjects", formData.academic_year_id, formData.class_id],
     queryFn: () =>
-      teacherAssignmentApi.getSubjects(formData.academic_year_id as number, formData.class_id as number),
-    enabled: !!formData.academic_year_id && !!formData.class_id,
+      teacherAssignmentApi.getSubjects(
+        formData.academic_year_id as number,
+        formData.class_id as number
+      ),
+    enabled:
+      !!formData.academic_year_id &&
+      !!formData.class_id &&
+      !useSubjectMultiClassSelector,
   });
 
   const { data: assignmentCheck, isFetching: assignmentChecking } = useQuery({
@@ -356,7 +457,42 @@ export function useAssignTeacherController() {
       !!formData.academic_year_id,
   });
 
-  const isClassTeacherMode = formData.subject_id == null;
+  const selectedSubject = useMemo(
+    () => subjectsWithMappings.find((subject) => subject.id === formData.subject_id) ?? null,
+    [subjectsWithMappings, formData.subject_id]
+  );
+
+  const subjectClassDivisionMap = useMemo(() => {
+    if (!useSubjectMultiClassSelector || !selectedSubject || !formData.academic_year_id) {
+      return [];
+    }
+    return buildSubjectClassDivisionMap(
+      subjectsWithMappings,
+      selectedSubject.name,
+      formData.academic_year_id
+    );
+  }, [
+    useSubjectMultiClassSelector,
+    selectedSubject,
+    subjectsWithMappings,
+    formData.academic_year_id,
+  ]);
+
+  useEffect(() => {
+    if (!useSubjectMultiClassSelector || formData.subject_id == null) {
+      return;
+    }
+    setFormData((prev) => {
+      if (prev.class_id === null && (prev.class_division_ids?.length || 0) === 0) {
+        return prev;
+      }
+      return {
+        ...prev,
+        class_id: null,
+        class_division_ids: [],
+      };
+    });
+  }, [formData.subject_id, useSubjectMultiClassSelector, setFormData]);
 
   useEffect(() => {
     if (skipNextAcademicCascadeResetRef.current) {
@@ -463,35 +599,51 @@ export function useAssignTeacherController() {
     [teachers]
   );
 
-  const subjectOptions = useMemo<SelectItemOption[]>(
-    () =>
-      subjects.map((item) => ({
+  const subjectOptions = useMemo<SelectItemOption[]>(() => {
+    if (useSubjectMultiClassSelector) {
+      const byName = new Map<string, SubjectOption>();
+      for (const subject of subjectsWithMappings) {
+        const key = subject.name.trim().toLowerCase();
+        if (!key || byName.has(key)) {
+          continue;
+        }
+        byName.set(key, subject);
+      }
+      return Array.from(byName.values()).map((item) => ({
         id: String(item.id),
         value: String(item.id),
         label: item.name,
-      })),
-    [subjects]
-  );
+      }));
+    }
 
-  const formConfig = useMemo(
-    () =>
-      assignTeacherFormConfig({
-        academicYearOptions,
-        classOptions,
-        divisionOptions,
-        teacherOptions,
-        subjectOptions,
-        academicYearsLoading,
-        classesLoading,
-        divisionsLoading,
-        teachersLoading,
-        subjectsLoading,
-        disableClass: !formData.academic_year_id,
-        disableDivision: !formData.class_id,
-        disableTeacher: !formData.academic_year_id || effectiveTenantId == null,
-        disableSubject: !formData.academic_year_id || !formData.class_id,
-      }),
-    [
+    return subjects.map((item) => ({
+      id: String(item.id),
+      value: String(item.id),
+      label: item.name,
+    }));
+  }, [subjects, subjectsWithMappings, useSubjectMultiClassSelector]);
+
+  const formConfig = useMemo(() => {
+    const config = assignTeacherFormConfig({
+      academicYearOptions,
+      classOptions,
+      divisionOptions,
+      teacherOptions,
+      subjectOptions,
+      academicYearsLoading,
+      classesLoading,
+      divisionsLoading,
+      teachersLoading,
+      subjectsLoading: useSubjectMultiClassSelector ? subjectsLoading : legacySubjectsLoading,
+      disableClass: !formData.academic_year_id,
+      disableDivision: !formData.class_id,
+      disableTeacher: !formData.academic_year_id || effectiveTenantId == null,
+      disableSubject: !formData.academic_year_id,
+      hideClassFields: useSubjectMultiClassSelector,
+    });
+
+    return config;
+  }, [
       academicYearOptions,
       classOptions,
       divisionOptions,
@@ -502,6 +654,9 @@ export function useAssignTeacherController() {
       divisionsLoading,
       teachersLoading,
       subjectsLoading,
+      legacySubjectsLoading,
+      useSubjectMultiClassSelector,
+      subjectClassDivisionMap,
       formData.academic_year_id,
       formData.class_id,
       formData.class_division_ids,
@@ -511,19 +666,151 @@ export function useAssignTeacherController() {
     ]
   );
 
+  const handleSubjectScopeClassToggle = useCallback(
+    (classId: number, checked: boolean) => {
+      setFormData((prev) => {
+        const classDivisionIds =
+          subjectClassDivisionMap
+            .find((column) => column.id === classId)
+            ?.divisions.map((division) => division.id) ?? [];
+        const nextDivisionIds = checked
+          ? Array.from(new Set([...(prev.class_division_ids || []), ...classDivisionIds]))
+          : (prev.class_division_ids || []).filter((id) => !classDivisionIds.includes(id));
+        return {
+          ...prev,
+          class_division_ids: nextDivisionIds,
+        };
+      });
+    },
+    [setFormData, subjectClassDivisionMap]
+  );
+
+  const handleSubjectScopeDivisionToggle = useCallback(
+    (_classId: number, divisionId: number, checked: boolean) => {
+      setFormData((prev) => ({
+        ...prev,
+        class_division_ids: checked
+          ? Array.from(new Set([...(prev.class_division_ids || []), divisionId]))
+          : (prev.class_division_ids || []).filter((id) => id !== divisionId),
+      }));
+    },
+    [setFormData]
+  );
+
+  const handleSubjectScopeClassSelectAll = useCallback(
+    (checked: boolean) => {
+      if (!checked) {
+        setFormData((prev) => ({ ...prev, class_division_ids: [] }));
+        return;
+      }
+      const allDivisionIds = subjectClassDivisionMap.flatMap((column) =>
+        column.divisions.map((division) => division.id)
+      );
+      setFormData((prev) => ({
+        ...prev,
+        class_division_ids: allDivisionIds,
+      }));
+    },
+    [setFormData, subjectClassDivisionMap]
+  );
+
+  const selectedSubjectClassIds = useMemo(
+    () =>
+      subjectClassDivisionMap
+        .filter((column) =>
+          column.divisions.some((division) => formData.class_division_ids.includes(division.id))
+        )
+        .map((column) => column.id),
+    [subjectClassDivisionMap, formData.class_division_ids]
+  );
+
+  const isSubjectScopeClassSelectAll = useMemo(
+    () =>
+      subjectClassDivisionMap.length > 0 &&
+      subjectClassDivisionMap.every((column) =>
+        column.divisions.every((division) => formData.class_division_ids.includes(division.id))
+      ),
+    [subjectClassDivisionMap, formData.class_division_ids]
+  );
+
   const handleConfirmSubmit = async () => {
-    if (
-      !formData.academic_year_id ||
-      !formData.class_id ||
-      (formData.class_division_ids?.length || 0) === 0 ||
-      !formData.teacher_id
-    ) {
+    if (!formData.academic_year_id || !formData.teacher_id) {
       return;
     }
 
-    if (formData.subject_id != null && (formData.class_division_ids?.length || 0) !== 1) {
-      setError("Subject teacher assignment requires exactly one division.");
-      setSnackbar("Subject teacher assignment requires exactly one division.");
+    if (useSubjectMultiClassSelector) {
+      if (!formData.subject_id || (formData.class_division_ids?.length || 0) === 0) {
+        setError("Select a subject and at least one class division.");
+        setSnackbar("Select a subject and at least one class division.");
+        return;
+      }
+
+      const subjectName = selectedSubject?.name;
+      if (!subjectName) {
+        setError("Selected subject is invalid.");
+        return;
+      }
+
+      const targets = resolveSubjectAssignmentTargets(
+        subjectsWithMappings,
+        subjectName,
+        formData.academic_year_id,
+        formData.class_division_ids
+      );
+      if (targets.length === 0) {
+        setError("Selected divisions are not mapped to this subject.");
+        setSnackbar("Selected divisions are not mapped to this subject.");
+        return;
+      }
+
+      setError(null);
+      try {
+        const grouped = new Map<number, { divisionIds: number[]; subjectId: number }>();
+        for (const target of targets) {
+          const existing = grouped.get(target.class_id);
+          if (existing) {
+            existing.divisionIds.push(target.division_id);
+          } else {
+            grouped.set(target.class_id, {
+              divisionIds: [target.division_id],
+              subjectId: target.subject_id,
+            });
+          }
+        }
+
+        for (const [classId, group] of grouped.entries()) {
+          await assignTeacherMutation.mutateAsync({
+            academic_year_id: formData.academic_year_id,
+            class_id: classId,
+            class_division_ids: group.divisionIds,
+            teacher_id: formData.teacher_id,
+            subject_id: group.subjectId,
+          });
+        }
+
+        setSnackbar("Teacher assigned successfully!");
+        setTimeout(() => {
+          resetForm(emptyFormValues());
+          navigate("/teacher-assignments");
+        }, 1000);
+      } catch (err) {
+        const apiError = err as ApiError;
+        const errorMessage =
+          (apiError?.response?.data?.detail as string | undefined) ||
+          (apiError?.response?.data?.message as string | undefined) ||
+          (err instanceof Error ? err.message : "Failed to assign teacher.");
+        setError(errorMessage);
+        setSnackbar(errorMessage);
+      }
+      return;
+    }
+
+    if (
+      !formData.class_id ||
+      (formData.class_division_ids?.length || 0) === 0
+    ) {
+      setError("Class and at least one division are required.");
+      setSnackbar("Class and at least one division are required.");
       return;
     }
 
@@ -558,6 +845,7 @@ export function useAssignTeacherController() {
   };
 
   const canShowAssignmentHint =
+    !useSubjectMultiClassSelector &&
     !!formData.academic_year_id &&
     !!formData.class_id &&
     (formData.class_division_ids?.length || 0) === 1;
@@ -580,6 +868,13 @@ export function useAssignTeacherController() {
     canShowAssignmentHint,
     assignmentHintLabel,
     isClassTeacherMode,
+    useSubjectMultiClassSelector,
+    subjectClassDivisionMap,
+    selectedSubjectClassIds,
+    isSubjectScopeClassSelectAll,
+    handleSubjectScopeClassToggle,
+    handleSubjectScopeDivisionToggle,
+    handleSubjectScopeClassSelectAll,
     handleConfirmSubmit,
     assignTeacherPending: assignTeacherMutation.isPending,
     hasAssignedLegend:

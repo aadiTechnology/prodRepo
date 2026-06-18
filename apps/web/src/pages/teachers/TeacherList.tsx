@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Select, MenuItem } from "@mui/material";
 import {
@@ -35,7 +36,7 @@ export default function TeacherList() {
   // List configuration state
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [classFilter, setClassFilter] = useState("");
   const [divisionFilter, setDivisionFilter] = useState("");
   
