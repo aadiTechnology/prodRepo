@@ -5,7 +5,10 @@ from typing import List, Optional, Tuple
 from datetime import date, timedelta
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
+from app.core.exceptions import ConflictException, ValidationException
 
 from app.models.homework import Homework, HomeworkAttachment
 from app.repositories import homework_repository as repo
@@ -22,7 +25,12 @@ from app.schemas.homework_schema import (
     HomeworkUpdate,
     SubjectOption,
 )
-from app.utils.homework_status import HOMEWORK_STATUS_ACTIVE, normalize_homework_status
+from app.utils.homework_status import (
+    HOMEWORK_STATUS_ACTIVE,
+    from_db_homework_status,
+    is_draft_homework_status,
+    normalize_homework_status,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -47,7 +55,7 @@ def _to_response(hw: Homework) -> HomeworkResponse:
         instructions=hw.instructions,
         assigned_date=hw.assigned_date,
         submission_date=hw.submission_date,
-        status=hw.status,
+        status=from_db_homework_status(hw.status),
         notify_parents=hw.notify_parents,
         published_at=hw.published_at,
         created_at=hw.created_at,
@@ -101,8 +109,53 @@ def get_viewer_context(
 HOMEWORK_EDIT_DELETE_WINDOW_DAYS = 7
 
 
+def _integrity_hint(exc: IntegrityError) -> str:
+    raw = str(getattr(exc, "orig", exc) or exc).strip()
+    return raw[:900] if raw else ""
+
+
+def _raise_homework_integrity(exc: IntegrityError) -> None:
+    hint = _integrity_hint(exc)
+    db_err = hint.lower()
+
+    if "ck_homework_status" in db_err or (
+        "check constraint" in db_err and "status" in db_err
+    ):
+        raise ValidationException(
+            "Homework status was rejected by the database. "
+            "Deploy the latest API build so Active/Draft map to published/draft."
+            + (f" Detail: {hint}" if hint else "")
+        ) from exc
+
+    if "ck_homework_dates" in db_err or (
+        "check constraint" in db_err and "submission_date" in db_err
+    ):
+        raise ValidationException(
+            "Submission date must be on or after the assigned date."
+            + (f" Detail: {hint}" if hint else "")
+        ) from exc
+
+    if "foreign key" in db_err or "referenced table" in db_err:
+        raise ValidationException(
+            "One of the selected values is invalid "
+            "(class, division, subject, teacher, or academic year)."
+            + (f" Detail: {hint}" if hint else "")
+        ) from exc
+
+    if "2627" in db_err or "2601" in db_err or "duplicate" in db_err or "unique key" in db_err:
+        raise ConflictException(
+            "A homework record with the same details may already exist."
+            + (f" Detail: {hint}" if hint else "")
+        ) from exc
+
+    raise ConflictException(
+        "Could not save homework due to a database constraint."
+        + (f" Detail: {hint}" if hint else "")
+    ) from exc
+
+
 def _assert_homework_editable(hw: Homework) -> None:
-    if hw.status == "Draft":
+    if is_draft_homework_status(hw.status):
         return
     cutoff = hw.assigned_date + timedelta(days=HOMEWORK_EDIT_DELETE_WINDOW_DAYS)
     if date.today() >= cutoff:
@@ -197,22 +250,26 @@ def create_homework(
             detail="Submission date cannot be before assigned date",
         )
 
-    return repo.create_homework(
-        db,
-        tenant_id=tenant_id,
-        teacher_id=teacher_id,
-        user_id=user_id,
-        class_id=payload.class_id,
-        class_division_id=payload.class_division_id,
-        subject_id=payload.subject_id,
-        academic_year_id=payload.academic_year_id,
-        title=payload.title,
-        instructions=payload.instructions,
-        assigned_date=payload.assigned_date,
-        submission_date=payload.submission_date,
-        hw_status=payload.status,
-        notify_parents=payload.notify_parents,
-    )
+    try:
+        return repo.create_homework(
+            db,
+            tenant_id=tenant_id,
+            teacher_id=teacher_id,
+            user_id=user_id,
+            class_id=payload.class_id,
+            class_division_id=payload.class_division_id,
+            subject_id=payload.subject_id,
+            academic_year_id=payload.academic_year_id,
+            title=payload.title,
+            instructions=payload.instructions,
+            assigned_date=payload.assigned_date,
+            submission_date=payload.submission_date,
+            hw_status=payload.status,
+            notify_parents=payload.notify_parents,
+        )
+    except IntegrityError as exc:
+        db.rollback()
+        _raise_homework_integrity(exc)
 
 
 def update_homework(
@@ -235,7 +292,11 @@ def update_homework(
             detail="Submission date cannot be before assigned date",
         )
 
-    return repo.update_homework(db, hw=hw, user_id=user_id, update_data=update_data)
+    try:
+        return repo.update_homework(db, hw=hw, user_id=user_id, update_data=update_data)
+    except IntegrityError as exc:
+        db.rollback()
+        _raise_homework_integrity(exc)
 
 
 def delete_homework(

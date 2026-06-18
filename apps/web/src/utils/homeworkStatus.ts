@@ -6,6 +6,8 @@ export type HomeworkStatus = typeof HOMEWORK_STATUS_DRAFT | typeof HOMEWORK_STAT
 
 export function normalizeHomeworkStatus(status: string | null | undefined): string {
   const value = (status ?? "").trim();
+  if (value.toLowerCase() === "published") return HOMEWORK_STATUS_ACTIVE;
+  if (value.toLowerCase() === "draft") return HOMEWORK_STATUS_DRAFT;
   if (value === LEGACY_PUBLISHED_STATUS) return HOMEWORK_STATUS_ACTIVE;
   return value;
 }

@@ -11,6 +11,7 @@ from app.models.homework import Homework
 from app.models.lead import LeadParent
 from app.models.student import Student
 from app.models.user import User, UserRole
+from app.utils.homework_status import is_live_homework_status
 
 STUDENT_ROLE_TOKENS = frozenset({"student", "students"})
 PARENT_ROLE_TOKENS = frozenset({"parent", "parents", "guardian"})
@@ -293,7 +294,7 @@ def _homework_matches_scope(hw: Homework, scope: ClassDivisionScope) -> bool:
 def homework_visible_to_viewer(hw: Homework, ctx: HomeworkViewerContext) -> bool:
     if ctx.kind == "admin":
         return True
-    if ctx.published_only and hw.status not in {"Active", "Published"}:
+    if ctx.published_only and not is_live_homework_status(hw.status):
         return False
     if not ctx.scopes:
         return False

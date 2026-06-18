@@ -23,8 +23,8 @@ class Homework(Base):
     assigned_date = Column(Date, nullable=False)
     submission_date = Column(Date, nullable=True)
 
-    # Draft | Active (legacy rows may still store Published)
-    status = Column(String(20), nullable=False, default="Draft")
+    # Draft | Active (API); DB stores draft | published (legacy rows may use Published/Active).
+    status = Column(String(20), nullable=False, default="draft")
     notify_parents = Column(Boolean, nullable=False, default=False)
 
     published_at = Column(DateTime, nullable=True)

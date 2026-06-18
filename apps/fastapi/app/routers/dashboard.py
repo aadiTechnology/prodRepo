@@ -21,6 +21,7 @@ from app.services import notice_service
 from app.models.homework import Homework
 from app.repositories.homework_repository import _build_class_division_scope_filter
 from app.services.homework_access import resolve_teacher_assignment_scopes
+from app.utils.homework_status import DB_LIVE_HOMEWORK_STATUSES, from_db_homework_status
 from app.models.lead import Lead, LeadStatus
 from app.models.academic import SchoolClass, ClassDivision
 
@@ -886,7 +887,7 @@ def _build_teacher_dashboard(
         for hw in hw_rows:
             hw_id = typing_cast(int, hw.id)
             hw_title = typing_cast(str, hw.title)
-            hw_status = typing_cast(Optional[str], hw.status) or "Published"
+            hw_status = from_db_homework_status(typing_cast(Optional[str], hw.status))
             hw_assigned = typing_cast(Optional[date], hw.assigned_date)
             hw_submission = typing_cast(Optional[date], hw.submission_date)
             hw_items.append(TeacherHomeworkItem(
@@ -1053,7 +1054,7 @@ def _build_student_dashboard(
                 db.query(func.count(Homework.id))
                 .filter(Homework.tenant_id == tenant_id)
                 .filter(Homework.class_id == student.class_id)
-                .filter(Homework.status == "Published")
+                .filter(Homework.status.in_(tuple(DB_LIVE_HOMEWORK_STATUSES)))
                 .filter(Homework.is_deleted == False)
                 .filter(Homework.submission_date >= today)
             )

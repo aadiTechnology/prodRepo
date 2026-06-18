@@ -31,9 +31,27 @@ async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError) -
     logger.error(f"Database error: {str(exc)}", exc_info=True)
     
     if isinstance(exc, IntegrityError):
-        content: dict = {"detail": "Database integrity error. Resource may already exist."}
+        raw = str(getattr(exc, "orig", exc) or exc)
+        raw_lower = raw.lower()
+        if "ck_homework_status" in raw_lower:
+            detail = (
+                "Homework status was rejected by the database. "
+                "Deploy the latest API so Active/Draft map to published/draft."
+            )
+        elif "ck_homework_dates" in raw_lower:
+            detail = "Submission date must be on or after the assigned date."
+        elif "check constraint" in raw_lower:
+            detail = "Database constraint rejected this request."
+        elif "foreign key" in raw_lower:
+            detail = "A related record was not found (invalid class, subject, teacher, or academic year)."
+        elif any(token in raw_lower for token in ("duplicate", "unique key", "2627", "2601")):
+            detail = "Database integrity error. Resource may already exist."
+        else:
+            detail = "Database integrity error. Resource may already exist."
+
+        content: dict = {"detail": detail}
         if settings.DEBUG:
-            content["driver_detail"] = (str(getattr(exc, "orig", exc) or exc))[:800]
+            content["driver_detail"] = raw[:800]
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content=content,
