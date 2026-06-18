@@ -17,6 +17,7 @@ import profileService from "../api/services/profileService";
 import { apiBaseUrl } from "../config";
 import { colorTokens } from "../tokens/colors";
 import { toRoleLabel } from "../utils/formatters";
+import { getTimeGreeting, getFirstName } from "../utils/greeting";
 
 function MainLayout() {
   const theme = useTheme();
@@ -155,6 +156,8 @@ function MainLayout() {
 
   const DRAWER_WIDTH = 280;
   const COLLAPSED_DRAWER_WIDTH = 80;
+  const headerGreeting = getTimeGreeting(new Date().getHours());
+  const headerFirstName = getFirstName(user?.full_name || "User");
 
   return (
     <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
@@ -203,11 +206,12 @@ function MainLayout() {
         >
           <Toolbar
             sx={{
-              minHeight: 68,
-              px: { xs: 2, md: 3 },
+              minHeight: { xs: 56, sm: 60, md: 68 },
+              px: { xs: 1.5, sm: 2, md: 3 },
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              gap: 1,
             }}
           >
             {/* Column 1: Left - Logo & Branding */}
@@ -284,48 +288,51 @@ function MainLayout() {
               )}
             </Box>
 
-            {/* Column 2: Center - Tenant Name (Visible on MD+) */}
-            {!isMobile && user?.tenant && (
-              <Box
-                sx={{
-                  flex: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 1,
-                  px: 2
-                }}
-              >
-                <Typography
-                  variant="h5"
-                  sx={{
-                    fontWeight: 800,
-                    letterSpacing: "0.5px",
-                    background: "linear-gradient(45deg, #1e293b 30%, #334155 90%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    textAlign: "center",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis"
-                  }}
-                >
-                  {user.tenant.name}
-                </Typography>
-              </Box>
-            )}
-
-            {/* Column 3: Right - Actions & User Menu */}
+            {/* Right — greeting + user profile */}
             <Box
               sx={{
-                flex: { xs: '0 1 auto', md: 1 },
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                gap: 2,
+                flex: { xs: 1, md: "0 1 auto" },
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: { xs: 1, sm: 1.5, md: 2 },
                 zIndex: 2,
+                minWidth: 0,
               }}
             >
+              {isAuthenticated && user && (
+                <Typography
+                  component="div"
+                  sx={{
+                    fontWeight: 800,
+                    letterSpacing: "-0.02em",
+                    color: colorTokens.text.primary,
+                    textAlign: "right",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    maxWidth: { xs: 140, sm: 260, md: 320, lg: 420 },
+                    fontSize: { xs: "0.9rem", sm: "1.05rem", md: "1.15rem", lg: "1.2rem" },
+                    lineHeight: 1.25,
+                  }}
+                >
+                  {headerGreeting.text},{" "}
+                  <Box component="span" sx={{ color: colorTokens.primary.main, fontWeight: 800 }}>
+                    {headerFirstName}
+                  </Box>{" "}
+                  <Box
+                    component="span"
+                    sx={{
+                      display: "inline-block",
+                      fontSize: { xs: "1rem", sm: "1.1rem", md: "1.2rem" },
+                      animation: "headerWaveHand 2.5s ease-in-out infinite",
+                      transformOrigin: "70% 70%",
+                    }}
+                  >
+                    👋
+                  </Box>
+                </Typography>
+              )}
 
               {/* User menu */}
               {isAuthenticated && user && (
@@ -334,9 +341,9 @@ function MainLayout() {
                   sx={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 1.5,
+                    gap: { xs: 0.75, sm: 1.5 },
                     cursor: "pointer",
-                    padding: "6px 12px",
+                    padding: { xs: "4px 6px", sm: "6px 12px" },
                     borderRadius: "14px",
                     transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                     border: "1px solid transparent",
@@ -347,7 +354,7 @@ function MainLayout() {
                     }
                   }}
                 >
-                  <Box sx={{ display: { xs: "none", md: "flex" }, flexDirection: "column", alignItems: "flex-end" }}>
+                  <Box sx={{ display: { xs: "none", lg: "flex" }, flexDirection: "column", alignItems: "flex-end" }}>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: "text.primary", lineHeight: 1.1 }}>
                       {user.full_name || 'User'}
                     </Typography>
@@ -373,12 +380,13 @@ function MainLayout() {
                     key={avatarKey}
                     src={avatarSrc || ''}
                     sx={{
-                      width: 42,
-                      height: 42,
+                      width: { xs: 36, sm: 42 },
+                      height: { xs: 36, sm: 42 },
                       bgcolor: "primary.main",
                       boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)",
                       border: "2px solid white",
                       transition: "transform 0.2s",
+                      fontSize: { xs: "0.85rem", sm: "1rem" },
                       "&:hover": { transform: "scale(1.05)" }
                     }}
                   >
@@ -520,6 +528,18 @@ function MainLayout() {
         </Box>
       </Box>
       {isAuthenticated && <AIAssistant />}
+      <style>{`
+        @keyframes headerWaveHand {
+          0%  { transform: rotate(0deg); }
+          10% { transform: rotate(14deg); }
+          20% { transform: rotate(-8deg); }
+          30% { transform: rotate(14deg); }
+          40% { transform: rotate(-4deg); }
+          50% { transform: rotate(10deg); }
+          60% { transform: rotate(0deg); }
+          100%{ transform: rotate(0deg); }
+        }
+      `}</style>
     </Box>
   );
 }

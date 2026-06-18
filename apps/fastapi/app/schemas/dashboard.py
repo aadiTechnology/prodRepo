@@ -9,6 +9,10 @@ class AttendanceOverview(BaseModel):
     absent: int = Field(default=0)
     half_day: int = Field(default=0)
     leave: int = Field(default=0)
+    present_boys: int = Field(default=0)
+    present_girls: int = Field(default=0)
+    absent_boys: int = Field(default=0)
+    absent_girls: int = Field(default=0)
 
 class LeadStatusCount(BaseModel):
     """Lead counts grouped by status."""

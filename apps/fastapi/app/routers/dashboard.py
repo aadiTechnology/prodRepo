@@ -156,6 +156,51 @@ def _class_gender_counts(db: Session, tenant_id: int, class_id: int, division_id
     return boys, girls, new_this_month
 
 
+_BOY_GENDERS = ("male", "boy", "m")
+_GIRL_GENDERS = ("female", "girl", "f")
+
+
+def _apply_attendance_gender_breakdown(
+    db: Session,
+    overview: AttendanceOverview,
+    tenant_id: int,
+    scope_filters: list,
+) -> None:
+    """Fill present_boys/girls and absent_boys/girls for the same scope as overview counts."""
+    if not scope_filters:
+        return
+    q = (
+        db.query(
+            StudentAttendance.status,
+            func.lower(Student.gender),
+            func.count(StudentAttendance.id),
+        )
+        .join(Student, Student.id == StudentAttendance.student_id)
+        .filter(StudentAttendance.tenant_id == tenant_id)
+        .filter(StudentAttendance.is_deleted == False)
+    )
+    for f in scope_filters:
+        q = q.filter(f)
+    rows = q.group_by(StudentAttendance.status, func.lower(Student.gender)).all()
+    for status, gender, cnt in rows:
+        if not status:
+            continue
+        sl = str(status).lower()
+        g = (gender or "").strip()
+        is_boy = g in _BOY_GENDERS
+        is_girl = g in _GIRL_GENDERS
+        if "present" in sl or "half" in sl:
+            if is_boy:
+                overview.present_boys += cnt
+            elif is_girl:
+                overview.present_girls += cnt
+        elif "absent" in sl:
+            if is_boy:
+                overview.absent_boys += cnt
+            elif is_girl:
+                overview.absent_girls += cnt
+
+
 # ─── Endpoint ─────────────────────────────────────────────────────────────────
 @router.get("/me", response_model=DashboardResponse)
 def get_my_dashboard(
@@ -279,7 +324,17 @@ def get_attendance_card(
             if class_id:
                 base_q = base_q.filter(StudentAttendance.class_id == class_id)
 
+        scope_filters: list = [
+            StudentAttendance.tenant_id == tenant_id,
+            StudentAttendance.is_deleted == False,
+        ]
+        if is_teacher and clauses:
+            scope_filters.append(or_(*clauses))
+        elif class_id:
+            scope_filters.append(StudentAttendance.class_id == class_id)
+
         if start_date and end_date:
+            scope_filters.append(StudentAttendance.attendance_date.between(start_date, end_date))
             att_counts = (
                 base_q.filter(StudentAttendance.attendance_date.between(start_date, end_date))
                 .group_by(StudentAttendance.status).all()
@@ -298,6 +353,7 @@ def get_attendance_card(
 
             latest = latest_q.order_by(StudentAttendance.attendance_date.desc()).first()
             if latest:
+                scope_filters.append(StudentAttendance.attendance_date == latest[0])
                 att_counts = (
                     base_q.filter(StudentAttendance.attendance_date == latest[0])
                     .group_by(StudentAttendance.status).all()
@@ -315,6 +371,8 @@ def get_attendance_card(
                 overview.half_day = cnt
             elif "leave" in sl:
                 overview.leave = cnt
+
+        _apply_attendance_gender_breakdown(db, overview, tenant_id, scope_filters)
 
         return overview
 
@@ -694,6 +752,7 @@ def _build_teacher_dashboard(
     # Attendance for assigned classes — section-specific date range
     att_counts = []
     absentees = []
+    att_gender_filters: list = []
     if attendance_pairs:
         clauses = [
             and_(StudentAttendance.class_id == cid, StudentAttendance.class_division_id == did)
@@ -715,6 +774,12 @@ def _build_teacher_dashboard(
         )
 
         if eff_att_start and eff_att_end:
+            att_gender_filters = [
+                StudentAttendance.tenant_id == tenant_id,
+                StudentAttendance.is_deleted == False,
+                or_(*clauses),
+                StudentAttendance.attendance_date.between(eff_att_start, eff_att_end),
+            ]
             att_counts = (
                 base_att.filter(StudentAttendance.attendance_date.between(eff_att_start, eff_att_end))
                 .group_by(StudentAttendance.status).all()
@@ -731,6 +796,12 @@ def _build_teacher_dashboard(
             )
             if latest:
                 target = latest[0]
+                att_gender_filters = [
+                    StudentAttendance.tenant_id == tenant_id,
+                    StudentAttendance.is_deleted == False,
+                    or_(*clauses),
+                    StudentAttendance.attendance_date == target,
+                ]
                 att_counts = (
                     base_att.filter(StudentAttendance.attendance_date == target)
                     .group_by(StudentAttendance.status).all()
@@ -762,6 +833,9 @@ def _build_teacher_dashboard(
             overview.half_day = cnt
         elif "leave" in sl:
             overview.leave = cnt
+
+    if att_gender_filters:
+        _apply_attendance_gender_breakdown(db, overview, tenant_id, att_gender_filters)
 
     # Weekly trend (last 5 days)
     weekly_points = []

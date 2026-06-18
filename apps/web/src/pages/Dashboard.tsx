@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   Box,
-  Container,
   Grid,
   Card,
   CardContent,
@@ -21,7 +20,6 @@ import {
   TableHead,
   TableRow,
   MenuItem,
-  Alert,
 } from "@mui/material";
 import {
   School as SchoolIcon,
@@ -40,9 +38,6 @@ import {
   Warning as WarningIcon,
   Refresh as RefreshIcon,
   AccessTime as AccessTimeIcon,
-  WbSunny as SunIcon,
-  WbTwilight as SunriseIcon,
-  NightsStay as MoonIcon,
   Star as StarIcon,
   Call as CallIcon,
   AssignmentInd as AssignmentIndIcon,
@@ -50,6 +45,8 @@ import {
   Assignment as HomeworkIcon,
   MenuBook as SubjectIcon,
   PersonAdd as PersonAddIcon,
+  Person as PersonIcon,
+  Email as EmailIcon,
   Edit as EditIcon,
   CheckBox as QuickMarkIcon,
   DragIndicator as DragHandleIcon,
@@ -84,17 +81,24 @@ import dashboardService, {
   FeeCollectionSummary,
 } from "../api/services/dashboardService";
 import schoolClassService, { SchoolClass } from "../api/services/schoolClassService";
+import academicYearService, { AcademicYear } from "../api/services/academicYearService";
+import profileService from "../api/services/profileService";
 import { formatLastLoginLabel, getPreviousLoginIso } from "../utils/lastLoginStorage";
+import { toRoleLabel } from "../utils/formatters";
+import { toMediaUrl } from "../utils/mediaUrl";
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
 const C = {
+  brand: "#1E40AF",
+  brandLight: "#3B82F6",
+  brandDark: "#1E3A8A",
   blue: "#2563EB",
   blueDark: "#1D4ED8",
   blueGlass: "rgba(37,99,235,0.08)",
-  green: "#16A34A",
-  greenGlass: "rgba(22,163,74,0.08)",
+  green: "#059669",
+  greenGlass: "rgba(5,150,105,0.1)",
   amber: "#D97706",
-  amberGlass: "rgba(217,119,6,0.08)",
+  amberGlass: "rgba(217,119,6,0.1)",
   red: "#DC2626",
   redGlass: "rgba(220,38,38,0.08)",
   purple: "#7C3AED",
@@ -102,10 +106,54 @@ const C = {
   slate: "#0F172A",
   slateText: "#1E293B",
   muted: "#64748B",
-  border: "rgba(226,232,240,0.8)",
-  cardBg: "rgba(255,255,255,0.72)",
-  cardBorder: "rgba(255,255,255,0.55)",
+  mutedLight: "#94A3B8",
+  border: "#E2E8F0",
+  borderLight: "#F1F5F9",
+  surface: "#FFFFFF",
+  surfaceMuted: "#F8FAFC",
+  cardBg: "#FFFFFF",
+  cardBorder: "#E2E8F0",
   white: "#FFFFFF",
+  pageBg: "transparent",
+  navyStart: "#0F172A",
+  navyMid: "#1E3A8A",
+  navyEnd: "#2563EB",
+  shadow: "0 1px 2px rgba(15,23,42,0.04), 0 4px 16px rgba(15,23,42,0.05)",
+  shadowMd: "0 4px 6px rgba(15,23,42,0.04), 0 12px 32px rgba(15,23,42,0.07)",
+  radius: { sm: "10px", md: "14px", lg: "16px", xl: "20px" },
+};
+
+const filterChipSx = (active: boolean) => ({
+  height: 28,
+  fontSize: "0.72rem",
+  fontWeight: 700,
+  borderRadius: "8px",
+  cursor: "pointer",
+  bgcolor: active ? C.brand : C.surface,
+  color: active ? "#fff" : C.muted,
+  border: `1.5px solid ${active ? C.brand : C.border}`,
+  transition: "all 0.15s ease",
+  "&:hover": {
+    bgcolor: active ? C.brandDark : C.surfaceMuted,
+    borderColor: active ? C.brandDark : C.brandLight,
+    color: active ? "#fff" : C.slateText,
+  },
+});
+
+const dateFieldSx = {
+  width: { xs: "100%", sm: 132 },
+  minWidth: 120,
+  "& .MuiOutlinedInput-root": {
+    height: 28,
+    fontSize: "0.72rem",
+    fontWeight: 600,
+    borderRadius: "8px",
+    bgcolor: C.surface,
+    "& fieldset": { borderColor: C.border },
+    "&:hover fieldset": { borderColor: C.brandLight },
+    "&.Mui-focused fieldset": { borderColor: C.brand },
+  },
+  "& input": { py: "4px !important", px: "8px !important" },
 };
 
 // ─── Draggable section infrastructure ────────────────────────────────────────
@@ -235,19 +283,7 @@ const CardDateFilter: React.FC<{
         label={p.label}
         size="small"
         onClick={() => onChange({ preset: p.key, ...getPresetRange(p.key) })}
-        sx={{
-          height: 22,
-          fontSize: "11px",
-          fontWeight: 700,
-          borderRadius: "6px",
-          cursor: "pointer",
-          bgcolor: value.preset === p.key ? C.blue : C.blueGlass,
-          color: value.preset === p.key ? "#fff" : C.muted,
-          border: `1px solid ${value.preset === p.key ? C.blue : "rgba(37,99,235,0.18)"}`,
-          "&:hover": {
-            bgcolor: value.preset === p.key ? C.blueDark : "rgba(37,99,235,0.14)",
-          },
-        }}
+        sx={filterChipSx(value.preset === p.key)}
       />
     ))}
     {value.preset === "custom" && (
@@ -259,7 +295,7 @@ const CardDateFilter: React.FC<{
           onChange={(e) => onChange({ ...value, start: e.target.value })}
           InputLabelProps={{ shrink: true }}
           inputProps={{ style: { fontSize: 11, padding: "3px 7px" } }}
-          sx={{ width: 128, "& fieldset": { borderRadius: "6px" } }}
+          sx={dateFieldSx}
         />
         <TextField
           type="date"
@@ -268,30 +304,97 @@ const CardDateFilter: React.FC<{
           onChange={(e) => onChange({ ...value, end: e.target.value })}
           InputLabelProps={{ shrink: true }}
           inputProps={{ style: { fontSize: 11, padding: "3px 7px" } }}
-          sx={{ width: 128, "& fieldset": { borderRadius: "6px" } }}
+          sx={dateFieldSx}
         />
       </Box>
     )}
   </Box>
 );
 
-// ─── Glassmorphic card shell ──────────────────────────────────────────────────
+// ─── Attendance date filter: Month + single specific-date Custom ──────────────
+// Unlike CardDateFilter (which uses a start/end range for "custom"), attendance
+// "custom" selects ONE day. It defaults to today and disallows future dates.
+const ATT_PRESETS: Array<{ key: DatePreset; label: string }> = [
+  { key: "month", label: "Month" },
+  { key: "custom", label: "Custom" },
+];
+
+const clampDate = (d: string, min?: string, max?: string) => {
+  let v = d;
+  if (min && v < min) v = min;
+  if (max && v > max) v = max;
+  return v;
+};
+
+const AttendanceDateFilter: React.FC<{
+  value: SectionDateFilter;
+  onChange: (f: SectionDateFilter) => void;
+  /** Academic-year lower bound (YYYY-MM-DD) — earliest selectable day. */
+  minDate?: string;
+  /** Upper bound (YYYY-MM-DD) — defaults to today; future days disabled. */
+  maxDate?: string;
+}> = ({ value, onChange, minDate, maxDate }) => {
+  const todayIso = isoDate(new Date());
+  const max = maxDate || todayIso;
+  // Custom always defaults to TODAY (clamped to the academic year), not the
+  // Month preset's start date.
+  const defaultDay = clampDate(todayIso, minDate, max);
+  const selectedDay =
+    value.preset === "custom" && value.start ? clampDate(value.start, minDate, max) : defaultDay;
+
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+      {ATT_PRESETS.map((p) => {
+        const active = value.preset === p.key;
+        return (
+          <Chip
+            key={p.key}
+            label={p.label}
+            size="small"
+            onClick={() =>
+              p.key === "custom"
+                ? onChange({ preset: "custom", start: defaultDay, end: defaultDay })
+                : onChange({ preset: p.key, ...getPresetRange(p.key) })
+            }
+            sx={filterChipSx(active)}
+          />
+        );
+      })}
+      {value.preset === "custom" && (
+        <TextField
+          type="date"
+          size="small"
+          value={selectedDay}
+          onChange={(e) => {
+            const d = e.target.value;
+            if (!d) return;
+            const clamped = clampDate(d, minDate, max);
+            onChange({ preset: "custom", start: clamped, end: clamped });
+          }}
+          InputLabelProps={{ shrink: true }}
+          inputProps={{ min: minDate, max, style: { fontSize: 11, padding: "3px 7px" } }}
+          sx={dateFieldSx}
+        />
+      )}
+    </Box>
+  );
+};
+
+// ─── Card shell + shared UI primitives ───────────────────────────────────────
 const GCard: React.FC<{ children: React.ReactNode; sx?: object }> = ({ children, sx }) => (
   <Card
     elevation={0}
     sx={{
-      borderRadius: "20px",
-      border: `1.5px solid ${C.cardBorder}`,
+      borderRadius: C.radius.lg,
+      border: `1px solid ${C.cardBorder}`,
       background: C.cardBg,
-      backdropFilter: "blur(16px)",
-      boxShadow: "0 4px 24px rgba(15,23,42,0.04), inset 0 1px 0 rgba(255,255,255,0.55)",
-      transition: "all 0.3s cubic-bezier(0.16,1,0.3,1)",
+      boxShadow: C.shadow,
+      transition: "box-shadow 0.2s ease, border-color 0.2s ease",
       position: "relative",
       overflow: "hidden",
       "&:hover": {
-        boxShadow: "0 8px 32px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.7)",
-        borderColor: "rgba(255,255,255,0.7)",
-        transform: "translateY(-2px)",
+        boxShadow: C.shadowMd,
+        borderColor: "#CBD5E1",
       },
       ...sx,
     }}
@@ -300,7 +403,56 @@ const GCard: React.FC<{ children: React.ReactNode; sx?: object }> = ({ children,
   </Card>
 );
 
-// ─── Card section header with optional date filter ────────────────────────────
+const ActionLink: React.FC<{ label: string; onClick: () => void }> = ({ label, onClick }) => (
+  <Button
+    size="small"
+    endIcon={<ArrowIcon sx={{ fontSize: "14px !important" }} />}
+    onClick={onClick}
+    sx={{
+      color: C.brand,
+      fontWeight: 700,
+      textTransform: "none",
+      fontSize: { xs: "0.75rem", sm: "0.8rem" },
+      px: { xs: 0.5, sm: 1 },
+      minWidth: 0,
+      whiteSpace: "nowrap",
+      "&:hover": { bgcolor: C.blueGlass },
+    }}
+  >
+    {label}
+  </Button>
+);
+
+const StatPill: React.FC<{ label: string; value: string | number; color: string; bg: string }> = ({
+  label, value, color, bg,
+}) => (
+  <Box
+    sx={{
+      p: { xs: 1.25, sm: 1.5 },
+      bgcolor: bg,
+      borderRadius: C.radius.md,
+      border: `1px solid ${color}22`,
+    }}
+  >
+    <Typography
+      sx={{
+        color: C.muted,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        fontSize: "0.65rem",
+        letterSpacing: "0.06em",
+        display: "block",
+        mb: 0.35,
+      }}
+    >
+      {label}
+    </Typography>
+    <Typography sx={{ fontWeight: 800, color, fontSize: { xs: "1.15rem", sm: "1.35rem" }, lineHeight: 1.1 }}>
+      {value}
+    </Typography>
+  </Box>
+);
+
 const CardHeader: React.FC<{
   title: string;
   icon?: React.ReactNode;
@@ -308,17 +460,65 @@ const CardHeader: React.FC<{
   dateFilter?: React.ReactNode;
 }> = ({ title, icon, action, dateFilter }) => (
   <Box sx={{ mb: 2.5 }}>
-    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: dateFilter ? 1.5 : 0 }}>
-      <Typography
-        variant="subtitle1"
-        sx={{ fontWeight: 800, color: C.slateText, display: "flex", alignItems: "center", gap: 1, letterSpacing: "-0.1px" }}
-      >
-        {icon}
-        {title}
-      </Typography>
-      {action}
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: { xs: "column", md: "row" },
+        justifyContent: "space-between",
+        alignItems: { xs: "stretch", md: "flex-start" },
+        gap: { xs: 1.25, md: 2 },
+        pb: dateFilter ? 1.5 : 0,
+        borderBottom: dateFilter ? `1px solid ${C.borderLight}` : "none",
+      }}
+    >
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, flex: 1, minWidth: 0 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
+          {icon && (
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: C.radius.sm,
+                bgcolor: C.blueGlass,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                "& .MuiSvgIcon-root": { fontSize: 18 },
+              }}
+            >
+              {icon}
+            </Box>
+          )}
+          <Typography
+            sx={{
+              fontWeight: 800,
+              color: C.slateText,
+              fontSize: { xs: "0.95rem", sm: "1.05rem" },
+              letterSpacing: "-0.02em",
+              lineHeight: 1.25,
+            }}
+          >
+            {title}
+          </Typography>
+        </Box>
+        {action && <Box sx={{ flexShrink: 0 }}>{action}</Box>}
+      </Box>
+      {dateFilter && (
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 1,
+            alignItems: "center",
+            justifyContent: { xs: "flex-start", md: "flex-end" },
+            width: { xs: "100%", md: "auto" },
+          }}
+        >
+          {dateFilter}
+        </Box>
+      )}
     </Box>
-    {dateFilter}
   </Box>
 );
 
@@ -397,31 +597,59 @@ const GenderCountChip = ({
 };
 
 const SnapCard: React.FC<SnapCardProps> = ({ title, value, icon, accentColor, glassBg, sub, onClick }) => (
-  <GCard sx={{ cursor: onClick ? "pointer" : "default" }}>
-    <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }} onClick={onClick}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1.5 }}>
+  <GCard sx={{ cursor: onClick ? "pointer" : "default", height: "100%" }}>
+    <Box
+      sx={{
+        height: 3,
+        background: `linear-gradient(90deg, ${accentColor}, ${accentColor}88)`,
+      }}
+    />
+    <CardContent
+      sx={{ p: { xs: 2, sm: 2.25 }, "&:last-child": { pb: { xs: 2, sm: 2.25 } } }}
+      onClick={onClick}
+    >
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 1.25 }}>
         <Typography
-          variant="caption"
-          sx={{ color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.9px", display: "block" }}
+          sx={{
+            color: C.muted,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.07em",
+            fontSize: "0.68rem",
+            lineHeight: 1.3,
+            minWidth: 0,
+            pt: 0.25,
+          }}
         >
           {title}
         </Typography>
-        <Avatar
+        <Box
           sx={{
+            width: 38,
+            height: 38,
+            borderRadius: C.radius.sm,
             bgcolor: glassBg,
             color: accentColor,
-            width: 40,
-            height: 40,
-            borderRadius: "12px",
-            border: `1.5px solid ${accentColor}22`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            border: `1px solid ${accentColor}20`,
           }}
         >
           {icon}
-        </Avatar>
+        </Box>
       </Box>
       <Typography
-        variant="h4"
-        sx={{ fontWeight: 900, color: C.slateText, letterSpacing: "-1.5px", lineHeight: 1.1, mb: sub ? 1 : 0 }}
+        sx={{
+          fontWeight: 800,
+          color: C.slateText,
+          fontSize: { xs: "1.65rem", sm: "1.85rem", lg: "2rem" },
+          letterSpacing: "-0.03em",
+          lineHeight: 1.05,
+          mb: sub ? 0.75 : 0,
+          wordBreak: "break-word",
+        }}
       >
         {value}
       </Typography>
@@ -718,22 +946,13 @@ const NoticesCardContent: React.FC<{
   );
 };
 
-// ─── Welcome banner ───────────────────────────────────────────────────────────
+// ─── Dashboard page header (greeting lives in MainLayout app bar) ─────────────
 const WelcomeBanner: React.FC<{
-  name: string;
-  tenantName?: string;
+  schoolName: string;
   lastLoginLabel: string;
   refreshing: boolean;
   onRefresh: () => void;
-}> = ({ name, tenantName, lastLoginLabel, refreshing, onRefresh }) => {
-  const hr = new Date().getHours();
-  const greet =
-    hr < 12
-      ? { text: "Good morning", icon: <SunriseIcon sx={{ color: "#FDE68A", fontSize: 28 }} />, sub: "Have a productive day!" }
-      : hr < 17
-        ? { text: "Good afternoon", icon: <SunIcon sx={{ color: "#FCD34D", fontSize: 28 }} />, sub: "Keep up the great work!" }
-        : { text: "Good evening", icon: <MoonIcon sx={{ color: "#C4B5FD", fontSize: 28 }} />, sub: "Hope your day went well." };
-
+}> = ({ schoolName, lastLoginLabel, refreshing, onRefresh }) => {
   const today = new Date().toLocaleDateString("en-IN", {
     weekday: "long",
     year: "numeric",
@@ -741,196 +960,153 @@ const WelcomeBanner: React.FC<{
     day: "numeric",
   });
 
-  const firstName = name.trim().split(/\s+/)[0] || name;
-
   return (
     <Box
       sx={{
-        mb: 3.5,
-        borderRadius: "24px",
-        position: "relative",
+        mb: { xs: 2.5, md: 3 },
+        borderRadius: { xs: C.radius.lg, md: C.radius.xl },
         overflow: "hidden",
-        boxShadow: "0 20px 60px -15px rgba(15,23,42,0.55)",
-        background: "linear-gradient(135deg, #0D1B3E 0%, #1A2F6E 45%, #1E40AF 100%)",
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          inset: 0,
-          background: [
-            "radial-gradient(ellipse 55% 120% at 100% 50%, rgba(99,102,241,0.28) 0%, transparent 60%)",
-            "radial-gradient(ellipse 40% 80% at 15% 0%, rgba(96,165,250,0.18) 0%, transparent 55%)",
-          ].join(", "),
-          pointerEvents: "none",
-        },
+        background: `linear-gradient(125deg, ${C.navyStart} 0%, ${C.navyMid} 48%, ${C.navyEnd} 100%)`,
+        boxShadow: "0 16px 48px rgba(15,23,42,0.22)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        position: "relative",
+        px: { xs: 2, sm: 2.5, md: 3 },
+        py: { xs: 2, sm: 2.5, md: 3 },
+        display: "flex",
+        flexDirection: { xs: "column", sm: "row" },
+        alignItems: { xs: "flex-start", sm: "center" },
+        justifyContent: "space-between",
+        gap: 2,
       }}
     >
-      {/* top shimmer line */}
-      <Box sx={{
-        position: "absolute", top: 0, left: 0, right: 0, height: 2,
-        background: "linear-gradient(90deg, transparent 0%, #60A5FA 30%, #A78BFA 60%, #34D399 80%, transparent 100%)",
-      }} />
+      <Box
+        sx={{
+          position: "absolute",
+          right: -60,
+          top: -60,
+          width: 220,
+          height: 220,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(59,130,246,0.25) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
 
-      {/* decorative circle */}
-      <Box sx={{
-        position: "absolute", right: -60, top: "50%", transform: "translateY(-50%)",
-        width: 340, height: 340, borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(99,102,241,0.22) 0%, transparent 70%)",
-        pointerEvents: "none",
-      }} />
-
-      <Box sx={{
-        position: "relative", zIndex: 1,
-        px: { xs: 3, md: 5 }, py: { xs: 3, md: 3.5 },
-        display: "flex",
-        flexDirection: { xs: "column", md: "row" },
-        alignItems: { xs: "flex-start", md: "center" },
-        gap: { xs: 2.5, md: 0 },
-      }}>
-
-        {/* ── Left: greeting ── */}
-        <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 2 }}>
-          {/* icon bubble */}
-          <Box sx={{
+      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, minWidth: 0, position: "relative", zIndex: 1 }}>
+        <Box
+          sx={{
+            width: { xs: 44, sm: 48 },
+            height: { xs: 44, sm: 48 },
+            borderRadius: C.radius.md,
+            bgcolor: "rgba(255,255,255,0.12)",
+            border: "1px solid rgba(255,255,255,0.18)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             flexShrink: 0,
-            width: 62, height: 62,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            borderRadius: "18px",
-            background: "rgba(255,255,255,0.1)",
-            border: "1.5px solid rgba(255,255,255,0.2)",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.25)",
-          }}>
-            {greet.icon}
-          </Box>
-          <Box>
-            <Typography sx={{
-              fontSize: { xs: "1.5rem", md: "1.75rem" },
-              fontWeight: 900,
-              lineHeight: 1.15,
-              letterSpacing: "-0.03em",
-              color: "#fff",
-            }}>
-              {greet.text},{" "}
-              <Box component="span" sx={{
-                background: "linear-gradient(90deg, #93C5FD, #C4B5FD)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}>
-                {firstName}
-              </Box>
-              {" "}
-              <Box component="span" sx={{ display: "inline-block", animation: "waveHand 2s infinite", transformOrigin: "70% 70%" }}>
-                👋
-              </Box>
-            </Typography>
-            <Typography sx={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.55)", fontWeight: 500, mt: 0.4 }}>
+            mt: 0.25,
+          }}
+        >
+          <SchoolIcon sx={{ color: "#FBBF24", fontSize: 26 }} />
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            sx={{
+              fontSize: { xs: "1rem", sm: "1.15rem", md: "1.3rem" },
+              fontWeight: 800,
+              letterSpacing: "0.02em",
+              color: "#FFFFFF",
+              textTransform: "uppercase",
+              lineHeight: 1.3,
+            }}
+          >
+            {schoolName}
+          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", mt: 0.75 }}>
+            <Typography
+              sx={{
+                fontWeight: 500,
+                color: "rgba(255,255,255,0.75)",
+                fontSize: { xs: "0.75rem", sm: "0.82rem" },
+                lineHeight: 1.3,
+              }}
+            >
               {today}
             </Typography>
-          </Box>
-        </Box>
-
-        {/* ── Center: school name (only when we have it, hidden on mobile) ── */}
-        {tenantName && (
-          <Box sx={{
-            display: { xs: "none", md: "flex" },
-            flexShrink: 0,
-            mx: 4,
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 0.5,
-            px: 4,
-            py: 2,
-            borderRadius: "16px",
-            background: "rgba(255,255,255,0.07)",
-            border: "1px solid rgba(255,255,255,0.14)",
-            backdropFilter: "blur(12px)",
-          }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <SchoolIcon sx={{ fontSize: 20, color: "#93C5FD", opacity: 0.9 }} />
-              <Typography sx={{
-                fontSize: "1.2rem",
-                fontWeight: 800,
-                letterSpacing: "-0.01em",
-                background: "linear-gradient(90deg, #FFFFFF 0%, #BFDBFE 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                whiteSpace: "nowrap",
-              }}>
-                {tenantName}
-              </Typography>
-            </Box>
-            <Typography sx={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-              {greet.sub}
-            </Typography>
-          </Box>
-        )}
-
-        {/* ── Right: last login + live + refresh ── */}
-        <Box sx={{
-          flexShrink: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: { xs: "flex-start", md: "flex-end" },
-          gap: 1.25,
-        }}>
-          {/* last login */}
-          <Box sx={{
-            display: "inline-flex", alignItems: "center", gap: 0.75,
-            px: 1.5, py: 0.6,
-            borderRadius: "10px",
-            bgcolor: "rgba(0,0,0,0.25)",
-            border: "1px solid rgba(255,255,255,0.1)",
-          }}>
-            <AccessTimeIcon sx={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }} />
-            <Typography sx={{ fontSize: "0.71rem", color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>
-              Last login · {lastLoginLabel}
-            </Typography>
-          </Box>
-
-          {/* live + refresh row */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
-            <Box sx={{
-              display: "inline-flex", alignItems: "center", gap: 0.75,
-              px: 1.5, py: 0.65,
-              borderRadius: "999px",
-              bgcolor: "rgba(16,185,129,0.15)",
-              border: "1px solid rgba(52,211,153,0.4)",
-            }}>
-              <Box sx={{
-                width: 7, height: 7, borderRadius: "50%",
-                bgcolor: "#34D399",
-                boxShadow: "0 0 8px rgba(52,211,153,0.9)",
-                animation: "pulseGreen 2s infinite",
-              }} />
-              <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#6EE7B7", letterSpacing: "0.1em" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              <Box
+                sx={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  bgcolor: "#4ADE80",
+                  boxShadow: "0 0 8px rgba(74,222,128,0.8)",
+                  animation: "pulseGreen 2s infinite",
+                }}
+              />
+              <Typography sx={{ fontSize: "0.65rem", fontWeight: 800, color: "#86EFAC", letterSpacing: "0.1em" }}>
                 LIVE
               </Typography>
             </Box>
+          </Box>
+          {refreshing && (
+            <Typography sx={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.55)", fontWeight: 600, mt: 0.5 }}>
+              Syncing latest data…
+            </Typography>
+          )}
+        </Box>
+      </Box>
 
-            {refreshing && (
-              <Typography sx={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.55)", fontWeight: 600 }}>
-                Syncing…
-              </Typography>
-            )}
-
-            <Tooltip title="Refresh dashboard">
-              <IconButton
-                onClick={onRefresh}
-                disabled={refreshing}
-                size="small"
-                sx={{
-                  width: 38, height: 38,
-                  bgcolor: "rgba(255,255,255,0.1)",
-                  color: "#fff",
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  "&:hover": { bgcolor: "rgba(255,255,255,0.2)", transform: "rotate(180deg)" },
-                  transition: "all 0.35s ease",
-                }}
-              >
-                <RefreshIcon sx={{ fontSize: 18, animation: refreshing ? "spin 1s linear infinite" : "none" }} />
-              </IconButton>
-            </Tooltip>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          position: "relative",
+          zIndex: 1,
+          alignSelf: { xs: "flex-end", sm: "center" },
+          flexShrink: 0,
+        }}
+      >
+        <Box
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 1,
+            px: 1.5,
+            py: 1,
+            borderRadius: C.radius.md,
+            bgcolor: "rgba(0,0,0,0.2)",
+            border: "1px solid rgba(255,255,255,0.1)",
+          }}
+        >
+          <AccessTimeIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.45)" }} />
+          <Box>
+            <Typography sx={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.45)", fontWeight: 800, letterSpacing: "0.08em", lineHeight: 1 }}>
+              LAST LOGIN
+            </Typography>
+            <Typography sx={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.9)", fontWeight: 700, lineHeight: 1.3 }}>
+              {lastLoginLabel}
+            </Typography>
           </Box>
         </Box>
+        <Tooltip title={refreshing ? "Syncing…" : "Refresh dashboard"}>
+          <IconButton
+            onClick={onRefresh}
+            disabled={refreshing}
+            size="small"
+            sx={{
+              width: 34,
+              height: 34,
+              bgcolor: "rgba(255,255,255,0.1)",
+              color: "rgba(255,255,255,0.85)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              "&:hover": { bgcolor: "rgba(255,255,255,0.18)" },
+            }}
+          >
+            <RefreshIcon sx={{ fontSize: 16, animation: refreshing ? "spin 1s linear infinite" : "none" }} />
+          </IconButton>
+        </Tooltip>
       </Box>
     </Box>
   );
@@ -938,23 +1114,273 @@ const WelcomeBanner: React.FC<{
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 const DashboardSkeleton: React.FC = () => (
-  <Container maxWidth="lg" sx={{ py: 4 }}>
-    <Skeleton variant="rectangular" height={100} sx={{ borderRadius: 3, mb: 3 }} />
-    <Grid container spacing={3}>
+  <Box sx={{ width: "100%", maxWidth: 1200, mx: "auto", py: { xs: 1.5, md: 2.5 } }}>
+    <Skeleton variant="rectangular" height={120} sx={{ borderRadius: C.radius.lg, mb: 3 }} />
+    <Grid container spacing={{ xs: 2, md: 2.5 }}>
       {[1, 2, 3, 4].map((i) => (
-        <Grid item xs={12} sm={6} md={3} key={i}>
-          <Skeleton variant="rectangular" height={120} sx={{ borderRadius: "20px" }} />
+        <Grid item xs={12} sm={6} lg={3} key={i}>
+          <Skeleton variant="rectangular" height={130} sx={{ borderRadius: C.radius.lg }} />
         </Grid>
       ))}
-      <Grid item xs={12} md={7}>
-        <Skeleton variant="rectangular" height={320} sx={{ borderRadius: "20px" }} />
+      <Grid item xs={12} lg={7}>
+        <Skeleton variant="rectangular" height={340} sx={{ borderRadius: C.radius.lg }} />
       </Grid>
-      <Grid item xs={12} md={5}>
-        <Skeleton variant="rectangular" height={320} sx={{ borderRadius: "20px" }} />
+      <Grid item xs={12} lg={5}>
+        <Skeleton variant="rectangular" height={340} sx={{ borderRadius: C.radius.lg }} />
       </Grid>
     </Grid>
-  </Container>
+  </Box>
 );
+
+type ProfileDetailLine = { icon?: React.ReactNode; text: string };
+
+function useProfileAvatarSrc(userId?: number, profileImagePath?: string | null) {
+  const [avatarSrc, setAvatarSrc] = useState<string | undefined>(() => toMediaUrl(profileImagePath));
+  const [avatarKey, setAvatarKey] = useState(0);
+
+  const refreshAvatar = useCallback(async () => {
+    try {
+      const data = await profileService.getProfile();
+      if (typeof data?.profile_image_path === "string") {
+        setAvatarSrc(toMediaUrl(data.profile_image_path));
+        setAvatarKey((k) => k + 1);
+      }
+    } catch {
+      // fall back to initials
+    }
+  }, []);
+
+  useEffect(() => {
+    if (profileImagePath) {
+      setAvatarSrc(toMediaUrl(profileImagePath));
+      return;
+    }
+    if (userId) void refreshAvatar();
+  }, [userId, profileImagePath, refreshAvatar]);
+
+  useEffect(() => {
+    const handler = () => void refreshAvatar();
+    window.addEventListener("profile-image-updated", handler);
+    window.addEventListener("profile-updated", handler);
+    return () => {
+      window.removeEventListener("profile-image-updated", handler);
+      window.removeEventListener("profile-updated", handler);
+    };
+  }, [refreshAvatar]);
+
+  return { avatarSrc, avatarKey };
+}
+
+const DashboardProfileCard: React.FC<{
+  details?: ProfileDetailLine[];
+  displayName?: string;
+  avatarOverride?: string;
+  /** card = grid widget (teacher/student); strip = full-width banner (admin) */
+  variant?: "card" | "strip";
+  metaChips?: string[];
+}> = ({ details = [], displayName, avatarOverride, variant = "card", metaChips = [] }) => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { roles: rbacRoles } = useRBAC();
+  const { avatarSrc, avatarKey } = useProfileAvatarSrc(user?.id, user?.profile_image_path);
+  const resolvedAvatar = avatarOverride || avatarSrc;
+  const name = displayName || user?.full_name || "User";
+  const roleLabel =
+    rbacRoles.length > 0
+      ? toRoleLabel(rbacRoles[0])
+      : user?.role === "SUPER_ADMIN"
+        ? "System Admin"
+        : user?.role || "User";
+
+  const avatarSize = variant === "strip" ? 56 : 72;
+
+  const avatarEl = (
+    <Avatar
+      key={avatarKey}
+      src={resolvedAvatar || ""}
+      imgProps={{ style: { objectFit: "cover" } }}
+      sx={{
+        width: avatarSize,
+        height: avatarSize,
+        bgcolor: C.brand,
+        fontSize: variant === "strip" ? "1.1rem" : "1.5rem",
+        fontWeight: 800,
+        border: `3px solid ${C.borderLight}`,
+        boxShadow: C.shadow,
+        flexShrink: 0,
+      }}
+    >
+      {!resolvedAvatar && name.charAt(0).toUpperCase()}
+    </Avatar>
+  );
+
+  const roleChip = (
+    <Chip
+      label={roleLabel}
+      size="small"
+      sx={{
+        height: 22,
+        fontSize: "0.65rem",
+        fontWeight: 800,
+        letterSpacing: "0.06em",
+        bgcolor: C.blueGlass,
+        color: C.brand,
+      }}
+    />
+  );
+
+  if (variant === "strip") {
+    const chips = metaChips.filter(Boolean);
+    return (
+      <GCard>
+        <CardContent sx={{ p: { xs: 1.75, sm: 2, md: 2.25 } }}>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              alignItems: { xs: "stretch", md: "center" },
+              gap: { xs: 1.5, md: 2 },
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flex: 1, minWidth: 0 }}>
+              {avatarEl}
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                  <Typography sx={{ fontWeight: 800, color: C.slateText, fontSize: { xs: "0.95rem", sm: "1.05rem" } }}>
+                    {name}
+                  </Typography>
+                  {roleChip}
+                </Box>
+                {user?.email && (
+                  <Typography sx={{ fontSize: "0.8rem", color: C.muted, fontWeight: 600, mt: 0.4 }} noWrap>
+                    {user.email}
+                  </Typography>
+                )}
+                {chips.length > 0 && (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mt: 1 }}>
+                    {chips.map((chip) => (
+                      <Chip
+                        key={chip}
+                        label={chip}
+                        size="small"
+                        sx={{
+                          height: 24,
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          bgcolor: C.surfaceMuted,
+                          color: C.slateText,
+                          border: `1px solid ${C.border}`,
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            </Box>
+            <Button
+              variant="outlined"
+              size="small"
+              endIcon={<ArrowIcon sx={{ fontSize: "14px !important" }} />}
+              onClick={() => navigate("/profile")}
+              sx={{
+                alignSelf: { xs: "stretch", md: "center" },
+                borderRadius: C.radius.sm,
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: "0.8rem",
+                color: C.brand,
+                borderColor: C.border,
+                px: 2,
+                "&:hover": { bgcolor: C.blueGlass, borderColor: C.brandLight },
+              }}
+            >
+              View Profile
+            </Button>
+          </Box>
+        </CardContent>
+      </GCard>
+    );
+  }
+
+  return (
+    <GCard sx={{ height: "100%" }}>
+      <CardContent sx={{ p: { xs: 2, sm: 2.5 }, height: "100%" }}>
+        <CardHeader
+          title="My Profile"
+          icon={<PersonIcon sx={{ color: C.brand }} />}
+          action={<ActionLink label="View Profile" onClick={() => navigate("/profile")} />}
+        />
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", sm: "row" },
+            alignItems: { xs: "center", sm: "flex-start" },
+            gap: 2,
+          }}
+        >
+          {avatarEl}
+          <Box sx={{ flex: 1, minWidth: 0, textAlign: { xs: "center", sm: "left" } }}>
+            <Typography sx={{ fontWeight: 800, color: C.slateText, fontSize: "1.05rem", lineHeight: 1.25 }}>
+              {name}
+            </Typography>
+            <Box sx={{ mt: 0.75, display: "flex", justifyContent: { xs: "center", sm: "flex-start" } }}>
+              {roleChip}
+            </Box>
+            {user?.email && (
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                  mt: 1.25,
+                  justifyContent: { xs: "center", sm: "flex-start" },
+                }}
+              >
+                <EmailIcon sx={{ fontSize: 15, color: C.muted }} />
+                <Typography sx={{ fontSize: "0.8rem", color: C.muted, fontWeight: 600 }} noWrap>
+                  {user.email}
+                </Typography>
+              </Box>
+            )}
+            {details.map((line, index) => (
+              <Box
+                key={`${line.text}-${index}`}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                  mt: 1,
+                  justifyContent: { xs: "center", sm: "flex-start" },
+                }}
+              >
+                {line.icon}
+                <Typography sx={{ fontSize: "0.8rem", color: C.slateText, fontWeight: 600 }}>
+                  {line.text}
+                </Typography>
+              </Box>
+            ))}
+            {user?.tenant?.name && !details.some((d) => d.text === user.tenant?.name) && (
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                  mt: 1,
+                  justifyContent: { xs: "center", sm: "flex-start" },
+                }}
+              >
+                <SchoolIcon sx={{ fontSize: 15, color: C.muted }} />
+                <Typography sx={{ fontSize: "0.8rem", color: C.slateText, fontWeight: 600 }}>
+                  {user.tenant.name}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Box>
+      </CardContent>
+    </GCard>
+  );
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 1. ADMIN DASHBOARD
@@ -974,6 +1400,9 @@ interface AdminViewProps {
   classes: Array<{ id: number; name: string }>;
   selectedClassId: number | "";
   onClassChange: (classId: number | "") => void;
+  /** Academic-year bounds for the attendance single-date picker. */
+  attMinDate?: string;
+  attMaxDate?: string;
 }
 
 const AdminDashboardView: React.FC<AdminViewProps> = ({
@@ -989,8 +1418,11 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
   classes,
   selectedClassId,
   onClassChange,
+  attMinDate,
+  attMaxDate,
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Use fast-endpoint override if available, fall back to full-load data
   const attData = attOverride ?? data.attendance_overview;
@@ -1053,7 +1485,7 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
   ];
 
   const ADMIN_KPI_DEFAULT     = ["admin_students", "admin_classes", "admin_fees", "admin_balance"];
-  const ADMIN_SECTIONS_DEFAULT = ["notices", "attendance_fee", "leads", "quick_actions"];
+  const ADMIN_SECTIONS_DEFAULT = ["attendance_fee", "notices", "leads", "quick_actions"];
 
   const kpiSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [kpiOrder, setKpiOrder] = useSectionOrder("admin_kpi_order", ADMIN_KPI_DEFAULT);
@@ -1082,13 +1514,8 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
               <CardContent sx={{ p: 3 }}>
                 <CardHeader
                   title="Recent Notices & Holidays"
-                  icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
-                  action={
-                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/communication/notices")}
-                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
-                      View All
-                    </Button>
-                  }
+                  icon={<NoticeIcon sx={{ color: C.red }} />}
+                  action={<ActionLink label="View All" onClick={() => navigate("/communication/notices")} />}
                 />
                 <NoticesCardContent notices={data.recent_notices} navigate={navigate} />
               </CardContent>
@@ -1101,32 +1528,30 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
           <SortableSection key={id} id={id}>
             <Grid container spacing={3}>
               {/* Attendance Overview */}
-              <Grid item xs={12} md={7}>
+              <Grid item xs={12} lg={7}>
                 <GCard sx={{ height: "100%" }}>
-                  <CardContent sx={{ p: 3 }}>
+                  <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                     <CardHeader
                       title="Attendance Overview"
-                      icon={<AttendanceIcon color="primary" sx={{ fontSize: 20 }} />}
-                      action={
-                        <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/attendance/report")}
-                          sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
-                          View Details
-                        </Button>
-                      }
+                      icon={<AttendanceIcon sx={{ color: C.brand }} />}
+                      action={<ActionLink label="View Details" onClick={() => navigate("/attendance/report")} />}
                       dateFilter={
-                        <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", width: "100%" }}>
-                          <CardDateFilter value={attFilter} onChange={onAttFilterChange} />
+                        <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                          <AttendanceDateFilter value={attFilter} onChange={onAttFilterChange} minDate={attMinDate} maxDate={attMaxDate} />
                           <TextField select size="small" value={selectedClassId}
                             onChange={(e) => onClassChange(e.target.value as number | "")}
                             SelectProps={{ displayEmpty: true }}
                             sx={{
-                              minWidth: 130,
+                              width: { xs: "100%", sm: 140 },
                               "& .MuiOutlinedInput-root": {
-                                height: 26, fontSize: "11px", fontWeight: 700, borderRadius: "6px",
-                                bgcolor: C.blueGlass, color: C.slateText,
-                                "& fieldset": { borderColor: "rgba(37,99,235,0.18)" },
-                                "&:hover fieldset": { borderColor: C.blue },
-                                "&.Mui-focused fieldset": { borderColor: C.blue },
+                                height: 28,
+                                fontSize: "0.72rem",
+                                fontWeight: 600,
+                                borderRadius: "8px",
+                                bgcolor: C.surfaceMuted,
+                                "& fieldset": { borderColor: C.border },
+                                "&:hover fieldset": { borderColor: C.brandLight },
+                                "&.Mui-focused fieldset": { borderColor: C.brand },
                               },
                             }}
                           >
@@ -1146,9 +1571,9 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
                         </Box>
                       </Box>
                     ) : (
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: { xs: "center", md: "flex-start" }, gap: { xs: 2, md: 3 }, flexWrap: { xs: "wrap", md: "nowrap" } }}>
                         <AttRing pct={attPct} size={140} color={attPct >= 75 ? C.green : C.amber} gradId="adminAttGrad" />
-                        <Grid container spacing={1.5} sx={{ flex: 1, minWidth: 160 }}>
+                        <Grid container spacing={1.5} sx={{ flex: 1, minWidth: { xs: "100%", md: 220 } }}>
                           {[
                             { label: "Present",  value: present,  color: C.green, bg: C.greenGlass },
                             { label: "Absent",   value: absent,   color: C.red,   bg: C.redGlass   },
@@ -1156,12 +1581,7 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
                             { label: "On Leave", value: leave,    color: C.blue,  bg: C.blueGlass  },
                           ].map((item) => (
                             <Grid item xs={6} key={item.label}>
-                              <Box sx={{ p: 1.5, bgcolor: item.bg, borderRadius: "12px", borderLeft: `3px solid ${item.color}` }}>
-                                <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, textTransform: "uppercase", display: "block", fontSize: "10px" }}>
-                                  {item.label}
-                                </Typography>
-                                <Typography variant="h5" sx={{ fontWeight: 900, color: item.color, mt: 0.3 }}>{item.value}</Typography>
-                              </Box>
+                              <StatPill label={item.label} value={item.value} color={item.color} bg={item.bg} />
                             </Grid>
                           ))}
                         </Grid>
@@ -1171,19 +1591,14 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
                 </GCard>
               </Grid>
 
-              {/* Fee Collection Progress */}
-              <Grid item xs={12} md={5}>
+              {/* Fee Collection */}
+              <Grid item xs={12} lg={5}>
                 <GCard sx={{ height: "100%" }}>
-                  <CardContent sx={{ p: 3 }}>
+                  <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                     <CardHeader
                       title="Fee Collection Progress"
-                      icon={<FeeIcon color="success" sx={{ fontSize: 20 }} />}
-                      action={
-                        <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/fees/invoices")}
-                          sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
-                          Collect Fee
-                        </Button>
-                      }
+                      icon={<FeeIcon sx={{ color: C.green }} />}
+                      action={<ActionLink label="Collect Fee" onClick={() => navigate("/fees/invoices")} />}
                       dateFilter={
                         <CardDateFilter value={feeFilter} onChange={onFeeFilterChange}
                           presets={[
@@ -1373,20 +1788,32 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
   };
 
   return (
-    <Grid container spacing={3}>
+    <Grid container spacing={{ xs: 2, md: 2.5 }}>
       {/* ─ Row 1: KPI snap cards — individually draggable ─ */}
       <Grid item xs={12}>
         <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
           <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
             <Grid container spacing={3}>
               {kpiOrder.map((id) => (
-                <Grid item xs={12} sm={6} md={3} key={id}>
+                <Grid item xs={12} sm={6} md={6} lg={3} key={id}>
                   <SortableSection id={id}>{renderAdminKpi(id)}</SortableSection>
                 </Grid>
               ))}
             </Grid>
           </SortableContext>
         </DndContext>
+      </Grid>
+
+      {/* ── Profile strip ── */}
+      <Grid item xs={12}>
+        <DashboardProfileCard
+          variant="strip"
+          metaChips={[
+            user?.tenant?.name || "",
+            `${data.student_snapshot.active_students} Students`,
+            `${data.student_snapshot.total_classes} Classes`,
+          ].filter(Boolean)}
+        />
       </Grid>
 
       {/* ─ Draggable sections ─ */}
@@ -1415,11 +1842,14 @@ interface TeacherViewProps {
   classes: Array<{ id: number; name: string }>;
   selectedClassId: number | "";
   onClassChange: (classId: number | "") => void;
+  /** Academic-year bounds for the attendance single-date picker. */
+  attMinDate?: string;
+  attMaxDate?: string;
 }
 
-const TEACHER_KPI_DEFAULT   = ["kpi_students", "kpi_att", "kpi_classes", "kpi_new"];
-const TEACHER_CARDS_DEFAULT = ["card_att", "card_classes", "card_homework", "card_notices"];
-const TEACHER_CARDS_SUBJECT = ["card_homework", "card_classes", "card_att", "card_notices"];
+const TEACHER_KPI_DEFAULT   = ["kpi_students", "kpi_present", "kpi_absent", "kpi_pct"];
+const TEACHER_CARDS_DEFAULT = ["card_att", "card_profile", "card_homework", "card_notices"];
+const TEACHER_CARDS_SUBJECT = ["card_homework", "card_profile", "card_att", "card_notices"];
 
 function aggregateTeacherDivisionStats(classes: TeacherDashboardData["assigned_classes"]) {
   const seen = new Set<string>();
@@ -1448,18 +1878,27 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   classes,
   selectedClassId,
   onClassChange,
+  attMinDate,
+  attMaxDate,
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const isSubjectFocused = data.dashboard_mode === "subject_focused";
   const canMarkAttendance = data.can_mark_attendance !== false && !isSubjectFocused;
-  const subjectSlots = data.assigned_classes.filter((c) => c.designation === "Subject Teacher");
   const classTeacherSlots = data.assigned_classes.filter((c) => c.designation === "Class Teacher");
-  const divisionStats = aggregateTeacherDivisionStats(data.assigned_classes);
+
+  const scopedClasses = React.useMemo(() => {
+    if (!selectedClassId) return data.assigned_classes;
+    return data.assigned_classes.filter((c) => c.class_id === selectedClassId);
+  }, [data.assigned_classes, selectedClassId]);
+
+  const divisionStats = aggregateTeacherDivisionStats(scopedClasses);
+  const primaryAssignment = classTeacherSlots[0] ?? scopedClasses[0];
 
   // ── KPI cards — individually draggable (grid) ──────────────────────────────
   const kpiSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-  const [kpiOrder, setKpiOrder] = useSectionOrder("teacher_kpi_v2", TEACHER_KPI_DEFAULT);
+  const [kpiOrder, setKpiOrder] = useSectionOrder("teacher_kpi_v3", TEACHER_KPI_DEFAULT);
   function handleKpiDrag(e: DragEndEvent) {
     const { active, over } = e;
     if (over && active.id !== over.id)
@@ -1469,7 +1908,7 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   // ── Main cards — each individually draggable (vertical list) ───────────────
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const [cardOrder, setCardOrder] = useSectionOrder(
-    "teacher_cards_v3",
+    "teacher_cards_v4",
     isSubjectFocused ? TEACHER_CARDS_SUBJECT : TEACHER_CARDS_DEFAULT
   );
   function handleCardDrag(e: DragEndEvent) {
@@ -1481,101 +1920,119 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   // ── Derived stats ──────────────────────────────────────────────────────────
   const attData = attOverride ?? data.today_attendance;
   const { present, absent, half_day, leave } = attData;
-  const totalAtt  = present + absent + half_day + leave;
-  const attPct    = totalAtt > 0 ? ((present + half_day * 0.5) / totalAtt) * 100 : 0;
+  const presentBoys = attData.present_boys ?? 0;
+  const presentGirls = attData.present_girls ?? 0;
+  const absentBoys = attData.absent_boys ?? 0;
+  const absentGirls = attData.absent_girls ?? 0;
+  const presentTotal = present + half_day;
+  const totalAtt = present + absent + half_day + leave;
+  const attPct = totalAtt > 0 ? ((present + half_day * 0.5) / totalAtt) * 100 : 0;
 
-  const totalStudents  = divisionStats.students;
-  const totalBoys      = divisionStats.boys;
-  const totalGirls     = divisionStats.girls;
-  const newThisMonth   = divisionStats.newMonth;
-  const totalClasses   = isSubjectFocused
-    ? subjectSlots.length
-    : classTeacherSlots.length || divisionStats.divisions;
+  const totalStudents = divisionStats.students;
+  const totalBoys = divisionStats.boys;
+  const totalGirls = divisionStats.girls;
+
+  const kpiGenderRow = (boys: number, girls: number) => (
+    <Box
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center", mt: 0.25 }}
+    >
+      <GenderCountChip tooltip="Boys" count={boys} variant="boys" />
+      <GenderCountChip tooltip="Girls" count={girls} variant="girls" />
+    </Box>
+  );
 
   // ── KPI renderer ───────────────────────────────────────────────────────────
   const renderKpi = (id: string) => {
     switch (id) {
       case "kpi_students":
         return (
-          <SnapCard title="My Students" value={totalStudents} icon={<PeopleIcon fontSize="small" />}
-            accentColor={C.purple} glassBg={C.purpleGlass} onClick={() => navigate("/students")}
+          <SnapCard
+            title="Total Students"
+            value={totalStudents}
+            icon={<PeopleIcon fontSize="small" />}
+            accentColor={C.purple}
+            glassBg={C.purpleGlass}
+            onClick={() => navigate("/students")}
             sub={
               <>
                 <Sparkline color={C.purple} delay={0} />
-                <Box
-                  onClick={(event) => event.stopPropagation()}
-                  onMouseDown={(event) => event.stopPropagation()}
-                  sx={{
-                    display: "flex",
-                    gap: 1,
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    mt: 0.25,
-                    position: "relative",
-                    zIndex: 1,
-                  }}
-                >
-                  <GenderCountChip tooltip="Boys" count={totalBoys} variant="boys" />
-                  <GenderCountChip tooltip="Girls" count={totalGirls} variant="girls" />
-                </Box>
+                {kpiGenderRow(totalBoys, totalGirls)}
               </>
             }
           />
         );
-      case "kpi_att":
+      case "kpi_present":
         return (
-          <SnapCard title="Present Today" value={`${present}/${totalAtt || "—"}`}
-            icon={<AttendanceIcon fontSize="small" />}
-            accentColor={attPct >= 80 ? C.green : C.amber}
-            glassBg={attPct >= 80 ? C.greenGlass : C.amberGlass}
+          <SnapCard
+            title="Present Students"
+            value={totalAtt === 0 ? "—" : presentTotal}
+            icon={<PresentIcon fontSize="small" />}
+            accentColor={C.green}
+            glassBg={C.greenGlass}
             onClick={() => navigate("/attendance/mark")}
             sub={
               <>
-                <Sparkline color={attPct >= 80 ? C.green : C.amber} delay={0.2} />
-                <Chip
-                  label={totalAtt === 0 ? "Not marked yet" : `${attPct.toFixed(0)}% attendance`}
-                  size="small"
-                  sx={{
-                    bgcolor: attPct >= 80 ? C.greenGlass : C.amberGlass,
-                    color: attPct >= 80 ? C.green : C.amber,
-                    fontWeight: 700, height: 18, fontSize: "11px", borderRadius: "5px",
-                  }}
-                />
+                <Sparkline color={C.green} delay={0.2} />
+                {totalAtt === 0 ? (
+                  <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700 }}>
+                    Not marked yet
+                  </Typography>
+                ) : (
+                  kpiGenderRow(presentBoys, presentGirls)
+                )}
               </>
             }
           />
         );
-      case "kpi_classes":
+      case "kpi_absent":
         return (
           <SnapCard
-            title={isSubjectFocused ? "My Subjects" : "My Classes"}
-            value={totalClasses}
-            icon={isSubjectFocused ? <SubjectIcon fontSize="small" /> : <ClassIcon fontSize="small" />}
-            accentColor={C.blue}
-            glassBg={C.blueGlass}
-            onClick={() => navigate(isSubjectFocused ? "/homework" : "/students")}
+            title="Absent Students"
+            value={totalAtt === 0 ? "—" : absent}
+            icon={<AbsentIcon fontSize="small" />}
+            accentColor={C.red}
+            glassBg={C.redGlass}
+            onClick={() => navigate("/attendance/report")}
             sub={
               <>
-                <Sparkline color={C.blue} delay={0.4} />
-                <Typography variant="caption" sx={{ color: C.blue, fontWeight: 700 }}>
-                  {isSubjectFocused
-                    ? `${subjectSlots.length} subject assignment${subjectSlots.length === 1 ? "" : "s"}`
-                    : "Assigned to you"}
-                </Typography>
+                <Sparkline color={C.red} delay={0.4} />
+                {totalAtt === 0 ? (
+                  <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700 }}>
+                    Not marked yet
+                  </Typography>
+                ) : (
+                  kpiGenderRow(absentBoys, absentGirls)
+                )}
               </>
             }
           />
         );
-      case "kpi_new":
+      case "kpi_pct":
         return (
-          <SnapCard title="New This Month" value={newThisMonth} icon={<PersonAddIcon fontSize="small" />}
-            accentColor={C.green} glassBg={C.greenGlass}
+          <SnapCard
+            title="Attendance Rate"
+            value={totalAtt === 0 ? "—" : `${attPct.toFixed(1)}%`}
+            icon={<AttendanceIcon fontSize="small" />}
+            accentColor={attPct >= 75 ? C.green : C.amber}
+            glassBg={attPct >= 75 ? C.greenGlass : C.amberGlass}
+            onClick={() => navigate("/attendance/report")}
             sub={
               <>
-                <Sparkline color={C.green} delay={0.6} />
-                <Typography variant="caption" sx={{ color: C.green, fontWeight: 700 }}>
-                  {newThisMonth > 0 ? "Students enrolled this month" : "No new enrollments yet"}
-                </Typography>
+                <Sparkline color={attPct >= 75 ? C.green : C.amber} delay={0.6} />
+                <Chip
+                  label={totalAtt === 0 ? "Not marked yet" : attPct >= 75 ? "On track" : "Needs attention"}
+                  size="small"
+                  sx={{
+                    bgcolor: attPct >= 75 ? C.greenGlass : C.amberGlass,
+                    color: attPct >= 75 ? C.green : C.amber,
+                    fontWeight: 700,
+                    height: 18,
+                    fontSize: "11px",
+                    borderRadius: "5px",
+                  }}
+                />
               </>
             }
           />
@@ -1595,7 +2052,7 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
           <GCard sx={{ height: "100%" }}>
             <CardContent sx={{ p: 2.5 }}>
               <CardHeader
-                title={isSubjectFocused ? "Division Attendance" : "Today's Attendance"}
+                title={isSubjectFocused ? "Division Attendance" : "Attendance"}
                 icon={<AttendanceIcon color="primary" sx={{ fontSize: 18 }} />}
                 action={
                   canMarkAttendance ? (
@@ -1607,13 +2064,7 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
                 }
                 dateFilter={
                   <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                    <CardDateFilter value={attFilter} onChange={onAttFilterChange}
-                      presets={[
-                        { key: "today",  label: "Today"  },
-                        { key: "week",   label: "7 Days" },
-                        { key: "custom", label: "Custom" },
-                      ]}
-                    />
+                    <AttendanceDateFilter value={attFilter} onChange={onAttFilterChange} minDate={attMinDate} maxDate={attMaxDate} />
                     {classes.length > 0 && (
                       <TextField select size="small" value={selectedClassId}
                         onChange={(e) => onClassChange(e.target.value as number | "")}
@@ -1679,87 +2130,24 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
           </GCard>
         );
 
-      // ── My Classes (compact) ───────────────────────────────────────────────
-      case "card_classes":
-        return (
-          <GCard sx={{ height: "100%" }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <CardHeader
-                title={isSubjectFocused ? "My Teaching Assignments" : "My Classes"}
-                icon={isSubjectFocused ? <SubjectIcon color="primary" sx={{ fontSize: 18 }} /> : <ClassIcon color="primary" sx={{ fontSize: 18 }} />}
-                action={
-                  <Button
-                    size="small"
-                    endIcon={<ArrowIcon />}
-                    onClick={() => navigate(isSubjectFocused ? "/homework" : "/students")}
-                    sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 11 }}
-                  >
-                    {isSubjectFocused ? "Homework" : "Students"}
-                  </Button>
-                }
-              />
-              {data.assigned_classes.length === 0 ? (
-                <Box sx={{ textAlign: "center", py: 3 }}>
-                  <SchoolIcon sx={{ fontSize: 36, color: C.muted, mb: 1 }} />
-                  <Typography variant="body2" sx={{ color: C.muted, fontSize: "12px", fontWeight: 600 }}>
-                    No assignments yet.
-                  </Typography>
-                </Box>
-              ) : (
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 1 }}>
-                  {data.assigned_classes.map((cls, i) => {
-                    const isClassTeacher = cls.designation === "Class Teacher";
-                    const accent = isClassTeacher ? C.green : C.purple;
-                    const accentGlass = isClassTeacher ? C.greenGlass : C.purpleGlass;
-                    return (
-                      <Box
-                        key={`${cls.class_id}-${cls.division_id}-${cls.subject_id ?? "ct"}-${i}`}
-                        onClick={() => navigate(isClassTeacher ? "/students" : "/homework")}
-                        sx={{
-                          display: "flex", alignItems: "center", gap: 1.5, p: 1.25,
-                          borderRadius: "12px", border: `1px solid ${C.border}`, cursor: "pointer",
-                          transition: "all 0.2s",
-                          "&:hover": { bgcolor: accentGlass, borderColor: accent + "35", transform: "translateX(2px)" },
-                        }}
-                      >
-                        <Avatar sx={{ bgcolor: accentGlass, color: accent, width: 36, height: 36, borderRadius: "10px", flexShrink: 0 }}>
-                          {isClassTeacher ? <SchoolIcon sx={{ fontSize: 16 }} /> : <SubjectIcon sx={{ fontSize: 16 }} />}
-                        </Avatar>
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
-                            <Typography sx={{ fontWeight: 800, color: C.slateText, fontSize: "12px", lineHeight: 1.3 }}>
-                              {cls.class_name} — {cls.division_name}
-                            </Typography>
-                            <Chip
-                              label={cls.designation || "Class Teacher"}
-                              size="small"
-                              sx={{
-                                height: 18,
-                                fontSize: "9px",
-                                fontWeight: 800,
-                                bgcolor: accentGlass,
-                                color: accent,
-                              }}
-                            />
-                          </Box>
-                          <Typography variant="caption" sx={{ color: C.muted, fontSize: "10px", display: "block" }}>
-                            {cls.subject_name
-                              ? `Subject: ${cls.subject_name}`
-                              : "All subjects (class in-charge)"}
-                            {" · "}
-                            {cls.student_count} students · ♂{cls.boys_count} ♀{cls.girls_count}
-                            {cls.new_this_month > 0 && ` · +${cls.new_this_month} new`}
-                          </Typography>
-                        </Box>
-                        <ArrowIcon sx={{ color: C.muted, fontSize: 15, flexShrink: 0 }} />
-                      </Box>
-                    );
-                  })}
-                </Box>
-              )}
-            </CardContent>
-          </GCard>
-        );
+      case "card_profile": {
+        const profileDetails: ProfileDetailLine[] = [];
+        if (primaryAssignment) {
+          profileDetails.push({
+            icon: <ClassIcon sx={{ fontSize: 15, color: C.muted }} />,
+            text: `${primaryAssignment.class_name} — ${primaryAssignment.division_name}${
+              primaryAssignment.subject_name ? ` · ${primaryAssignment.subject_name}` : ""
+            }`,
+          });
+        }
+        if (user?.tenant?.name) {
+          profileDetails.push({
+            icon: <SchoolIcon sx={{ fontSize: 15, color: C.muted }} />,
+            text: user.tenant.name,
+          });
+        }
+        return <DashboardProfileCard details={profileDetails} />;
+      }
 
       // ── Homework list ──────────────────────────────────────────────────────
       case "card_homework": {
@@ -1856,13 +2244,8 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
             <CardContent sx={{ p: 3 }}>
               <CardHeader
                 title="Recent Notices & Holidays"
-                icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
-                action={
-                  <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/communication/notices")}
-                    sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
-                    View All
-                  </Button>
-                }
+                icon={<NoticeIcon sx={{ color: C.red }} />}
+                action={<ActionLink label="View All" onClick={() => navigate("/communication/notices")} />}
               />
               <NoticesCardContent notices={data.recent_notices} navigate={navigate} />
             </CardContent>
@@ -1875,31 +2258,14 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   };
 
   return (
-    <Grid container spacing={3}>
-      {isSubjectFocused && (
-        <Grid item xs={12}>
-          <Alert severity="info" sx={{ borderRadius: "12px", fontSize: "0.85rem" }}>
-            You are logged in as a <strong>subject teacher</strong>. Homework and assignments are scoped to your
-            subjects. When you are assigned as a <strong>class teacher</strong>, this dashboard expands automatically
-            (all subjects, attendance marking, and full class view).
-          </Alert>
-        </Grid>
-      )}
-      {!isSubjectFocused && classTeacherSlots.length > 0 && subjectSlots.length > 0 && (
-        <Grid item xs={12}>
-          <Alert severity="success" sx={{ borderRadius: "12px", fontSize: "0.85rem" }}>
-            You have both <strong>class teacher</strong> and <strong>subject teacher</strong> roles. Class in-charge
-            divisions show all subjects; subject rows are limited to that subject.
-          </Alert>
-        </Grid>
-      )}
+    <Grid container spacing={{ xs: 2, md: 2.5 }}>
       {/* ── Row 1: KPI snap cards — individually draggable ── */}
       <Grid item xs={12}>
         <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
           <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
             <Grid container spacing={3}>
               {kpiOrder.map((id) => (
-                <Grid item xs={12} sm={6} md={3} key={id}>
+                <Grid item xs={12} sm={6} md={6} lg={3} key={id}>
                   <SortableSection id={id}>{renderKpi(id)}</SortableSection>
                 </Grid>
               ))}
@@ -1912,7 +2278,7 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
       <Grid item xs={12}>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCardDrag}>
           <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 3 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: { xs: 2, md: 3 } }}>
               {cardOrder.map((id) => (
                 <SortableSection
                   key={id}
@@ -1934,7 +2300,7 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
 // 3. STUDENT DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
 const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw", "s_kpi_fees"];
-const STUDENT_CARDS_DEFAULT = ["s_att", "s_fee", "s_homework", "s_notices"];
+const STUDENT_CARDS_DEFAULT = ["s_att", "s_profile", "s_fee", "s_homework", "s_notices"];
 
 const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }) => {
   const navigate = useNavigate();
@@ -1946,7 +2312,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
   const kpiSensors  = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const cardSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [kpiOrder,  setKpiOrder]  = useSectionOrder("student_kpi_order",   STUDENT_KPI_DEFAULT);
-  const [cardOrder, setCardOrder] = useSectionOrder("student_cards_order", STUDENT_CARDS_DEFAULT);
+  const [cardOrder, setCardOrder] = useSectionOrder("student_cards_v2", STUDENT_CARDS_DEFAULT);
 
   function handleKpiDrag(e: DragEndEvent) {
     const { active, over } = e;
@@ -2102,6 +2468,43 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
           </SortableSection>
         );
 
+      case "s_profile": {
+        const studentProfileDetails: ProfileDetailLine[] = [];
+        if (profile.class_name && profile.division_name) {
+          studentProfileDetails.push({
+            icon: <ClassIcon sx={{ fontSize: 15, color: C.muted }} />,
+            text: `${profile.class_name} — ${profile.division_name}`,
+          });
+        }
+        if (profile.roll_no) {
+          studentProfileDetails.push({
+            icon: <AssignmentIndIcon sx={{ fontSize: 15, color: C.muted }} />,
+            text: `Roll No: ${profile.roll_no}`,
+          });
+        }
+        if (profile.admission_no) {
+          studentProfileDetails.push({
+            icon: <SchoolIcon sx={{ fontSize: 15, color: C.muted }} />,
+            text: `Admission: ${profile.admission_no}`,
+          });
+        }
+        if (class_teacher) {
+          studentProfileDetails.push({
+            icon: <PersonIcon sx={{ fontSize: 15, color: C.muted }} />,
+            text: `Class Teacher: ${class_teacher}`,
+          });
+        }
+        return (
+          <SortableSection key={id} id={id}>
+            <DashboardProfileCard
+              displayName={profile.student_name}
+              avatarOverride={toMediaUrl(profile.photo_url)}
+              details={studentProfileDetails}
+            />
+          </SortableSection>
+        );
+      }
+
       case "s_fee":
         return (
           <SortableSection key={id} id={id}>
@@ -2156,30 +2559,61 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
       case "s_homework":
         return (
           <SortableSection key={id} id={id} sx={{ gridColumn: "1 / -1" }}>
-            <GCard>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
-                  <Avatar sx={{ bgcolor: homework.pending_count > 0 ? C.amberGlass : C.greenGlass, color: homework.pending_count > 0 ? C.amber : C.green, width: 52, height: 52, borderRadius: "14px", flexShrink: 0 }}>
-                    <HomeworkIcon sx={{ fontSize: 26 }} />
-                  </Avatar>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px" }}>Homework</Typography>
-                    <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mt: 0.25 }}>
-                      <Typography variant="h4" sx={{ fontWeight: 900, color: homework.pending_count > 0 ? C.amber : C.green, letterSpacing: "-1px", lineHeight: 1 }}>
-                        {homework.pending_count}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>
-                        {homework.pending_count === 0 ? "All assignments done — great going! 🎉" : `pending assignment${homework.pending_count !== 1 ? "s" : ""}`}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Button variant="outlined" size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/homework")}
-                    sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 700, borderColor: C.border, color: C.slateText, flexShrink: 0 }}>
-                    View All
-                  </Button>
+            <Box
+              sx={{
+                px: { xs: 2, sm: 2.5 },
+                py: { xs: 1.5, sm: 1.75 },
+                borderRadius: C.radius.md,
+                bgcolor: homework.pending_count > 0 ? "#FEF2F2" : "#F0FDF4",
+                border: `1px solid ${homework.pending_count > 0 ? "#FECACA" : "#BBF7D0"}`,
+                boxShadow: C.shadow,
+                display: "flex",
+                flexDirection: { xs: "column", sm: "row" },
+                alignItems: { xs: "flex-start", sm: "center" },
+                justifyContent: "space-between",
+                gap: 1.5,
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
+                <Box
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: C.radius.sm,
+                    bgcolor: homework.pending_count > 0 ? C.redGlass : C.greenGlass,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <HomeworkIcon sx={{ fontSize: 18, color: homework.pending_count > 0 ? C.red : C.green }} />
                 </Box>
-              </CardContent>
-            </GCard>
+                <Typography sx={{ fontSize: { xs: "0.82rem", sm: "0.9rem" }, fontWeight: 700, color: C.slateText, lineHeight: 1.45 }}>
+                  {homework.pending_count > 0
+                    ? `You have ${homework.pending_count} pending assignment${homework.pending_count !== 1 ? "s" : ""}`
+                    : "All homework assignments are complete — great going!"}
+                </Typography>
+              </Box>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => navigate("/homework")}
+                sx={{
+                  borderRadius: C.radius.sm,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  fontSize: "0.8rem",
+                  bgcolor: C.brand,
+                  boxShadow: "none",
+                  flexShrink: 0,
+                  px: 2,
+                  "&:hover": { bgcolor: C.brandDark },
+                }}
+              >
+                Go to Homework
+              </Button>
+            </Box>
           </SortableSection>
         );
 
@@ -2209,14 +2643,14 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
   };
 
   return (
-    <Grid container spacing={3}>
+    <Grid container spacing={{ xs: 2, md: 2.5 }}>
       {/* ── KPI snap cards — individually draggable ── */}
       <Grid item xs={12}>
         <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
           <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
             <Grid container spacing={3}>
               {kpiOrder.map((id) => (
-                <Grid item xs={12} sm={6} md={3} key={id}>
+                <Grid item xs={12} sm={6} md={6} lg={3} key={id}>
                   <SortableSection id={id}>{renderKpi(id)}</SortableSection>
                 </Grid>
               ))}
@@ -2229,7 +2663,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
       <Grid item xs={12}>
         <DndContext sensors={cardSensors} collisionDetection={closestCenter} onDragEnd={handleCardDrag}>
           <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 3 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: { xs: 2, md: 3 } }}>
               {cardOrder.map(renderCard)}
             </Box>
           </SortableContext>
@@ -2251,7 +2685,8 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Per-section date filters — each card controls its own range
-  const [attFilter, setAttFilter] = useState<SectionDateFilter>(makeFilter("week"));
+  // Attendance: Month | single-date Custom. Fee: 7 Days | Month | Custom range.
+  const [attFilter, setAttFilter] = useState<SectionDateFilter>(makeFilter("month"));
   const [feeFilter, setFeeFilter] = useState<SectionDateFilter>(makeFilter("month"));
 
   // ── Card-specific override state (populated by fast endpoints) ──────────────
@@ -2264,6 +2699,9 @@ export default function Dashboard() {
   const [classes, setClasses] = useState<Array<{ id: number; name: string }>>([]);
   const [attClassId, setAttClassId] = useState<number | "">("");
 
+  // ── Active academic year — constrains the attendance single-date picker ──────
+  const [academicYear, setAcademicYear] = useState<AcademicYear | null>(null);
+
   const seqRef = useRef(0);
   const attSeqRef = useRef(0);
   const feeSeqRef = useRef(0);
@@ -2271,7 +2709,8 @@ export default function Dashboard() {
   // ── Unified attendance-only fetch ───────────────────────────────────────────
   const fetchAttCardData = useCallback(
     async (f: SectionDateFilter, classId: number | "") => {
-      if (f.preset === "custom" && (!f.start || !f.end)) return; // wait for both dates
+      // Attendance custom = single date; only the start (selected day) is required.
+      if (f.preset === "custom" && !f.start) return;
       const seq = ++attSeqRef.current;
       setAttCardLoading(true);
       try {
@@ -2366,6 +2805,23 @@ export default function Dashboard() {
     }
   }, [data]);
 
+  // Load active academic year to bound the attendance custom-date picker
+  useEffect(() => {
+    academicYearService.listActive()
+      .then((years) => {
+        if (!years.length) return;
+        const today = isoDate(new Date());
+        const current =
+          years.find((y) => {
+            const s = y.start_date?.slice(0, 10);
+            const e = y.end_date?.slice(0, 10);
+            return s && e && s <= today && today <= e;
+          }) ?? years[0];
+        setAcademicYear(current);
+      })
+      .catch(() => { /* picker falls back to "no lower bound, max = today" */ });
+  }, []);
+
   // Extract unique assigned classes for Teachers
   const teacherClasses = React.useMemo(() => {
     if (data?.role !== "TEACHER" || !data.data) return [];
@@ -2405,14 +2861,19 @@ export default function Dashboard() {
     ? formatLastLoginLabel(getPreviousLoginIso(user.id))
     : "—";
 
+  // Attendance single-date picker bounds: within the active academic year,
+  // never beyond today.
+  const attTodayIso = isoDate(new Date());
+  const attMinDate = academicYear?.start_date?.slice(0, 10) || undefined;
+  const ayEndIso = academicYear?.end_date?.slice(0, 10);
+  const attMaxDate = ayEndIso && ayEndIso < attTodayIso ? ayEndIso : attTodayIso;
+
   if (loading) return <DashboardSkeleton />;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* ── Welcome banner ── */}
+    <Box sx={{ width: "100%", maxWidth: 1200, mx: "auto", py: { xs: 1.5, sm: 2, md: 2.5 } }}>
       <WelcomeBanner
-        name={user?.full_name || "User"}
-        tenantName={user?.tenant?.name}
+        schoolName={user?.tenant?.name || "School"}
         lastLoginLabel={lastLoginLabel}
         refreshing={refreshing}
         onRefresh={() => fetchData(true)}
@@ -2456,6 +2917,8 @@ export default function Dashboard() {
             classes={classes}
             selectedClassId={attClassId}
             onClassChange={handleAttClassChange}
+            attMinDate={attMinDate}
+            attMaxDate={attMaxDate}
           />
         ) : data.role === "TEACHER" ? (
           <TeacherDashboardView
@@ -2467,6 +2930,8 @@ export default function Dashboard() {
             classes={teacherClasses}
             selectedClassId={attClassId}
             onClassChange={handleAttClassChange}
+            attMinDate={attMinDate}
+            attMaxDate={attMaxDate}
           />
         ) : (
           <StudentDashboardView data={data.data as StudentDashboardData} />
@@ -2482,17 +2947,7 @@ export default function Dashboard() {
           70% { transform: scale(1.15); box-shadow: 0 0 0 8px rgba(16,185,129,0); }
           100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16,185,129,0); }
         }
-        @keyframes waveHand {
-          0%  { transform: rotate(0deg); }
-          10% { transform: rotate(14deg); }
-          20% { transform: rotate(-8deg); }
-          30% { transform: rotate(14deg); }
-          40% { transform: rotate(-4deg); }
-          50% { transform: rotate(10deg); }
-          60% { transform: rotate(0deg); }
-          100%{ transform: rotate(0deg); }
-        }
       `}</style>
-    </Container>
+    </Box>
   );
 }

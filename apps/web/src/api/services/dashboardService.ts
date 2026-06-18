@@ -5,6 +5,10 @@ export interface AttendanceOverview {
   absent: number;
   half_day: number;
   leave: number;
+  present_boys?: number;
+  present_girls?: number;
+  absent_boys?: number;
+  absent_girls?: number;
 }
 
 export interface LeadStatusCount {
