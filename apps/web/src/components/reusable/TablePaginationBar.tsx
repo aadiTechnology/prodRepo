@@ -15,7 +15,7 @@ export interface TablePaginationBarProps {
   rowsPerPageOptions?: number[];
 }
 
-const DEFAULT_OPTIONS = [10, 20, 25, 50];
+const DEFAULT_OPTIONS = [20, 25, 50];
 
 export default function TablePaginationBar({
   page,

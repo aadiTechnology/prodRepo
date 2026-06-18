@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import type { NavigateFunction } from "react-router-dom";
 import { useListManager } from "./useListManager";
 import reportProjectService, { type ReportProjectOption } from "../api/services/reportProjectService";
@@ -32,7 +33,7 @@ export function useSprintListController({ navigate }: UseSprintListControllerOpt
     initialFilters: {},
     initialSortBy: "sprint_id",
     initialSortOrder: "asc",
-    initialRowsPerPage: 10,
+    initialRowsPerPage: DEFAULT_LIST_ROWS_PER_PAGE,
     initialPage: 0,
     initialSearch: "",
   });

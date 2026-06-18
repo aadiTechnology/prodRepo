@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import type { User as AuthUser } from "../types/auth";
 import type { UserResponse } from "../types/user";
 import userService from "../api/services/userService";
@@ -97,7 +98,7 @@ export function useUsersListController({
     initialFilters: readStoredUsersFilters(),
     initialSortBy: "created_at",
     initialSortOrder: "asc",
-    initialRowsPerPage: 10,
+    initialRowsPerPage: DEFAULT_LIST_ROWS_PER_PAGE,
     initialPage: 0,
     initialSearch: "",
   });

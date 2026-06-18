@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import academicYearService, { type AcademicYear } from "../api/services/academicYearService";
 import { isAcademicYearActive } from "../utils/academicYear";
 
@@ -29,7 +30,7 @@ export function useAcademicYearListController() {
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
 
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);

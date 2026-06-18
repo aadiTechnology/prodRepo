@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
+from datetime import date, timedelta
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -20,6 +22,7 @@ from app.schemas.homework_schema import (
     HomeworkUpdate,
     SubjectOption,
 )
+from app.utils.homework_status import HOMEWORK_STATUS_ACTIVE, normalize_homework_status
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +95,27 @@ def get_viewer_context(
 
 
 # ---------------------------------------------------------------------------
+# Edit/delete window
+# ---------------------------------------------------------------------------
+
+HOMEWORK_EDIT_DELETE_WINDOW_DAYS = 7
+
+
+def _assert_homework_editable(hw: Homework) -> None:
+    if hw.status == "Draft":
+        return
+    cutoff = hw.assigned_date + timedelta(days=HOMEWORK_EDIT_DELETE_WINDOW_DAYS)
+    if date.today() >= cutoff:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Homework cannot be edited or deleted after "
+                f"{HOMEWORK_EDIT_DELETE_WINDOW_DAYS} days from the assigned date"
+            ),
+        )
+
+
+# ---------------------------------------------------------------------------
 # CRUD
 # ---------------------------------------------------------------------------
 
@@ -110,9 +134,9 @@ def list_homework(
     limit: int = 25,
     viewer_context: Optional[HomeworkViewerContext] = None,
 ) -> Tuple[List[Homework], int]:
-    effective_status = hw_status
+    effective_status = normalize_homework_status(hw_status) if hw_status else hw_status
     if viewer_context is not None and viewer_context.published_only:
-        effective_status = "Published"
+        effective_status = HOMEWORK_STATUS_ACTIVE
 
     return repo.list_homework(
         db,
@@ -167,7 +191,7 @@ def create_homework(
                 ),
             )
 
-    if payload.submission_date < payload.assigned_date:
+    if payload.submission_date is not None and payload.submission_date < payload.assigned_date:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Submission date cannot be before assigned date",
@@ -200,11 +224,12 @@ def update_homework(
     payload: HomeworkUpdate,
 ) -> Homework:
     hw = repo.get_homework(db, tenant_id=tenant_id, homework_id=homework_id)
+    _assert_homework_editable(hw)
     update_data = payload.model_dump(exclude_unset=True)
 
-    new_assigned = update_data.get("assigned_date", hw.assigned_date)
     new_submission = update_data.get("submission_date", hw.submission_date)
-    if new_submission < new_assigned:
+    new_assigned = update_data.get("assigned_date", hw.assigned_date)
+    if new_submission is not None and new_submission < new_assigned:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Submission date cannot be before assigned date",
@@ -221,6 +246,7 @@ def delete_homework(
     homework_id: int,
 ) -> dict:
     hw = repo.get_homework(db, tenant_id=tenant_id, homework_id=homework_id)
+    _assert_homework_editable(hw)
     repo.soft_delete_homework(db, hw=hw, user_id=user_id)
     return {"message": "Homework deleted successfully"}
 
@@ -232,6 +258,7 @@ def delete_homework(
 def add_attachment(
     db: Session,
     *,
+    tenant_id: int,
     homework_id: int,
     file_name: str,
     file_path: str,
@@ -239,6 +266,8 @@ def add_attachment(
     file_size_kb: Optional[int],
     uploaded_by: int,
 ) -> HomeworkAttachment:
+    hw = repo.get_homework(db, tenant_id=tenant_id, homework_id=homework_id)
+    _assert_homework_editable(hw)
     return repo.add_attachment(
         db,
         homework_id=homework_id,
@@ -253,9 +282,12 @@ def add_attachment(
 def delete_attachment(
     db: Session,
     *,
+    tenant_id: int,
     homework_id: int,
     attachment_id: int,
 ) -> dict:
+    hw = repo.get_homework(db, tenant_id=tenant_id, homework_id=homework_id)
+    _assert_homework_editable(hw)
     att = repo.get_attachment(db, homework_id=homework_id, attachment_id=attachment_id)
     file_path = repo.delete_attachment(db, att=att)
     return {"file_path": file_path}

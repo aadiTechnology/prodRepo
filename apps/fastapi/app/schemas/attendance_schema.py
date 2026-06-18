@@ -70,3 +70,12 @@ class AttendanceTeacherScopeResponse(BaseModel):
     teacher_id: int
     teacher_name: str
     classes: List[AttendanceScopeClass] = []
+
+
+class AttendanceNonWorkingDateItem(BaseModel):
+    date: date
+    reason: str
+
+
+class AttendanceNonWorkingDatesResponse(BaseModel):
+    dates: List[AttendanceNonWorkingDateItem] = []

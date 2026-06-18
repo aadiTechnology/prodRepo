@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import { getFeeCategories, deleteFeeCategory, getAcademicYears } from "../api/services/feeService";
 import schoolClassService from "../api/services/schoolClassService";
 import type { FeeCategoryResponse } from "../types/fee";
@@ -30,7 +31,7 @@ export function useFeeCategoryListController() {
     initialFilters: { className: "", academicYearId: "" },
     initialSortBy: "name",
     initialSortOrder: "asc",
-    initialRowsPerPage: 10,
+    initialRowsPerPage: DEFAULT_LIST_ROWS_PER_PAGE,
     initialPage: 0,
     initialSearch: "",
   });

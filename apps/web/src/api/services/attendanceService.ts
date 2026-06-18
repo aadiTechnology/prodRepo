@@ -70,6 +70,15 @@ export interface AttendanceTeacherScopeResponse {
   classes: AttendanceScopeClass[];
 }
 
+export interface AttendanceNonWorkingDateItem {
+  date: string;
+  reason: string;
+}
+
+export interface AttendanceNonWorkingDatesResponse {
+  dates: AttendanceNonWorkingDateItem[];
+}
+
 const attendanceService = {
   async getMyScope(academicYearId?: number) {
     const params = academicYearId ? { academic_year_id: academicYearId } : undefined;
@@ -116,6 +125,20 @@ const attendanceService = {
     offset?: number;
   }) {
     const { data } = await axiosInstance.get<AttendanceReportResponse>("/attendance/report", { params });
+    return data;
+  },
+
+  async getNonWorkingDates(params: {
+    academic_year_id: number;
+    class_id: number;
+    division_id: number;
+    from_date: string;
+    to_date: string;
+  }) {
+    const { data } = await axiosInstance.get<AttendanceNonWorkingDatesResponse>(
+      "/attendance/non-working-dates",
+      { params }
+    );
     return data;
   },
 };

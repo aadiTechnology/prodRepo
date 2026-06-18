@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import marketingHubService, { MarketingHubConfig } from "../api/services/marketingHubService";
 import { MARKETING_CATEGORIES, normalizeIntegrationUrl } from "../pages/marketing/marketingHub.utils";
 
@@ -17,7 +18,7 @@ export function useDigitalMarketingHubController() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
 
   const fetchConfig = useCallback(async () => {
     setLoading(true);

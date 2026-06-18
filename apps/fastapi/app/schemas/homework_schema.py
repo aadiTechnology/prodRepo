@@ -5,6 +5,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, field_validator
 
+from app.utils.homework_status import HOMEWORK_STATUS_ACTIVE, HOMEWORK_STATUS_DRAFT, normalize_homework_status
+
 
 # ---------------------------------------------------------------------------
 # Attachment
@@ -36,14 +38,24 @@ class HomeworkCreate(BaseModel):
     title: str
     instructions: Optional[str] = None
     assigned_date: date
-    submission_date: date
+    submission_date: Optional[date] = None
     notify_parents: bool = False
-    # "Draft" saves without publishing; "Published" publishes immediately
-    status: str = "Draft"
+    # "Draft" saves without publishing; "Active" publishes immediately
+    status: str = HOMEWORK_STATUS_DRAFT
+
+    @field_validator("status")
+    @classmethod
+    def normalize_status(cls, v: str) -> str:
+        normalized = normalize_homework_status(v)
+        if normalized not in {HOMEWORK_STATUS_DRAFT, HOMEWORK_STATUS_ACTIVE}:
+            raise ValueError("status must be Draft or Active")
+        return normalized
 
     @field_validator("submission_date")
     @classmethod
-    def submission_after_assigned(cls, v: date, info: any) -> date:
+    def submission_after_assigned(cls, v: Optional[date], info: any) -> Optional[date]:
+        if v is None:
+            return v
         assigned = info.data.get("assigned_date")
         if assigned and v < assigned:
             raise ValueError("Submission date cannot be before assigned date")
@@ -59,6 +71,16 @@ class HomeworkUpdate(BaseModel):
     submission_date: Optional[date] = None
     notify_parents: Optional[bool] = None
     status: Optional[str] = None
+
+    @field_validator("status")
+    @classmethod
+    def normalize_status(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        normalized = normalize_homework_status(v)
+        if normalized not in {HOMEWORK_STATUS_DRAFT, HOMEWORK_STATUS_ACTIVE}:
+            raise ValueError("status must be Draft or Active")
+        return normalized
 
     @field_validator("submission_date")
     @classmethod
@@ -91,7 +113,7 @@ class HomeworkResponse(BaseModel):
     title: str
     instructions: Optional[str] = None
     assigned_date: date
-    submission_date: date
+    submission_date: Optional[date] = None
     status: str
     notify_parents: bool
     published_at: Optional[datetime] = None

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import { subjectService } from "../api/services/subjectService";
 import { classService, academicYearService } from "../api/services/dropdownServices";
 import { type SubjectClassRow } from "../pages/academics/SubjectList.listConfig";
@@ -21,7 +22,7 @@ export function useSubjectListController() {
 
     // Pagination
     const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
     const [totalSubjects, setTotalSubjects] = useState(0);
 
     // Filters

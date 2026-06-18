@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import noticeService from "../api/services/noticeService";
 import type {
   Notice,
@@ -28,7 +29,7 @@ export function useNoticeListController() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [status, setStatus] = useState("");
   const [audienceType, setAudienceType] = useState("");
   const [noticeType, setNoticeType] = useState("");

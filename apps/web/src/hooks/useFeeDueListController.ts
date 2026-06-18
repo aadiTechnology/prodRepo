@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import feesApi, { type FeeDueListItem, type FeeDueStatusFilter } from "../api/services/feesApi";
+import { resolveCurrentAcademicYearId } from "../utils/academicYear";
 
 export type FeeDueTableRow = FeeDueListItem & { __skeleton?: boolean; __key: string };
 
@@ -35,7 +37,7 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
   const [installment, setInstallment] = useState<string>("");
   const [status, setStatus] = useState<FeeDueStatusFilter>("ALL");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [academicYearId, setAcademicYearId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -54,7 +56,8 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
 
   useEffect(() => {
     if (!academicYearId && academicYears.length > 0) {
-      setAcademicYearId(academicYears[0].id);
+      const currentYearId = resolveCurrentAcademicYearId(academicYears);
+      setAcademicYearId(currentYearId ? Number(currentYearId) : academicYears[0].id);
     }
   }, [academicYearId, academicYears]);
 

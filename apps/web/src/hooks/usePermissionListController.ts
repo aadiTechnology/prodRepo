@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import permissionService, {
   MenuTreeNode,
   Role,
@@ -138,7 +139,7 @@ export const usePermissionListController = () => {
 
   // ── Pagination State ───────────────────────────────────────────────────
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
 
   const handlePageChange = useCallback((newPage: number) => {
     setPage(newPage);

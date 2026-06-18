@@ -25,9 +25,18 @@ export interface TeacherOption {
   full_name: string;
 }
 
+export interface SubjectClassMappingOption {
+  class_id: number;
+  class_name?: string | null;
+  academic_year_id?: number | null;
+  class_division_id?: number | null;
+  division_name?: string | null;
+}
+
 export interface SubjectOption {
   id: number;
   name: string;
+  classes?: SubjectClassMappingOption[];
 }
 
 export interface TeacherAssignmentAssignedMap {
@@ -151,21 +160,40 @@ const teacherAssignmentApi = {
     return [];
   },
 
-  getSubjects: async (academicYearId: number, classId: number): Promise<SubjectOption[]> => {
-    const response = await axiosInstance.get("/api/subjects", {
-      params: {
-        skip: 0,
-        limit: 1000,
-        academic_year_id: academicYearId,
-        class_id: classId,
-        is_active: true,
-      },
-    });
+  getSubjects: async (
+    academicYearId: number,
+    classId?: number | null
+  ): Promise<SubjectOption[]> => {
+    const params: Record<string, number | boolean> = {
+      skip: 0,
+      limit: 1000,
+      academic_year_id: academicYearId,
+      is_active: true,
+    };
+    if (classId != null) {
+      params.class_id = classId;
+    }
+
+    const response = await axiosInstance.get("/api/subjects", { params });
     const payload = response.data as
-      | { data?: Array<{ id: number; name?: string | null }> }
-      | Array<{ id: number; name?: string | null }>;
+      | {
+          data?: Array<{
+            id: number;
+            name?: string | null;
+            classes?: SubjectClassMappingOption[];
+          }>;
+        }
+      | Array<{
+          id: number;
+          name?: string | null;
+          classes?: SubjectClassMappingOption[];
+        }>;
     const rows = Array.isArray(payload) ? payload : payload?.data || [];
-    return rows.map((item) => ({ id: item.id, name: item.name || "" }));
+    return rows.map((item) => ({
+      id: item.id,
+      name: item.name || "",
+      classes: item.classes || [],
+    }));
   },
 
   getTeacherAssignments: async (

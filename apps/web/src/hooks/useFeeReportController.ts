@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import feeReportService from "../api/services/feeReportService";
 import type {
   FeeReportFilterOptions,
   FeeReportRow,
   FeeReportSummary,
 } from "../types/feeReport";
+import { resolveCurrentAcademicYearId } from "../utils/academicYear";
 
 const DEFAULT_SUMMARY: FeeReportSummary = {
   total_students: 0,
@@ -25,7 +27,7 @@ export function useFeeReportController() {
 
   // Pagination
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
 
   // Data
   const [summary, setSummary] = useState<FeeReportSummary>(DEFAULT_SUMMARY);
@@ -45,7 +47,15 @@ export function useFeeReportController() {
   useEffect(() => {
     feeReportService
       .getFilterOptions()
-      .then(setFilterOptions)
+      .then((options) => {
+        setFilterOptions(options);
+        setAcademicYearId((prev) => {
+          if (prev != null) return prev;
+          const currentYearId = resolveCurrentAcademicYearId(options.academic_years ?? []);
+          if (currentYearId) return Number(currentYearId);
+          return options.academic_years?.[0]?.id ?? null;
+        });
+      })
       .catch(() => {});
   }, []);
 
@@ -79,7 +89,10 @@ export function useFeeReportController() {
   }, [fetchReport]);
 
   const handleReset = () => {
-    setAcademicYearId(null);
+    const currentYearId = resolveCurrentAcademicYearId(filterOptions.academic_years ?? []);
+    setAcademicYearId(
+      currentYearId ? Number(currentYearId) : (filterOptions.academic_years?.[0]?.id ?? null)
+    );
     setClassId(null);
     setInstallment("");
     setStartDate("");

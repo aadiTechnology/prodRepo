@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, text
 
 from app.models.homework import Homework, HomeworkAttachment
+from app.utils.homework_status import HOMEWORK_STATUS_ACTIVE, LIVE_HOMEWORK_STATUSES, normalize_homework_status
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +101,7 @@ def list_homework(
             _build_class_division_scope_filter(getattr(viewer_context, "scopes", ()))
         )
         if getattr(viewer_context, "published_only", False):
-            query = query.filter(Homework.status == "Published")
+            query = query.filter(Homework.status.in_(tuple(LIVE_HOMEWORK_STATUSES)))
     elif teacher_id is not None:
         query = query.filter(Homework.teacher_id == teacher_id)
     if class_id is not None:
@@ -111,13 +112,11 @@ def list_homework(
         query = query.filter(Homework.subject_id == subject_id)
     if academic_year_id is not None:
         query = query.filter(Homework.academic_year_id == academic_year_id)
-    if hw_status == "Overdue":
-        query = query.filter(
-            Homework.status == "Published",
-            Homework.submission_date < date.today(),
-        )
-    elif hw_status:
-        query = query.filter(Homework.status == hw_status)
+    if hw_status:
+        if hw_status == HOMEWORK_STATUS_ACTIVE:
+            query = query.filter(Homework.status.in_(tuple(LIVE_HOMEWORK_STATUSES)))
+        else:
+            query = query.filter(Homework.status == hw_status)
     if search:
         query = query.filter(Homework.title.ilike(f"%{search}%"))
 
@@ -157,12 +156,13 @@ def create_homework(
     title: str,
     instructions: Optional[str],
     assigned_date: date,
-    submission_date: date,
+    submission_date: Optional[date],
     hw_status: str,
     notify_parents: bool,
 ) -> Homework:
     now = datetime.utcnow()
-    published_at = now if hw_status == "Published" else None
+    normalized_status = normalize_homework_status(hw_status)
+    published_at = now if normalized_status == HOMEWORK_STATUS_ACTIVE else None
 
     hw = Homework(
         tenant_id=tenant_id,
@@ -175,10 +175,10 @@ def create_homework(
         instructions=instructions,
         assigned_date=assigned_date,
         submission_date=submission_date,
-        status=hw_status,
+        status=normalized_status,
         notify_parents=notify_parents,
         published_at=published_at,
-        published_by=user_id if hw_status == "Published" else None,
+        published_by=user_id if normalized_status == HOMEWORK_STATUS_ACTIVE else None,
         created_at=now,
         created_by=user_id,
     )
@@ -195,13 +195,16 @@ def update_homework(
     user_id: int,
     update_data: dict,
 ) -> Homework:
+    if "status" in update_data and update_data["status"] is not None:
+        update_data["status"] = normalize_homework_status(str(update_data["status"]))
+
     for key, value in update_data.items():
         setattr(hw, key, value)
 
     hw.updated_at = datetime.utcnow()  # type: ignore[assignment]
     hw.updated_by = user_id  # type: ignore[assignment]
 
-    if update_data.get("status") == "Published" and hw.published_at is None:
+    if update_data.get("status") == HOMEWORK_STATUS_ACTIVE and hw.published_at is None:
         hw.published_at = datetime.utcnow()  # type: ignore[assignment]
         hw.published_by = user_id  # type: ignore[assignment]
 

@@ -7,6 +7,13 @@ import { TeacherAssignmentApiItem } from "../api/teacherAssignmentApi";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 import {
+  buildNonWorkingDateMap,
+  findPreviousWorkingDate,
+  getAttendanceDateLockInfo,
+  resolveDefaultAttendanceDate,
+  type AttendanceDateLockInfo,
+} from "../utils/attendanceWorkingDays";
+import {
   buildMappingsFromAttendanceScope,
   fetchAllTeacherAssignments,
   filterTeachersWithClassTeacherAssignments,
@@ -52,6 +59,8 @@ export interface UseMarkAttendanceControllerResult {
   disableClassUntilTeacherSelected: boolean;
   hasClassTeacherAttendanceScope: boolean;
   classTeacherAttendancePairCount: number;
+  dateLockInfo: AttendanceDateLockInfo;
+  handleAttendanceDateChange: (nextDate: string) => void;
 }
 
 export function useMarkAttendanceController(): UseMarkAttendanceControllerResult {
@@ -82,6 +91,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     message: "",
     severity: 'success',
   });
+  const [nonWorkingDates, setNonWorkingDates] = useState<Map<string, string>>(new Map());
 
   const prevAcademicYearId = useRef<number>(0);
   const prevAutoFetchKey = useRef<string>("");
@@ -93,6 +103,21 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
   };
 
   const isFutureDate = (attendanceDate: string) => attendanceDate > today;
+
+  const selectedAcademicYear = useMemo(
+    () => academicYears.find((y) => y.id === filters.academic_year_id) ?? null,
+    [academicYears, filters.academic_year_id]
+  );
+
+  const dateLockInfo = useMemo(
+    () =>
+      getAttendanceDateLockInfo(filters.attendance_date, {
+        today,
+        academicYear: selectedAcademicYear,
+        nonWorkingDates,
+      }),
+    [filters.attendance_date, today, selectedAcademicYear, nonWorkingDates]
+  );
 
   const resolveNetworkErrorMessage = (fallback: string, err: unknown) => {
     const errorLike = err as { response?: unknown };
@@ -295,6 +320,89 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     !isTeacher || classTeacherAttendancePairCount > 0;
 
   useEffect(() => {
+    const { academic_year_id, class_id, division_id } = filters;
+    if (!academic_year_id || !class_id || !division_id) {
+      setNonWorkingDates(new Map());
+      return;
+    }
+
+    const year = academicYears.find((y) => y.id === academic_year_id);
+    const fromDate = year?.start_date ?? today;
+    const yearEnd = year?.end_date ?? today;
+    const toDate = today < yearEnd ? today : yearEnd;
+    if (fromDate > toDate) {
+      setNonWorkingDates(new Map());
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { dates } = await attendanceService.getNonWorkingDates({
+          academic_year_id,
+          class_id,
+          division_id,
+          from_date: fromDate,
+          to_date: toDate,
+        });
+        if (cancelled) return;
+        setNonWorkingDates(buildNonWorkingDateMap(dates));
+      } catch (err) {
+        console.error("Failed to load non-working dates", err);
+        if (!cancelled) setNonWorkingDates(new Map());
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filters.academic_year_id, filters.class_id, filters.division_id, academicYears, today]);
+
+  useEffect(() => {
+    const lock = getAttendanceDateLockInfo(filters.attendance_date, {
+      today,
+      academicYear: selectedAcademicYear,
+      nonWorkingDates,
+    });
+    if (!lock.locked) return;
+
+    const fallback = findPreviousWorkingDate(filters.attendance_date, {
+      today,
+      academicYear: selectedAcademicYear,
+      nonWorkingDates,
+    });
+    if (fallback && fallback !== filters.attendance_date) {
+      setFilters((prev) => ({ ...prev, attendance_date: fallback }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nonWorkingDates, filters.academic_year_id, filters.class_id, filters.division_id, today]);
+
+  const handleAttendanceDateChange = useCallback(
+    (nextDate: string) => {
+      if (!nextDate) return;
+      const lock = getAttendanceDateLockInfo(nextDate, {
+        today,
+        academicYear: selectedAcademicYear,
+        nonWorkingDates,
+      });
+      if (lock.locked) {
+        const fallback = findPreviousWorkingDate(nextDate, {
+          today,
+          academicYear: selectedAcademicYear,
+          nonWorkingDates,
+        });
+        showError(lock.message ?? "Selected date is not a working day");
+        if (fallback) {
+          setFilters((prev) => ({ ...prev, attendance_date: fallback }));
+        }
+        return;
+      }
+      setFilters((prev) => ({ ...prev, attendance_date: nextDate }));
+    },
+    [today, selectedAcademicYear, nonWorkingDates]
+  );
+
+  useEffect(() => {
     if (isTeacher) return;
     if (
       filters.teacher_id &&
@@ -413,6 +521,16 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
       }
 
       const selectedYear = academicYears.find((y) => y.id === nextFilters.academic_year_id);
+      const lock = getAttendanceDateLockInfo(nextFilters.attendance_date, {
+        today,
+        academicYear: selectedYear ?? null,
+        nonWorkingDates,
+      });
+      if (lock.locked) {
+        showError(lock.message ?? "Selected date is not a working day");
+        return;
+      }
+
       if (selectedYear) {
         if (
           nextFilters.attendance_date < selectedYear.start_date ||
@@ -440,7 +558,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         setLoading(false);
       }
     },
-    [academicYears, today, buildAutoFetchKey]
+    [academicYears, today, buildAutoFetchKey, nonWorkingDates]
   );
 
   const fetchStudents = useCallback(
@@ -459,6 +577,12 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
       key !== prevAutoFetchKey.current
     ) {
       if (filters.attendance_date > today) return;
+      const lock = getAttendanceDateLockInfo(filters.attendance_date, {
+        today,
+        academicYear: selectedAcademicYear,
+        nonWorkingDates,
+      });
+      if (lock.locked) return;
       void fetchStudentsWithFilters(filters);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -495,6 +619,10 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     }
     if (isFutureDate(filters.attendance_date)) {
       showError("You cannot mark attendance for future dates");
+      return;
+    }
+    if (dateLockInfo.locked) {
+      showError(dateLockInfo.message ?? "Selected date is not a working day");
       return;
     }
     if (students.some((student) => !student.status)) {
@@ -540,6 +668,10 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     const activeYear = academicYears.find((y) => y.is_active);
     const activeYearId = activeYear?.id ?? 0;
     prevAutoFetchKey.current = "";
+    const defaultDate = resolveDefaultAttendanceDate(today, {
+      academicYear: activeYear ?? null,
+      nonWorkingDates,
+    });
 
     if (!isTeacher) {
       suppressAutoFillRef.current = true;
@@ -553,7 +685,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
         teacher_id: 0,
         class_id: 0,
         division_id: 0,
-        attendance_date: today,
+        attendance_date: defaultDate,
       });
       return;
     }
@@ -582,7 +714,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
           teacher_id: scope.teacher_id,
           class_id: firstPair?.class_id ?? 0,
           division_id: firstPair?.division_id ?? 0,
-          attendance_date: today,
+          attendance_date: defaultDate,
         };
 
         if (activeYearId) {
@@ -624,5 +756,7 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     disableClassUntilTeacherSelected,
     hasClassTeacherAttendanceScope,
     classTeacherAttendancePairCount,
+    dateLockInfo,
+    handleAttendanceDateChange,
   };
 }

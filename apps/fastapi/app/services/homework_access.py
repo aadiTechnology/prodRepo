@@ -293,7 +293,7 @@ def _homework_matches_scope(hw: Homework, scope: ClassDivisionScope) -> bool:
 def homework_visible_to_viewer(hw: Homework, ctx: HomeworkViewerContext) -> bool:
     if ctx.kind == "admin":
         return True
-    if ctx.published_only and hw.status != "Published":
+    if ctx.published_only and hw.status not in {"Active", "Published"}:
         return False
     if not ctx.scopes:
         return False

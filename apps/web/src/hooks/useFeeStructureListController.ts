@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import feeService from "../api/services/feeService";
 import { type FeeStructure, type AcademicYear, type ClassEntity } from "../types/fee";
 import { useListManager } from "./useListManager";
@@ -20,7 +21,7 @@ export function useFeeStructureListController() {
     initialFilters: { academicYearId: "", className: "" },
     initialSortBy: "name",
     initialSortOrder: "asc",
-    initialRowsPerPage: 10,
+    initialRowsPerPage: DEFAULT_LIST_ROWS_PER_PAGE,
     initialPage: 0,
     initialSearch: "",
   });

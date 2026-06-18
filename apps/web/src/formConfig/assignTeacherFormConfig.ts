@@ -24,6 +24,7 @@ type AssignTeacherFormConfigArgs = {
   disableDivision: boolean;
   disableTeacher: boolean;
   disableSubject: boolean;
+  hideClassFields?: boolean;
 };
 
 export function assignTeacherFormConfig({
@@ -41,7 +42,23 @@ export function assignTeacherFormConfig({
   disableDivision,
   disableTeacher,
   disableSubject,
+  hideClassFields = false,
 }: AssignTeacherFormConfigArgs): FormConfig<AssignTeacherFormData> {
+  const classFieldRows: FormConfig<AssignTeacherFormData>["layoutRows"] = hideClassFields
+    ? []
+    : [
+        {
+          kind: "fields",
+          grid: { xs: 12, md: 6 },
+          fieldNames: ["class_id"],
+        },
+        {
+          kind: "fields",
+          grid: { xs: 12, md: 6 },
+          fieldNames: ["class_division_ids"],
+        },
+      ];
+
   return {
     fields: {
       academic_year_id: {
@@ -102,7 +119,7 @@ export function assignTeacherFormConfig({
         type: "select",
         required: false,
         helperText:
-          "Leave blank for Class Teacher (one per division). Select a subject for Subject Teacher. The same teacher can hold both roles and many assignments across classes/divisions (e.g. Nursery EVS and Std 2 Math).",
+          "Leave blank for Class Teacher (one per division). Select a subject to assign that teacher across multiple classes/divisions in one save.",
         props: {
           options: subjectOptions,
           loading: subjectsLoading,
@@ -126,18 +143,9 @@ export function assignTeacherFormConfig({
       {
         kind: "fields",
         grid: { xs: 12, md: 6 },
-        fieldNames: ["class_id"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
-        fieldNames: ["class_division_ids"],
-      },
-      {
-        kind: "fields",
-        grid: { xs: 12, md: 6 },
         fieldNames: ["subject_id"],
       },
+      ...classFieldRows,
     ],
   };
 }

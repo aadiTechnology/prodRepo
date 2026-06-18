@@ -17,6 +17,9 @@ from app.schemas.attendance_schema import (
     AttendanceScopeDivision,
 )
 from app.services import teacher_service
+from app.utils.attendance_working_days import assert_attendance_working_day, collect_non_working_dates, is_weekend
+
+ALLOWED_STUDENT_ATTENDANCE_STATUSES = frozenset({"Present", "Absent"})
 
 class AttendanceService:
     def __init__(self, db: Session):
@@ -32,6 +35,21 @@ class AttendanceService:
     ) -> AttendanceListResponse:
         if attendance_date > date.today():
             raise HTTPException(status_code=400, detail="Cannot fetch attendance for future dates")
+
+        if academic_year_id is not None:
+            assert_attendance_working_day(
+                self.db,
+                tenant_id=tenant_id,
+                academic_year_id=academic_year_id,
+                class_id=class_id,
+                division_id=division_id,
+                check_date=attendance_date,
+            )
+        elif is_weekend(attendance_date):
+            raise HTTPException(
+                status_code=400,
+                detail="Attendance cannot be marked on non-working days (Weekend)",
+            )
 
         # 1. Fetch all active students for this class/division (optionally scoped to academic year)
         student_query = self.db.query(Student).filter(
@@ -94,8 +112,23 @@ class AttendanceService:
             if req.attendance_date > date.today():
                 raise HTTPException(status_code=400, detail="You cannot mark attendance for future dates")
 
+            assert_attendance_working_day(
+                self.db,
+                tenant_id=current_user.tenant_id,
+                academic_year_id=req.academic_year_id,
+                class_id=req.class_id,
+                division_id=req.class_division_id,
+                check_date=req.attendance_date,
+            )
+
             # 2. Process each record
             for record in req.records:
+                if record.status not in ALLOWED_STUDENT_ATTENDANCE_STATUSES:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Only Present and Absent are allowed for student attendance",
+                    )
+
                 # Check for existing record to update, else create new
                 existing = self.db.query(StudentAttendance).filter(
                     StudentAttendance.tenant_id == current_user.tenant_id,
@@ -319,4 +352,24 @@ class AttendanceService:
             teacher_id=teacher.id,
             teacher_name=teacher.full_name,
             classes=scope_classes,
+        )
+
+    def get_non_working_dates(
+        self,
+        *,
+        tenant_id: int,
+        academic_year_id: int,
+        class_id: int,
+        division_id: int,
+        from_date: date,
+        to_date: date,
+    ) -> dict[str, str]:
+        return collect_non_working_dates(
+            self.db,
+            tenant_id=tenant_id,
+            academic_year_id=academic_year_id,
+            class_id=class_id,
+            division_id=division_id,
+            from_date=from_date,
+            to_date=to_date,
         )

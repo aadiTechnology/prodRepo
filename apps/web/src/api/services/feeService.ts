@@ -14,7 +14,7 @@ import {
 const feeService = {
   getFeeStructures: async (
     page = 0,
-    size = 10,
+    size = 20,
     search = "",
     classId?: number,
     academicYearId?: number,

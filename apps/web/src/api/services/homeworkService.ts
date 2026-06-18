@@ -30,8 +30,8 @@ export interface HomeworkResponse {
   title: string;
   instructions: string | null;
   assigned_date: string;
-  submission_date: string;
-  status: "Draft" | "Published";
+  submission_date: string | null;
+  status: "Draft" | "Active" | "Published";
   notify_parents: boolean;
   published_at: string | null;
   created_at: string;
@@ -55,9 +55,9 @@ export interface HomeworkCreatePayload {
   title: string;
   instructions?: string | null;
   assigned_date: string; // ISO date: YYYY-MM-DD
-  submission_date: string;
+  submission_date?: string | null;
   notify_parents: boolean;
-  status: "Draft" | "Published";
+  status: "Draft" | "Active";
 }
 
 export interface HomeworkUpdatePayload {
@@ -66,9 +66,9 @@ export interface HomeworkUpdatePayload {
   title?: string;
   instructions?: string | null;
   assigned_date?: string;
-  submission_date?: string;
+  submission_date?: string | null;
   notify_parents?: boolean;
-  status?: "Draft" | "Published";
+  status?: "Draft" | "Active";
 }
 
 export interface SubjectOption {
@@ -95,7 +95,7 @@ export interface HomeworkListParams {
   class_division_id?: number;
   subject_id?: number;
   academic_year_id?: number;
-  status?: "Draft" | "Published" | "Overdue";
+  status?: "Draft" | "Active";
   teacher_id?: number;
 }
 

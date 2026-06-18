@@ -90,7 +90,7 @@ export const createHomeworkFormConfig = (options: {
       name: "submission_date",
       label: "Submission Date",
       type: "date",
-      required: true,
+      required: false,
     },
   },
 
@@ -99,7 +99,7 @@ export const createHomeworkFormConfig = (options: {
     { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["class_id"] },
     { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["class_division_id"] },
     { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["subject_id"] },
-    { kind: "section", title: "Homework Details", grid: { xs: 12 } },
+    { kind: "section", title: "Homework Title", grid: { xs: 12 } },
     { kind: "fields", grid: { xs: 12 }, fieldNames: ["title"] },
     { kind: "fields", grid: { xs: 12 }, fieldNames: ["instructions"] },
     { kind: "section", title: "Schedule", grid: { xs: 12 } },

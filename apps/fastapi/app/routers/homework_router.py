@@ -284,6 +284,7 @@ def upload_attachment(
 
     attachment = homework_service.add_attachment(
         db,
+        tenant_id=current_user.tenant_id,
         homework_id=homework_id,
         file_name=file.filename or safe_name,
         file_path=f"/homework-attachments/{safe_name}",
@@ -318,7 +319,12 @@ def delete_attachment(
         homework_id=homework_id,
         viewer_context=viewer_context,
     )
-    result = homework_service.delete_attachment(db, homework_id=homework_id, attachment_id=attachment_id)
+    result = homework_service.delete_attachment(
+        db,
+        tenant_id=current_user.tenant_id,
+        homework_id=homework_id,
+        attachment_id=attachment_id,
+    )
     # Delete file from disk (best-effort)
     try:
         file_path = os.path.join("static", result.get("file_path", "").lstrip("/"))

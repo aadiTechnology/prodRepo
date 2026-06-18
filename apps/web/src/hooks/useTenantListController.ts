@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import { enqueueSnackbar } from "notistack";
 import type { NavigateFunction } from "react-router-dom";
 import tenantService from "../api/services/tenantService";
@@ -57,7 +58,7 @@ export function useTenantListController({
     initialFilters: {},
     initialSortBy: "created_at",
     initialSortOrder: "asc",
-    initialRowsPerPage: 10,
+    initialRowsPerPage: DEFAULT_LIST_ROWS_PER_PAGE,
     initialPage: 0,
     initialSearch: "",
   });

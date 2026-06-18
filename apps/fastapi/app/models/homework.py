@@ -21,9 +21,9 @@ class Homework(Base):
     instructions = Column(Text, nullable=True)
 
     assigned_date = Column(Date, nullable=False)
-    submission_date = Column(Date, nullable=False)
+    submission_date = Column(Date, nullable=True)
 
-    # Draft | Published
+    # Draft | Active (legacy rows may still store Published)
     status = Column(String(20), nullable=False, default="Draft")
     notify_parents = Column(Boolean, nullable=False, default=False)
 

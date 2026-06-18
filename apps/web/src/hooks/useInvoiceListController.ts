@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import invoiceService from "../api/services/invoiceService";
 import schoolClassService, { type SchoolClass } from "../api/services/schoolClassService";
 import academicYearService, { type AcademicYear } from "../api/services/academicYearService";
@@ -46,7 +47,7 @@ export function useInvoiceListController() {
   const [totalRows, setTotalRows] = useState(0);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [sortBy, setSortBy] = useState<"invoice_no" | "due_date" | "student_name">("invoice_no");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [academicYearId, setAcademicYearId] = useState("");
