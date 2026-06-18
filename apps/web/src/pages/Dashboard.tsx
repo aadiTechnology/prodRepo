@@ -311,13 +311,35 @@ const CardDateFilter: React.FC<{
   </Box>
 );
 
-// ─── Attendance date filter: Month + single specific-date Custom ──────────────
+// ─── Attendance date filter: Custom (single day) + Weekly ───────────────
 // Unlike CardDateFilter (which uses a start/end range for "custom"), attendance
 // "custom" selects ONE day. It defaults to today and disallows future dates.
 const ATT_PRESETS: Array<{ key: DatePreset; label: string }> = [
-  { key: "month", label: "Month" },
+  { key: "week", label: "Weekly" },
   { key: "custom", label: "Custom" },
 ];
+
+const makeAttDefaultFilter = (): SectionDateFilter => {
+  const today = isoDate(new Date());
+  return { preset: "custom", start: today, end: today };
+};
+
+const classFilterSelectSx = {
+  width: { xs: "100%", sm: 140 },
+  minWidth: 105,
+  "& .MuiOutlinedInput-root": {
+    height: 28,
+    fontSize: "0.72rem",
+    fontWeight: 600,
+    borderRadius: "8px",
+    bgcolor: C.surface,
+    color: C.slateText,
+    "& fieldset": { borderColor: C.border },
+    "&:hover fieldset": { borderColor: C.brandLight },
+    "&.Mui-focused fieldset": { borderColor: C.brand },
+    "& .MuiSelect-icon": { color: C.muted },
+  },
+};
 
 const clampDate = (d: string, min?: string, max?: string) => {
   let v = d;
@@ -1359,22 +1381,6 @@ const DashboardProfileCard: React.FC<{
                 </Typography>
               </Box>
             ))}
-            {user?.tenant?.name && !details.some((d) => d.text === user.tenant?.name) && (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.75,
-                  mt: 1,
-                  justifyContent: { xs: "center", sm: "flex-start" },
-                }}
-              >
-                <SchoolIcon sx={{ fontSize: 15, color: C.muted }} />
-                <Typography sx={{ fontSize: "0.8rem", color: C.slateText, fontWeight: 600 }}>
-                  {user.tenant.name}
-                </Typography>
-              </Box>
-            )}
           </Box>
         </Box>
       </CardContent>
@@ -1538,28 +1544,16 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
                       dateFilter={
                         <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
                           <AttendanceDateFilter value={attFilter} onChange={onAttFilterChange} minDate={attMinDate} maxDate={attMaxDate} />
-                          <TextField select size="small" value={selectedClassId}
-                            onChange={(e) => onClassChange(e.target.value as number | "")}
-                            SelectProps={{ displayEmpty: true }}
-                            sx={{
-                              width: { xs: "100%", sm: 140 },
-                              "& .MuiOutlinedInput-root": {
-                                height: 28,
-                                fontSize: "0.72rem",
-                                fontWeight: 600,
-                                borderRadius: "8px",
-                                bgcolor: C.surfaceMuted,
-                                "& fieldset": { borderColor: C.border },
-                                "&:hover fieldset": { borderColor: C.brandLight },
-                                "&.Mui-focused fieldset": { borderColor: C.brand },
-                              },
-                            }}
+                          {classes.length > 0 && (
+                          <TextField select size="small" value={selectedClassId || classes[0]?.id || ""}
+                            onChange={(e) => onClassChange(Number(e.target.value))}
+                            sx={classFilterSelectSx}
                           >
-                            <MenuItem value="" sx={{ fontSize: "11px", fontWeight: 700, color: C.muted }}>All Classes</MenuItem>
                             {classes.map((cls) => (
                               <MenuItem key={cls.id} value={cls.id} sx={{ fontSize: "11px", fontWeight: 700 }}>{cls.name}</MenuItem>
                             ))}
                           </TextField>
+                          )}
                         </Box>
                       }
                     />
@@ -1809,10 +1803,9 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
         <DashboardProfileCard
           variant="strip"
           metaChips={[
-            user?.tenant?.name || "",
             `${data.student_snapshot.active_students} Students`,
             `${data.student_snapshot.total_classes} Classes`,
-          ].filter(Boolean)}
+          ]}
         />
       </Grid>
 
@@ -1889,9 +1882,10 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   const classTeacherSlots = data.assigned_classes.filter((c) => c.designation === "Class Teacher");
 
   const scopedClasses = React.useMemo(() => {
-    if (!selectedClassId) return data.assigned_classes;
-    return data.assigned_classes.filter((c) => c.class_id === selectedClassId);
-  }, [data.assigned_classes, selectedClassId]);
+    const activeClassId = selectedClassId || classes[0]?.id;
+    if (!activeClassId) return data.assigned_classes;
+    return data.assigned_classes.filter((c) => c.class_id === activeClassId);
+  }, [data.assigned_classes, selectedClassId, classes]);
 
   const divisionStats = aggregateTeacherDivisionStats(scopedClasses);
   const primaryAssignment = classTeacherSlots[0] ?? scopedClasses[0];
@@ -2050,41 +2044,25 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
       case "card_att":
         return (
           <GCard sx={{ height: "100%" }}>
-            <CardContent sx={{ p: 2.5 }}>
+            <CardContent sx={{ p: 2.5, display: "flex", flexDirection: "column", height: "100%" }}>
               <CardHeader
                 title={isSubjectFocused ? "Division Attendance" : "Attendance"}
                 icon={<AttendanceIcon color="primary" sx={{ fontSize: 18 }} />}
-                action={
-                  canMarkAttendance ? (
-                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/attendance/mark")}
-                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 11 }}>
-                      Mark
-                    </Button>
-                  ) : null
-                }
                 dateFilter={
                   <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
                     <AttendanceDateFilter value={attFilter} onChange={onAttFilterChange} minDate={attMinDate} maxDate={attMaxDate} />
                     {classes.length > 0 && (
-                      <TextField select size="small" value={selectedClassId}
-                        onChange={(e) => onClassChange(e.target.value as number | "")}
-                        SelectProps={{ displayEmpty: true }}
-                        sx={{
-                          minWidth: 105,
-                          "& .MuiOutlinedInput-root": {
-                            height: 24, fontSize: "10px", fontWeight: 700, borderRadius: "6px",
-                            bgcolor: C.blueGlass, color: C.slateText,
-                            "& fieldset": { borderColor: "rgba(37,99,235,0.18)" },
-                            "&:hover fieldset": { borderColor: C.blue },
-                          },
-                        }}>
-                        <MenuItem value="" sx={{ fontSize: "11px" }}>All Classes</MenuItem>
+                      <TextField select size="small" value={selectedClassId || classes[0]?.id || ""}
+                        onChange={(e) => onClassChange(Number(e.target.value))}
+                        sx={classFilterSelectSx}
+                      >
                         {classes.map((c) => <MenuItem key={c.id} value={c.id} sx={{ fontSize: "11px" }}>{c.name}</MenuItem>)}
                       </TextField>
                     )}
                   </Box>
                 }
               />
+              <Box sx={{ flex: 1 }}>
               {attCardLoading ? (
                 <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
                   <Box sx={{ width: 28, height: 28, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
@@ -2092,17 +2070,11 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
               ) : totalAtt === 0 ? (
                 <Box sx={{ textAlign: "center", py: 3 }}>
                   <AttendanceIcon sx={{ fontSize: 36, color: C.muted, mb: 1 }} />
-                  <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600, mb: 1.5, fontSize: "12px" }}>
+                  <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600, fontSize: "12px" }}>
                     {isSubjectFocused
                       ? "Attendance not marked yet for your division."
                       : "Not marked yet."}
                   </Typography>
-                  {canMarkAttendance && (
-                    <Button variant="contained" size="small" onClick={() => navigate("/attendance/mark")}
-                      sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 700, bgcolor: C.blue, boxShadow: "none", fontSize: "11px" }}>
-                      Mark Now
-                    </Button>
-                  )}
                 </Box>
               ) : (
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2.5, mt: 1 }}>
@@ -2126,6 +2098,12 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
                   </Grid>
                 </Box>
               )}
+              </Box>
+              {canMarkAttendance && (
+                <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.5, pt: 0.5 }}>
+                  <ActionLink label="Mark" onClick={() => navigate("/attendance/mark")} />
+                </Box>
+              )}
             </CardContent>
           </GCard>
         );
@@ -2138,12 +2116,6 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
             text: `${primaryAssignment.class_name} — ${primaryAssignment.division_name}${
               primaryAssignment.subject_name ? ` · ${primaryAssignment.subject_name}` : ""
             }`,
-          });
-        }
-        if (user?.tenant?.name) {
-          profileDetails.push({
-            icon: <SchoolIcon sx={{ fontSize: 15, color: C.muted }} />,
-            text: user.tenant.name,
           });
         }
         return <DashboardProfileCard details={profileDetails} />;
@@ -2482,12 +2454,6 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
             text: `Roll No: ${profile.roll_no}`,
           });
         }
-        if (profile.admission_no) {
-          studentProfileDetails.push({
-            icon: <SchoolIcon sx={{ fontSize: 15, color: C.muted }} />,
-            text: `Admission: ${profile.admission_no}`,
-          });
-        }
         if (class_teacher) {
           studentProfileDetails.push({
             icon: <PersonIcon sx={{ fontSize: 15, color: C.muted }} />,
@@ -2684,9 +2650,8 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Per-section date filters — each card controls its own range
-  // Attendance: Month | single-date Custom. Fee: 7 Days | Month | Custom range.
-  const [attFilter, setAttFilter] = useState<SectionDateFilter>(makeFilter("month"));
+  // Per-section date filters — attendance: Custom (today) | Weekly; fee: 7 Days | Month | Custom
+  const [attFilter, setAttFilter] = useState<SectionDateFilter>(makeAttDefaultFilter);
   const [feeFilter, setFeeFilter] = useState<SectionDateFilter>(makeFilter("month"));
 
   // ── Card-specific override state (populated by fast endpoints) ──────────────
@@ -2836,6 +2801,19 @@ export default function Dashboard() {
     });
     return unique;
   }, [data]);
+
+  const attendanceClassList = React.useMemo(
+    () => (data?.role === "TEACHER" ? teacherClasses : classes),
+    [data?.role, teacherClasses, classes]
+  );
+
+  // Default attendance class to the first available class
+  useEffect(() => {
+    if (attendanceClassList.length === 0 || attClassId !== "") return;
+    const firstId = attendanceClassList[0].id;
+    setAttClassId(firstId);
+    fetchAttCardData(attFilter, firstId);
+  }, [attendanceClassList, attClassId, attFilter, fetchAttCardData]);
 
   // ── Fast fee-only fetch — only this card refreshes ─────────────────────────
   const handleFeeFilterChange = useCallback(
