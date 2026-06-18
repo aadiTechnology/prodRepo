@@ -312,7 +312,7 @@ function MainLayout() {
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     maxWidth: { xs: 140, sm: 260, md: 320, lg: 420 },
-                    fontSize: { xs: "0.9rem", sm: "1.05rem", md: "1.15rem", lg: "1.2rem" },
+                    fontSize: { xs: "0.82rem", sm: "0.92rem", md: "1rem", lg: "1.05rem" },
                     lineHeight: 1.25,
                   }}
                 >
@@ -324,7 +324,7 @@ function MainLayout() {
                     component="span"
                     sx={{
                       display: "inline-block",
-                      fontSize: { xs: "1rem", sm: "1.1rem", md: "1.2rem" },
+                      fontSize: { xs: "0.9rem", sm: "1rem", md: "1.05rem" },
                       animation: "headerWaveHand 2.5s ease-in-out infinite",
                       transformOrigin: "70% 70%",
                     }}

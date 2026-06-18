@@ -61,7 +61,6 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  verticalListSortingStrategy,
   rectSortingStrategy,
   useSortable,
   arrayMove,
@@ -217,8 +216,14 @@ const pairedCardGridSx = {
 const pairedCardWrapSx = {
   minWidth: 0,
   height: "100%",
-  display: "flex",
-  "& > *": { flex: 1, width: "100%" },
+  "& .sortable-content": {
+    height: "100%",
+    width: "100%",
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    "& > *": { flex: 1, width: "100%", minWidth: 0 },
+  },
 };
 
 const SortableSection: React.FC<{ id: string; children: React.ReactNode; sx?: object }> = ({ id, children, sx }) => {
@@ -229,39 +234,52 @@ const SortableSection: React.FC<{ id: string; children: React.ReactNode; sx?: ob
       sx={{
         transform: CSS.Transform.toString(transform),
         transition,
-        opacity: isDragging ? 0.55 : 1,
         position: "relative",
-        "&:hover .drag-handle": { opacity: 1 },
+        zIndex: isDragging ? 50 : "auto",
+        minWidth: 0,
+        height: "100%",
+        ...(isDragging && {
+          boxShadow: C.shadowMd,
+          "& .MuiCard-root": { borderColor: "#CBD5E1" },
+        }),
+        "@media (hover: hover)": {
+          "&:hover .drag-handle": { opacity: 0.55 },
+        },
         ...sx,
       }}
     >
-      {/* Drag handle — visible on hover */}
       <Box
         className="drag-handle"
         {...attributes}
         {...listeners}
         sx={{
           position: "absolute",
-          top: 10,
-          right: 10,
-          zIndex: 10,
+          top: 8,
+          right: 8,
+          zIndex: 20,
           opacity: 0,
-          transition: "opacity 0.2s",
+          transition: "opacity 0.15s ease",
           cursor: "grab",
-          bgcolor: "rgba(255,255,255,0.9)",
-          border: "1px solid rgba(0,0,0,0.08)",
-          borderRadius: "8px",
-          p: 0.5,
           display: "flex",
           alignItems: "center",
-          color: C.muted,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-          "&:active": { cursor: "grabbing" },
+          justifyContent: "center",
+          width: "24px !important",
+          height: "24px !important",
+          minWidth: "24px !important",
+          maxWidth: "24px !important",
+          flex: "none !important",
+          p: 0,
+          m: 0,
+          bgcolor: "transparent",
+          border: "none",
+          boxShadow: "none",
+          color: C.mutedLight,
+          "&:active": { cursor: "grabbing", opacity: 0.85 },
         }}
       >
         <DragHandleIcon sx={{ fontSize: 18 }} />
       </Box>
-      {children}
+      <Box className="sortable-content">{children}</Box>
     </Box>
   );
 };
@@ -455,9 +473,11 @@ const GCard: React.FC<{ children: React.ReactNode; sx?: object }> = ({ children,
       transition: "box-shadow 0.2s ease, border-color 0.2s ease",
       position: "relative",
       overflow: "hidden",
-      "&:hover": {
-        boxShadow: C.shadowMd,
-        borderColor: "#CBD5E1",
+      "@media (hover: hover)": {
+        "&:hover": {
+          boxShadow: C.shadowMd,
+          borderColor: "#CBD5E1",
+        },
       },
       ...sx,
     }}
@@ -510,7 +530,7 @@ const StatPill: React.FC<{ label: string; value: string | number; color: string;
     >
       {label}
     </Typography>
-    <Typography sx={{ fontWeight: 800, color, fontSize: { xs: "1.15rem", sm: "1.35rem" }, lineHeight: 1.1 }}>
+    <Typography sx={{ fontWeight: 800, color, fontSize: { xs: "1.05rem", sm: "1.2rem" }, lineHeight: 1.1 }}>
       {value}
     </Typography>
   </Box>
@@ -522,66 +542,53 @@ const CardHeader: React.FC<{
   action?: React.ReactNode;
   dateFilter?: React.ReactNode;
 }> = ({ title, icon, action, dateFilter }) => (
-  <Box sx={{ mb: 2.5 }}>
+  <Box sx={{ mb: 2 }}>
     <Box
       sx={{
         display: "flex",
-        flexDirection: { xs: "column", md: "row" },
         justifyContent: "space-between",
-        alignItems: { xs: "stretch", md: "flex-start" },
-        gap: { xs: 1.25, md: 2 },
-        pb: dateFilter ? 1.5 : 0,
-        borderBottom: dateFilter ? `1px solid ${C.borderLight}` : "none",
+        alignItems: "center",
+        gap: 1,
+        mb: dateFilter ? 1.25 : 0,
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, flex: 1, minWidth: 0 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
-          {icon && (
-            <Box
-              sx={{
-                width: 36,
-                height: 36,
-                borderRadius: C.radius.sm,
-                bgcolor: C.blueGlass,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                "& .MuiSvgIcon-root": { fontSize: 18 },
-              }}
-            >
-              {icon}
-            </Box>
-          )}
-          <Typography
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+        {icon && (
+          <Box
             sx={{
-              fontWeight: 800,
-              color: C.slateText,
-              fontSize: { xs: "0.95rem", sm: "1.05rem" },
-              letterSpacing: "-0.02em",
-              lineHeight: 1.25,
+              width: 32,
+              height: 32,
+              borderRadius: C.radius.sm,
+              bgcolor: C.blueGlass,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              "& .MuiSvgIcon-root": { fontSize: 17 },
             }}
           >
-            {title}
-          </Typography>
-        </Box>
-        {action && <Box sx={{ flexShrink: 0 }}>{action}</Box>}
-      </Box>
-      {dateFilter && (
-        <Box
+            {icon}
+          </Box>
+        )}
+        <Typography
+          variant="subtitle1"
           sx={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 1,
-            alignItems: "center",
-            justifyContent: { xs: "flex-start", md: "flex-end" },
-            width: { xs: "100%", md: "auto" },
+            fontWeight: 800,
+            color: C.slateText,
+            letterSpacing: "-0.1px",
+            lineHeight: 1.25,
           }}
         >
-          {dateFilter}
-        </Box>
-      )}
+          {title}
+        </Typography>
+      </Box>
+      {action && <Box sx={{ flexShrink: 0 }}>{action}</Box>}
     </Box>
+    {dateFilter && (
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
+        {dateFilter}
+      </Box>
+    )}
   </Box>
 );
 
@@ -663,33 +670,33 @@ const SnapCard: React.FC<SnapCardProps> = ({ title, value, icon, accentColor, gl
   <GCard sx={{ cursor: onClick ? "pointer" : "default", height: "100%" }}>
     <Box
       sx={{
-        height: 3,
+        height: 2,
         background: `linear-gradient(90deg, ${accentColor}, ${accentColor}88)`,
       }}
     />
     <CardContent
-      sx={{ p: { xs: 2, sm: 2.25 }, "&:last-child": { pb: { xs: 2, sm: 2.25 } } }}
+      sx={{ p: { xs: 1.75, sm: 2 }, "&:last-child": { pb: { xs: 1.75, sm: 2 } } }}
       onClick={onClick}
     >
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 1.25 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 1 }}>
         <Typography
           sx={{
             color: C.muted,
-            fontWeight: 700,
+            fontWeight: 600,
             textTransform: "uppercase",
-            letterSpacing: "0.07em",
             fontSize: "0.68rem",
-            lineHeight: 1.3,
+            letterSpacing: "0.05em",
+            lineHeight: 1.35,
             minWidth: 0,
-            pt: 0.25,
+            pt: 0.15,
           }}
         >
           {title}
         </Typography>
         <Box
           sx={{
-            width: 38,
-            height: 38,
+            width: 32,
+            height: 32,
             borderRadius: C.radius.sm,
             bgcolor: glassBg,
             color: accentColor,
@@ -698,6 +705,7 @@ const SnapCard: React.FC<SnapCardProps> = ({ title, value, icon, accentColor, gl
             justifyContent: "center",
             flexShrink: 0,
             border: `1px solid ${accentColor}20`,
+            "& .MuiSvgIcon-root": { fontSize: 17 },
           }}
         >
           {icon}
@@ -705,12 +713,12 @@ const SnapCard: React.FC<SnapCardProps> = ({ title, value, icon, accentColor, gl
       </Box>
       <Typography
         sx={{
-          fontWeight: 800,
+          fontWeight: 700,
           color: C.slateText,
-          fontSize: { xs: "1.65rem", sm: "1.85rem", lg: "2rem" },
-          letterSpacing: "-0.03em",
-          lineHeight: 1.05,
-          mb: sub ? 0.75 : 0,
+          fontSize: { xs: "1.2rem", sm: "1.3rem" },
+          letterSpacing: "-0.4px",
+          lineHeight: 1.15,
+          mb: sub ? 0.65 : 0,
           wordBreak: "break-word",
         }}
       >
@@ -736,16 +744,15 @@ const AttRing: React.FC<{ pct: number; size?: number; color?: string; gradId: st
           <stop offset="100%" stopColor={color + "BB"} />
         </linearGradient>
       </defs>
-      <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="3" />
-      <circle cx="18" cy="18" r="15.9" fill="none" stroke={`${color}18`} strokeWidth="3.2" strokeDasharray="1 3" />
+      <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="3" />
       <circle
         cx="18"
         cy="18"
         r="15.9"
         fill="none"
         stroke={`url(#${gradId})`}
-        strokeWidth="3.2"
-        strokeLinecap="round"
+        strokeWidth="3"
+        strokeLinecap="butt"
         strokeDasharray={`${Math.min(pct, 100)} ${100 - Math.min(pct, 100)}`}
         style={{ transition: "stroke-dasharray 1.1s ease" }}
       />
@@ -760,7 +767,7 @@ const AttRing: React.FC<{ pct: number; size?: number; color?: string; gradId: st
         justifyContent: "center",
       }}
     >
-      <Typography sx={{ fontWeight: 900, fontSize: size > 110 ? "1.45rem" : "1rem", color, letterSpacing: "-0.5px" }}>
+      <Typography sx={{ fontWeight: 900, fontSize: size > 110 ? "1.25rem" : "0.95rem", color, letterSpacing: "-0.5px" }}>
         {pct.toFixed(1)}%
       </Typography>
       <Typography sx={{ fontSize: "9px", color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px" }}>
@@ -1075,7 +1082,7 @@ const WelcomeBanner: React.FC<{
         <Box sx={{ minWidth: 0 }}>
           <Typography
             sx={{
-              fontSize: { xs: "1rem", sm: "1.15rem", md: "1.3rem" },
+              fontSize: { xs: "0.95rem", sm: "1.05rem", md: "1.15rem" },
               fontWeight: 800,
               letterSpacing: "0.02em",
               color: "#FFFFFF",
@@ -1311,7 +1318,7 @@ const DashboardProfileCard: React.FC<{
               {avatarEl}
               <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-                  <Typography sx={{ fontWeight: 800, color: C.slateText, fontSize: { xs: "0.95rem", sm: "1.05rem" } }}>
+                  <Typography sx={{ fontWeight: 800, color: C.slateText, fontSize: { xs: "0.9rem", sm: "0.95rem" } }}>
                     {name}
                   </Typography>
                   {roleChip}
@@ -1391,7 +1398,7 @@ const DashboardProfileCard: React.FC<{
         >
           {avatarEl}
           <Box sx={{ flex: 1, minWidth: 0, textAlign: { xs: "center", sm: "left" } }}>
-            <Typography sx={{ fontWeight: 800, color: C.slateText, fontSize: "1.05rem", lineHeight: 1.25 }}>
+            <Typography sx={{ fontWeight: 800, color: C.slateText, fontSize: "0.95rem", lineHeight: 1.25 }}>
               {name}
             </Typography>
             <Box sx={{ mt: 0.75, display: "flex", justifyContent: { xs: "center", sm: "flex-start" } }}>
@@ -1540,7 +1547,7 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
   ];
 
   const ADMIN_KPI_DEFAULT     = ["admin_students", "admin_classes", "admin_fees", "admin_balance"];
-  const ADMIN_SECTIONS_DEFAULT = ["attendance_fee", "notices", "leads", "quick_actions"];
+  const ADMIN_SECTIONS_DEFAULT = ["admin_profile", "attendance_overview", "fee_collection", "notices", "leads", "quick_actions"];
 
   const kpiSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [kpiOrder, setKpiOrder] = useSectionOrder("admin_kpi_order", ADMIN_KPI_DEFAULT);
@@ -1551,7 +1558,7 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
   }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-  const [sectionOrder, setSectionOrder] = useSectionOrder("admin_dash_order", ADMIN_SECTIONS_DEFAULT);
+  const [sectionOrder, setSectionOrder] = useSectionOrder("admin_dash_order_v3", ADMIN_SECTIONS_DEFAULT);
 
   function handleDragEnd(e: DragEndEvent) {
     const { active, over } = e;
@@ -1562,225 +1569,221 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
 
   const renderAdminSection = (id: string) => {
     switch (id) {
-      case "notices":
+      case "admin_profile":
         return (
-          <SortableSection key={id} id={id}>
-            <GCard>
-              <CardContent sx={{ p: 3 }}>
-                <CardHeader
-                  title="Recent Notices & Holidays"
-                  icon={<NoticeIcon sx={{ color: C.red }} />}
-                  action={<ActionLink label="View All" onClick={() => navigate("/communication/notices")} />}
-                />
-                <NoticesCardContent notices={data.recent_notices} navigate={navigate} />
-              </CardContent>
-            </GCard>
-          </SortableSection>
+          <DashboardProfileCard
+            variant="strip"
+            metaChips={[
+              `${data.student_snapshot.active_students} Students`,
+              `${data.student_snapshot.total_classes} Classes`,
+            ]}
+          />
         );
 
-      case "attendance_fee":
+      case "notices":
         return (
-          <SortableSection key={id} id={id}>
-            <Grid container spacing={3}>
-              {/* Attendance Overview */}
-              <Grid item xs={12} lg={7}>
-                <GCard sx={{ height: "100%" }}>
-                  <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                    <CardHeader
-                      title="Attendance Overview"
-                      icon={<AttendanceIcon sx={{ color: C.brand }} />}
-                      action={<ActionLink label="View Details" onClick={() => navigate("/attendance/report")} />}
-                      dateFilter={
-                        <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                          <AttendanceDateFilter value={attFilter} onChange={onAttFilterChange} minDate={attMinDate} maxDate={attMaxDate} />
-                          {classes.length > 0 && (
-                          <TextField select size="small" value={selectedClassId || classes[0]?.id || ""}
-                            onChange={(e) => onClassChange(Number(e.target.value))}
-                            sx={classFilterSelectSx}
-                          >
-                            {classes.map((cls) => (
-                              <MenuItem key={cls.id} value={cls.id} sx={{ fontSize: "11px", fontWeight: 700 }}>{cls.name}</MenuItem>
-                            ))}
-                          </TextField>
-                          )}
-                        </Box>
-                      }
-                    />
-                    {attCardLoading ? (
-                      <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-                        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
-                          <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
-                          <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading attendance…</Typography>
-                        </Box>
-                      </Box>
-                    ) : (
-                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: { xs: "center", md: "flex-start" }, gap: { xs: 2, md: 3 }, flexWrap: { xs: "wrap", md: "nowrap" } }}>
-                        <AttRing pct={attPct} size={140} color={attPct >= 75 ? C.green : C.amber} gradId="adminAttGrad" />
-                        <Grid container spacing={1.5} sx={{ flex: 1, minWidth: { xs: "100%", md: 220 } }}>
-                          {[
-                            { label: "Present",  value: present,  color: C.green, bg: C.greenGlass },
-                            { label: "Absent",   value: absent,   color: C.red,   bg: C.redGlass   },
-                            { label: "Half Day", value: half_day, color: C.amber, bg: C.amberGlass },
-                            { label: "On Leave", value: leave,    color: C.blue,  bg: C.blueGlass  },
-                          ].map((item) => (
-                            <Grid item xs={6} key={item.label}>
-                              <StatPill label={item.label} value={item.value} color={item.color} bg={item.bg} />
-                            </Grid>
-                          ))}
-                        </Grid>
-                      </Box>
-                    )}
-                  </CardContent>
-                </GCard>
-              </Grid>
+          <GCard>
+            <CardContent sx={{ p: 3 }}>
+              <CardHeader
+                title="Recent Notices & Holidays"
+                icon={<NoticeIcon sx={{ color: C.red }} />}
+                action={<ActionLink label="View All" onClick={() => navigate("/communication/notices")} />}
+              />
+              <NoticesCardContent notices={data.recent_notices} navigate={navigate} />
+            </CardContent>
+          </GCard>
+        );
 
-              {/* Fee Collection */}
-              <Grid item xs={12} lg={5}>
-                <GCard sx={{ height: "100%" }}>
-                  <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                    <CardHeader
-                      title="Fee Collection Progress"
-                      icon={<FeeIcon sx={{ color: C.green }} />}
-                      action={<ActionLink label="Collect Fee" onClick={() => navigate("/fees/invoices")} />}
-                      dateFilter={
-                        <CardDateFilter value={feeFilter} onChange={onFeeFilterChange}
-                          presets={[
-                            { key: "week", label: "7 Days" },
-                            { key: "month", label: "Month" },
-                            { key: "custom", label: "Custom" },
-                          ]}
-                        />
-                      }
-                    />
-                    {feeCardLoading ? (
-                      <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-                        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
-                          <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.greenGlass}`, borderTopColor: C.green, animation: "spin 0.8s linear infinite" }} />
-                          <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading fees…</Typography>
-                        </Box>
-                      </Box>
-                    ) : (
-                      <>
-                        <Box sx={{ mb: 2.5 }}>
-                          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
-                            <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>Recovery Rate</Typography>
-                            <Typography variant="body2" sx={{ color: C.green, fontWeight: 800 }}>{feePct.toFixed(1)}%</Typography>
-                          </Box>
-                          <LinearProgress variant="determinate" value={feePct}
-                            sx={{ height: 10, borderRadius: 5, bgcolor: C.greenGlass,
-                              "& .MuiLinearProgress-bar": { background: `linear-gradient(90deg, ${C.green}, #34D399)`, borderRadius: 5 } }}
-                          />
-                        </Box>
-                        {[
-                          { label: "Total Projected",  value: fmtINR(total_fee),     color: C.slateText, icon: <TrendIcon sx={{ fontSize: 16, color: C.slateText }} /> },
-                          { label: "Total Collected",  value: fmtINR(total_paid),    color: C.green,     icon: <PresentIcon sx={{ fontSize: 16, color: C.green }} /> },
-                          { label: "Total Outstanding",value: fmtINR(total_balance), color: C.red,       icon: <WarningIcon sx={{ fontSize: 16, color: C.red }} /> },
-                        ].map((row) => (
-                          <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                              {row.icon}
-                              <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>{row.label}</Typography>
-                            </Box>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: row.color }}>{row.value}</Typography>
-                          </Box>
-                        ))}
-                      </>
+      case "attendance_overview":
+        return (
+          <GCard sx={{ height: "100%" }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+              <CardHeader
+                title="Attendance Overview"
+                icon={<AttendanceIcon sx={{ color: C.brand }} />}
+                action={<ActionLink label="View Details" onClick={() => navigate("/attendance/report")} />}
+                dateFilter={
+                  <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                    <AttendanceDateFilter value={attFilter} onChange={onAttFilterChange} minDate={attMinDate} maxDate={attMaxDate} />
+                    {classes.length > 0 && (
+                    <TextField select size="small" value={selectedClassId || classes[0]?.id || ""}
+                      onChange={(e) => onClassChange(Number(e.target.value))}
+                      sx={classFilterSelectSx}
+                    >
+                      {classes.map((cls) => (
+                        <MenuItem key={cls.id} value={cls.id} sx={{ fontSize: "11px", fontWeight: 700 }}>{cls.name}</MenuItem>
+                      ))}
+                    </TextField>
                     )}
-                  </CardContent>
-                </GCard>
-              </Grid>
-            </Grid>
-          </SortableSection>
+                  </Box>
+                }
+              />
+              {attCardLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
+                    <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading attendance…</Typography>
+                  </Box>
+                </Box>
+              ) : (
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: { xs: "center", md: "flex-start" }, gap: { xs: 2, md: 3 }, flexWrap: { xs: "wrap", md: "nowrap" } }}>
+                  <AttRing pct={attPct} size={140} color={attPct >= 75 ? C.green : C.amber} gradId="adminAttGrad" />
+                  <Grid container spacing={1.5} sx={{ flex: 1, minWidth: { xs: "100%", md: 220 } }}>
+                    {[
+                      { label: "Present",  value: present,  color: C.green, bg: C.greenGlass },
+                      { label: "Absent",   value: absent,   color: C.red,   bg: C.redGlass   },
+                    ].map((item) => (
+                      <Grid item xs={6} key={item.label}>
+                        <StatPill label={item.label} value={item.value} color={item.color} bg={item.bg} />
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+            </CardContent>
+          </GCard>
+        );
+
+      case "fee_collection":
+        return (
+          <GCard sx={{ height: "100%" }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+              <CardHeader
+                title="Fee Collection Progress"
+                icon={<FeeIcon sx={{ color: C.green }} />}
+                action={<ActionLink label="Collect Fee" onClick={() => navigate("/fees/invoices")} />}
+                dateFilter={
+                  <CardDateFilter value={feeFilter} onChange={onFeeFilterChange}
+                    presets={[
+                      { key: "week", label: "7 Days" },
+                      { key: "month", label: "Month" },
+                      { key: "custom", label: "Custom" },
+                    ]}
+                  />
+                }
+              />
+              {feeCardLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.greenGlass}`, borderTopColor: C.green, animation: "spin 0.8s linear infinite" }} />
+                    <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading fees…</Typography>
+                  </Box>
+                </Box>
+              ) : (
+                <>
+                  <Box sx={{ mb: 2.5 }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
+                      <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>Recovery Rate</Typography>
+                      <Typography variant="body2" sx={{ color: C.green, fontWeight: 800 }}>{feePct.toFixed(1)}%</Typography>
+                    </Box>
+                    <LinearProgress variant="determinate" value={feePct}
+                      sx={{ height: 10, borderRadius: 5, bgcolor: C.greenGlass,
+                        "& .MuiLinearProgress-bar": { background: `linear-gradient(90deg, ${C.green}, #34D399)`, borderRadius: 5 } }}
+                    />
+                  </Box>
+                  {[
+                    { label: "Total Projected",  value: fmtINR(total_fee),     color: C.slateText, icon: <TrendIcon sx={{ fontSize: 16, color: C.slateText }} /> },
+                    { label: "Total Collected",  value: fmtINR(total_paid),    color: C.green,     icon: <PresentIcon sx={{ fontSize: 16, color: C.green }} /> },
+                    { label: "Total Outstanding",value: fmtINR(total_balance), color: C.red,       icon: <WarningIcon sx={{ fontSize: 16, color: C.red }} /> },
+                  ].map((row) => (
+                    <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                        {row.icon}
+                        <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>{row.label}</Typography>
+                      </Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: row.color }}>{row.value}</Typography>
+                    </Box>
+                  ))}
+                </>
+              )}
+            </CardContent>
+          </GCard>
         );
 
       case "leads":
         return (
-          <SortableSection key={id} id={id}>
-            <GCard>
-              <CardContent sx={{ p: 3 }}>
-                <CardHeader
-                  title="Admissions Lead Pipeline"
-                  icon={<PersonAddIcon color="primary" sx={{ fontSize: 20 }} />}
-                  action={
-                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/admissions/leads")}
-                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
-                      View All
-                    </Button>
-                  }
-                />
-                <Grid container spacing={2}>
-                  {data.lead_pipeline.map((lp, i) => {
-                    const pct = totalLeads > 0 ? (lp.count / totalLeads) * 100 : 0;
-                    return (
-                      <Grid item xs={12} sm={6} md={3} key={i}>
-                        <Box sx={{
-                          p: 2, borderRadius: "14px", border: `1.5px solid ${C.border}`,
-                          transition: "all 0.22s cubic-bezier(0.16,1,0.3,1)",
-                          "&:hover": { borderColor: (lp.color_code || C.blue) + "45", bgcolor: (lp.color_code || C.blue) + "08",
-                            transform: "translateY(-2px)", boxShadow: `0 4px 16px ${lp.color_code || C.blue}12` },
-                        }}>
-                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.75 }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                              <Box sx={{ color: lp.color_code || C.blue, display: "flex", alignItems: "center" }}>
-                                {getLeadIcon(lp.status)}
-                              </Box>
-                              <Typography variant="body2" sx={{ fontWeight: 700, color: lp.color_code || C.slateText, fontSize: "12px" }}>
-                                {lp.status}
-                              </Typography>
+          <GCard>
+            <CardContent sx={{ p: 3 }}>
+              <CardHeader
+                title="Admissions Lead Pipeline"
+                icon={<PersonAddIcon color="primary" sx={{ fontSize: 20 }} />}
+                action={
+                  <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/admissions/leads")}
+                    sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                    View All
+                  </Button>
+                }
+              />
+              <Grid container spacing={2}>
+                {data.lead_pipeline.map((lp, i) => {
+                  const pct = totalLeads > 0 ? (lp.count / totalLeads) * 100 : 0;
+                  return (
+                    <Grid item xs={12} sm={6} md={3} key={i}>
+                      <Box sx={{
+                        p: 2, borderRadius: "14px", border: `1.5px solid ${C.border}`,
+                        transition: "all 0.22s cubic-bezier(0.16,1,0.3,1)",
+                        "&:hover": { borderColor: (lp.color_code || C.blue) + "45", bgcolor: (lp.color_code || C.blue) + "08",
+                          transform: "translateY(-2px)", boxShadow: `0 4px 16px ${lp.color_code || C.blue}12` },
+                      }}>
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.75 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                            <Box sx={{ color: lp.color_code || C.blue, display: "flex", alignItems: "center" }}>
+                              {getLeadIcon(lp.status)}
                             </Box>
-                            <Typography variant="h5" sx={{ fontWeight: 900, color: lp.color_code || C.slateText }}>{lp.count}</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: lp.color_code || C.slateText, fontSize: "12px" }}>
+                              {lp.status}
+                            </Typography>
                           </Box>
-                          <Typography variant="caption" sx={{ color: C.muted, display: "block", mb: 1 }}>
-                            {totalLeads > 0 ? `${pct.toFixed(0)}% of pipeline` : "0% of pipeline"}
-                          </Typography>
-                          <LinearProgress variant="determinate" value={pct}
-                            sx={{ height: 4, borderRadius: 2, bgcolor: "rgba(0,0,0,0.04)",
-                              "& .MuiLinearProgress-bar": { bgcolor: lp.color_code || C.blue, borderRadius: 2 } }}
-                          />
+                          <Typography variant="h5" sx={{ fontWeight: 900, color: lp.color_code || C.slateText }}>{lp.count}</Typography>
                         </Box>
-                      </Grid>
-                    );
-                  })}
-                </Grid>
-              </CardContent>
-            </GCard>
-          </SortableSection>
+                        <Typography variant="caption" sx={{ color: C.muted, display: "block", mb: 1 }}>
+                          {totalLeads > 0 ? `${pct.toFixed(0)}% of pipeline` : "0% of pipeline"}
+                        </Typography>
+                        <LinearProgress variant="determinate" value={pct}
+                          sx={{ height: 4, borderRadius: 2, bgcolor: "rgba(0,0,0,0.04)",
+                            "& .MuiLinearProgress-bar": { bgcolor: lp.color_code || C.blue, borderRadius: 2 } }}
+                        />
+                      </Box>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            </CardContent>
+          </GCard>
         );
 
       case "quick_actions":
         return (
-          <SortableSection key={id} id={id}>
-            <GCard>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="subtitle1"
-                  sx={{ fontWeight: 800, color: C.slateText, mb: 2.5, display: "flex", alignItems: "center", gap: 1, letterSpacing: "-0.1px" }}>
-                  <TrendIcon color="primary" sx={{ fontSize: 20 }} />
-                  Quick Administrative Actions
-                </Typography>
-                <Grid container spacing={2}>
-                  {quickActions.map((qa) => (
-                    <Grid item xs={12} sm={6} md={3} key={qa.label}>
-                      <Box onClick={() => navigate(qa.path)} sx={{
-                        display: "flex", alignItems: "center", gap: 2, p: 2,
-                        borderRadius: "14px", border: `1px solid ${C.border}`, cursor: "pointer",
-                        transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
-                        "&:hover": { bgcolor: qa.bg, borderColor: qa.color + "35", transform: "translateX(3px)", boxShadow: `0 4px 14px ${qa.color}12` },
-                      }}>
-                        <Avatar sx={{ bgcolor: qa.bg, color: qa.color, width: 44, height: 44, borderRadius: "12px", flexShrink: 0 }}>
-                          {qa.icon}
-                        </Avatar>
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 800, color: C.slateText, lineHeight: 1.3 }}>{qa.label}</Typography>
-                          <Typography variant="caption" sx={{ color: C.muted, lineHeight: 1.3, display: "block" }}>{qa.desc}</Typography>
-                        </Box>
-                        <ArrowIcon sx={{ color: C.muted, fontSize: 18, flexShrink: 0 }} />
+          <GCard>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="subtitle1"
+                sx={{ fontWeight: 800, color: C.slateText, mb: 2.5, display: "flex", alignItems: "center", gap: 1, letterSpacing: "-0.1px" }}>
+                <TrendIcon color="primary" sx={{ fontSize: 20 }} />
+                Quick Administrative Actions
+              </Typography>
+              <Grid container spacing={2}>
+                {quickActions.map((qa) => (
+                  <Grid item xs={12} sm={6} md={3} key={qa.label}>
+                    <Box onClick={() => navigate(qa.path)} sx={{
+                      display: "flex", alignItems: "center", gap: 2, p: 2,
+                      borderRadius: "14px", border: `1px solid ${C.border}`, cursor: "pointer",
+                      transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                      "&:hover": { bgcolor: qa.bg, borderColor: qa.color + "35", transform: "translateX(3px)", boxShadow: `0 4px 14px ${qa.color}12` },
+                    }}>
+                      <Avatar sx={{ bgcolor: qa.bg, color: qa.color, width: 44, height: 44, borderRadius: "12px", flexShrink: 0 }}>
+                        {qa.icon}
+                      </Avatar>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: C.slateText, lineHeight: 1.3 }}>{qa.label}</Typography>
+                        <Typography variant="caption" sx={{ color: C.muted, lineHeight: 1.3, display: "block" }}>{qa.desc}</Typography>
                       </Box>
-                    </Grid>
-                  ))}
-                </Grid>
-              </CardContent>
-            </GCard>
-          </SortableSection>
+                      <ArrowIcon sx={{ color: C.muted, fontSize: 18, flexShrink: 0 }} />
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            </CardContent>
+          </GCard>
         );
 
       default:
@@ -1847,23 +1850,24 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
         </DndContext>
       </Grid>
 
-      {/* ── Profile strip ── */}
-      <Grid item xs={12}>
-        <DashboardProfileCard
-          variant="strip"
-          metaChips={[
-            `${data.student_snapshot.active_students} Students`,
-            `${data.student_snapshot.total_classes} Classes`,
-          ]}
-        />
-      </Grid>
-
-      {/* ─ Draggable sections ─ */}
+      {/* ─ Draggable sections — 2-col grid, each card individually movable ─ */}
       <Grid item xs={12}>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={sectionOrder} strategy={verticalListSortingStrategy}>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              {sectionOrder.map((id) => renderAdminSection(id))}
+          <SortableContext items={sectionOrder} strategy={rectSortingStrategy}>
+            <Box sx={pairedCardGridSx}>
+              {sectionOrder.map((id) => (
+                <SortableSection
+                  key={id}
+                  id={id}
+                  sx={{
+                    ...(id === "admin_profile" || id === "notices" || id === "leads" || id === "quick_actions"
+                      ? { gridColumn: "1 / -1" }
+                      : pairedCardWrapSx),
+                  }}
+                >
+                  {renderAdminSection(id)}
+                </SortableSection>
+              ))}
             </Box>
           </SortableContext>
         </DndContext>
@@ -1951,7 +1955,7 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   // ── Main cards — each individually draggable (vertical list) ───────────────
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const [cardOrder, setCardOrder] = useSectionOrder(
-    "teacher_cards_v4",
+    "teacher_cards_v6",
     isSubjectFocused ? TEACHER_CARDS_SUBJECT : TEACHER_CARDS_DEFAULT
   );
   function handleCardDrag(e: DragEndEvent) {
@@ -2132,15 +2136,15 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
                     {[
                       { label: "Present",  value: present,  color: C.green, bg: C.greenGlass },
                       { label: "Absent",   value: absent,   color: C.red,   bg: C.redGlass   },
-                      { label: "Half Day", value: half_day, color: C.amber, bg: C.amberGlass },
-                      { label: "On Leave", value: leave,    color: C.blue,  bg: C.blueGlass  },
+                      // { label: "Half Day", value: half_day, color: C.amber, bg: C.amberGlass },
+                      // { label: "On Leave", value: leave,    color: C.blue,  bg: C.blueGlass  },
                     ].map((s) => (
                       <Grid item xs={6} key={s.label}>
                         <Box sx={{ p: 1, bgcolor: s.bg, borderRadius: "10px", borderLeft: `3px solid ${s.color}` }}>
                           <Typography sx={{ fontSize: "9px", color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px" }}>
                             {s.label}
                           </Typography>
-                          <Typography sx={{ fontWeight: 900, color: s.color, fontSize: "1.2rem", lineHeight: 1.2 }}>{s.value}</Typography>
+                          <Typography sx={{ fontWeight: 900, color: s.color, fontSize: "1.05rem", lineHeight: 1.2 }}>{s.value}</Typography>
                         </Box>
                       </Grid>
                     ))}
