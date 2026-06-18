@@ -180,6 +180,47 @@ function useSectionOrder(storageKey: string, defaultOrder: string[]): [string[],
   return [order, save];
 }
 
+/** KPI row — columns expand evenly for 1–4 cards (no empty slot). */
+const kpiGridSx = (count: number) => {
+  const n = Math.max(count, 1);
+  const rowCols = `repeat(${n}, minmax(0, 1fr))`;
+  return {
+    display: "grid",
+    gridTemplateColumns: {
+      xs: "1fr",
+      sm: n === 1 ? "1fr" : n === 2 ? "repeat(2, minmax(0, 1fr))" : rowCols,
+      md: rowCols,
+      lg: rowCols,
+    },
+    gap: 3,
+    width: "100%",
+  };
+};
+
+const dashboardCardGridSx = {
+  display: "grid",
+  gridTemplateColumns: {
+    xs: "1fr",
+    md: "repeat(2, minmax(0, 1fr))",
+  },
+  gap: { xs: 2, md: 3 },
+  alignItems: "start",
+  width: "100%",
+};
+
+/** Side-by-side student/teacher cards — equal height in each row. */
+const pairedCardGridSx = {
+  ...dashboardCardGridSx,
+  alignItems: "stretch",
+};
+
+const pairedCardWrapSx = {
+  minWidth: 0,
+  height: "100%",
+  display: "flex",
+  "& > *": { flex: 1, width: "100%" },
+};
+
 const SortableSection: React.FC<{ id: string; children: React.ReactNode; sx?: object }> = ({ id, children, sx }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   return (
@@ -1200,7 +1241,9 @@ const DashboardProfileCard: React.FC<{
   /** card = grid widget (teacher/student); strip = full-width banner (admin) */
   variant?: "card" | "strip";
   metaChips?: string[];
-}> = ({ details = [], displayName, avatarOverride, variant = "card", metaChips = [] }) => {
+  /** Stretch to match sibling card height (attendance + profile row). */
+  fillHeight?: boolean;
+}> = ({ details = [], displayName, avatarOverride, variant = "card", metaChips = [], fillHeight = false }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { roles: rbacRoles } = useRBAC();
@@ -1325,8 +1368,13 @@ const DashboardProfileCard: React.FC<{
   }
 
   return (
-    <GCard sx={{ height: "100%" }}>
-      <CardContent sx={{ p: { xs: 2, sm: 2.5 }, height: "100%" }}>
+    <GCard sx={fillHeight ? { height: "100%", display: "flex", flexDirection: "column" } : undefined}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 3 },
+          ...(fillHeight ? { flex: 1, display: "flex", flexDirection: "column" } : {}),
+        }}
+      >
         <CardHeader
           title="My Profile"
           icon={<PersonIcon sx={{ color: C.brand }} />}
@@ -1336,8 +1384,9 @@ const DashboardProfileCard: React.FC<{
           sx={{
             display: "flex",
             flexDirection: { xs: "column", sm: "row" },
-            alignItems: { xs: "center", sm: "flex-start" },
+            alignItems: { xs: "center", sm: fillHeight ? "center" : "flex-start" },
             gap: 2,
+            ...(fillHeight ? { flex: 1 } : {}),
           }}
         >
           {avatarEl}
@@ -1787,13 +1836,13 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
       <Grid item xs={12}>
         <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
           <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
-            <Grid container spacing={3}>
+            <Box sx={kpiGridSx(kpiOrder.length)}>
               {kpiOrder.map((id) => (
-                <Grid item xs={12} sm={6} md={6} lg={3} key={id}>
-                  <SortableSection id={id}>{renderAdminKpi(id)}</SortableSection>
-                </Grid>
+                <SortableSection key={id} id={id} sx={{ minWidth: 0 }}>
+                  {renderAdminKpi(id)}
+                </SortableSection>
               ))}
-            </Grid>
+            </Box>
           </SortableContext>
         </DndContext>
       </Grid>
@@ -2118,7 +2167,7 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
             }`,
           });
         }
-        return <DashboardProfileCard details={profileDetails} />;
+        return <DashboardProfileCard details={profileDetails} fillHeight />;
       }
 
       // ── Homework list ──────────────────────────────────────────────────────
@@ -2235,13 +2284,13 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
       <Grid item xs={12}>
         <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
           <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
-            <Grid container spacing={3}>
+            <Box sx={kpiGridSx(kpiOrder.length)}>
               {kpiOrder.map((id) => (
-                <Grid item xs={12} sm={6} md={6} lg={3} key={id}>
-                  <SortableSection id={id}>{renderKpi(id)}</SortableSection>
-                </Grid>
+                <SortableSection key={id} id={id} sx={{ minWidth: 0 }}>
+                  {renderKpi(id)}
+                </SortableSection>
               ))}
-            </Grid>
+            </Box>
           </SortableContext>
         </DndContext>
       </Grid>
@@ -2250,12 +2299,16 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
       <Grid item xs={12}>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCardDrag}>
           <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: { xs: 2, md: 3 } }}>
+            <Box sx={pairedCardGridSx}>
               {cardOrder.map((id) => (
                 <SortableSection
                   key={id}
                   id={id}
-                  sx={{ gridColumn: (id === "card_notices" || id === "card_homework") ? "1 / -1" : "auto" }}
+                  sx={{
+                    ...(id === "card_notices" || id === "card_homework"
+                      ? { gridColumn: "1 / -1" }
+                      : pairedCardWrapSx),
+                  }}
                 >
                   {renderCardContent(id)}
                 </SortableSection>
@@ -2271,20 +2324,25 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
 // ═══════════════════════════════════════════════════════════════════════════════
 // 3. STUDENT DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
-const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw", "s_kpi_fees"];
-const STUDENT_CARDS_DEFAULT = ["s_att", "s_profile", "s_fee", "s_homework", "s_notices"];
+const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw"];
+// Fee KPI hidden for students — restore when fee module is enabled:
+// const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw", "s_kpi_fees"];
+const STUDENT_CARDS_DEFAULT = ["s_att", "s_profile", "s_homework", "s_notices"];
+// Fee card hidden for students — restore when fee module is enabled:
+// const STUDENT_CARDS_DEFAULT = ["s_att", "s_profile", "s_fee", "s_homework", "s_notices"];
 
 const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }) => {
   const navigate = useNavigate();
-  const { profile, attendance, fee_status, class_teacher, homework, recent_notices } = data;
-  const { total_fee, total_paid, total_balance, is_overdue, next_due_date } = fee_status;
-  const feePct = total_fee > 0 ? (total_paid / total_fee) * 100 : 0;
-  const fmtINR = (n: number) => "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  const { profile, attendance, /* fee_status, */ class_teacher, homework, recent_notices } = data;
+  // Fee fields — uncomment with s_kpi_fees / s_fee cards below
+  // const { total_fee, total_paid, total_balance, is_overdue, next_due_date } = fee_status;
+  // const feePct = total_fee > 0 ? (total_paid / total_fee) * 100 : 0;
+  // const fmtINR = (n: number) => "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
   const kpiSensors  = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const cardSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-  const [kpiOrder,  setKpiOrder]  = useSectionOrder("student_kpi_order",   STUDENT_KPI_DEFAULT);
-  const [cardOrder, setCardOrder] = useSectionOrder("student_cards_v2", STUDENT_CARDS_DEFAULT);
+  const [kpiOrder,  setKpiOrder]  = useSectionOrder("student_kpi_v2",   STUDENT_KPI_DEFAULT);
+  const [cardOrder, setCardOrder] = useSectionOrder("student_cards_v3", STUDENT_CARDS_DEFAULT);
 
   function handleKpiDrag(e: DragEndEvent) {
     const { active, over } = e;
@@ -2369,6 +2427,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
             }
           />
         );
+      /* Fee KPI — hidden for students; restore when fee module is enabled
       case "s_kpi_fees":
         return (
           <SnapCard
@@ -2394,6 +2453,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
             }
           />
         );
+      */
       default: return null;
     }
   };
@@ -2402,8 +2462,8 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
     switch (id) {
       case "s_att":
         return (
-          <SortableSection key={id} id={id}>
-            <GCard>
+          <SortableSection key={id} id={id} sx={pairedCardWrapSx}>
+            <GCard sx={{ height: "100%" }}>
               <CardContent sx={{ p: 3 }}>
                 <CardHeader
                   title="My Attendance"
@@ -2461,16 +2521,18 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
           });
         }
         return (
-          <SortableSection key={id} id={id}>
+          <SortableSection key={id} id={id} sx={pairedCardWrapSx}>
             <DashboardProfileCard
               displayName={profile.student_name}
               avatarOverride={toMediaUrl(profile.photo_url)}
               details={studentProfileDetails}
+              fillHeight
             />
           </SortableSection>
         );
       }
 
+      /* Fee Status card — hidden for students; restore when fee module is enabled
       case "s_fee":
         return (
           <SortableSection key={id} id={id}>
@@ -2521,6 +2583,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
             </GCard>
           </SortableSection>
         );
+      */
 
       case "s_homework":
         return (
@@ -2614,13 +2677,13 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
       <Grid item xs={12}>
         <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
           <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
-            <Grid container spacing={3}>
+            <Box sx={kpiGridSx(kpiOrder.length)}>
               {kpiOrder.map((id) => (
-                <Grid item xs={12} sm={6} md={6} lg={3} key={id}>
-                  <SortableSection id={id}>{renderKpi(id)}</SortableSection>
-                </Grid>
+                <SortableSection key={id} id={id} sx={{ minWidth: 0 }}>
+                  {renderKpi(id)}
+                </SortableSection>
               ))}
-            </Grid>
+            </Box>
           </SortableContext>
         </DndContext>
       </Grid>
@@ -2629,7 +2692,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
       <Grid item xs={12}>
         <DndContext sensors={cardSensors} collisionDetection={closestCenter} onDragEnd={handleCardDrag}>
           <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: { xs: 2, md: 3 } }}>
+            <Box sx={pairedCardGridSx}>
               {cardOrder.map(renderCard)}
             </Box>
           </SortableContext>
