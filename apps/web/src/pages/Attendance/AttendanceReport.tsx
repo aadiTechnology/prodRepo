@@ -22,8 +22,6 @@ import {
   FileDownload as ExportIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
-  Warning as WarningIcon,
-  EventNote as EventNoteIcon,
 } from "@mui/icons-material";
 import { PageHeader, PageLayout } from "../../components/layout";
 import { EntityTableSection } from "../../components/reusable";
@@ -71,7 +69,7 @@ const exportAttendanceReportCsv = (
   fromDate: string,
   toDate: string
 ) => {
-  const headers = ["Date", "Roll #", "Student Name", "Status", "Type", "Remarks"];
+  const headers = ["Date", "Roll #", "Student Name", "Status", "Remarks"];
   const csvRows = [
     headers.join(","),
     ...records.map((record) =>
@@ -80,7 +78,6 @@ const exportAttendanceReportCsv = (
         escapeCsvCell(record.roll_no || "-"),
         escapeCsvCell(record.student_name),
         escapeCsvCell(record.status),
-        escapeCsvCell(record.type || "-"),
         escapeCsvCell(record.remarks || "-"),
       ].join(",")
     ),
@@ -184,8 +181,6 @@ const summarizeStudentRecords = (
 ) => {
   let total_present = 0;
   let total_absent = 0;
-  let total_half_day = 0;
-  let total_leave = 0;
 
   for (const record of records) {
     switch (record.status) {
@@ -195,32 +190,22 @@ const summarizeStudentRecords = (
       case "Absent":
         total_absent += 1;
         break;
-      case "Half Day":
-        total_half_day += 1;
-        break;
-      case "Leave":
-        total_leave += 1;
-        break;
       default:
         break;
     }
   }
 
-  const workingDays = total_present + total_absent + total_half_day + total_leave;
+  const workingDays = total_present + total_absent;
   const pct = (count: number) =>
     workingDays > 0 ? Math.round((count / workingDays) * 100) : 0;
 
   return {
     total_present,
     total_absent,
-    total_half_day,
-    total_leave,
     workingDays,
     attendancePct: pct(total_present),
     presentPct: pct(total_present),
     absentPct: pct(total_absent),
-    halfDayPct: pct(total_half_day),
-    leavePct: pct(total_leave),
   };
 };
 
@@ -632,21 +617,14 @@ const AttendanceReport = () => {
     {
       id: "status",
       label: "STATUS",
-      width: "15%",
+      width: "20%",
       align: "center" as const,
       render: (row: any) => getStatusChip(row.status)
     },
     {
-      id: "type",
-      label: "TYPE",
-      width: "15%",
-      align: "center" as const,
-      render: (row: any) => row.type ? <Typography variant="caption" sx={{ fontWeight: 700, px: 2, py: 0.5, border: `1px solid ${colorTokens.border.subtle}`, borderRadius: '15px' }}>{row.type}</Typography> : '-'
-    },
-    {
       id: "remarks",
       label: "REMARKS",
-      width: "20%",
+      width: "30%",
       render: (row: any) => <Typography variant="body2" color="text.secondary">{row.remarks || '-'}</Typography>
     }
   ], []);
@@ -971,7 +949,7 @@ const AttendanceReport = () => {
             <Box
               sx={{
                 display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "repeat(auto-fit, minmax(200px, 1fr))" },
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
                 gap: { xs: 1.5, sm: 2 },
               }}
             >
@@ -1050,82 +1028,6 @@ const AttendanceReport = () => {
                   </Box>
                 </Stack>
               </AppCard>
-
-              <AppCard
-                sx={{
-                  height: "100%",
-                  background: `linear-gradient(135deg, ${alpha(colorTokens.preschool.peach.main, 0.14)} 0%, ${alpha(colorTokens.preschool.peach.main, 0.06)} 100%)`,
-                  border: `1.5px solid ${alpha(colorTokens.preschool.peach.main, 0.35)}`,
-                }}
-                paddingSize="dense"
-              >
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <Box
-                    sx={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: "16px",
-                      bgcolor: alpha(colorTokens.preschool.peach.main, 0.22),
-                      color: colorTokens.preschool.peach.main,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <WarningIcon sx={{ fontSize: 32 }} />
-                  </Box>
-                  <Box flex={1} minWidth={0}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: "uppercase", fontSize: "0.65rem" }}>
-                      Half Days
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5, fontSize: "1.65rem", lineHeight: 1.1 }}>
-                      {studentStats.total_half_day}
-                    </Typography>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.peach.main, mt: 0.75, display: "block", fontSize: "0.7rem" }}>
-                      {studentStats.halfDayPct}%
-                    </Typography>
-                  </Box>
-                </Stack>
-              </AppCard>
-
-              <AppCard
-                sx={{
-                  height: "100%",
-                  background: `linear-gradient(135deg, ${alpha(colorTokens.preschool.lavender.main, 0.14)} 0%, ${alpha(colorTokens.preschool.lavender.main, 0.06)} 100%)`,
-                  border: `1.5px solid ${alpha(colorTokens.preschool.lavender.main, 0.35)}`,
-                }}
-                paddingSize="dense"
-              >
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <Box
-                    sx={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: "16px",
-                      bgcolor: alpha(colorTokens.preschool.lavender.main, 0.22),
-                      color: colorTokens.preschool.lavender.main,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <EventNoteIcon sx={{ fontSize: 32 }} />
-                  </Box>
-                  <Box flex={1} minWidth={0}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: "uppercase", fontSize: "0.65rem" }}>
-                      On Leave
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5, fontSize: "1.65rem", lineHeight: 1.1 }}>
-                      {studentStats.total_leave}
-                    </Typography>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.lavender.main, mt: 0.75, display: "block", fontSize: "0.7rem" }}>
-                      {studentStats.leavePct}%
-                    </Typography>
-                  </Box>
-                </Stack>
-              </AppCard>
             </Box>
 
             <Box
@@ -1189,8 +1091,6 @@ const AttendanceReport = () => {
                       { label: "Total Working Days", value: studentStats.workingDays, color: colorTokens.text.primary },
                       { label: "Days Present", value: studentStats.total_present, color: colorTokens.preschool.mint.main },
                       { label: "Days Absent", value: studentStats.total_absent, color: colorTokens.preschool.coral.main },
-                      { label: "Days Half Day", value: studentStats.total_half_day, color: colorTokens.preschool.peach.main },
-                      { label: "Days On Leave", value: studentStats.total_leave, color: colorTokens.preschool.lavender.main },
                     ].map((row) => (
                       <Stack
                         key={row.label}
@@ -1230,7 +1130,7 @@ const AttendanceReport = () => {
             <Box
               sx={{
                 display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "repeat(auto-fit, minmax(200px, 1fr))" },
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
                 gap: { xs: 1.5, sm: 2 },
               }}
             >
@@ -1345,122 +1245,6 @@ const AttendanceReport = () => {
                     </Typography>
                     <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.coral.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
                       Missed sessions
-                    </Typography>
-                  </Box>
-                </Stack>
-              </AppCard>
-
-              {/* Half Day Card */}
-              <AppCard
-                sx={{
-                  height: "100%",
-                  background: `linear-gradient(135deg, ${alpha(colorTokens.preschool.peach.main, 0.14)} 0%, ${alpha(colorTokens.preschool.peach.main, 0.06)} 100%)`,
-                  border: `1.5px solid ${alpha(colorTokens.preschool.peach.main, 0.35)}`,
-                  position: "relative",
-                  overflow: "hidden",
-                  transition: "all 0.25s ease",
-                  "&:hover": {
-                    transform: "translateY(-4px)",
-                    boxShadow: `0 12px 24px ${alpha(colorTokens.preschool.peach.main, 0.2)}`,
-                    borderColor: alpha(colorTokens.preschool.peach.main, 0.45),
-                  },
-                  "&::before": {
-                    content: '""',
-                    position: "absolute",
-                    top: 0,
-                    right: 0,
-                    width: "100px",
-                    height: "100px",
-                    background: `radial-gradient(circle at top right, ${alpha(colorTokens.preschool.peach.main, 0.15)}, transparent 70%)`,
-                    pointerEvents: "none",
-                  }
-                }}
-                paddingSize="dense"
-              >
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <Box
-                    sx={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: "16px",
-                      bgcolor: alpha(colorTokens.preschool.peach.main, 0.22),
-                      color: colorTokens.preschool.peach.main,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      boxShadow: `inset 0 0 0 1.5px ${alpha(colorTokens.preschool.peach.main, 0.3)}`,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <WarningIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
-                  </Box>
-                  <Box flex={1} minWidth={0}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', fontSize: '0.65rem' }}>
-                      Half Days
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 0.5, fontSize: '1.65rem', lineHeight: 1.1 }}>
-                      {reportData.summary.total_half_day}
-                    </Typography>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.peach.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
-                      Partial attendance
-                    </Typography>
-                  </Box>
-                </Stack>
-              </AppCard>
-
-              {/* Leave Card */}
-              <AppCard
-                sx={{
-                  height: "100%",
-                  background: `linear-gradient(135deg, ${alpha(colorTokens.preschool.lavender.main, 0.14)} 0%, ${alpha(colorTokens.preschool.lavender.main, 0.06)} 100%)`,
-                  border: `1.5px solid ${alpha(colorTokens.preschool.lavender.main, 0.35)}`,
-                  position: "relative",
-                  overflow: "hidden",
-                  transition: "all 0.25s ease",
-                  "&:hover": {
-                    transform: "translateY(-4px)",
-                    boxShadow: `0 12px 24px ${alpha(colorTokens.preschool.lavender.main, 0.2)}`,
-                    borderColor: alpha(colorTokens.preschool.lavender.main, 0.45),
-                  },
-                  "&::before": {
-                    content: '""',
-                    position: "absolute",
-                    top: 0,
-                    right: 0,
-                    width: "100px",
-                    height: "100px",
-                    background: `radial-gradient(circle at top right, ${alpha(colorTokens.preschool.lavender.main, 0.15)}, transparent 70%)`,
-                    pointerEvents: "none",
-                  }
-                }}
-                paddingSize="dense"
-              >
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <Box
-                    sx={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: "16px",
-                      bgcolor: alpha(colorTokens.preschool.lavender.main, 0.22),
-                      color: colorTokens.preschool.lavender.main,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      boxShadow: `inset 0 0 0 1.5px ${alpha(colorTokens.preschool.lavender.main, 0.3)}`,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <EventNoteIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
-                  </Box>
-                  <Box flex={1} minWidth={0}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', fontSize: '0.65rem' }}>
-                      On Leave
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 0.5, fontSize: '1.65rem', lineHeight: 1.1 }}>
-                      {reportData.summary.total_leave}
-                    </Typography>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.preschool.lavender.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
-                      Approved time off
                     </Typography>
                   </Box>
                 </Stack>

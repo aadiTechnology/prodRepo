@@ -367,11 +367,7 @@ const MarkAttendance = () => {
           value={filters.attendance_date}
           onChange={(e) => handleAttendanceDateChange(e.target.value)}
           InputLabelProps={{ shrink: true }}
-          helperText={
-            dateLockInfo.locked
-              ? dateLockInfo.message
-              : "Weekends and holidays are not available for attendance"
-          }
+          helperText={dateLockInfo.locked ? dateLockInfo.message : undefined}
           FormHelperTextProps={{
             sx: {
               color: dateLockInfo.locked ? colorTokens.preschool.coral.main : colorTokens.text.secondary,
