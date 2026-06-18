@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import roleService from "../api/services/roleService";
 import { type Role } from "../types/role.types";
 
@@ -8,7 +9,7 @@ export function useRolesListController() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [totalRoles, setTotalRoles] = useState(0);
 
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);

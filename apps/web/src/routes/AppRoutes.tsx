@@ -3,7 +3,7 @@
  * Defines all application routes with lazy loading and code-splitting
  * Integrates protected routes, layouts, and suspense fallbacks
  */
-import React, { lazy, Suspense } from "react";
+import { lazy, Suspense } from "react";
 import { Box, CircularProgress } from "@mui/material";
 import { Routes, Route, Outlet, Navigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
