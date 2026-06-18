@@ -47,14 +47,6 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-        
-    # File uploads (notice attachments, etc.)
-    UPLOADS_ROOT: str = Field(
-        default="static/uploads",
-        description="Root directory on disk for uploaded attachment files",
-    )
-
-
     
     # Logging
     LOG_LEVEL: str = "INFO"

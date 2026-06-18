@@ -5,12 +5,11 @@ from datetime import datetime
 from uuid import uuid4
 
 from app.core.exceptions import ValidationException
-from app.core.upload_paths import (
-    NOTICE_ATTACHMENTS_URL_PREFIX,
-    disk_path_for_public_attachment_path,
-    notice_attachment_public_path,
-    notice_attachments_dir,
-)
+
+UPLOAD_DIR = os.path.join("static", "notice-attachments")
+NOTICE_ATTACHMENTS_URL_PREFIX = "/notice-attachments"
+
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MAX_FILE_BYTES = 3 * 1024 * 1024
 
@@ -76,7 +75,7 @@ def save_notice_attachment_file(
     ext = MIME_TO_EXT.get(mime) or os.path.splitext(file_name or "")[1].lower() or ".bin"
     unique_suffix = datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
     safe_name = f"{tenant_id}_{notice_id}_{unique_suffix}{ext}"
-    disk_path = os.path.join(notice_attachments_dir(), safe_name)
+    disk_path = os.path.join(UPLOAD_DIR, safe_name)
 
     try:
         with open(disk_path, "wb") as buf:
@@ -84,8 +83,19 @@ def save_notice_attachment_file(
     except OSError as exc:
         raise ValidationException("File upload failed") from exc
 
-    return notice_attachment_public_path(safe_name)
+    return f"{NOTICE_ATTACHMENTS_URL_PREFIX}/{safe_name}"
 
 
 def disk_path_for_attachment(file_path: str) -> str:
-    return disk_path_for_public_attachment_path(file_path)
+    trimmed = file_path.strip().lstrip("/")
+    filename = os.path.basename(trimmed)
+
+    disk_path = os.path.join(UPLOAD_DIR, filename)
+    if os.path.exists(disk_path):
+        return disk_path
+
+    legacy_uploads_path = os.path.join("static", "uploads", "notice-attachments", filename)
+    if os.path.exists(legacy_uploads_path):
+        return legacy_uploads_path
+
+    return os.path.join("static", trimmed)
