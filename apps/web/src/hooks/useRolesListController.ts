@@ -70,6 +70,7 @@ export function useRolesListController() {
     } finally {
       setDeleteLoading(false);
     }
+    
   };
 
   return {
