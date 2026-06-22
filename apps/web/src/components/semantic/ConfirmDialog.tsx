@@ -52,7 +52,10 @@ export default function ConfirmDialog({
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={(_event, reason) => {
+        if (reason === "backdropClick" || reason === "escapeKeyDown") return;
+        onClose();
+      }}
       disableRestoreFocus
       data-testid={dataTestId}
       PaperProps={{

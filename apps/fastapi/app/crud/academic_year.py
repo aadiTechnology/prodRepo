@@ -51,7 +51,7 @@ def get_by_id(db: Session, id: int, tenant_id: int) -> Optional[AcademicYear]:
 
 def create(db: Session, data: AcademicYearCreate, tenant_id: int, created_by: int) -> AcademicYear:
     if data.end_date <= data.start_date:
-        raise HTTPException(status_code=400, detail="end_date must be after start_date")
+        raise HTTPException(status_code=400, detail="End date must be after start date.")
     
     existing = db.query(AcademicYear).filter(
         AcademicYear.code == data.code,
@@ -88,7 +88,7 @@ def update(db: Session, id: int, data: AcademicYearUpdate, tenant_id: int, updat
         new_start = update_data.get("start_date", db_obj.start_date)
         new_end = update_data.get("end_date", db_obj.end_date)
         if new_end <= new_start:
-            raise HTTPException(status_code=400, detail="end_date must be after start_date")
+            raise HTTPException(status_code=400, detail="End date must be after start date.")
             
     if "code" in update_data and update_data["code"] != db_obj.code:
         existing = db.query(AcademicYear).filter(

@@ -64,9 +64,11 @@ const AddAcademicYear = () => {
     handleChange,
     handleFieldValueChange,
     handleSubmit: baseHandleSubmit,
+    resetForm,
   } = useFormManager<AddAcademicYearFormData>({
     initialValues,
     validationConfig,
+    dependentFieldPairs: [["start_date", "end_date"]],
     onClearError: () => setError(null),
   });
 
@@ -141,12 +143,21 @@ const AddAcademicYear = () => {
       if (apiFieldErrors) {
         setFieldErrors((prev) => ({ ...prev, ...apiFieldErrors }));
       }
-      setError(
-        message || (isEditMode ? "Failed to update academic year." : "Failed to create academic year.")
-      );
+      if (!apiFieldErrors || Object.keys(apiFieldErrors).length === 0) {
+        setError(
+          message || (isEditMode ? "Failed to update academic year." : "Failed to create academic year.")
+        );
+      } else {
+        setError(null);
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    resetForm();
+    setError(null);
   };
 
   return (
@@ -177,7 +188,7 @@ const AddAcademicYear = () => {
         saveTooltipCreate: "Save",
         saveTooltipEdit: "Save",
       }}
-      onCancelNavigate={() => navigate("/academic-years")}
+      onCancelNavigate={handleCancel}
       confirmMessage={(ctx) =>
         ctx.isEditMode
           ? "Are you sure you want to update this academic year?"

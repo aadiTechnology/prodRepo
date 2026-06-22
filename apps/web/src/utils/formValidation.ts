@@ -133,5 +133,14 @@ export function mapApiErrorsToFields(err: unknown): {
     fieldErrors.email = "Email already exists.";
   }
 
+  const endDateMsg = "End date must be after start date.";
+  if (
+    msg.toLowerCase().includes("end_date") &&
+    msg.toLowerCase().includes("start_date")
+  ) {
+    fieldErrors.end_date = endDateMsg;
+    msg = "Please fix the highlighted errors.";
+  }
+
   return { fieldErrors, message: msg };
 }

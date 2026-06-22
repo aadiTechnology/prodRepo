@@ -64,6 +64,7 @@ const AcademicYearList = () => {
 
       <EntityTableSection<AcademicYear>
         label="Academic Years"
+        showInfoBar={false}
         totalRows={controller.totalRows}
         page={controller.page}
         rowsPerPage={controller.rowsPerPage}
