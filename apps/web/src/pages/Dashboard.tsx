@@ -54,10 +54,13 @@ import {
 import {
   DndContext,
   closestCenter,
+  closestCorners,
   PointerSensor,
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -196,34 +199,40 @@ const kpiGridSx = (count: number) => {
   };
 };
 
-const dashboardCardGridSx = {
+/** 2-column draggable grid — compact tiles + full-width rows. */
+const sortableGridSx = {
   display: "grid",
-  gridTemplateColumns: {
-    xs: "1fr",
-    md: "repeat(2, minmax(0, 1fr))",
-  },
-  gap: { xs: 2, md: 3 },
-  alignItems: "start",
+  gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+  gap: { xs: 2, md: 2.5 },
   width: "100%",
-};
-
-/** Side-by-side student/teacher cards — equal height in each row. */
-const pairedCardGridSx = {
-  ...dashboardCardGridSx,
   alignItems: "stretch",
 };
 
-const pairedCardWrapSx = {
+const sortableGridFullSx = {
+  gridColumn: { xs: "1", md: "1 / -1" },
+};
+
+const sortableGridTileSx = {
   minWidth: 0,
   height: "100%",
   "& .sortable-content": {
     height: "100%",
-    width: "100%",
     minWidth: 0,
     display: "flex",
     flexDirection: "column",
     "& > *": { flex: 1, width: "100%", minWidth: 0 },
   },
+};
+
+const dragOverlayWrapSx = {
+  cursor: "grabbing",
+  boxShadow: C.shadowMd,
+  borderRadius: C.radius.lg,
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: 0,
+  bgcolor: "transparent",
+  pointerEvents: "none" as const,
 };
 
 const SortableSection: React.FC<{ id: string; children: React.ReactNode; sx?: object }> = ({ id, children, sx }) => {
@@ -232,16 +241,12 @@ const SortableSection: React.FC<{ id: string; children: React.ReactNode; sx?: ob
     <Box
       ref={setNodeRef}
       sx={{
-        transform: CSS.Transform.toString(transform),
-        transition,
+        transform: isDragging ? undefined : CSS.Transform.toString(transform),
+        transition: isDragging ? undefined : transition,
+        opacity: isDragging ? 0 : 1,
         position: "relative",
-        zIndex: isDragging ? 50 : "auto",
         minWidth: 0,
-        height: "100%",
-        ...(isDragging && {
-          boxShadow: C.shadowMd,
-          "& .MuiCard-root": { borderColor: "#CBD5E1" },
-        }),
+        width: "100%",
         "@media (hover: hover)": {
           "&:hover .drag-handle": { opacity: 0.55 },
         },
@@ -281,6 +286,129 @@ const SortableSection: React.FC<{ id: string; children: React.ReactNode; sx?: ob
       </Box>
       <Box className="sortable-content">{children}</Box>
     </Box>
+  );
+};
+
+const useKpiDragSensors = () =>
+  useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+const useCardDragSensors = () =>
+  useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+function useSortableDrag(storageKey: string, defaultOrder: string[]) {
+  const [order, setOrder] = useSectionOrder(storageKey, defaultOrder);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const onDragStart = useCallback((e: DragStartEvent) => {
+    setActiveId(String(e.active.id));
+  }, []);
+
+  const onDragCancel = useCallback(() => {
+    setActiveId(null);
+  }, []);
+
+  const onDragEnd = useCallback(
+    (e: DragEndEvent) => {
+      const { active, over } = e;
+      if (over && active.id !== over.id) {
+        setOrder(arrayMove(order, order.indexOf(String(active.id)), order.indexOf(String(over.id))));
+      }
+      setActiveId(null);
+    },
+    [order, setOrder]
+  );
+
+  return { order, activeId, onDragStart, onDragEnd, onDragCancel };
+}
+
+const getSortableGridItemSx = (id: string, fullWidthIds: Set<string>) =>
+  fullWidthIds.has(id) ? sortableGridFullSx : sortableGridTileSx;
+
+const SortableKpiRow: React.FC<{
+  items: string[];
+  activeId: string | null;
+  onDragStart: (e: DragStartEvent) => void;
+  onDragEnd: (e: DragEndEvent) => void;
+  onDragCancel: () => void;
+  renderItem: (id: string) => React.ReactNode;
+}> = ({ items, activeId, onDragStart, onDragEnd, onDragCancel, renderItem }) => {
+  const sensors = useKpiDragSensors();
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
+    >
+      <SortableContext items={items} strategy={rectSortingStrategy}>
+        <Box sx={kpiGridSx(items.length)}>
+          {items.map((id) => (
+            <SortableSection key={id} id={id} sx={{ minWidth: 0 }}>
+              {renderItem(id)}
+            </SortableSection>
+          ))}
+        </Box>
+      </SortableContext>
+      <DragOverlay dropAnimation={null}>
+        {activeId ? (
+          <Box sx={{ ...dragOverlayWrapSx, minWidth: 160 }}>{renderItem(activeId)}</Box>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+};
+
+const SortableCardGrid: React.FC<{
+  items: string[];
+  activeId: string | null;
+  onDragStart: (e: DragStartEvent) => void;
+  onDragEnd: (e: DragEndEvent) => void;
+  onDragCancel: () => void;
+  fullWidthIds: Set<string>;
+  compactOverlayIds?: Set<string>;
+  renderItem: (id: string) => React.ReactNode;
+}> = ({
+  items,
+  activeId,
+  onDragStart,
+  onDragEnd,
+  onDragCancel,
+  fullWidthIds,
+  compactOverlayIds,
+  renderItem,
+}) => {
+  const sensors = useCardDragSensors();
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
+    >
+      <SortableContext items={items} strategy={rectSortingStrategy}>
+        <Box sx={sortableGridSx}>
+          {items.map((id) => (
+            <SortableSection key={id} id={id} sx={getSortableGridItemSx(id, fullWidthIds)}>
+              {renderItem(id)}
+            </SortableSection>
+          ))}
+        </Box>
+      </SortableContext>
+      <DragOverlay dropAnimation={null}>
+        {activeId ? (
+          <Box
+            sx={{
+              ...dragOverlayWrapSx,
+              ...(compactOverlayIds?.has(activeId) ? { maxWidth: { xs: "100%", md: 420 } } : {}),
+            }}
+          >
+            {renderItem(activeId)}
+          </Box>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 };
 
@@ -536,47 +664,96 @@ const StatPill: React.FC<{ label: string; value: string | number; color: string;
   </Box>
 );
 
+/** Muted inset panel for paired dashboard tiles (teacher attendance / profile). */
+const dashTilePanelSx = {
+  flex: 1,
+  display: "flex",
+  flexDirection: "column" as const,
+  justifyContent: "center",
+  p: 1.25,
+  bgcolor: C.surfaceMuted,
+  borderRadius: C.radius.md,
+  border: `1px solid ${C.borderLight}`,
+  minWidth: 0,
+};
+
+const dashTileCardContentSx = {
+  p: 1.75,
+  flex: 1,
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: 1,
+  minHeight: 0,
+};
+
+const dashFilterBarSx = {
+  display: "flex",
+  flexWrap: "wrap" as const,
+  alignItems: "center",
+  gap: 0.5,
+  p: 0.75,
+  bgcolor: C.surfaceMuted,
+  borderRadius: C.radius.sm,
+  border: `1px solid ${C.borderLight}`,
+};
+
+const DashStatRow: React.FC<{ label: string; value: string | number; color: string }> = ({
+  label,
+  value,
+  color,
+}) => (
+  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.6, minWidth: 0 }}>
+      <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />
+      <Typography sx={{ fontSize: "0.68rem", fontWeight: 600, color: C.muted }}>{label}</Typography>
+    </Box>
+    <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color, flexShrink: 0, lineHeight: 1 }}>{value}</Typography>
+  </Box>
+);
+
 const CardHeader: React.FC<{
   title: string;
   icon?: React.ReactNode;
   action?: React.ReactNode;
   dateFilter?: React.ReactNode;
-}> = ({ title, icon, action, dateFilter }) => (
-  <Box sx={{ mb: 2 }}>
+  compact?: boolean;
+}> = ({ title, icon, action, dateFilter, compact }) => (
+  <Box sx={{ mb: compact ? 1.25 : 2 }}>
     <Box
       sx={{
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
         gap: 1,
-        mb: dateFilter ? 1.25 : 0,
+        mb: dateFilter ? (compact ? 0.75 : 1.25) : 0,
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: compact ? 0.75 : 1, minWidth: 0 }}>
         {icon && (
           <Box
             sx={{
-              width: 32,
-              height: 32,
+              width: compact ? 28 : 32,
+              height: compact ? 28 : 32,
               borderRadius: C.radius.sm,
               bgcolor: C.blueGlass,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
-              "& .MuiSvgIcon-root": { fontSize: 17 },
+              "& .MuiSvgIcon-root": { fontSize: compact ? 15 : 17 },
             }}
           >
             {icon}
           </Box>
         )}
         <Typography
-          variant="subtitle1"
+          variant={compact ? "subtitle2" : "subtitle1"}
           sx={{
             fontWeight: 800,
             color: C.slateText,
             letterSpacing: "-0.1px",
             lineHeight: 1.25,
+            fontSize: compact ? "0.88rem" : undefined,
           }}
         >
           {title}
@@ -730,52 +907,74 @@ const SnapCard: React.FC<SnapCardProps> = ({ title, value, icon, accentColor, gl
 );
 
 // ─── SVG donut attendance ring ────────────────────────────────────────────────
-const AttRing: React.FC<{ pct: number; size?: number; color?: string; gradId: string }> = ({
-  pct,
-  size = 130,
-  color = C.blue,
-  gradId,
-}) => (
-  <Box sx={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
-    <svg width={size} height={size} viewBox="0 0 36 36" style={{ transform: "rotate(-90deg)" }}>
-      <defs>
-        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={color} />
-          <stop offset="100%" stopColor={color + "BB"} />
-        </linearGradient>
-      </defs>
-      <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="3" />
-      <circle
-        cx="18"
-        cy="18"
-        r="15.9"
-        fill="none"
-        stroke={`url(#${gradId})`}
-        strokeWidth="3"
-        strokeLinecap="butt"
-        strokeDasharray={`${Math.min(pct, 100)} ${100 - Math.min(pct, 100)}`}
-        style={{ transition: "stroke-dasharray 1.1s ease" }}
-      />
-    </svg>
-    <Box
-      sx={{
-        position: "absolute",
-        inset: 0,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <Typography sx={{ fontWeight: 900, fontSize: size > 110 ? "1.25rem" : "0.95rem", color, letterSpacing: "-0.5px" }}>
-        {pct.toFixed(1)}%
-      </Typography>
-      <Typography sx={{ fontSize: "9px", color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px" }}>
-        Presence Rate
-      </Typography>
+const AttRing: React.FC<{
+  pct: number;
+  size?: number;
+  color?: string;
+  gradId: string;
+  /** Hide "Presence Rate" caption — use on compact dashboard tiles. */
+  hideLabel?: boolean;
+}> = ({ pct, size = 130, color = C.blue, gradId, hideLabel = false }) => {
+  const showLabel = !hideLabel && size >= 100;
+  const pctFontSize = size > 110 ? "1.25rem" : size > 88 ? "0.95rem" : size > 76 ? "0.78rem" : "0.72rem";
+
+  return (
+    <Box sx={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox="0 0 36 36" style={{ transform: "rotate(-90deg)" }}>
+        <defs>
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={color} />
+            <stop offset="100%" stopColor={color + "BB"} />
+          </linearGradient>
+        </defs>
+        <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="3" />
+        <circle
+          cx="18"
+          cy="18"
+          r="15.9"
+          fill="none"
+          stroke={`url(#${gradId})`}
+          strokeWidth="3"
+          strokeLinecap="butt"
+          strokeDasharray={`${Math.min(pct, 100)} ${100 - Math.min(pct, 100)}`}
+          style={{ transition: "stroke-dasharray 1.1s ease" }}
+        />
+      </svg>
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          px: 0.5,
+          textAlign: "center",
+        }}
+      >
+        <Typography sx={{ fontWeight: 800, fontSize: pctFontSize, color, letterSpacing: "-0.4px", lineHeight: 1 }}>
+          {pct.toFixed(1)}%
+        </Typography>
+        {showLabel && (
+          <Typography
+            sx={{
+              fontSize: "8px",
+              color: C.muted,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.3px",
+              lineHeight: 1.15,
+              mt: 0.25,
+              maxWidth: size * 0.62,
+            }}
+          >
+            Presence Rate
+          </Typography>
+        )}
+      </Box>
     </Box>
-  </Box>
-);
+  );
+};
 
 // ─── Animated sparkline ───────────────────────────────────────────────────────
 const Sparkline: React.FC<{ color: string; delay?: number }> = ({ color, delay = 0 }) => (
@@ -1250,7 +1449,9 @@ const DashboardProfileCard: React.FC<{
   metaChips?: string[];
   /** Stretch to match sibling card height (attendance + profile row). */
   fillHeight?: boolean;
-}> = ({ details = [], displayName, avatarOverride, variant = "card", metaChips = [], fillHeight = false }) => {
+  /** Compact vertical tile — pairs with attendance in a 2-col grid. */
+  compact?: boolean;
+}> = ({ details = [], displayName, avatarOverride, variant = "card", metaChips = [], fillHeight = false, compact = false }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { roles: rbacRoles } = useRBAC();
@@ -1264,7 +1465,7 @@ const DashboardProfileCard: React.FC<{
         ? "System Admin"
         : user?.role || "User";
 
-  const avatarSize = variant === "strip" ? 56 : 72;
+  const avatarSize = variant === "strip" ? 56 : compact ? 48 : 72;
 
   const avatarEl = (
     <Avatar
@@ -1368,6 +1569,55 @@ const DashboardProfileCard: React.FC<{
             >
               View Profile
             </Button>
+          </Box>
+        </CardContent>
+      </GCard>
+    );
+  }
+
+  if (compact) {
+    return (
+      <GCard sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+        <CardContent sx={dashTileCardContentSx}>
+          <CardHeader
+            compact
+            title="My Profile"
+            icon={<PersonIcon sx={{ color: C.brand, fontSize: 16 }} />}
+            action={<ActionLink label="View" onClick={() => navigate("/profile")} />}
+          />
+          <Box sx={dashTilePanelSx}>
+            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.25, width: "100%" }}>
+              {avatarEl}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.65, flexWrap: "wrap", mb: 0.75 }}>
+                  <Typography
+                    sx={{ fontWeight: 700, color: C.slateText, fontSize: "0.86rem", lineHeight: 1.25 }}
+                    noWrap
+                    title={name}
+                  >
+                    {name}
+                  </Typography>
+                  {roleChip}
+                </Box>
+                <Divider sx={{ borderColor: C.borderLight, mb: 0.75 }} />
+                {user?.email && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.6, mb: 0.5, minWidth: 0 }}>
+                    <EmailIcon sx={{ fontSize: 14, color: C.muted, flexShrink: 0 }} />
+                    <Typography sx={{ fontSize: "0.7rem", color: C.muted, fontWeight: 600 }} noWrap title={user.email}>
+                      {user.email}
+                    </Typography>
+                  </Box>
+                )}
+                {details.map((line, index) => (
+                  <Box key={`${line.text}-${index}`} sx={{ display: "flex", alignItems: "center", gap: 0.6, minWidth: 0, mt: index === 0 ? 0 : 0.45 }}>
+                    {line.icon}
+                    <Typography sx={{ fontSize: "0.7rem", color: C.slateText, fontWeight: 600 }} noWrap title={line.text}>
+                      {line.text}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
           </Box>
         </CardContent>
       </GCard>
@@ -1548,24 +1798,11 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
 
   const ADMIN_KPI_DEFAULT     = ["admin_students", "admin_classes", "admin_fees", "admin_balance"];
   const ADMIN_SECTIONS_DEFAULT = ["admin_profile", "attendance_overview", "fee_collection", "notices", "leads", "quick_actions"];
+  const ADMIN_FULL_WIDTH_SECTIONS = new Set(["admin_profile", "notices", "leads", "quick_actions"]);
+  const ADMIN_COMPACT_SECTIONS = new Set(["attendance_overview", "fee_collection"]);
 
-  const kpiSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-  const [kpiOrder, setKpiOrder] = useSectionOrder("admin_kpi_order", ADMIN_KPI_DEFAULT);
-  function handleKpiDrag(e: DragEndEvent) {
-    const { active, over } = e;
-    if (over && active.id !== over.id)
-      setKpiOrder(arrayMove(kpiOrder, kpiOrder.indexOf(String(active.id)), kpiOrder.indexOf(String(over.id))));
-  }
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-  const [sectionOrder, setSectionOrder] = useSectionOrder("admin_dash_order_v3", ADMIN_SECTIONS_DEFAULT);
-
-  function handleDragEnd(e: DragEndEvent) {
-    const { active, over } = e;
-    if (over && active.id !== over.id) {
-      setSectionOrder(arrayMove(sectionOrder, sectionOrder.indexOf(String(active.id)), sectionOrder.indexOf(String(over.id))));
-    }
-  }
+  const kpiDrag = useSortableDrag("admin_kpi_order", ADMIN_KPI_DEFAULT);
+  const sectionDrag = useSortableDrag("admin_dash_order_v6", ADMIN_SECTIONS_DEFAULT);
 
   const renderAdminSection = (id: string) => {
     switch (id) {
@@ -1596,106 +1833,122 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
 
       case "attendance_overview":
         return (
-          <GCard sx={{ height: "100%" }}>
-            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <GCard sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            <CardContent sx={dashTileCardContentSx}>
               <CardHeader
+                compact
                 title="Attendance Overview"
                 icon={<AttendanceIcon sx={{ color: C.brand }} />}
-                action={<ActionLink label="View Details" onClick={() => navigate("/attendance/report")} />}
-                dateFilter={
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                    <AttendanceDateFilter value={attFilter} onChange={onAttFilterChange} minDate={attMinDate} maxDate={attMaxDate} />
-                    {classes.length > 0 && (
-                    <TextField select size="small" value={selectedClassId || classes[0]?.id || ""}
-                      onChange={(e) => onClassChange(Number(e.target.value))}
-                      sx={classFilterSelectSx}
-                    >
-                      {classes.map((cls) => (
-                        <MenuItem key={cls.id} value={cls.id} sx={{ fontSize: "11px", fontWeight: 700 }}>{cls.name}</MenuItem>
-                      ))}
-                    </TextField>
-                    )}
-                  </Box>
-                }
+                action={<ActionLink label="Details" onClick={() => navigate("/attendance/report")} />}
               />
-              {attCardLoading ? (
-                <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
-                    <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
-                    <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading attendance…</Typography>
-                  </Box>
-                </Box>
-              ) : (
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: { xs: "center", md: "flex-start" }, gap: { xs: 2, md: 3 }, flexWrap: { xs: "wrap", md: "nowrap" } }}>
-                  <AttRing pct={attPct} size={140} color={attPct >= 75 ? C.green : C.amber} gradId="adminAttGrad" />
-                  <Grid container spacing={1.5} sx={{ flex: 1, minWidth: { xs: "100%", md: 220 } }}>
-                    {[
-                      { label: "Present",  value: present,  color: C.green, bg: C.greenGlass },
-                      { label: "Absent",   value: absent,   color: C.red,   bg: C.redGlass   },
-                    ].map((item) => (
-                      <Grid item xs={6} key={item.label}>
-                        <StatPill label={item.label} value={item.value} color={item.color} bg={item.bg} />
-                      </Grid>
+              <Box sx={dashFilterBarSx}>
+                <AttendanceDateFilter value={attFilter} onChange={onAttFilterChange} minDate={attMinDate} maxDate={attMaxDate} />
+                {classes.length > 0 && (
+                  <TextField
+                    select
+                    size="small"
+                    value={selectedClassId || classes[0]?.id || ""}
+                    onChange={(e) => onClassChange(Number(e.target.value))}
+                    sx={{ ...classFilterSelectSx, width: 108, minWidth: 96 }}
+                  >
+                    {classes.map((cls) => (
+                      <MenuItem key={cls.id} value={cls.id} sx={{ fontSize: "11px", fontWeight: 700 }}>
+                        {cls.name}
+                      </MenuItem>
                     ))}
-                  </Grid>
-                </Box>
-              )}
+                  </TextField>
+                )}
+              </Box>
+              <Box sx={dashTilePanelSx}>
+                {attCardLoading ? (
+                  <Box sx={{ display: "flex", justifyContent: "flex-start" }}>
+                    <Box
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: "50%",
+                        border: `3px solid ${C.blueGlass}`,
+                        borderTopColor: C.blue,
+                        animation: "spin 0.8s linear infinite",
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <AttRing pct={attPct} size={84} hideLabel color={attPct >= 75 ? C.green : C.amber} gradId="adminAttGrad" />
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.85 }}>
+                      <DashStatRow label="Present" value={present} color={C.green} />
+                      <DashStatRow label="Absent" value={absent} color={C.red} />
+                    </Box>
+                  </Box>
+                )}
+              </Box>
             </CardContent>
           </GCard>
         );
 
       case "fee_collection":
         return (
-          <GCard sx={{ height: "100%" }}>
-            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <GCard sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            <CardContent sx={dashTileCardContentSx}>
               <CardHeader
-                title="Fee Collection Progress"
+                compact
+                title="Fee Collection"
                 icon={<FeeIcon sx={{ color: C.green }} />}
-                action={<ActionLink label="Collect Fee" onClick={() => navigate("/fees/invoices")} />}
-                dateFilter={
-                  <CardDateFilter value={feeFilter} onChange={onFeeFilterChange}
-                    presets={[
-                      { key: "week", label: "7 Days" },
-                      { key: "month", label: "Month" },
-                      { key: "custom", label: "Custom" },
-                    ]}
-                  />
-                }
+                action={<ActionLink label="Collect" onClick={() => navigate("/fees/invoices")} />}
               />
-              {feeCardLoading ? (
-                <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
-                    <Box sx={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.greenGlass}`, borderTopColor: C.green, animation: "spin 0.8s linear infinite" }} />
-                    <Typography variant="caption" sx={{ color: C.muted, fontWeight: 600 }}>Loading fees…</Typography>
-                  </Box>
-                </Box>
-              ) : (
-                <>
-                  <Box sx={{ mb: 2.5 }}>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
-                      <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>Recovery Rate</Typography>
-                      <Typography variant="body2" sx={{ color: C.green, fontWeight: 800 }}>{feePct.toFixed(1)}%</Typography>
-                    </Box>
-                    <LinearProgress variant="determinate" value={feePct}
-                      sx={{ height: 10, borderRadius: 5, bgcolor: C.greenGlass,
-                        "& .MuiLinearProgress-bar": { background: `linear-gradient(90deg, ${C.green}, #34D399)`, borderRadius: 5 } }}
+              <Box sx={dashFilterBarSx}>
+                <CardDateFilter
+                  value={feeFilter}
+                  onChange={onFeeFilterChange}
+                  presets={[
+                    { key: "week", label: "7 Days" },
+                    { key: "month", label: "Month" },
+                    { key: "custom", label: "Custom" },
+                  ]}
+                />
+              </Box>
+              <Box sx={dashTilePanelSx}>
+                {feeCardLoading ? (
+                  <Box sx={{ display: "flex", justifyContent: "flex-start" }}>
+                    <Box
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: "50%",
+                        border: `3px solid ${C.greenGlass}`,
+                        borderTopColor: C.green,
+                        animation: "spin 0.8s linear infinite",
+                      }}
                     />
                   </Box>
-                  {[
-                    { label: "Total Projected",  value: fmtINR(total_fee),     color: C.slateText, icon: <TrendIcon sx={{ fontSize: 16, color: C.slateText }} /> },
-                    { label: "Total Collected",  value: fmtINR(total_paid),    color: C.green,     icon: <PresentIcon sx={{ fontSize: 16, color: C.green }} /> },
-                    { label: "Total Outstanding",value: fmtINR(total_balance), color: C.red,       icon: <WarningIcon sx={{ fontSize: 16, color: C.red }} /> },
-                  ].map((row) => (
-                    <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                        {row.icon}
-                        <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600 }}>{row.label}</Typography>
+                ) : (
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                    <Box>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                        <Typography sx={{ color: C.muted, fontWeight: 600, fontSize: "0.72rem" }}>Recovery</Typography>
+                        <Typography sx={{ color: C.green, fontWeight: 800, fontSize: "0.82rem" }}>{feePct.toFixed(1)}%</Typography>
                       </Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: row.color }}>{row.value}</Typography>
+                      <LinearProgress
+                        variant="determinate"
+                        value={feePct}
+                        sx={{
+                          height: 7,
+                          borderRadius: 4,
+                          bgcolor: C.greenGlass,
+                          "& .MuiLinearProgress-bar": {
+                            background: `linear-gradient(90deg, ${C.green}, #34D399)`,
+                            borderRadius: 4,
+                          },
+                        }}
+                      />
                     </Box>
-                  ))}
-                </>
-              )}
+                    <DashStatRow label="Projected" value={fmtINR(total_fee)} color={C.slateText} />
+                    <DashStatRow label="Collected" value={fmtINR(total_paid)} color={C.green} />
+                    <DashStatRow label="Outstanding" value={fmtINR(total_balance)} color={C.red} />
+                  </Box>
+                )}
+              </Box>
             </CardContent>
           </GCard>
         );
@@ -1837,40 +2090,27 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
     <Grid container spacing={{ xs: 2, md: 2.5 }}>
       {/* ─ Row 1: KPI snap cards — individually draggable ─ */}
       <Grid item xs={12}>
-        <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
-          <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
-            <Box sx={kpiGridSx(kpiOrder.length)}>
-              {kpiOrder.map((id) => (
-                <SortableSection key={id} id={id} sx={{ minWidth: 0 }}>
-                  {renderAdminKpi(id)}
-                </SortableSection>
-              ))}
-            </Box>
-          </SortableContext>
-        </DndContext>
+        <SortableKpiRow
+          items={kpiDrag.order}
+          activeId={kpiDrag.activeId}
+          onDragStart={kpiDrag.onDragStart}
+          onDragEnd={kpiDrag.onDragEnd}
+          onDragCancel={kpiDrag.onDragCancel}
+          renderItem={renderAdminKpi}
+        />
       </Grid>
 
-      {/* ─ Draggable sections — 2-col grid, each card individually movable ─ */}
       <Grid item xs={12}>
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={sectionOrder} strategy={rectSortingStrategy}>
-            <Box sx={pairedCardGridSx}>
-              {sectionOrder.map((id) => (
-                <SortableSection
-                  key={id}
-                  id={id}
-                  sx={{
-                    ...(id === "admin_profile" || id === "notices" || id === "leads" || id === "quick_actions"
-                      ? { gridColumn: "1 / -1" }
-                      : pairedCardWrapSx),
-                  }}
-                >
-                  {renderAdminSection(id)}
-                </SortableSection>
-              ))}
-            </Box>
-          </SortableContext>
-        </DndContext>
+        <SortableCardGrid
+          items={sectionDrag.order}
+          activeId={sectionDrag.activeId}
+          onDragStart={sectionDrag.onDragStart}
+          onDragEnd={sectionDrag.onDragEnd}
+          onDragCancel={sectionDrag.onDragCancel}
+          fullWidthIds={ADMIN_FULL_WIDTH_SECTIONS}
+          compactOverlayIds={ADMIN_COMPACT_SECTIONS}
+          renderItem={renderAdminSection}
+        />
       </Grid>
     </Grid>
   );
@@ -1896,6 +2136,8 @@ interface TeacherViewProps {
 const TEACHER_KPI_DEFAULT   = ["kpi_students", "kpi_present", "kpi_absent", "kpi_pct"];
 const TEACHER_CARDS_DEFAULT = ["card_att", "card_profile", "card_homework", "card_notices"];
 const TEACHER_CARDS_SUBJECT = ["card_homework", "card_profile", "card_att", "card_notices"];
+const TEACHER_FULL_WIDTH_CARDS = new Set(["card_homework", "card_notices"]);
+const TEACHER_COMPACT_CARDS = new Set(["card_att", "card_profile"]);
 
 function aggregateTeacherDivisionStats(classes: TeacherDashboardData["assigned_classes"]) {
   const seen = new Set<string>();
@@ -1943,26 +2185,11 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
   const divisionStats = aggregateTeacherDivisionStats(scopedClasses);
   const primaryAssignment = classTeacherSlots[0] ?? scopedClasses[0];
 
-  // ── KPI cards — individually draggable (grid) ──────────────────────────────
-  const kpiSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-  const [kpiOrder, setKpiOrder] = useSectionOrder("teacher_kpi_v3", TEACHER_KPI_DEFAULT);
-  function handleKpiDrag(e: DragEndEvent) {
-    const { active, over } = e;
-    if (over && active.id !== over.id)
-      setKpiOrder(arrayMove(kpiOrder, kpiOrder.indexOf(String(active.id)), kpiOrder.indexOf(String(over.id))));
-  }
-
-  // ── Main cards — each individually draggable (vertical list) ───────────────
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-  const [cardOrder, setCardOrder] = useSectionOrder(
-    "teacher_cards_v6",
+  const kpiDrag = useSortableDrag("teacher_kpi_v3", TEACHER_KPI_DEFAULT);
+  const cardDrag = useSortableDrag(
+    "teacher_cards_v9",
     isSubjectFocused ? TEACHER_CARDS_SUBJECT : TEACHER_CARDS_DEFAULT
   );
-  function handleCardDrag(e: DragEndEvent) {
-    const { active, over } = e;
-    if (over && active.id !== over.id)
-      setCardOrder(arrayMove(cardOrder, cardOrder.indexOf(String(active.id)), cardOrder.indexOf(String(over.id))));
-  }
 
   // ── Derived stats ──────────────────────────────────────────────────────────
   const attData = attOverride ?? data.today_attendance;
@@ -2096,67 +2323,69 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
       // ── Attendance (compact) ───────────────────────────────────────────────
       case "card_att":
         return (
-          <GCard sx={{ height: "100%" }}>
-            <CardContent sx={{ p: 2.5, display: "flex", flexDirection: "column", height: "100%" }}>
+          <GCard sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            <CardContent sx={dashTileCardContentSx}>
               <CardHeader
+                compact
                 title={isSubjectFocused ? "Division Attendance" : "Attendance"}
-                icon={<AttendanceIcon color="primary" sx={{ fontSize: 18 }} />}
-                dateFilter={
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                    <AttendanceDateFilter value={attFilter} onChange={onAttFilterChange} minDate={attMinDate} maxDate={attMaxDate} />
-                    {classes.length > 0 && (
-                      <TextField select size="small" value={selectedClassId || classes[0]?.id || ""}
-                        onChange={(e) => onClassChange(Number(e.target.value))}
-                        sx={classFilterSelectSx}
-                      >
-                        {classes.map((c) => <MenuItem key={c.id} value={c.id} sx={{ fontSize: "11px" }}>{c.name}</MenuItem>)}
-                      </TextField>
-                    )}
-                  </Box>
-                }
+                icon={<AttendanceIcon color="primary" sx={{ fontSize: 16 }} />}
+                action={canMarkAttendance ? <ActionLink label="Mark" onClick={() => navigate("/attendance/mark")} /> : undefined}
               />
-              <Box sx={{ flex: 1 }}>
-              {attCardLoading ? (
-                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-                  <Box sx={{ width: 28, height: 28, borderRadius: "50%", border: `3px solid ${C.blueGlass}`, borderTopColor: C.blue, animation: "spin 0.8s linear infinite" }} />
-                </Box>
-              ) : totalAtt === 0 ? (
-                <Box sx={{ textAlign: "center", py: 3 }}>
-                  <AttendanceIcon sx={{ fontSize: 36, color: C.muted, mb: 1 }} />
-                  <Typography variant="body2" sx={{ color: C.muted, fontWeight: 600, fontSize: "12px" }}>
-                    {isSubjectFocused
-                      ? "Attendance not marked yet for your division."
-                      : "Not marked yet."}
-                  </Typography>
-                </Box>
-              ) : (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 2.5, mt: 1 }}>
-                  <AttRing pct={attPct} size={96} color={attPct >= 80 ? C.green : C.amber} gradId="teacherAttRing" />
-                  <Grid container spacing={1} sx={{ flex: 1 }}>
-                    {[
-                      { label: "Present",  value: present,  color: C.green, bg: C.greenGlass },
-                      { label: "Absent",   value: absent,   color: C.red,   bg: C.redGlass   },
-                      // { label: "Half Day", value: half_day, color: C.amber, bg: C.amberGlass },
-                      // { label: "On Leave", value: leave,    color: C.blue,  bg: C.blueGlass  },
-                    ].map((s) => (
-                      <Grid item xs={6} key={s.label}>
-                        <Box sx={{ p: 1, bgcolor: s.bg, borderRadius: "10px", borderLeft: `3px solid ${s.color}` }}>
-                          <Typography sx={{ fontSize: "9px", color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                            {s.label}
-                          </Typography>
-                          <Typography sx={{ fontWeight: 900, color: s.color, fontSize: "1.05rem", lineHeight: 1.2 }}>{s.value}</Typography>
-                        </Box>
-                      </Grid>
+              <Box sx={dashFilterBarSx}>
+                <AttendanceDateFilter value={attFilter} onChange={onAttFilterChange} minDate={attMinDate} maxDate={attMaxDate} />
+                {classes.length > 0 && (
+                  <TextField
+                    select
+                    size="small"
+                    value={selectedClassId || classes[0]?.id || ""}
+                    onChange={(e) => onClassChange(Number(e.target.value))}
+                    sx={{ ...classFilterSelectSx, width: 108, minWidth: 96 }}
+                  >
+                    {classes.map((c) => (
+                      <MenuItem key={c.id} value={c.id} sx={{ fontSize: "11px" }}>
+                        {c.name}
+                      </MenuItem>
                     ))}
-                  </Grid>
-                </Box>
-              )}
+                  </TextField>
+                )}
               </Box>
-              {canMarkAttendance && (
-                <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.5, pt: 0.5 }}>
-                  <ActionLink label="Mark" onClick={() => navigate("/attendance/mark")} />
-                </Box>
-              )}
+              <Box sx={dashTilePanelSx}>
+                {attCardLoading ? (
+                  <Box sx={{ display: "flex", justifyContent: "flex-start" }}>
+                    <Box
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: "50%",
+                        border: `3px solid ${C.blueGlass}`,
+                        borderTopColor: C.blue,
+                        animation: "spin 0.8s linear infinite",
+                      }}
+                    />
+                  </Box>
+                ) : totalAtt === 0 ? (
+                  <Box>
+                    <AttendanceIcon sx={{ fontSize: 24, color: C.muted, mb: 0.5 }} />
+                    <Typography sx={{ color: C.muted, fontWeight: 600, fontSize: "0.7rem", lineHeight: 1.35 }}>
+                      {isSubjectFocused ? "Not marked for your division." : "Not marked yet."}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <AttRing
+                      pct={attPct}
+                      size={84}
+                      hideLabel
+                      color={attPct >= 80 ? C.green : C.amber}
+                      gradId="teacherAttRing"
+                    />
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.85 }}>
+                      <DashStatRow label="Present" value={present} color={C.green} />
+                      <DashStatRow label="Absent" value={absent} color={C.red} />
+                    </Box>
+                  </Box>
+                )}
+              </Box>
             </CardContent>
           </GCard>
         );
@@ -2165,13 +2394,13 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
         const profileDetails: ProfileDetailLine[] = [];
         if (primaryAssignment) {
           profileDetails.push({
-            icon: <ClassIcon sx={{ fontSize: 15, color: C.muted }} />,
+            icon: <ClassIcon sx={{ fontSize: 14, color: C.muted }} />,
             text: `${primaryAssignment.class_name} — ${primaryAssignment.division_name}${
               primaryAssignment.subject_name ? ` · ${primaryAssignment.subject_name}` : ""
             }`,
           });
         }
-        return <DashboardProfileCard details={profileDetails} fillHeight />;
+        return <DashboardProfileCard compact details={profileDetails} fillHeight />;
       }
 
       // ── Homework list ──────────────────────────────────────────────────────
@@ -2286,40 +2515,27 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
     <Grid container spacing={{ xs: 2, md: 2.5 }}>
       {/* ── Row 1: KPI snap cards — individually draggable ── */}
       <Grid item xs={12}>
-        <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
-          <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
-            <Box sx={kpiGridSx(kpiOrder.length)}>
-              {kpiOrder.map((id) => (
-                <SortableSection key={id} id={id} sx={{ minWidth: 0 }}>
-                  {renderKpi(id)}
-                </SortableSection>
-              ))}
-            </Box>
-          </SortableContext>
-        </DndContext>
+        <SortableKpiRow
+          items={kpiDrag.order}
+          activeId={kpiDrag.activeId}
+          onDragStart={kpiDrag.onDragStart}
+          onDragEnd={kpiDrag.onDragEnd}
+          onDragCancel={kpiDrag.onDragCancel}
+          renderItem={renderKpi}
+        />
       </Grid>
 
-      {/* ── Main cards — 2-column grid, each individually draggable ── */}
       <Grid item xs={12}>
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCardDrag}>
-          <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
-            <Box sx={pairedCardGridSx}>
-              {cardOrder.map((id) => (
-                <SortableSection
-                  key={id}
-                  id={id}
-                  sx={{
-                    ...(id === "card_notices" || id === "card_homework"
-                      ? { gridColumn: "1 / -1" }
-                      : pairedCardWrapSx),
-                  }}
-                >
-                  {renderCardContent(id)}
-                </SortableSection>
-              ))}
-            </Box>
-          </SortableContext>
-        </DndContext>
+        <SortableCardGrid
+          items={cardDrag.order}
+          activeId={cardDrag.activeId}
+          onDragStart={cardDrag.onDragStart}
+          onDragEnd={cardDrag.onDragEnd}
+          onDragCancel={cardDrag.onDragCancel}
+          fullWidthIds={TEACHER_FULL_WIDTH_CARDS}
+          compactOverlayIds={TEACHER_COMPACT_CARDS}
+          renderItem={renderCardContent}
+        />
       </Grid>
     </Grid>
   );
@@ -2332,6 +2548,8 @@ const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw"];
 // Fee KPI hidden for students — restore when fee module is enabled:
 // const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw", "s_kpi_fees"];
 const STUDENT_CARDS_DEFAULT = ["s_att", "s_profile", "s_homework", "s_notices"];
+const STUDENT_FULL_WIDTH_CARDS = new Set(["s_homework", "s_notices"]);
+const STUDENT_COMPACT_CARDS = new Set(["s_att", "s_profile"]);
 // Fee card hidden for students — restore when fee module is enabled:
 // const STUDENT_CARDS_DEFAULT = ["s_att", "s_profile", "s_fee", "s_homework", "s_notices"];
 
@@ -2343,21 +2561,8 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
   // const feePct = total_fee > 0 ? (total_paid / total_fee) * 100 : 0;
   // const fmtINR = (n: number) => "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
-  const kpiSensors  = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-  const cardSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-  const [kpiOrder,  setKpiOrder]  = useSectionOrder("student_kpi_v2",   STUDENT_KPI_DEFAULT);
-  const [cardOrder, setCardOrder] = useSectionOrder("student_cards_v3", STUDENT_CARDS_DEFAULT);
-
-  function handleKpiDrag(e: DragEndEvent) {
-    const { active, over } = e;
-    if (over && active.id !== over.id)
-      setKpiOrder(arrayMove(kpiOrder, kpiOrder.indexOf(String(active.id)), kpiOrder.indexOf(String(over.id))));
-  }
-  function handleCardDrag(e: DragEndEvent) {
-    const { active, over } = e;
-    if (over && active.id !== over.id)
-      setCardOrder(arrayMove(cardOrder, cardOrder.indexOf(String(active.id)), cardOrder.indexOf(String(over.id))));
-  }
+  const kpiDrag = useSortableDrag("student_kpi_v2", STUDENT_KPI_DEFAULT);
+  const cardDrag = useSortableDrag("student_cards_v6", STUDENT_CARDS_DEFAULT);
 
   const renderKpi = (id: string) => {
     const totalDays = attendance.present + attendance.absent;
@@ -2466,42 +2671,35 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
     switch (id) {
       case "s_att":
         return (
-          <SortableSection key={id} id={id} sx={pairedCardWrapSx}>
-            <GCard sx={{ height: "100%" }}>
-              <CardContent sx={{ p: 3 }}>
-                <CardHeader
-                  title="My Attendance"
-                  action={
-                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/attendance/report")}
-                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
-                      View History
-                    </Button>
-                  }
-                />
-                <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+          <GCard sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            <CardContent sx={dashTileCardContentSx}>
+              <CardHeader
+                compact
+                title="My Attendance"
+                action={
+                  <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/attendance/report")}
+                    sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 11 }}>
+                    History
+                  </Button>
+                }
+              />
+              <Box sx={dashTilePanelSx}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                   <AttRing
                     pct={attendance.percentage}
-                    size={110}
+                    size={84}
+                    hideLabel
                     color={attendance.percentage >= 75 ? C.green : C.red}
                     gradId="studAttGrad"
                   />
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.85 }}>
+                    <DashStatRow label="Present" value={`${attendance.present}d`} color={C.green} />
+                    <DashStatRow label="Absent" value={`${attendance.absent}d`} color={C.red} />
+                  </Box>
                 </Box>
-                <Grid container spacing={1}>
-                  {[
-                    { label: "Present", value: `${attendance.present} Days`, color: C.green, bg: C.greenGlass },
-                    { label: "Absent",  value: `${attendance.absent} Days`,  color: C.red,   bg: C.redGlass  },
-                  ].map((s) => (
-                    <Grid item xs={6} key={s.label}>
-                      <Box sx={{ p: 1, bgcolor: s.bg, borderRadius: "10px", textAlign: "center", borderLeft: `3px solid ${s.color}` }}>
-                        <Typography variant="caption" sx={{ color: C.muted, fontWeight: 700, display: "block" }}>{s.label}</Typography>
-                        <Typography sx={{ fontSize: "0.95rem", fontWeight: 900, color: s.color }}>{s.value}</Typography>
-                      </Box>
-                    </Grid>
-                  ))}
-                </Grid>
-              </CardContent>
-            </GCard>
-          </SortableSection>
+              </Box>
+            </CardContent>
+          </GCard>
         );
 
       case "s_profile": {
@@ -2525,14 +2723,13 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
           });
         }
         return (
-          <SortableSection key={id} id={id} sx={pairedCardWrapSx}>
-            <DashboardProfileCard
-              displayName={profile.student_name}
-              avatarOverride={toMediaUrl(profile.photo_url)}
-              details={studentProfileDetails}
-              fillHeight
-            />
-          </SortableSection>
+          <DashboardProfileCard
+            compact
+            displayName={profile.student_name}
+            avatarOverride={toMediaUrl(profile.photo_url)}
+            details={studentProfileDetails}
+            fillHeight
+          />
         );
       }
 
@@ -2591,84 +2788,80 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
 
       case "s_homework":
         return (
-          <SortableSection key={id} id={id} sx={{ gridColumn: "1 / -1" }}>
-            <Box
-              sx={{
-                px: { xs: 2, sm: 2.5 },
-                py: { xs: 1.5, sm: 1.75 },
-                borderRadius: C.radius.md,
-                bgcolor: homework.pending_count > 0 ? "#FEF2F2" : "#F0FDF4",
-                border: `1px solid ${homework.pending_count > 0 ? "#FECACA" : "#BBF7D0"}`,
-                boxShadow: C.shadow,
-                display: "flex",
-                flexDirection: { xs: "column", sm: "row" },
-                alignItems: { xs: "flex-start", sm: "center" },
-                justifyContent: "space-between",
-                gap: 1.5,
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
-                <Box
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: C.radius.sm,
-                    bgcolor: homework.pending_count > 0 ? C.redGlass : C.greenGlass,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <HomeworkIcon sx={{ fontSize: 18, color: homework.pending_count > 0 ? C.red : C.green }} />
-                </Box>
-                <Typography sx={{ fontSize: { xs: "0.82rem", sm: "0.9rem" }, fontWeight: 700, color: C.slateText, lineHeight: 1.45 }}>
-                  {homework.pending_count > 0
-                    ? `You have ${homework.pending_count} pending assignment${homework.pending_count !== 1 ? "s" : ""}`
-                    : "All homework assignments are complete — great going!"}
-                </Typography>
-              </Box>
-              <Button
-                variant="contained"
-                size="small"
-                onClick={() => navigate("/homework")}
+          <Box
+            sx={{
+              px: { xs: 2, sm: 2.5 },
+              py: { xs: 1.5, sm: 1.75 },
+              borderRadius: C.radius.md,
+              bgcolor: homework.pending_count > 0 ? "#FEF2F2" : "#F0FDF4",
+              border: `1px solid ${homework.pending_count > 0 ? "#FECACA" : "#BBF7D0"}`,
+              boxShadow: C.shadow,
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              alignItems: { xs: "flex-start", sm: "center" },
+              justifyContent: "space-between",
+              gap: 1.5,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
+              <Box
                 sx={{
+                  width: 36,
+                  height: 36,
                   borderRadius: C.radius.sm,
-                  textTransform: "none",
-                  fontWeight: 700,
-                  fontSize: "0.8rem",
-                  bgcolor: C.brand,
-                  boxShadow: "none",
+                  bgcolor: homework.pending_count > 0 ? C.redGlass : C.greenGlass,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   flexShrink: 0,
-                  px: 2,
-                  "&:hover": { bgcolor: C.brandDark },
                 }}
               >
-                Go to Homework
-              </Button>
+                <HomeworkIcon sx={{ fontSize: 18, color: homework.pending_count > 0 ? C.red : C.green }} />
+              </Box>
+              <Typography sx={{ fontSize: { xs: "0.82rem", sm: "0.9rem" }, fontWeight: 700, color: C.slateText, lineHeight: 1.45 }}>
+                {homework.pending_count > 0
+                  ? `You have ${homework.pending_count} pending assignment${homework.pending_count !== 1 ? "s" : ""}`
+                  : "All homework assignments are complete — great going!"}
+              </Typography>
             </Box>
-          </SortableSection>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => navigate("/homework")}
+              sx={{
+                borderRadius: C.radius.sm,
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: "0.8rem",
+                bgcolor: C.brand,
+                boxShadow: "none",
+                flexShrink: 0,
+                px: 2,
+                "&:hover": { bgcolor: C.brandDark },
+              }}
+            >
+              Go to Homework
+            </Button>
+          </Box>
         );
 
       case "s_notices":
         return (
-          <SortableSection key={id} id={id} sx={{ gridColumn: "1 / -1" }}>
-            <GCard>
-              <CardContent sx={{ p: 3 }}>
-                <CardHeader
-                  title="Latest Notices & Holidays"
-                  icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
-                  action={
-                    <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/communication/notices")}
-                      sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
-                      View All
-                    </Button>
-                  }
-                />
-                <NoticesCardContent notices={recent_notices} navigate={navigate} />
-              </CardContent>
-            </GCard>
-          </SortableSection>
+          <GCard>
+            <CardContent sx={{ p: 3 }}>
+              <CardHeader
+                title="Latest Notices & Holidays"
+                icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
+                action={
+                  <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate("/communication/notices")}
+                    sx={{ color: C.blue, fontWeight: 700, textTransform: "none", fontSize: 12 }}>
+                    View All
+                  </Button>
+                }
+              />
+              <NoticesCardContent notices={recent_notices} navigate={navigate} />
+            </CardContent>
+          </GCard>
         );
 
       default: return null;
@@ -2677,30 +2870,28 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
 
   return (
     <Grid container spacing={{ xs: 2, md: 2.5 }}>
-      {/* ── KPI snap cards — individually draggable ── */}
       <Grid item xs={12}>
-        <DndContext sensors={kpiSensors} collisionDetection={closestCenter} onDragEnd={handleKpiDrag}>
-          <SortableContext items={kpiOrder} strategy={rectSortingStrategy}>
-            <Box sx={kpiGridSx(kpiOrder.length)}>
-              {kpiOrder.map((id) => (
-                <SortableSection key={id} id={id} sx={{ minWidth: 0 }}>
-                  {renderKpi(id)}
-                </SortableSection>
-              ))}
-            </Box>
-          </SortableContext>
-        </DndContext>
+        <SortableKpiRow
+          items={kpiDrag.order}
+          activeId={kpiDrag.activeId}
+          onDragStart={kpiDrag.onDragStart}
+          onDragEnd={kpiDrag.onDragEnd}
+          onDragCancel={kpiDrag.onDragCancel}
+          renderItem={renderKpi}
+        />
       </Grid>
 
-      {/* ── Main cards ── */}
       <Grid item xs={12}>
-        <DndContext sensors={cardSensors} collisionDetection={closestCenter} onDragEnd={handleCardDrag}>
-          <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
-            <Box sx={pairedCardGridSx}>
-              {cardOrder.map(renderCard)}
-            </Box>
-          </SortableContext>
-        </DndContext>
+        <SortableCardGrid
+          items={cardDrag.order}
+          activeId={cardDrag.activeId}
+          onDragStart={cardDrag.onDragStart}
+          onDragEnd={cardDrag.onDragEnd}
+          onDragCancel={cardDrag.onDragCancel}
+          fullWidthIds={STUDENT_FULL_WIDTH_CARDS}
+          compactOverlayIds={STUDENT_COMPACT_CARDS}
+          renderItem={renderCard}
+        />
       </Grid>
     </Grid>
   );
