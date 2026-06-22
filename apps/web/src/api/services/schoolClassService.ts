@@ -16,6 +16,7 @@ export interface ClassDivision {
   division_name: string;
   capacity?: number | null;
   is_active: boolean;
+  student_count?: number;
 }
 
 export interface SchoolClass {

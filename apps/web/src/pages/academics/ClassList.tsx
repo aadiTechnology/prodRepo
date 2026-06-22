@@ -64,6 +64,7 @@ export default function ClassList() {
 
             <EntityTableSection<SchoolClass>
                 label="Classes"
+                showInfoBar={false}
                 totalRows={controller.totalClasses}
                 page={controller.page}
                 rowsPerPage={controller.rowsPerPage}

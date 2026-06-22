@@ -1,12 +1,16 @@
 import { type SchoolClass } from "../../api/services/schoolClassService";
 import { type ListConfig } from "../../components/reusable/listFramework.types";
 import StatusChip from "../../components/roles/StatusChip";
-import { TableRowActions } from "../../components/reusable";
+import { formatClassDisplayLabel } from "../../utils/formatters";
 
 type ClassListConfigArgs = {
   navigate: (path: string) => void;
   onDeleteClick?: (schoolClass: SchoolClass) => void;
 };
+
+function getActiveDivisions(row: SchoolClass) {
+  return row.divisions?.filter((d) => d.is_active) ?? [];
+}
 
 export const createClassListConfig = ({
   navigate,
@@ -16,28 +20,42 @@ export const createClassListConfig = ({
     {
       id: "name",
       label: "Class",
-      field: "name",
+      render: (row: SchoolClass) => formatClassDisplayLabel(row.name) || "-",
     },
     {
       id: "division",
       label: "Division",
       align: "center",
       render: (row: SchoolClass) => {
-        const activeDivisions = row.divisions?.filter(d => d.is_active) ?? [];
-        return activeDivisions.length > 0 
-          ? activeDivisions.map(d => d.division_name).join(", ") 
-          : "-";
+        const activeDivisions = getActiveDivisions(row);
+        if (activeDivisions.length === 0) return "-";
+        return activeDivisions
+          .map((d) => formatClassDisplayLabel(d.division_name))
+          .join(", ");
+      },
+    },
+    {
+      id: "students",
+      label: "Students",
+      align: "center",
+      render: (row: SchoolClass) => {
+        const activeDivisions = getActiveDivisions(row);
+        if (activeDivisions.length === 0) return "-";
+        return activeDivisions
+          .map((d) => `${formatClassDisplayLabel(d.division_name)}: ${d.student_count ?? 0}`)
+          .join(", ");
       },
     },
     {
       id: "capacity",
-      label: "Capacity",
+      label: "Seat Capacity",
       align: "center",
       render: (row: SchoolClass) => {
-        const activeDivisions = row.divisions?.filter(d => d.is_active) ?? [];
+        const activeDivisions = getActiveDivisions(row);
         if (activeDivisions.length === 0) return "-";
-        const totalCapacity = activeDivisions.reduce((sum, d) => sum + (Number(d.capacity) || 0), 0);
-        return totalCapacity || "-";
+        return activeDivisions
+          .map((d) => `${formatClassDisplayLabel(d.division_name)}: ${d.capacity ?? "-"}`)
+          .join(", ");
       },
     },
     {

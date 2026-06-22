@@ -3,7 +3,7 @@ import re
 from fastapi import HTTPException
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
-from app.models import SchoolClass, ClassDivision, AcademicYear
+from app.models import SchoolClass, ClassDivision, AcademicYear, Student
 from app.schemas.school_class_schema import SchoolClassCreate, SchoolClassUpdate
 
 def _normalize_text(value: str | None) -> str | None:
@@ -68,6 +68,25 @@ def _generate_default_code(name: str) -> str:
     normalized = re.sub(r"[^A-Z0-9]+", "-", raw).strip("-")
     return normalized[:40] or "CLASS"
 
+def _attach_division_student_counts(db: Session, tenant_id: int, classes: list[SchoolClass]) -> None:
+    division_ids = [d.id for c in classes for d in (c.divisions or [])]
+    if not division_ids:
+        return
+    rows = (
+        db.query(Student.class_division_id, func.count(Student.id))
+        .filter(
+            Student.tenant_id == tenant_id,
+            Student.class_division_id.in_(division_ids),
+            Student.is_active == True,  # noqa: E712
+        )
+        .group_by(Student.class_division_id)
+        .all()
+    )
+    counts = {div_id: cnt for div_id, cnt in rows}
+    for cls in classes:
+        for div in cls.divisions or []:
+            setattr(div, "student_count", counts.get(div.id, 0))
+
 def get_all_classes(
     db: Session,
     tenant_id: int,
@@ -90,7 +109,9 @@ def get_all_classes(
             )
         )
 
-    return query.options(joinedload(SchoolClass.divisions), joinedload(SchoolClass.academic_year)).order_by(SchoolClass.name.asc()).distinct().all()
+    classes = query.options(joinedload(SchoolClass.divisions), joinedload(SchoolClass.academic_year)).order_by(SchoolClass.name.asc()).distinct().all()
+    _attach_division_student_counts(db, tenant_id, classes)
+    return classes
 
 def get_class_by_id(db: Session, class_id: int, tenant_id: int):
     db_obj = db.query(SchoolClass).options(joinedload(SchoolClass.divisions), joinedload(SchoolClass.academic_year)).filter(
@@ -100,6 +121,7 @@ def get_class_by_id(db: Session, class_id: int, tenant_id: int):
     ).first()
     if not db_obj:
         raise HTTPException(status_code=404, detail="Class not found")
+    _attach_division_student_counts(db, tenant_id, [db_obj])
     return db_obj
 
 def create_class(

@@ -86,6 +86,7 @@ class ClassDivisionResponse(BaseModel):
     division_name: str
     capacity: Optional[int] = None
     is_active: bool
+    student_count: int = 0
 
     class Config:
         from_attributes = True

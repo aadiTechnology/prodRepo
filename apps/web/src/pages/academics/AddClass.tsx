@@ -28,6 +28,7 @@ export default function AddClass() {
     const [academicYearOptions, setAcademicYearOptions] = useState<
         { id: string; label: string; value: string }[]
     >([]);
+    const [defaultAcademicYearId, setDefaultAcademicYearId] = useState("");
 
     const initialValues = useMemo<AddClassFormData>(() => ({
         name: "",
@@ -52,6 +53,7 @@ export default function AddClass() {
         handleChange,
         handleFieldValueChange,
         handleSubmit: baseHandleSubmit,
+        resetForm,
     } = useFormManager<AddClassFormData>({
         initialValues,
         validationConfig,
@@ -269,6 +271,7 @@ export default function AddClass() {
                 );
                 if (!isEditMode) {
                     const currentYearId = resolveCurrentAcademicYearId(years);
+                    setDefaultAcademicYearId(currentYearId);
                     setFormData((prev) => ({
                         ...prev,
                         academic_year_id: currentYearId,
@@ -368,6 +371,18 @@ export default function AddClass() {
         }
     };
 
+    const handleCancel = () => {
+        if (isEditMode) {
+            fetchClass();
+        } else {
+            resetForm({
+                ...initialValues,
+                academic_year_id: defaultAcademicYearId,
+            });
+        }
+        setError(null);
+    };
+
     return (
         <BaseForm<AddClassFormData>
             formConfig={formConfig}
@@ -393,10 +408,10 @@ export default function AddClass() {
                 ],
                 homePath: "/",
                 cancelTooltip: "Cancel",
-                saveTooltipCreate: "Finish & Create",
-                saveTooltipEdit: "Save Changes",
+                saveTooltipCreate: "Save",
+                saveTooltipEdit: "Save",
             }}
-            onCancelNavigate={() => navigate("/classes")}
+            onCancelNavigate={handleCancel}
             confirmMessage={(ctx) =>
                 ctx.isEditMode
                     ? "Are you sure you want to update this class and its divisions?"
