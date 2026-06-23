@@ -17,6 +17,7 @@ import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 
 import BaseForm from "../../components/reusable/BaseForm";
 import FormSectionLabel from "../../components/reusable/FormSectionLabel";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
 import { useFormManager } from "../../hooks/useFormManager";
@@ -154,6 +155,9 @@ const toAbsoluteAssetUrl = (url?: string | null): string => {
 
 export default function EnrollmentPage() {
   const navigate = useNavigate();
+  const { buildFormBreadcrumbs, navigateWithConfigHub, navigateToList, fromConfigHub } =
+    useConfigHubNavigation();
+  const studentListPath = "/students";
   const { leadId, studentId: routeStudentId } = useParams<{ leadId?: string; studentId?: string }>();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
@@ -163,6 +167,36 @@ export default function EnrollmentPage() {
   const isStudentAddMode = searchParams.get("source") === "students" && !isEditMode && !isViewMode;
   const isStudentFlow = isStudentAddMode || isEditMode || isViewMode;
   const editStudentId = searchParams.get("studentId") || routeStudentId;
+
+  const enrollmentPageTitle = isViewMode
+    ? "Student Details"
+    : isEditMode
+      ? "Edit"
+      : isStudentAddMode
+        ? "Add"
+        : "Enrollment";
+
+  const enrollmentHeaderLinks = useMemo(() => {
+    if (isStudentFlow && fromConfigHub) {
+      return buildFormBreadcrumbs(
+        { title: "Student Management", path: studentListPath },
+        enrollmentPageTitle
+      );
+    }
+    return [
+      {
+        title: isStudentFlow ? "Students" : "Lead Management",
+        path: isStudentFlow ? studentListPath : "/admissions/leads",
+      },
+      { title: enrollmentPageTitle, path: "#" },
+    ];
+  }, [
+    buildFormBreadcrumbs,
+    enrollmentPageTitle,
+    fromConfigHub,
+    isStudentFlow,
+    studentListPath,
+  ]);
 
   const canEnroll = hasPermission("ADMISSIONS_MGMT:create") || hasPermission("ADMISSIONS_MGMT:edit") || user?.role === "SUPER_ADMIN";
 
@@ -614,7 +648,7 @@ export default function EnrollmentPage() {
         const res = await enrollmentService.enroll(buildPayload());
         setSnackbar(res.message || "Enrollment completed successfully");
       }
-      setTimeout(() => navigate("/students"), 1000);
+      setTimeout(() => navigateWithConfigHub(studentListPath), 1000);
     } catch (e: any) {
       setError(
         e?.response?.data?.detail ||
@@ -1277,22 +1311,19 @@ export default function EnrollmentPage() {
         snackbar={snackbar}
         onSnackbarClose={() => setSnackbar(null)}
         headerConfig={{
-          links: [
-            {
-              title: isStudentFlow ? "Students" : "Lead Management",
-              path: isStudentFlow ? "/students" : "/admissions/leads",
-            },
-            {
-              title: isViewMode ? "Student Details" : isEditMode ? "Edit" : isStudentAddMode ? "Add" : "Enrollment",
-              path: "#",
-            },
-          ],
+          links: enrollmentHeaderLinks,
           homePath: "/",
           cancelTooltip: isViewMode ? "Back" : "Cancel",
           saveTooltipCreate: isEditMode ? "Save Student" : "Enroll Student",
           saveTooltipEdit: "Save Student",
         }}
-        onCancelNavigate={() => navigate(-1)}
+        onCancelNavigate={() => {
+          if (isStudentFlow && fromConfigHub) {
+            navigateToList(studentListPath);
+            return;
+          }
+          navigate(-1);
+        }}
         confirmMessage={() =>
           isViewMode
             ? "This page is in view-only mode."

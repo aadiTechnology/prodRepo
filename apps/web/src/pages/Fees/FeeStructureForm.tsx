@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import feeService from "../../api/services/feeService";
 import BaseForm from "../../components/reusable/BaseForm";
 import { useFormManager } from "../../hooks/useFormManager";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import {
   createFeeStructureFormConfig,
   installmentCountForType,
@@ -44,6 +45,8 @@ const resolveCurrentAcademicYearId = (years: AcademicYear[]): string => {
 const FeeStructureForm = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id?: string }>();
+  const { buildFormBreadcrumbs, navigateWithConfigHub, navigateToList } = useConfigHubNavigation();
+  const listPath = "/fees/setup";
   const isEditMode = Boolean(id);
 
   const [loading, setLoading] = useState(false);
@@ -423,7 +426,7 @@ const FeeStructureForm = () => {
         await feeService.createFeeStructure(payload);
         setSnackbar("Fee structure created successfully!");
       }
-      setTimeout(() => navigate("/fees/setup"), 1000);
+      setTimeout(() => navigateWithConfigHub(listPath), 1000);
     } catch (err: any) {
       let msg = err?.message || "Failed to save fee structure.";
       if (err?.response?.status === 409 || msg.toLowerCase().includes("exists")) {
@@ -462,13 +465,13 @@ const FeeStructureForm = () => {
       snackbar={snackbar}
       onSnackbarClose={() => setSnackbar(null)}
       headerConfig={{
-        links: [
-          { title: "Fee Setup", path: "/fees/setup" },
-          { title: isEditMode ? "Edit Structure" : "New Structure", path: "#" },
-        ],
+        links: buildFormBreadcrumbs(
+          { title: "Fee Setup", path: listPath },
+          isEditMode ? "Edit Structure" : "New Structure"
+        ),
         homePath: "/",
       }}
-      onCancelNavigate={() => navigate("/fees/setup")}
+      onCancelNavigate={() => navigateToList(listPath)}
       confirmMessage={
         isEditMode
           ? "Are you sure you want to update this fee structure?"

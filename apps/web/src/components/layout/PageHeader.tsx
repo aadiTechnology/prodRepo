@@ -7,7 +7,8 @@
 import { Box, Typography, IconButton, Stack } from "@mui/material";
 import { ReactNode } from "react";
 import { ChevronRightTwoTone, HomeTwoTone } from "@mui/icons-material";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import type { ConfigHubLocationState } from "../../hooks/useConfigHubNavigation";
 import { colorTokens } from "../../tokens/colors";
 import { alpha } from "@mui/material/styles";
 
@@ -50,9 +51,16 @@ export default function PageHeader({
   actions,
 }: LayoutPageHeaderProps) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleNav = (path: string) => {
-    navigate(resolvePath(path), { state: { fromInternal: true } });
+    const locState = location.state as ConfigHubLocationState | null;
+    navigate(resolvePath(path), {
+      state: {
+        fromInternal: true,
+        ...(locState?.fromConfigHub ? { fromConfigHub: true } : {}),
+      },
+    });
   };
 
   return (

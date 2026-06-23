@@ -1,6 +1,6 @@
 import React from "react";
 import { Alert, Snackbar, Select, MenuItem, Typography } from "@mui/material";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { PageHeader } from "../../components/layout";
 import {
@@ -12,24 +12,18 @@ import {
   TablePaginationBar,
 } from "../../components/reusable";
 import { useFeeCategoryListController } from "../../hooks/useFeeCategoryListController";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { createFeeCategoryListConfig } from "./FeeCategoryList.listConfig";
 
 const FeeCategoryManagement = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const controller = useFeeCategoryListController();
+  const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
 
-  const fromConfigHub = location.state?.fromConfigHub;
-
-  const breadcrumbLinks = fromConfigHub
-    ? [
-        { title: "Basic Configuration", path: "/configuration" },
-        { title: "Fee Category Management", path: "#" },
-      ]
-    : [{ title: "Fee Category Management", path: "#" }];
+  const breadcrumbLinks = buildListBreadcrumbs("Fee Category Management");
 
   const config = createFeeCategoryListConfig({
-    navigate,
+    navigate: navigateWithConfigHub,
     onDeleteClick: controller.handleDeleteClick,
   });
 
@@ -112,7 +106,7 @@ const FeeCategoryManagement = () => {
                   </>
                 }
                 searchPlaceholder="Search Category"
-                onAddClick={() => navigate("/fees/categories/add")}
+                onAddClick={() => navigateWithConfigHub("/fees/categories/add")}
                 addLabel="Add Category"
               />
             }

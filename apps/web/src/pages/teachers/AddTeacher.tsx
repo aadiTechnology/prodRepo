@@ -12,6 +12,7 @@ import { useAuth } from "../../context/AuthContext";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
 import { emailRequiredPatternRules } from "../../utils/formValidationPresets";
 import { useFormManager } from "../../hooks/useFormManager";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import BaseForm from "../../components/reusable/BaseForm";
 import type { SelectItemOption, MediaUploadSlotItem } from "../../components/semantic";
 import { addTeacherFormConfig, type AddTeacherFormData } from "./AddTeacher.formConfig";
@@ -42,6 +43,8 @@ export default function AddTeacher() {
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
   const navigate = useNavigate();
+  const { buildFormBreadcrumbs, navigateWithConfigHub, navigateToList } = useConfigHubNavigation();
+  const listPath = "/teachers";
   const { user } = useAuth();
   const activeTenantId = user?.tenant_id ?? user?.tenant?.id ?? null;
 
@@ -346,14 +349,14 @@ export default function AddTeacher() {
         }
         await teacherService.update(Number(id), payload as TeacherUpdate);
         setSnackbar("Teacher updated successfully");
-        setTimeout(() => navigate("/teachers"), 1000);
+        setTimeout(() => navigateWithConfigHub(listPath), 1000);
       } else {
         await teacherService.create(payload as TeacherCreate, activeTenantId);
         setSnackbar("Teacher added successfully");
         if (actionType === 'SAVE_AND_ADD') {
           setFormData(emptyForm());
         } else {
-          setTimeout(() => navigate("/teachers"), 1000);
+          setTimeout(() => navigateWithConfigHub(listPath), 1000);
         }
       }
     } catch (err: unknown) {
@@ -390,16 +393,16 @@ export default function AddTeacher() {
       snackbar={snackbar}
       onSnackbarClose={() => setSnackbar(null)}
       headerConfig={{
-        links: [
-          { title: "Teachers", path: "/teachers" },
-          { title: isEditMode ? "Edit Teacher" : "Add Teacher", path: "#" },
-        ],
+        links: buildFormBreadcrumbs(
+          { title: "Teachers", path: listPath },
+          isEditMode ? "Edit Teacher" : "Add Teacher"
+        ),
         homePath: "/",
         cancelTooltip: "Cancel",
         saveTooltipCreate: "Save",
         saveTooltipEdit: "Save",
       }}
-      onCancelNavigate={() => navigate("/teachers")}
+      onCancelNavigate={() => navigateToList(listPath)}
       confirmMessage={(ctx: any) =>
         ctx.isEditMode
           ? "Are you sure you want to update this teacher?"

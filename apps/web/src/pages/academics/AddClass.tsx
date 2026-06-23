@@ -6,6 +6,7 @@ import schoolClassService from "../../api/services/schoolClassService";
 import academicYearService from "../../api/services/academicYearService";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
 import { useFormManager } from "../../hooks/useFormManager";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import BaseForm from "../../components/reusable/BaseForm";
 import { createAddClassFormConfig, type AddClassFormData, type AddClassDivision } from "./AddClass.formConfig";
 import { TextFieldInput } from "../../components/semantic";
@@ -19,6 +20,8 @@ import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
 export default function AddClass() {
     const navigate = useNavigate();
     const { id } = useParams<{ id?: string }>();
+    const { buildFormBreadcrumbs, navigateWithConfigHub, navigateToList } = useConfigHubNavigation();
+    const listPath = "/classes";
     const isEditMode = Boolean(id && id !== "new");
 
     const [loading, setLoading] = useState(false);
@@ -356,7 +359,7 @@ export default function AddClass() {
                 });
                 setSnackbar("Class created successfully.");
             }
-            setTimeout(() => navigate("/classes"), 1000);
+            setTimeout(() => navigateWithConfigHub(listPath), 1000);
         } catch (err: unknown) {
             console.error("Class save error:", err);
             const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
@@ -372,15 +375,7 @@ export default function AddClass() {
     };
 
     const handleCancel = () => {
-        if (isEditMode) {
-            fetchClass();
-        } else {
-            resetForm({
-                ...initialValues,
-                academic_year_id: defaultAcademicYearId,
-            });
-        }
-        setError(null);
+        navigateToList(listPath);
     };
 
     return (
@@ -402,10 +397,10 @@ export default function AddClass() {
             snackbar={snackbar}
             onSnackbarClose={() => setSnackbar(null)}
             headerConfig={{
-                links: [
-                    { title: "Classes", path: "/classes" },
-                    { title: isEditMode ? "Edit Class" : "Add Class", path: "#" },
-                ],
+                links: buildFormBreadcrumbs(
+                    { title: "Classes", path: listPath },
+                    isEditMode ? "Edit Class" : "Add Class"
+                ),
                 homePath: "/",
                 cancelTooltip: "Cancel",
                 saveTooltipCreate: "Save",

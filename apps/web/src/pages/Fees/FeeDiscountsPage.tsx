@@ -11,7 +11,7 @@ import {
     Alert,
     Snackbar,
 } from "@mui/material";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
     ListPageLayout,
     ListPageToolbar,
@@ -25,6 +25,7 @@ import StatusChip from "../../components/roles/StatusChip";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import feeDiscountService from "../../api/services/feeDiscountService";
 import { FeeDiscount } from "../../types/feeDiscount";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import CreateDiscountDialog from "./CreateDiscountDialog";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -32,19 +33,12 @@ import CreateDiscountDialog from "./CreateDiscountDialog";
 // ═══════════════════════════════════════════════════════════════════════════
 const FeeDiscountsPage = () => {
     const navigate = useNavigate();
-    const location = useLocation();
+    const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
     const [discounts, setDiscounts] = useState<FeeDiscount[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fromConfigHub = location.state?.fromConfigHub;
-
-    const breadcrumbLinks = fromConfigHub
-        ? [
-            { title: "Basic Configuration", path: "/configuration" },
-            { title: "Fee Discounts", path: "#" },
-          ]
-        : [{ title: "Fee Discounts", path: "#" }];
+    const breadcrumbLinks = buildListBreadcrumbs("Fee Discounts");
 
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(0);
@@ -108,11 +102,11 @@ const FeeDiscountsPage = () => {
     };
 
     const handleEditClick = (discount: FeeDiscount) => {
-        navigate(`/fees/discounts/${discount.id}/edit`);
+        navigateWithConfigHub(`/fees/discounts/${discount.id}/edit`);
     };
 
     const handleCreateClick = () => {
-        navigate("/fees/discounts/add");
+        navigateWithConfigHub("/fees/discounts/add");
     };
 
     const handleDialogClose = (refresh = false) => {

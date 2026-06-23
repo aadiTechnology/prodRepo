@@ -10,6 +10,7 @@ import {
 import schoolClassService from "../../api/services/schoolClassService";
 import BaseForm from "../../components/reusable/BaseForm";
 import { useFormManager } from "../../hooks/useFormManager";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import {
   createFeeCategoryFormConfig,
   type FeeCategoryFormData,
@@ -26,6 +27,8 @@ const resolveCurrentAcademicYearId = (
 const AddEditFeeCategory = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id?: string }>();
+  const { buildFormBreadcrumbs, navigateWithConfigHub, navigateToList } = useConfigHubNavigation();
+  const listPath = "/fees/categories";
   const isEditMode = Boolean(id);
 
   const [loading, setLoading] = useState(false);
@@ -161,7 +164,7 @@ const AddEditFeeCategory = () => {
       }
       setTimeout(() => {
         setSnackbar(null);
-        navigate("/fees/categories");
+        navigateWithConfigHub(listPath);
       }, 1200);
     } catch (err: any) {
       let message = err?.message || (isEditMode ? "Failed to update category." : "Failed to create category.");
@@ -197,16 +200,13 @@ const AddEditFeeCategory = () => {
       snackbar={snackbar}
       onSnackbarClose={() => setSnackbar(null)}
       headerConfig={{
-        links: [
-          { title: "Fee Categories", path: "/fees/categories" },
-          {
-            title: isEditMode ? "Edit Fee Category" : "Add Fee Category",
-            path: "#",
-          },
-        ],
-        homePath: "/fees/categories",
+        links: buildFormBreadcrumbs(
+          { title: "Fee Categories", path: listPath },
+          isEditMode ? "Edit Fee Category" : "Add Fee Category"
+        ),
+        homePath: listPath,
       }}
-      onCancelNavigate={() => navigate("/fees/categories")}
+      onCancelNavigate={() => navigateToList(listPath)}
       confirmMessage={isEditMode ? "Update this fee category?" : "Create this fee category?"}
       gridSpacing={3}
     />

@@ -6,28 +6,22 @@
 
 import { Alert, Snackbar } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ListPageLayout, ListPageToolbar, EntityTableSection } from "../components/reusable";
 import { PageHeader } from "../components/layout";
 import ConfirmDialog from "../components/common/ConfirmDialog";
 import { useRBAC } from "../context/RBACContext";
 import { useRolesListController } from "../hooks/useRolesListController";
+import { useConfigHubNavigation } from "../hooks/useConfigHubNavigation";
 import { createRoleListConfig } from "./RoleManagementPage.listConfig";
 import { type Role } from "../types/role.types";
 
 const RoleManagementPage = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { hasPermission } = useRBAC();
+  const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
 
-  const fromConfigHub = location.state?.fromConfigHub;
-
-  const breadcrumbLinks = fromConfigHub
-    ? [
-        { title: "Basic Configuration", path: "/configuration" },
-        { title: "Role Management", path: "#" },
-      ]
-    : [{ title: "Role Management", path: "#" }];
+  const breadcrumbLinks = buildListBreadcrumbs("Role Management");
 
   // Restore permission logic and config creation to component
   const canCreateRole = hasPermission("ADMIN_MGMT:create");
@@ -36,7 +30,7 @@ const RoleManagementPage = () => {
 
   const controller = useRolesListController();
   const listConfig = createRoleListConfig({
-    navigate,
+    navigate: navigateWithConfigHub,
     onDeleteClick: controller.handleDeleteClick,
     canEditRole,
     canDeleteRole,
@@ -56,7 +50,7 @@ const RoleManagementPage = () => {
                 searchValue={controller.search}
                 onSearchChange={controller.setSearch}
                 searchPlaceholder="Search roles..."
-                onAddClick={() => navigate("/roles/create")}
+                onAddClick={() => navigateWithConfigHub("/roles/create")}
                 addLabel="Add Role"
                 addIcon={<AddIcon sx={{ fontSize: 24 }} />}
               />

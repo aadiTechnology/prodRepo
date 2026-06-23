@@ -6,23 +6,24 @@ import { PageHeader } from "../../components/layout";
 import { EntityTableSection, ListPageLayout, ListPageToolbar } from "../../components/reusable";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { usePermissionListController } from "../../hooks/usePermissionListController";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import {
   createPermissionListConfig,
   type PermissionTableRow,
 } from "./PermissionManagementPage.listConfig";
 
-const breadcrumbLinks = [{ title: "Permission Mapping", path: "#" }];
-
 const emptyMessageNoRole = "Select a role above to view its permissions.";
 
 export default function PermissionManagementPage() {
   const navigate = useNavigate();
+  const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
+  const breadcrumbLinks = buildListBreadcrumbs("Permission Mapping");
   const controller = usePermissionListController();
 
   const listConfig = useMemo(
     () =>
       createPermissionListConfig({
-        navigate,
+        navigate: navigateWithConfigHub,
         canEdit: controller.canEdit,
         isSystemAdmin: controller.isSystemAdmin,
         selectedRole: controller.selectedRole,
@@ -35,7 +36,7 @@ export default function PermissionManagementPage() {
         onDeleteClick: controller.requestDelete,
       }),
     [
-      navigate,
+      navigateWithConfigHub,
       controller.canEdit,
       controller.isSystemAdmin,
       controller.selectedRole,

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Add as AddIcon } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
 import { PageHeader } from "../../components/layout";
@@ -7,13 +7,14 @@ import { ListPageLayout, ListPageToolbar, EntityTableSection } from "../../compo
 import { type SubjectResponse } from "../../api/services/subjectService";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { useSubjectListController } from "../../hooks/useSubjectListController";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { createSubjectListConfig, type SubjectClassRow } from "./SubjectList.listConfig";
 
 export default function SubjectList() {
     const navigate = useNavigate();
-    const location = useLocation();
     const controller = useSubjectListController();
     const { enqueueSnackbar } = useSnackbar();
+    const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
 
     useEffect(() => {
         if (!controller.success) return;
@@ -35,17 +36,10 @@ export default function SubjectList() {
         controller.setError(null);
     }, [controller.error, controller.setError, enqueueSnackbar]);
 
-    const fromConfigHub = location.state?.fromConfigHub;
-
-    const breadcrumbLinks = fromConfigHub
-        ? [
-            { title: "Basic Configuration", path: "/configuration" },
-            { title: "Subjects", path: "#" },
-          ]
-        : [{ title: "Subjects", path: "#" }];
+    const breadcrumbLinks = buildListBreadcrumbs("Subjects");
 
     const listConfig = createSubjectListConfig({
-        navigate,
+        navigate: navigateWithConfigHub,
         onDeleteClick: controller.handleDeleteClick,
     });
 
@@ -83,7 +77,7 @@ export default function SubjectList() {
                                 },
 
                             ]}
-                            onAddClick={() => navigate("/subjects/new")}
+                            onAddClick={() => navigateWithConfigHub("/subjects/new")}
                             addLabel="Add Subject"
                             addIcon={<AddIcon sx={{ fontSize: 24 }} />}
                         />

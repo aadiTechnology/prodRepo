@@ -3,6 +3,7 @@ import { Autocomplete, TextField } from "../components/primitives";
 import { useNavigate, useParams } from "react-router-dom";
 import feeDiscountService from "../api/services/feeDiscountService";
 import { useFormManager } from "../hooks/useFormManager";
+import { useConfigHubNavigation } from "../hooks/useConfigHubNavigation";
 import BaseForm from "../components/reusable/BaseForm";
 import { createAddFeeDiscountFormConfig, type AddFeeDiscountFormData } from "./AddFeeDiscount.formConfig";
 
@@ -18,6 +19,8 @@ const emptyForm = (): AddFeeDiscountFormData => ({
 
 export default function AddFeeDiscount() {
   const navigate = useNavigate();
+  const { buildFormBreadcrumbs, navigateWithConfigHub, navigateToList } = useConfigHubNavigation();
+  const listPath = "/fees/discounts";
   const { id: routeDiscountId } = useParams<{ id?: string }>();
   const discountId = routeDiscountId ?? null;
   const isEditMode = Boolean(discountId);
@@ -132,7 +135,7 @@ export default function AddFeeDiscount() {
         await feeDiscountService.create(payload);
         setSnackbar("Discount created successfully.");
       }
-      setTimeout(() => navigate("/fees/discounts"), 1000);
+      setTimeout(() => navigateWithConfigHub(listPath), 1000);
     } catch (err: any) {
       setError(
         err?.response?.data?.detail ||
@@ -247,16 +250,16 @@ export default function AddFeeDiscount() {
       snackbar={snackbar}
       onSnackbarClose={() => setSnackbar(null)}
       headerConfig={{
-        links: [
-          { title: "Fee Discounts", path: "/fees/discounts" },
-          { title: isEditMode ? "Edit Fee Discount" : "Add Fee Discount", path: "#" },
-        ],
+        links: buildFormBreadcrumbs(
+          { title: "Fee Discounts", path: listPath },
+          isEditMode ? "Edit Fee Discount" : "Add Fee Discount"
+        ),
         homePath: "/",
         cancelTooltip: "Cancel",
         saveTooltipCreate: "Save",
         saveTooltipEdit: "Update",
       }}
-      onCancelNavigate={() => navigate("/fees/discounts")}
+      onCancelNavigate={() => navigateToList(listPath)}
       confirmMessage={(ctx) =>
         ctx.isEditMode
           ? "Are you sure you want to update this discount?"

@@ -4,6 +4,7 @@ import roleService from "../api/services/roleService";
 import { useAuth } from "../context/AuthContext";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../utils/formValidation";
 import { useFormManager } from "../hooks/useFormManager";
+import { useConfigHubNavigation } from "../hooks/useConfigHubNavigation";
 import BaseForm from "../components/reusable/BaseForm";
 import { createAddRoleFormConfig, type AddRoleFormData } from "./AddRole.formConfig";
 import { apiBaseUrl } from "../config";
@@ -18,6 +19,8 @@ const emptyForm = (): AddRoleFormData => ({
 export default function RolePage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id?: string }>();
+  const { buildFormBreadcrumbs, navigateWithConfigHub, navigateToList } = useConfigHubNavigation();
+  const listPath = "/roles";
   const isEditMode = Boolean(id);
   const auth = useAuth();
   const tenantId = auth?.user?.tenant_id;
@@ -164,7 +167,7 @@ export default function RolePage() {
         await roleService.createRole(payload);
         setSnackbar("Role saved successfully.");
       }
-      setTimeout(() => navigate("/roles"), 1000);
+      setTimeout(() => navigateWithConfigHub(listPath), 1000);
     } catch (err: unknown) {
       console.error("Role save error:", err);
       const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
@@ -198,16 +201,16 @@ export default function RolePage() {
       snackbar={snackbar}
       onSnackbarClose={() => setSnackbar(null)}
       headerConfig={{
-        links: [
-          { title: "Roles", path: "/roles" },
-          { title: isEditMode ? "Edit Role" : "Add Role", path: "#" },
-        ],
+        links: buildFormBreadcrumbs(
+          { title: "Roles", path: listPath },
+          isEditMode ? "Edit Role" : "Add Role"
+        ),
         homePath: "/",
         cancelTooltip: "Cancel",
         saveTooltipCreate: "Save",
         saveTooltipEdit: "Update",
       }}
-      onCancelNavigate={() => navigate("/roles")}
+      onCancelNavigate={() => navigateToList(listPath)}
       confirmMessage={(ctx) =>
         ctx.isEditMode
           ? "Are you sure you want to update this role?"

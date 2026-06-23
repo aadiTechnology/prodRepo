@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import academicYearService from "../../api/services/academicYearService";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
 import { useFormManager } from "../../hooks/useFormManager";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import BaseForm from "../../components/reusable/BaseForm";
 import {
   createAddAcademicYearFormConfig,
@@ -12,6 +13,8 @@ import {
 const AddAcademicYear = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id?: string }>();
+  const { buildFormBreadcrumbs, navigateWithConfigHub, navigateToList } = useConfigHubNavigation();
+  const listPath = "/academic-years";
   const isEditMode = !!id && id !== "new";
   const validId = !!id && id !== "new";
 
@@ -130,7 +133,7 @@ const AddAcademicYear = () => {
         });
         setSnackbar("Academic year created successfully.");
       }
-      window.setTimeout(() => navigate("/academic-years"), 1200);
+      window.setTimeout(() => navigateWithConfigHub(listPath), 1200);
     } catch (err: unknown) {
       let apiFieldErrors, message;
       try {
@@ -156,8 +159,7 @@ const AddAcademicYear = () => {
   };
 
   const handleCancel = () => {
-    resetForm();
-    setError(null);
+    navigateToList(listPath);
   };
 
   return (
@@ -179,10 +181,10 @@ const AddAcademicYear = () => {
       snackbar={snackbar}
       onSnackbarClose={() => setSnackbar(null)}
       headerConfig={{
-        links: [
-          { title: "Academic Years", path: "/academic-years" },
-          { title: isEditMode ? "Edit Academic Year" : "Add Academic Year", path: "#" },
-        ],
+        links: buildFormBreadcrumbs(
+          { title: "Academic Years", path: listPath },
+          isEditMode ? "Edit Academic Year" : "Add Academic Year"
+        ),
         homePath: "/",
         cancelTooltip: "Cancel",
         saveTooltipCreate: "Save",

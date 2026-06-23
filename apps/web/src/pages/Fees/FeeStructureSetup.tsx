@@ -7,7 +7,7 @@ import {
   Alert,
   Snackbar,
 } from "@mui/material";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { PageHeader } from "../../components/layout";
 import {
@@ -19,24 +19,18 @@ import {
   TablePaginationBar,
 } from "../../components/reusable";
 import { useFeeStructureListController } from "../../hooks/useFeeStructureListController";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { createFeeStructureListConfig } from "./FeeStructureList.listConfig";
 
 const FeeStructureSetup = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const controller = useFeeStructureListController();
+  const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
 
-  const fromConfigHub = location.state?.fromConfigHub;
-
-  const breadcrumbLinks = fromConfigHub
-    ? [
-        { title: "Basic Configuration", path: "/configuration" },
-        { title: "Fee Structure Setup", path: "#" },
-      ]
-    : [{ title: "Fee Structure Setup", path: "#" }];
+  const breadcrumbLinks = buildListBreadcrumbs("Fee Structure Setup");
 
   const config = createFeeStructureListConfig({
-    navigate,
+    navigate: navigateWithConfigHub,
     onDeleteClick: controller.handleDeleteClick,
   });
 
@@ -117,7 +111,7 @@ const FeeStructureSetup = () => {
                   </Select>
                 </>
               }
-              onAddClick={() => navigate("/fees/setup/add")}
+              onAddClick={() => navigateWithConfigHub("/fees/setup/add")}
               addLabel="Setup Fee"
               searchPlaceholder="Search by class..."
             />

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Select, MenuItem } from "@mui/material";
 import {
   ListPageLayout,
@@ -11,21 +11,15 @@ import { PageHeader } from "../../components/layout";
 import { Alert, Box, Snackbar, Typography } from "../../components/primitives";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import teacherService, { type TeacherResponse } from "../../api/services/teacherService";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { createTeacherListConfig, renderTeacherRowActions } from "./TeacherList.listConfig";
 import schoolClassService, { type SchoolClass } from "../../api/services/schoolClassService";
 
 export default function TeacherList() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
 
-  const fromConfigHub = location.state?.fromConfigHub;
-
-  const breadcrumbLinks = fromConfigHub
-    ? [
-        { title: "Basic Configuration", path: "/configuration" },
-        { title: "Teacher Management", path: "#" },
-      ]
-    : [{ title: "Teacher Management", path: "#" }];
+  const breadcrumbLinks = buildListBreadcrumbs("Teacher Management");
 
   // State
   const [teachers, setTeachers] = useState<TeacherResponse[]>([]);
@@ -156,12 +150,12 @@ export default function TeacherList() {
   const listConfig = useMemo(
     () =>
       createTeacherListConfig({
-        navigate,
+        navigate: navigateWithConfigHub,
         onDeleteClick: openDeleteConfirm,
         onToggleStatusClick: handleToggleStatus,
         toggleLoadingId,
       }),
-    [navigate, toggleLoadingId]
+    [navigateWithConfigHub, toggleLoadingId]
   );
 
   return (
@@ -175,7 +169,7 @@ export default function TeacherList() {
               searchValue={search}
               onSearchChange={handleSearchChange}
               searchPlaceholder="Search by name, ID or mobile"
-              onAddClick={() => navigate("/teachers/add")}
+              onAddClick={() => navigateWithConfigHub("/teachers/add")}
               addLabel="Add Teacher"
               renderActions={
                 <>

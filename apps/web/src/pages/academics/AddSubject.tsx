@@ -10,6 +10,7 @@ import schoolClassService from "../../api/services/schoolClassService";
 import academicYearService from "../../api/services/academicYearService";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
 import { useFormManager } from "../../hooks/useFormManager";
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import BaseForm from "../../components/reusable/BaseForm";
 import { createAddSubjectFormConfig, type AddSubjectFormData, type AddSubjectItem } from "./AddSubject.formConfig";
 import { TextFieldInput, SelectItem } from "../../components/semantic";
@@ -30,6 +31,8 @@ export default function AddSubject() {
     const navigate = useNavigate();
     const location = useLocation();
     const { id } = useParams<{ id?: string }>();
+    const { buildFormBreadcrumbs, navigateWithConfigHub, navigateToList } = useConfigHubNavigation();
+    const listPath = "/subjects";
     const isEditMode = Boolean(id && id !== "new");
     
     // Get academic_year_id, class_id, and subject_type from navigation state
@@ -479,7 +482,7 @@ export default function AddSubject() {
                 await Promise.all(promises);
                 setSnackbar("Subjects created and assigned to class successfully.");
             }
-            setTimeout(() => navigate("/subjects"), 1000);
+            setTimeout(() => navigateWithConfigHub(listPath), 1000);
         } catch (err: any) {
             const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
             if (apiFieldErrors) setFieldErrors(apiFieldErrors);
@@ -509,19 +512,16 @@ export default function AddSubject() {
             snackbar={snackbar}
             onSnackbarClose={() => setSnackbar(null)}
             headerConfig={{
-                links: [
-                    { title: "Subjects", path: "/subjects" },
-                    { 
-                        title: isEditMode 
-                            ? `Edit ${navigationState.subject_type || "Subject"} Subjects` 
-                            : "Bulk Add Subjects", 
-                        path: "#" 
-                    },
-                ],
+                links: buildFormBreadcrumbs(
+                    { title: "Subjects", path: listPath },
+                    isEditMode
+                        ? `Edit ${navigationState.subject_type || "Subject"} Subjects`
+                        : "Bulk Add Subjects"
+                ),
                 homePath: "/",
             }}
 
-            onCancelNavigate={() => navigate("/subjects")}
+            onCancelNavigate={() => navigateToList(listPath)}
             confirmMessage={() => {
                 if (isEditMode) {
                     const existingCount = formData.subjects.filter(s => s.id).length;
