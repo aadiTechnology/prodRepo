@@ -3,6 +3,7 @@ import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import { subjectService } from "../api/services/subjectService";
 import { classService, academicYearService } from "../api/services/dropdownServices";
 import { type SubjectClassRow } from "../pages/academics/SubjectList.listConfig";
+import { formatClassDisplayLabel } from "../utils/formatters";
 
 const resolveCurrentAcademicYearId = (
     years: { id: number; is_current?: boolean | number; is_active?: boolean | number }[]
@@ -48,7 +49,10 @@ export function useSubjectListController() {
                 setClassOptions(
                     classes
                         .filter((c: any) => c.is_active && !c.is_deleted)
-                        .map((c: any) => ({ label: c.name, value: String(c.id) })),
+                        .map((c: any) => ({
+                            label: formatClassDisplayLabel(c.name) || String(c.id),
+                            value: String(c.id),
+                        })),
                 );
             })
             .catch(() => { });

@@ -2,6 +2,7 @@ import { Chip, alpha } from "@mui/material";
 import { type ListConfig } from "../../components/reusable/listFramework.types";
 import StatusChip from "../../components/roles/StatusChip";
 import { colorTokens } from "../../tokens/colors";
+import { formatClassDisplayLabel } from "../../utils/formatters";
 
 // Flattened row type for display (one row per academic year - class - subject_type combination)
 export interface SubjectClassRow {
@@ -40,7 +41,7 @@ export const createSubjectListConfig = ({
       id: "class_name",
       label: "Class",
       width: "15%",
-      render: (row: SubjectClassRow) => row.class_name || "-",
+      render: (row: SubjectClassRow) => formatClassDisplayLabel(row.class_name) || "-",
     },
     {
       id: "subject_name",

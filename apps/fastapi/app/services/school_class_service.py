@@ -5,6 +5,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 from app.models import SchoolClass, ClassDivision, AcademicYear, Student
 from app.schemas.school_class_schema import SchoolClassCreate, SchoolClassUpdate
+from app.services.teacher_assignment_guards import class_has_teacher_assignment
 
 def _normalize_text(value: str | None) -> str | None:
     if value is None:
@@ -310,6 +311,12 @@ def update_class(
 
 def soft_delete_class(db: Session, class_id: int, tenant_id: int, deleted_by: int):
     db_obj = get_class_by_id(db, class_id, tenant_id)
+    if class_has_teacher_assignment(db, tenant_id, class_id):
+        class_name = (db_obj.name or "this class").strip()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete {class_name} class because it is assigned to a teacher.",
+        )
     db_obj.is_deleted = True
     db_obj.deleted_at = datetime.utcnow()
     db_obj.deleted_by = deleted_by

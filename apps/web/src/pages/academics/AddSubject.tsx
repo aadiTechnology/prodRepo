@@ -4,7 +4,6 @@ import { Box, IconButton, Button, Switch } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import SchoolIcon from "@mui/icons-material/School";
-import ClassIcon from "@mui/icons-material/Class";
 import { subjectService } from "../../api/services/subjectService";
 import schoolClassService from "../../api/services/schoolClassService";
 import academicYearService from "../../api/services/academicYearService";
@@ -16,6 +15,7 @@ import { createAddSubjectFormConfig, type AddSubjectFormData, type AddSubjectIte
 import { TextFieldInput, SelectItem } from "../../components/semantic";
 import { FormSectionLabel, DataTable, type DataTableColumn } from "../../components/reusable";
 import { colorTokens } from "../../tokens/colors";
+import { formatClassDisplayLabel } from "../../utils/formatters";
 
 const resolveCurrentAcademicYearId = (
     years: { id: number; is_current?: boolean | number; is_active?: boolean | number }[]
@@ -70,6 +70,7 @@ export default function AddSubject() {
         handleChange,
         handleFieldValueChange,
         handleSubmit: baseHandleSubmit,
+        resetForm,
     } = useFormManager<AddSubjectFormData>({
         initialValues,
         validationConfig,
@@ -228,8 +229,7 @@ export default function AddSubject() {
             grid: { xs: 12 },
             render: () => (
                 <Box sx={{ mt: 4 }}>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2, px: 1 }}>
-                        <FormSectionLabel title="Subject List for Selection" icon={<ClassIcon fontSize="small" />} sx={{ mb: 0 }} />
+                    <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", mb: 2, px: 1 }}>
                         <Button
                             variant="outlined"
                             startIcon={<AddIcon />}
@@ -302,7 +302,7 @@ export default function AddSubject() {
                 const classData = classes || [];
                 const options = classData.map((c: any) => ({
                     id: String(c.id),
-                    label: c.name,
+                    label: formatClassDisplayLabel(c.name) || String(c.id),
                     value: String(c.id)
                 }));
                 
@@ -521,7 +521,15 @@ export default function AddSubject() {
                 homePath: "/",
             }}
 
-            onCancelNavigate={() => navigateToList(listPath)}
+            onCancelNavigate={() => {
+                if (isEditMode) {
+                    navigateToList(listPath);
+                    return;
+                }
+                resetForm();
+                setError(null);
+                setOriginalSubjectIds([]);
+            }}
             confirmMessage={() => {
                 if (isEditMode) {
                     const existingCount = formData.subjects.filter(s => s.id).length;

@@ -1,6 +1,6 @@
-import { useNavigate } from "react-router-dom";
-import { Alert, Snackbar } from "../../components/primitives";
+import { useEffect } from "react";
 import { Add as AddIcon } from "@mui/icons-material";
+import { useSnackbar } from "notistack";
 import { PageHeader } from "../../components/layout";
 import { ListPageLayout, ListPageToolbar, EntityTableSection } from "../../components/reusable";
 import { type SchoolClass } from "../../api/services/schoolClassService";
@@ -10,9 +10,29 @@ import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { createClassListConfig } from "./ClassList.listConfig";
 
 export default function ClassList() {
-    const navigate = useNavigate();
     const controller = useClassListController();
+    const { enqueueSnackbar } = useSnackbar();
     const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
+
+    useEffect(() => {
+        if (!controller.success) return;
+        enqueueSnackbar(controller.success, {
+            variant: "success",
+            autoHideDuration: 3000,
+            anchorOrigin: { vertical: "top", horizontal: "center" },
+        });
+        controller.setSuccess(null);
+    }, [controller.success, controller.setSuccess, enqueueSnackbar]);
+
+    useEffect(() => {
+        if (!controller.error) return;
+        enqueueSnackbar(controller.error, {
+            variant: "error",
+            autoHideDuration: 4000,
+            anchorOrigin: { vertical: "top", horizontal: "center" },
+        });
+        controller.setError(null);
+    }, [controller.error, controller.setError, enqueueSnackbar]);
 
     const breadcrumbLinks = buildListBreadcrumbs("Classes");
 
@@ -50,12 +70,6 @@ export default function ClassList() {
                 />
             }
         >
-            {controller.error && (
-                <Alert severity="error" sx={{ m: 2 }} onClose={() => controller.setError?.(null)}>
-                    {controller.error}
-                </Alert>
-            )}
-
             <EntityTableSection<SchoolClass>
                 label="Classes"
                 showInfoBar={false}
@@ -82,22 +96,6 @@ export default function ClassList() {
                 onCancel={() => controller.setDeleteDialogOpen(false)}
                 loading={controller.deleteLoading}
             />
-
-            <Snackbar
-                open={!!controller.success}
-                autoHideDuration={3000}
-                anchorOrigin={{ vertical: "top", horizontal: "center" }}
-                onClose={() => controller.setSuccess(null)}
-            >
-                <Alert
-                    onClose={() => controller.setSuccess(null)}
-                    severity="success"
-                    variant="filled"
-                    sx={{ width: "100%", borderRadius: "12px" }}
-                >
-                    {controller.success}
-                </Alert>
-            </Snackbar>
         </ListPageLayout>
     );
 }

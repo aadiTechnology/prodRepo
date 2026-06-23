@@ -4,6 +4,17 @@ import schoolClassService, { type SchoolClass } from "../api/services/schoolClas
 import academicYearService from "../api/services/academicYearService";
 import { resolveCurrentAcademicYearId } from "../utils/academicYear";
 
+function resolveApiErrorMessage(err: unknown, fallback: string): string {
+  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0] as { msg?: string };
+    if (typeof first?.msg === "string") return first.msg;
+  }
+  const message = (err as { message?: string })?.message;
+  return message || fallback;
+}
+
 export function useClassListController() {
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,8 +106,9 @@ export function useClassListController() {
       setSelectedClass(null);
       setSuccess("Class deleted successfully.");
       await fetchData();
-    } catch (err: any) {
-      setError(err?.message || "Failed to delete class.");
+    } catch (err: unknown) {
+      setDeleteDialogOpen(false);
+      setError(resolveApiErrorMessage(err, "Failed to delete class."));
     } finally {
       setDeleteLoading(false);
     }

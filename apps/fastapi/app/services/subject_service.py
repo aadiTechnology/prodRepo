@@ -6,6 +6,7 @@ from sqlalchemy import or_, and_, desc, asc
 from app.models.subject import Subject, SubjectClass
 from app.models.academic import SchoolClass
 from app.schemas.subject_schema import SubjectCreate, SubjectUpdate
+from app.services.teacher_assignment_guards import subject_has_teacher_and_class_assignment
 
 class SubjectService:
     @staticmethod
@@ -297,6 +298,16 @@ class SubjectService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Subject not found"
+            )
+
+        if subject_has_teacher_and_class_assignment(db, tenant_id, subject_id):
+            subject_name = (db_subject.name or "this subject").strip()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Cannot delete {subject_name} subject because it is assigned "
+                    "to a teacher and class."
+                ),
             )
 
         db_subject.is_deleted = True

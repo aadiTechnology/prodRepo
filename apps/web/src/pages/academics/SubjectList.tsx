@@ -87,6 +87,7 @@ export default function SubjectList() {
         >
             <EntityTableSection<SubjectClassRow>
                 label="Subjects"
+                showInfoBar={false}
                 totalRows={controller.totalSubjects}
                 page={controller.page}
                 rowsPerPage={controller.rowsPerPage}
