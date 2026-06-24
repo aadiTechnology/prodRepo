@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, contains_eager
 from typing import List, Optional, Tuple
 from datetime import datetime
 from fastapi import HTTPException, status
@@ -8,7 +8,63 @@ from app.models.academic import SchoolClass
 from app.schemas.subject_schema import SubjectCreate, SubjectUpdate
 from app.services.teacher_assignment_guards import subject_has_teacher_and_class_assignment
 
+_SUBJECT_CLASS_LOAD = joinedload(Subject.subject_classes).options(
+    joinedload(SubjectClass.academic_year),
+    joinedload(SubjectClass.class_model).joinedload(SchoolClass.academic_year),
+    joinedload(SubjectClass.division_model),
+)
+
+_SUBJECT_CLASS_CONTAINS_EAGER = contains_eager(Subject.subject_classes).options(
+    joinedload(SubjectClass.academic_year),
+    joinedload(SubjectClass.class_model).joinedload(SchoolClass.academic_year),
+    joinedload(SubjectClass.division_model),
+)
+
+
 class SubjectService:
+    @staticmethod
+    def _resolve_academic_year(sc: SubjectClass) -> tuple[Optional[int], Optional[str]]:
+        academic_year_id = sc.academic_year_id
+        academic_year_name = sc.academic_year.name if sc.academic_year else None
+        if not academic_year_name and sc.class_model is not None:
+            class_year = sc.class_model.academic_year
+            if class_year is not None:
+                academic_year_name = class_year.name
+                if academic_year_id is None:
+                    academic_year_id = sc.class_model.academic_year_id
+        return academic_year_id, academic_year_name
+
+    @staticmethod
+    def _subject_class_to_dict(sc: SubjectClass) -> dict:
+        academic_year_id, academic_year_name = SubjectService._resolve_academic_year(sc)
+        return {
+            "class_id": sc.class_id,
+            "class_name": sc.class_model.name if sc.class_model else None,
+            "academic_year_id": academic_year_id,
+            "academic_year_name": academic_year_name,
+            "class_division_id": sc.class_division_id,
+            "division_name": sc.division_model.division_name if sc.division_model else None,
+            "is_mandatory": sc.is_mandatory,
+            "is_active": sc.is_active,
+        }
+
+    @staticmethod
+    def _attach_class_mappings(
+        subject: Subject,
+        class_id: Optional[int] = None,
+        academic_year_id: Optional[int] = None,
+    ) -> None:
+        mappings: list[dict] = []
+        for sc in subject.subject_classes:
+            if class_id is not None and sc.class_id != class_id:
+                continue
+            if academic_year_id is not None:
+                resolved_year_id, _ = SubjectService._resolve_academic_year(sc)
+                if resolved_year_id != academic_year_id:
+                    continue
+            mappings.append(SubjectService._subject_class_to_dict(sc))
+        subject.classes = mappings
+
     @staticmethod
     def get_subjects(
         db: Session,
@@ -38,56 +94,41 @@ class SubjectService:
             query = query.filter(Subject.is_active == is_active)
 
         if class_id is not None or academic_year_id is not None:
-            query = query.join(SubjectClass)
+            query = query.join(SubjectClass).options(_SUBJECT_CLASS_CONTAINS_EAGER)
             if class_id is not None:
                 query = query.filter(SubjectClass.class_id == class_id)
             if academic_year_id is not None:
                 query = query.filter(SubjectClass.academic_year_id == academic_year_id)
+        else:
+            query = query.options(_SUBJECT_CLASS_LOAD)
 
         total = query.count()
         subjects = query.distinct().order_by(asc(Subject.name)).offset(skip).limit(limit).all()
 
-
-        # Prefetching classes mapping for the response
         for subject in subjects:
-            subject.classes = [
-                {
-                    "class_id": sc.class_id,
-                    "class_name": sc.class_model.name if sc.class_model else None,
-                    "academic_year_id": sc.academic_year_id,
-                    "academic_year_name": sc.academic_year.name if sc.academic_year else None,
-                    "class_division_id": sc.class_division_id,
-                    "division_name": sc.division_model.division_name if sc.division_model else None,
-                    "is_mandatory": sc.is_mandatory,
-                    "is_active": sc.is_active
-                }
-                for sc in subject.subject_classes
-            ]
+            SubjectService._attach_class_mappings(
+                subject,
+                class_id=class_id,
+                academic_year_id=academic_year_id,
+            )
 
         return subjects, total
 
     @staticmethod
     def get_subject(db: Session, tenant_id: int, subject_id: int) -> Optional[Subject]:
-        subject = db.query(Subject).filter(
-            Subject.tenant_id == tenant_id,
-            Subject.id == subject_id,
-            Subject.is_deleted == False
-        ).first()
+        subject = (
+            db.query(Subject)
+            .options(_SUBJECT_CLASS_LOAD)
+            .filter(
+                Subject.tenant_id == tenant_id,
+                Subject.id == subject_id,
+                Subject.is_deleted == False,
+            )
+            .first()
+        )
 
         if subject:
-            subject.classes = [
-                {
-                    "class_id": sc.class_id,
-                    "class_name": sc.class_model.name if sc.class_model else None,
-                    "academic_year_id": sc.academic_year_id,
-                    "academic_year_name": sc.academic_year.name if sc.academic_year else None,
-                    "class_division_id": sc.class_division_id,
-                    "division_name": sc.division_model.division_name if sc.division_model else None,
-                    "is_mandatory": sc.is_mandatory,
-                    "is_active": sc.is_active
-                }
-                for sc in subject.subject_classes
-            ]
+            SubjectService._attach_class_mappings(subject)
         return subject
 
     @staticmethod
@@ -159,20 +200,7 @@ class SubjectService:
 
         db.commit()
         db.refresh(db_subject)
-        
-        db_subject.classes = [
-            {
-                "class_id": sc.class_id,
-                "class_name": sc.class_model.name if sc.class_model else None,
-                "academic_year_id": sc.academic_year_id,
-                "academic_year_name": sc.academic_year.name if sc.academic_year else None,
-                "class_division_id": sc.class_division_id,
-                "division_name": sc.division_model.division_name if sc.division_model else None,
-                "is_mandatory": sc.is_mandatory,
-                "is_active": sc.is_active
-            }
-            for sc in db_subject.subject_classes
-        ]
+        SubjectService._attach_class_mappings(db_subject)
         return db_subject
 
     @staticmethod
@@ -270,20 +298,7 @@ class SubjectService:
 
         db.commit()
         db.refresh(db_subject)
-
-        db_subject.classes = [
-            {
-                "class_id": sc.class_id,
-                "class_name": sc.class_model.name if sc.class_model else None,
-                "academic_year_id": sc.academic_year_id,
-                "academic_year_name": sc.academic_year.name if sc.academic_year else None,
-                "class_division_id": sc.class_division_id,
-                "division_name": sc.division_model.division_name if sc.division_model else None,
-                "is_mandatory": sc.is_mandatory,
-                "is_active": sc.is_active
-            }
-            for sc in db_subject.subject_classes
-        ]
+        SubjectService._attach_class_mappings(db_subject)
         return db_subject
 
     @staticmethod

@@ -2544,9 +2544,9 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
 // ═══════════════════════════════════════════════════════════════════════════════
 // 3. STUDENT DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
-const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw"];
-// Fee KPI hidden for students — restore when fee module is enabled:
-// const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw", "s_kpi_fees"];
+const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present"];
+// Pending HW KPI removed per QA — homework status remains on the s_homework card below.
+// const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw"];
 const STUDENT_CARDS_DEFAULT = ["s_att", "s_profile", "s_homework", "s_notices"];
 const STUDENT_FULL_WIDTH_CARDS = new Set(["s_homework", "s_notices"]);
 const STUDENT_COMPACT_CARDS = new Set(["s_att", "s_profile"]);
@@ -2571,7 +2571,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
         return (
           <SnapCard
             title="Attendance"
-            value={`${attendance.percentage.toFixed(0)}%`}
+            value={`${attendance.percentage.toFixed(1)}%`}
             icon={<AttendanceIcon fontSize="small" />}
             accentColor={attendance.percentage >= 75 ? C.green : C.red}
             glassBg={attendance.percentage >= 75 ? C.greenGlass : C.redGlass}
@@ -2611,6 +2611,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
             }
           />
         );
+      /* Pending HW KPI removed — see s_homework card for homework status.
       case "s_kpi_hw":
         return (
           <SnapCard
@@ -2636,6 +2637,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
             }
           />
         );
+      */
       /* Fee KPI — hidden for students; restore when fee module is enabled
       case "s_kpi_fees":
         return (

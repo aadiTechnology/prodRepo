@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import { subjectService } from "../api/services/subjectService";
 import { classService, academicYearService } from "../api/services/dropdownServices";
@@ -104,6 +104,27 @@ export function useSubjectListController() {
     };
 
     // Group subjects by academic year, class, AND subject_type - showing all subjects/codes in one row for same type
+    const academicYearNameById = useMemo(
+        () => Object.fromEntries(academicYearOptions.map((option) => [option.value, option.label])),
+        [academicYearOptions],
+    );
+
+    const resolveAcademicYearName = useCallback(
+        (classMapping: { academic_year_id?: number; academic_year_name?: string | null }) => {
+            if (classMapping.academic_year_name) {
+                return classMapping.academic_year_name;
+            }
+            if (classMapping.academic_year_id != null) {
+                return academicYearNameById[String(classMapping.academic_year_id)] || "-";
+            }
+            if (academicYearFilter) {
+                return academicYearNameById[academicYearFilter] || "-";
+            }
+            return "-";
+        },
+        [academicYearNameById, academicYearFilter],
+    );
+
     const subjectRows: SubjectClassRow[] = useMemo(() => {
         const groupedMap = new Map<string, {
             subject_ids: number[];
@@ -152,7 +173,7 @@ export function useSubjectListController() {
                             subject_names: [subject.name],
                             subject_codes: [subject.code],
                             subject_types: [subject.subject_type],
-                            academic_year_name: classMapping.academic_year_name || "-",
+                            academic_year_name: resolveAcademicYearName(classMapping),
                             academic_year_id: classMapping.academic_year_id,
                             class_name: classMapping.class_name || "-",
                             class_id: classMapping.class_id,
@@ -182,7 +203,7 @@ export function useSubjectListController() {
         }));
 
         return rows;
-    }, [subjects]);
+    }, [subjects, resolveAcademicYearName]);
 
 
 
