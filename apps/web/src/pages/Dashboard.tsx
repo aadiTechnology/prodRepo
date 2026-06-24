@@ -1085,26 +1085,15 @@ const NoticesTable: React.FC<{ notices: RecentNoticeItem[]; navigate: ReturnType
       </Typography>
     );
 
-  const chipStyle = (p: string | null) => {
-    const m: Record<string, [string, string]> = {
-      High: ["#FEF2F2", C.red],
-      Medium: ["#FFFBEB", C.amber],
-      Low: ["#F0FDF4", C.green],
-      Normal: ["#EFF6FF", C.blue],
-    };
-    const [bg, col] = m[p || "Normal"] || m["Normal"];
-    return { bgcolor: bg, color: col };
-  };
-
   return (
     <>
       <NoticeLegend notices={notices} />
       <Table size="small">
         <TableHead>
           <TableRow>
-            {["Title", "Type", "Date", "Priority", ""].map((h) => (
+            {["Title", "Type", "Date", ""].map((h) => (
               <TableCell
-                key={h}
+                key={h || "actions"}
                 sx={{ fontWeight: 700, color: C.muted, fontSize: "11px", borderBottom: `1px solid ${C.border}`, py: 1 }}
               >
                 {h}
@@ -1125,13 +1114,6 @@ const NoticesTable: React.FC<{ notices: RecentNoticeItem[]; navigate: ReturnType
               </TableCell>
               <TableCell>
                 <Typography variant="caption" sx={{ color: C.muted }}>{n.published_at || "—"}</Typography>
-              </TableCell>
-              <TableCell>
-                <Chip
-                  label={n.priority || "Normal"}
-                  size="small"
-                  sx={{ ...chipStyle(n.priority), fontWeight: 700, fontSize: "11px", height: 20, borderRadius: "5px" }}
-                />
               </TableCell>
               <TableCell align="right">
                 <Button
