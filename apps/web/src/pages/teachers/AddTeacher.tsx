@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import PersonIcon from "@mui/icons-material/Person";
 import ContactPhoneIcon from "@mui/icons-material/ContactPhone";
 import SchoolIcon from "@mui/icons-material/School";
@@ -42,8 +42,7 @@ const emptyForm = (): AddTeacherFormData => ({
 export default function AddTeacher() {
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
-  const navigate = useNavigate();
-  const { buildFormBreadcrumbs, navigateWithConfigHub, navigateToList } = useConfigHubNavigation();
+  const { buildFormBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
   const listPath = "/teachers";
   const { user } = useAuth();
   const activeTenantId = user?.tenant_id ?? user?.tenant?.id ?? null;
@@ -375,6 +374,39 @@ export default function AddTeacher() {
     }
   };
 
+  const handleCancel = useCallback(() => {
+    if (isEditMode && loadedTeacher) {
+      setFormData({
+        full_name: loadedTeacher.full_name,
+        date_of_birth: loadedTeacher.date_of_birth || null,
+        gender: loadedTeacher.gender || null,
+        mobile_number: loadedTeacher.mobile_number,
+        email: loadedTeacher.email || null,
+        qualification: loadedTeacher.qualification || null,
+        experience_years: loadedTeacher.experience_years || null,
+        class_id: loadedTeacher.class_id ? String(loadedTeacher.class_id) : null,
+        class_division_id: loadedTeacher.class_division_id ? String(loadedTeacher.class_division_id) : null,
+        photo_url: loadedTeacher.photo_url || "",
+        is_active: loadedTeacher.is_active,
+        address: loadedTeacher.address || null,
+        city: loadedTeacher.city || null,
+        state: loadedTeacher.state || null,
+        pincode: loadedTeacher.pincode || null,
+      });
+      setUploadItems(
+        loadedTeacher.photo_url
+          ? [{ id: "existing", previewUrl: toMediaUrl(loadedTeacher.photo_url) || loadedTeacher.photo_url }]
+          : []
+      );
+    } else {
+      setFormData(emptyForm());
+      setUploadItems([]);
+    }
+    setFieldErrors({});
+    setError(null);
+    setSnackbar(null);
+  }, [isEditMode, loadedTeacher, setFormData, setFieldErrors]);
+
   return (
     <BaseForm<AddTeacherFormData>
       formConfig={formConfig}
@@ -402,7 +434,7 @@ export default function AddTeacher() {
         saveTooltipCreate: "Save",
         saveTooltipEdit: "Save",
       }}
-      onCancelNavigate={() => navigateToList(listPath)}
+      onCancelNavigate={handleCancel}
       confirmMessage={(ctx: any) =>
         ctx.isEditMode
           ? "Are you sure you want to update this teacher?"
