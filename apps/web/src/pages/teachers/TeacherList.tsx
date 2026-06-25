@@ -1,64 +1,89 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { Add as AddIcon } from "@mui/icons-material";
+import { useSnackbar } from "notistack";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
-import { useNavigate } from "react-router-dom";
-import { Select, MenuItem } from "@mui/material";
 import {
   ListPageLayout,
   ListPageToolbar,
   EntityTableSection,
 } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
-import { Alert, Box, Snackbar, Typography } from "../../components/primitives";
-import ConfirmDialog from "../../components/semantic/ConfirmDialog";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 import teacherService, { type TeacherResponse } from "../../api/services/teacherService";
 import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
-import { createTeacherListConfig, renderTeacherRowActions } from "./TeacherList.listConfig";
+import { createTeacherListConfig } from "./TeacherList.listConfig";
 import schoolClassService, { type SchoolClass } from "../../api/services/schoolClassService";
+import { formatClassDisplayLabel } from "../../utils/formatters";
 
 export default function TeacherList() {
-  const navigate = useNavigate();
+  const { enqueueSnackbar } = useSnackbar();
   const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
 
-  const breadcrumbLinks = buildListBreadcrumbs("Teacher Management");
+  const breadcrumbLinks = buildListBreadcrumbs("Teachers");
 
-  // State
   const [teachers, setTeachers] = useState<TeacherResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // List configuration state
+  const [success, setSuccess] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [classFilter, setClassFilter] = useState("");
   const [divisionFilter, setDivisionFilter] = useState("");
-  
-  // Data for filters
-  const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const [filtersLoading, setFiltersLoading] = useState(false);
 
-  // Actions state
-  const [toggleLoadingId, setToggleLoadingId] = useState<number | null>(null);
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<TeacherResponse | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchClasses = async () => {
-      setFiltersLoading(true);
-      try {
-        const data = await schoolClassService.getAll();
-        setClasses(data);
-      } catch (err: unknown) {
-        console.error("Failed to fetch classes:", err);
-      } finally {
-        setFiltersLoading(false);
-      }
-    };
-    fetchClasses();
+    if (!success) return;
+    enqueueSnackbar(success, {
+      variant: "success",
+      autoHideDuration: 3000,
+      anchorOrigin: { vertical: "top", horizontal: "center" },
+    });
+    setSuccess(null);
+  }, [success, enqueueSnackbar]);
+
+  useEffect(() => {
+    if (!error) return;
+    enqueueSnackbar(error, {
+      variant: "error",
+      autoHideDuration: 4000,
+      anchorOrigin: { vertical: "top", horizontal: "center" },
+    });
+    setError(null);
+  }, [error, enqueueSnackbar]);
+
+  useEffect(() => {
+    schoolClassService
+      .getAll()
+      .then(setClasses)
+      .catch(() => setError("Failed to load class filters."));
   }, []);
+
+  const classOptions = useMemo(
+    () =>
+      classes.map((cls) => ({
+        label: formatClassDisplayLabel(cls.name) || String(cls.id),
+        value: String(cls.id),
+      })),
+    [classes]
+  );
+
+  const divisionOptions = useMemo(() => {
+    if (!classFilter) return [];
+    const selectedClass = classes.find((c) => String(c.id) === classFilter);
+    if (!selectedClass?.divisions?.length) return [];
+    return selectedClass.divisions.map((d) => ({
+      label: formatClassDisplayLabel(d.division_name) || d.division_name,
+      value: String(d.id),
+    }));
+  }, [classes, classFilter]);
 
   const fetchTeachers = useCallback(async () => {
     setLoading(true);
@@ -73,8 +98,7 @@ export default function TeacherList() {
       });
       setTeachers(response.items);
       setTotal(response.total);
-    } catch (err: unknown) {
-      console.error("Failed to fetch teachers:", err);
+    } catch {
       setError("Failed to load teachers.");
     } finally {
       setLoading(false);
@@ -92,7 +116,7 @@ export default function TeacherList() {
 
   const handleClassChange = (val: string) => {
     setClassFilter(val);
-    setDivisionFilter(""); // Reset division when class changes
+    setDivisionFilter("");
     setPage(0);
   };
 
@@ -101,47 +125,23 @@ export default function TeacherList() {
     setPage(0);
   };
 
-  const divisionOptions = useMemo(() => {
-    if (!classFilter) return [];
-    const selectedClass = classes.find(c => String(c.id) === classFilter);
-    if (!selectedClass || !selectedClass.divisions) return [];
-    return selectedClass.divisions.map(d => ({ label: d.division_name, value: String(d.id) }));
-  }, [classes, classFilter]);
-
-  const handleToggleStatus = async (teacher: TeacherResponse) => {
-    setToggleLoadingId(teacher.id);
-    try {
-      await teacherService.toggleStatus(teacher.id);
-      await fetchTeachers();
-    } catch (err: unknown) {
-      console.error("Failed to toggle status:", err);
-      // We could use a snackbar here, but for simplicity just log
-    } finally {
-      setToggleLoadingId(null);
-    }
-  };
-
-  const openDeleteConfirm = (teacher: TeacherResponse) => {
+  const handleDeleteClick = (teacher: TeacherResponse) => {
     setTeacherToDelete(teacher);
-    setConfirmDialogOpen(true);
+    setDeleteDialogOpen(true);
   };
 
-  const closeDeleteConfirm = () => {
-    setTeacherToDelete(null);
-    setConfirmDialogOpen(false);
-  };
-
-  const confirmDelete = async () => {
+  const handleConfirmDelete = async () => {
     if (!teacherToDelete) return;
     setDeleteLoading(true);
     try {
       await teacherService.delete(teacherToDelete.id);
-      await fetchTeachers();
-      closeDeleteConfirm();
-      setSnackbar("Teacher deleted successfully.");
-    } catch (err: unknown) {
-      console.error("Failed to delete teacher:", err);
+      setSuccess("Teacher deleted successfully.");
+      setDeleteDialogOpen(false);
+      setTeacherToDelete(null);
+      fetchTeachers();
+    } catch {
       setError("Failed to delete teacher.");
+      setDeleteDialogOpen(false);
     } finally {
       setDeleteLoading(false);
     }
@@ -151,15 +151,15 @@ export default function TeacherList() {
     () =>
       createTeacherListConfig({
         navigate: navigateWithConfigHub,
-        onDeleteClick: openDeleteConfirm,
-        onToggleStatusClick: handleToggleStatus,
-        toggleLoadingId,
+        onDeleteClick: handleDeleteClick,
       }),
-    [navigateWithConfigHub, toggleLoadingId]
+    [navigateWithConfigHub]
   );
 
   return (
     <ListPageLayout
+      pageBackground
+      contentPaddingSize="none"
       header={
         <PageHeader
           links={breadcrumbLinks}
@@ -168,77 +168,33 @@ export default function TeacherList() {
             <ListPageToolbar
               searchValue={search}
               onSearchChange={handleSearchChange}
-              searchPlaceholder="Search by name, ID or mobile"
+              searchPlaceholder="Search teachers..."
+              filters={[
+                {
+                  label: "Class",
+                  value: classFilter,
+                  onChange: handleClassChange,
+                  options: classOptions,
+                },
+                {
+                  label: "Division",
+                  value: divisionFilter,
+                  onChange: handleDivisionChange,
+                  options: divisionOptions,
+                  disabled: !classFilter,
+                },
+              ]}
               onAddClick={() => navigateWithConfigHub("/teachers/add")}
               addLabel="Add Teacher"
-              renderActions={
-                <>
-                  <Select
-                    value={classFilter}
-                    onChange={(e) => handleClassChange(e.target.value as string)}
-                    displayEmpty
-                    size="small"
-                    sx={{
-                      minWidth: { xs: "100%", sm: 180 },
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: "15px",
-                        fontSize: "0.85rem",
-                        fontWeight: 600,
-                      },
-                    }}
-                  >
-                    <MenuItem value="">
-                      <Typography variant="body2" color="text.secondary">
-                        All Classes
-                      </Typography>
-                    </MenuItem>
-                    {classes.map((cls) => (
-                      <MenuItem key={cls.id} value={String(cls.id)}>
-                        {cls.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  <Select
-                    value={divisionFilter}
-                    onChange={(e) => handleDivisionChange(e.target.value as string)}
-                    displayEmpty
-                    size="small"
-                    disabled={!classFilter}
-                    sx={{
-                      minWidth: { xs: "100%", sm: 180 },
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: "15px",
-                        fontSize: "0.85rem",
-                        fontWeight: 600,
-                      },
-                    }}
-                  >
-                    <MenuItem value="">
-                      <Typography variant="body2" color="text.secondary">
-                        All Divisions
-                      </Typography>
-                    </MenuItem>
-                    {divisionOptions.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </>
-              }
+              addIcon={<AddIcon sx={{ fontSize: 24 }} />}
             />
           }
         />
       }
     >
-      {error && (
-        <Box sx={{ m: 2 }}>
-          <Typography color="error">{error}</Typography>
-        </Box>
-      )}
-
       <EntityTableSection<TeacherResponse>
-        label=""
+        label="Teachers"
+        showInfoBar={false}
         totalRows={total}
         page={page}
         rowsPerPage={rowsPerPage}
@@ -248,45 +204,20 @@ export default function TeacherList() {
         data={teachers}
         loading={loading}
         emptyMessage={listConfig.uiPolicy.emptyMessage}
-        renderRowActions={(row: TeacherResponse) =>
-          renderTeacherRowActions({
-            row,
-            toggleLoadingId,
-            onView: () => listConfig.actions!.rowActions!(row)?.onView?.(),
-            onEdit: () => listConfig.actions!.rowActions!(row)?.onEdit?.(),
-            onDelete: () => listConfig.actions!.rowActions!(row)?.onDelete?.(),
-            onToggleStatus: () => handleToggleStatus(row),
-          })
-        }
+        rowActions={listConfig.actions.rowActions}
         stickyHeader
         size="small"
       />
 
       <ConfirmDialog
-        open={confirmDialogOpen}
+        open={deleteDialogOpen}
         title="Please Confirm"
         message="Are you sure you want to delete this teacher?"
-        confirmLabel={deleteLoading ? "Deleting…" : "Confirm"}
-        onConfirm={confirmDelete}
-        onClose={closeDeleteConfirm}
+        confirmText={deleteLoading ? "Deleting…" : "Confirm"}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteDialogOpen(false)}
         loading={deleteLoading}
       />
-
-      <Snackbar
-        open={!!snackbar}
-        autoHideDuration={3000}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        onClose={() => setSnackbar(null)}
-      >
-        <Alert
-          onClose={() => setSnackbar(null)}
-          severity="success"
-          variant="filled"
-          sx={{ width: "100%", borderRadius: "12px" }}
-        >
-          {snackbar}
-        </Alert>
-      </Snackbar>
     </ListPageLayout>
   );
 }

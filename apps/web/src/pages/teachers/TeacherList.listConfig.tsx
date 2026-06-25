@@ -1,58 +1,69 @@
-import React from "react";
 import type { TeacherResponse } from "../../api/services/teacherService";
 import type { NavigateFunction } from "react-router-dom";
 import type { ListConfig } from "../../components/reusable";
 import StatusChip from "../../components/roles/StatusChip";
-import { Box, Typography, Button } from "../../components/primitives";
-import { formatShortDate } from "../../utils/formatters";
-import TableRowActions from "../../components/reusable/TableRowActions";
+import { formatClassDisplayLabel, formatShortDate } from "../../utils/formatters";
 
-// Re-using same style options pattern
 type TeacherSortBy = "name" | "created_at";
 
 function formatTeacherClassName(t: TeacherResponse): string {
   const fromAssignments = (t.assignment_rows ?? [])
     .map((row) => row.class_name)
     .filter(Boolean);
-  if (fromAssignments.length) return [...new Set(fromAssignments)].join(", ");
-  if (t.class_name) return t.class_name;
+  if (fromAssignments.length) {
+    return [...new Set(fromAssignments)]
+      .map((name) => formatClassDisplayLabel(name) || name)
+      .join(", ");
+  }
+  if (t.class_name) return formatClassDisplayLabel(t.class_name) || t.class_name;
   return "-";
 }
 
 function formatTeacherDivisionName(t: TeacherResponse): string {
   const fromAssignments = (t.assignment_rows ?? []).flatMap((row) => row.division_names ?? []);
-  if (fromAssignments.length) return [...new Set(fromAssignments)].join(", ");
-  if (t.division_name) return t.division_name;
+  if (fromAssignments.length) {
+    return [...new Set(fromAssignments)]
+      .map((name) => formatClassDisplayLabel(name) || name)
+      .join(", ");
+  }
+  if (t.division_name) return formatClassDisplayLabel(t.division_name) || t.division_name;
   return "-";
 }
 
 type TeacherListConfigFactoryArgs = {
   navigate: NavigateFunction;
   onDeleteClick: (teacher: TeacherResponse) => void;
-  onToggleStatusClick: (teacher: TeacherResponse) => void;
-  toggleLoadingId: number | null;
 };
 
 export function createTeacherListConfig({
   navigate,
   onDeleteClick,
-  onToggleStatusClick,
-  toggleLoadingId,
 }: TeacherListConfigFactoryArgs): ListConfig<TeacherResponse, TeacherSortBy> {
   return {
     columns: [
       { id: "full_name", label: "Name", field: "full_name" },
       { id: "mobile_number", label: "Contact", field: "mobile_number" },
-      { id: "class", label: "Class", render: (t: TeacherResponse) => formatTeacherClassName(t) },
-      { id: "division", label: "Division", render: (t: TeacherResponse) => formatTeacherDivisionName(t) },
+      {
+        id: "class",
+        label: "Class",
+        render: (t: TeacherResponse) => formatTeacherClassName(t),
+      },
+      {
+        id: "division",
+        label: "Division",
+        align: "center",
+        render: (t: TeacherResponse) => formatTeacherDivisionName(t),
+      },
       {
         id: "status",
         label: "Status",
+        align: "center",
         render: (t: TeacherResponse) => <StatusChip status={t.is_active ? "ACTIVE" : "INACTIVE"} />,
       },
       {
         id: "created_at",
         label: "Created Date",
+        align: "center",
         render: (t: TeacherResponse) => formatShortDate(t.created_at),
       },
     ],
@@ -63,44 +74,16 @@ export function createTeacherListConfig({
       { id: "created-asc", label: "Date (oldest)", sortBy: "created_at", sortOrder: "asc" },
     ],
     uiPolicy: {
-      emptyMessage: (
-        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            No teachers found.
-          </Typography>
-          <Button variant="contained" color="primary" onClick={() => navigate("/teachers/add")}>
-            Add Teacher
-          </Button>
-        </Box>
-      ),
-      errorFallbackMessage: "Failed to fetch teachers.",
+      emptyMessage: "No teachers found. Click 'Add Teacher' to begin.",
+      errorFallbackMessage: "Failed to load teachers.",
       retryLabel: "Retry",
     },
     actions: {
-      rowActions: (tableTeacher: TeacherResponse) => ({
-        onView: () => navigate(`/teachers/${tableTeacher.id}`),
-        onEdit: () => navigate(`/teachers/${tableTeacher.id}/edit`),
-        onDelete: () => onDeleteClick(tableTeacher),
-        disabled: toggleLoadingId === tableTeacher.id,
+      rowActions: (teacher: TeacherResponse) => ({
+        onView: () => navigate(`/teachers/${teacher.id}`),
+        onEdit: () => navigate(`/teachers/${teacher.id}/edit`),
+        onDelete: () => onDeleteClick(teacher),
       }),
     },
   };
-}
-
-export function renderTeacherRowActions(args: {
-  row: TeacherResponse;
-  toggleLoadingId: number | null;
-  onEdit: () => void;
-  onDelete: () => void;
-  onView: () => void;
-  onToggleStatus: () => void;
-}) {
-  const { row, toggleLoadingId, onEdit, onDelete, onView, onToggleStatus } = args;
-
-  return (
-    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <TableRowActions onView={onView} onEdit={onEdit} onDelete={onDelete} />
-      {/* We could add an explicit toggle button here, but typically it is fine in TableRowActions or StatusChip. Since TableRowActions doesn't have onToggle by default in this repo's standard components, we might wait. Actually table actions are standardized, let's keep it simple. */}
-    </Box>
-  );
 }
