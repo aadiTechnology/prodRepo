@@ -178,6 +178,9 @@ export function addTeacherFormConfig({
         label: "Pincode",
         type: "text",
         placeholder: "6-digit pincode",
+        props: {
+          htmlInput: { maxLength: 6, inputMode: "numeric", pattern: "[0-9]*" },
+        },
       },
     },
     layoutRows: [

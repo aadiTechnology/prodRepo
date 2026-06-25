@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 class TeacherAssignmentDivision(BaseModel):
     id: int
@@ -35,6 +35,18 @@ class TeacherBase(BaseModel):
 
 # Properties to receive on creation
 class TeacherCreate(TeacherBase):
+    @field_validator("pincode")
+    @classmethod
+    def validate_pincode(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if normalized == "":
+            return None
+        if not normalized.isdigit() or len(normalized) != 6:
+            raise ValueError("Pincode must be a 6-digit number")
+        return normalized
+
     pass
 
 # Properties to receive on update
@@ -56,6 +68,18 @@ class TeacherUpdate(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     pincode: Optional[str] = None
+
+    @field_validator("pincode")
+    @classmethod
+    def validate_pincode(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if normalized == "":
+            return None
+        if not normalized.isdigit() or len(normalized) != 6:
+            raise ValueError("Pincode must be a 6-digit number")
+        return normalized
 
 # Properties to return to client
 class TeacherResponse(TeacherBase):

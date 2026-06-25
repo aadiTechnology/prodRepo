@@ -74,7 +74,10 @@ export default function AddTeacher() {
     email: emailRequiredPatternRules<AddTeacherFormData>(),
     experience_years: [
       { type: "pattern", regex: /^\d*$/, message: "Must be a whole number" }
-    ]
+    ],
+    pincode: [
+      { type: "pattern", regex: /^\d{6}$/, message: "Pincode must be a 6-digit number" }
+    ],
   }), []);
 
   const {
@@ -308,6 +311,18 @@ export default function AddTeacher() {
     [isEditMode, classOptions, divisionOptions, classesLoading, uploadItems, handleAddMediaFiles, handleRemoveMediaItem]
   );
 
+  const handleTeacherFieldChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      if (e.target.name === "pincode") {
+        const numericValue = e.target.value.replace(/\D/g, "").slice(0, 6);
+        handleFieldValueChange("pincode", numericValue);
+        return;
+      }
+      handleChange(e);
+    },
+    [handleChange, handleFieldValueChange]
+  );
+
 
 
   const handleConfirmSubmit = async (values: AddTeacherFormData, actionType: 'SAVE' | 'SAVE_AND_ADD') => {
@@ -413,7 +428,7 @@ export default function AddTeacher() {
       formData={formData}
       setFormData={setFormData}
       fieldErrors={fieldErrors}
-      handleChange={handleChange}
+      handleChange={handleTeacherFieldChange}
       handleFieldValueChange={handleFieldValueChange}
       handleSubmit={handleSubmit}
       setFormError={setError}
