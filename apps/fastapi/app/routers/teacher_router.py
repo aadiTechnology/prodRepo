@@ -118,7 +118,14 @@ async def list_teachers(
     )
     
     return TeacherListResponse(
-        items=[map_db_model_to_response(t, db=db) for t in db_teachers],
+        items=[
+            map_db_model_to_response(
+                t,
+                assignment_rows=t.get("assignment_rows") if isinstance(t, Mapping) else None,
+                db=db,
+            )
+            for t in db_teachers
+        ],
         total=total
     )
 

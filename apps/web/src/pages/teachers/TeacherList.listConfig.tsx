@@ -11,18 +11,18 @@ import TableRowActions from "../../components/reusable/TableRowActions";
 type TeacherSortBy = "name" | "created_at";
 
 function formatTeacherClassName(t: TeacherResponse): string {
-  if (t.class_name) return t.class_name;
   const fromAssignments = (t.assignment_rows ?? [])
     .map((row) => row.class_name)
     .filter(Boolean);
   if (fromAssignments.length) return [...new Set(fromAssignments)].join(", ");
+  if (t.class_name) return t.class_name;
   return "-";
 }
 
 function formatTeacherDivisionName(t: TeacherResponse): string {
-  if (t.division_name) return t.division_name;
   const fromAssignments = (t.assignment_rows ?? []).flatMap((row) => row.division_names ?? []);
   if (fromAssignments.length) return [...new Set(fromAssignments)].join(", ");
+  if (t.division_name) return t.division_name;
   return "-";
 }
 

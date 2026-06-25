@@ -182,9 +182,18 @@ def get_all_teachers(
                         "class_name": row["class_name"],
                         "division_ids": set(),
                         "division_names": [],
+                        "divisions": [],
                     }
                 if row["class_division_id"] is not None:
                     grouped[key]["division_ids"].add(row["class_division_id"])
+                    existing_division_ids = {d["id"] for d in grouped[key]["divisions"]}
+                    if int(row["class_division_id"]) not in existing_division_ids:
+                        grouped[key]["divisions"].append(
+                            {
+                                "id": int(row["class_division_id"]),
+                                "division_name": row["division_name"] or "",
+                            }
+                        )
                 if row["division_name"] and row["division_name"] not in grouped[key]["division_names"]:
                     grouped[key]["division_names"].append(row["division_name"])
 
@@ -206,6 +215,8 @@ def get_all_teachers(
                         "class_division_id": legacy_class_division_id,
                         "class_name": teacher_dict.get("legacy_class_name"),
                         "division_name": teacher_dict.get("legacy_division_name"),
+                        "assignment_rows": [],
+                        "_class_ids": {legacy_class_id} if legacy_class_id is not None else set(),
                         "_division_ids": (
                             {legacy_class_division_id}
                             if legacy_class_division_id is not None
@@ -215,18 +226,42 @@ def get_all_teachers(
                     continue
 
                 teacher_groups.sort(key=lambda item: ((item["class_name"] or "").upper(), item["class_id"] or 0))
-                for grp in teacher_groups:
-                    flattened.append({
-                        **teacher_dict,
+                list_assignment_rows = [
+                    {
                         "class_id": grp["class_id"],
-                        "class_division_id": None,
                         "class_name": grp["class_name"],
-                        "division_name": ", ".join(grp["division_names"]) if grp["division_names"] else None,
-                        "_division_ids": grp["division_ids"],
-                    })
+                        "division_names": grp["division_names"],
+                        "divisions": grp["divisions"],
+                    }
+                    for grp in teacher_groups
+                ]
+                class_names = [grp["class_name"] for grp in teacher_groups if grp["class_name"]]
+                division_names: list[str] = []
+                for grp in teacher_groups:
+                    for name in grp["division_names"]:
+                        if name not in division_names:
+                            division_names.append(name)
+                all_class_ids = {grp["class_id"] for grp in teacher_groups if grp["class_id"] is not None}
+                all_division_ids: set = set()
+                for grp in teacher_groups:
+                    all_division_ids.update(grp["division_ids"])
+
+                flattened.append({
+                    **teacher_dict,
+                    "class_id": teacher_groups[0]["class_id"] if len(teacher_groups) == 1 else None,
+                    "class_division_id": None,
+                    "class_name": ", ".join(class_names) if class_names else None,
+                    "division_name": ", ".join(division_names) if division_names else None,
+                    "assignment_rows": list_assignment_rows,
+                    "_class_ids": all_class_ids,
+                    "_division_ids": all_division_ids,
+                })
 
             if class_id is not None:
-                flattened = [row for row in flattened if row["class_id"] == class_id]
+                flattened = [
+                    row for row in flattened
+                    if class_id in (row.get("_class_ids") or set()) or row.get("class_id") == class_id
+                ]
 
             if class_division_id is not None:
                 flattened = [
@@ -238,6 +273,7 @@ def get_all_teachers(
             data = flattened[skip: skip + limit]
             for row in data:
                 row.pop("_division_ids", None)
+                row.pop("_class_ids", None)
 
             return data, total
         except SQLAlchemyError:
