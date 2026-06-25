@@ -7,6 +7,7 @@ from app.models.user import User
 from app.schemas.teacher_schema import TeacherCreate, TeacherUpdate
 from app.schemas.user import UserCreate, UserUpdate
 from app.services import user_service, profile_image_service
+from app.services.teacher_assignment_guards import teacher_has_active_assignment
 from app.core.exceptions import ConflictException, NotFoundException
 from fastapi import HTTPException, status
 
@@ -514,6 +515,17 @@ def toggle_teacher_status(db: Session, teacher_id: int, updated_by: int, tenant_
 def soft_delete_teacher(db: Session, teacher_id: int, deleted_by: int, tenant_id: int) -> None:
     from datetime import datetime
     db_teacher = get_teacher_by_id(db, teacher_id, tenant_id)
+
+    if teacher_has_active_assignment(db, tenant_id, teacher_id):
+        teacher_name = (db_teacher.full_name or "this teacher").strip()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Cannot delete {teacher_name} because this teacher is assigned "
+                "to class/division for an academic year. Unassign first."
+            ),
+        )
+
     db_teacher.is_deleted = True
     db_teacher.deleted_at = datetime.utcnow()
     db_teacher.deleted_by = deleted_by

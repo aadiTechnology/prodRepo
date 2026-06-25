@@ -15,6 +15,17 @@ import { createTeacherListConfig } from "./TeacherList.listConfig";
 import schoolClassService, { type SchoolClass } from "../../api/services/schoolClassService";
 import { formatClassDisplayLabel } from "../../utils/formatters";
 
+function resolveApiErrorMessage(err: unknown, fallback: string): string {
+  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0] as { msg?: string };
+    if (typeof first?.msg === "string") return first.msg;
+  }
+  const message = (err as { message?: string })?.message;
+  return message || fallback;
+}
+
 export default function TeacherList() {
   const { enqueueSnackbar } = useSnackbar();
   const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
@@ -139,8 +150,8 @@ export default function TeacherList() {
       setDeleteDialogOpen(false);
       setTeacherToDelete(null);
       fetchTeachers();
-    } catch {
-      setError("Failed to delete teacher.");
+    } catch (err: unknown) {
+      setError(resolveApiErrorMessage(err, "Failed to delete teacher."));
       setDeleteDialogOpen(false);
     } finally {
       setDeleteLoading(false);

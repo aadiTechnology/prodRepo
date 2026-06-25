@@ -71,3 +71,23 @@ def subject_has_teacher_and_class_assignment(
         return bool(assigned)
     except SQLAlchemyError:
         return False
+
+
+def teacher_has_active_assignment(db: Session, tenant_id: int, teacher_id: int) -> bool:
+    """True when teacher has any active assignment for class/division/academic year."""
+    try:
+        assigned = db.execute(
+            text(
+                """
+                SELECT TOP 1 1
+                FROM teacher_assignments
+                WHERE tenant_id = :tenant_id
+                  AND teacher_id = :teacher_id
+                  AND is_active = 1
+                """
+            ),
+            {"tenant_id": tenant_id, "teacher_id": teacher_id},
+        ).scalar()
+        return bool(assigned)
+    except SQLAlchemyError:
+        return False
