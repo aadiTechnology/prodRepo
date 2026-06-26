@@ -138,6 +138,7 @@ export default function FormFieldRenderer<T extends Record<string, unknown>>({
           value={String(formData[name] ?? "")}
           onChange={handleChange}
           placeholder={field.placeholder}
+          required={field.required}
           error={showError}
           helperText={helperText}
           {...(extra as Record<string, unknown>)}
