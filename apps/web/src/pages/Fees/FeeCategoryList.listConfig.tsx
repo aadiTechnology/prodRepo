@@ -48,7 +48,6 @@ export function createFeeCategoryListConfig({
     },
     uiPolicy: {
       emptyMessage: "No fee categories available.",
-      title: "Fee Category Directory",
     },
   };
 }

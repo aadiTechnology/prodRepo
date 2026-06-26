@@ -1,12 +1,10 @@
 import React from "react";
 import { Alert, Snackbar, Select, MenuItem, Typography } from "@mui/material";
-import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { PageHeader } from "../../components/layout";
 import {
   ListPageLayout,
   ListPageToolbar,
-  DirectoryInfoBar,
   DataTable,
   TableRowActions,
   TablePaginationBar,
@@ -16,7 +14,6 @@ import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { createFeeCategoryListConfig } from "./FeeCategoryList.listConfig";
 
 const FeeCategoryManagement = () => {
-  const navigate = useNavigate();
   const controller = useFeeCategoryListController();
   const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
 
@@ -27,14 +24,9 @@ const FeeCategoryManagement = () => {
     onDeleteClick: controller.handleDeleteClick,
   });
 
-  const rangeStart =
-    controller.filteredCategories.length > 0
-      ? controller.listState.page * controller.listState.rowsPerPage + 1
-      : 0;
-  const rangeEnd = Math.min(
-    (controller.listState.page + 1) * controller.listState.rowsPerPage,
-    controller.filteredCategories.length
-  );
+  const showPagination =
+    !controller.loading &&
+    controller.filteredCategories.length > controller.listState.rowsPerPage;
 
   return (
     <ListPageLayout
@@ -124,14 +116,6 @@ const FeeCategoryManagement = () => {
       }
       pageBackground={true}
     >
-      {!controller.loading && controller.filteredCategories.length > 0 && (
-        <DirectoryInfoBar
-          label={config.uiPolicy.title}
-          rangeStart={rangeStart}
-          rangeEnd={rangeEnd}
-          total={controller.filteredCategories.length}
-        />
-      )}
       <DataTable
         columns={config.columns}
         data={controller.paginatedCategories}
@@ -146,7 +130,7 @@ const FeeCategoryManagement = () => {
         stickyHeader
         size="small"
       />
-      {!controller.loading && controller.filteredCategories.length > 0 && (
+      {showPagination && (
         <TablePaginationBar
           page={controller.listState.page}
           rowsPerPage={controller.listState.rowsPerPage}
