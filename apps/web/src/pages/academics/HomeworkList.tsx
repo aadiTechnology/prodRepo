@@ -274,7 +274,7 @@ export default function HomeworkList() {
     return finalHomeworkList.slice(start, start + listRowsPerPage);
   }, [finalHomeworkList, listPage, listRowsPerPage]);
 
-  const showAudiencePagination = finalHomeworkList.length > 10;
+  const showAudiencePagination = finalHomeworkList.length > listRowsPerPage;
 
   const audiencePaginationBar = showAudiencePagination ? (
     <TablePaginationBar
@@ -282,10 +282,7 @@ export default function HomeworkList() {
       rowsPerPage={listRowsPerPage}
       totalRows={finalHomeworkList.length}
       onPageChange={setListPage}
-      onRowsPerPageChange={(value) => {
-        setListRowsPerPage(value);
-        setListPage(0);
-      }}
+      onRowsPerPageChange={setListRowsPerPage}
     />
   ) : null;
 
@@ -664,7 +661,7 @@ export default function HomeworkList() {
             </Box>
 
             {/* Main Homework List view */}
-            {!controller.tableLoading && finalHomeworkList.length === 0 ? (
+            {!controller.loading && finalHomeworkList.length === 0 ? (
               <Box
                 sx={{
                   textAlign: "center",
@@ -725,19 +722,15 @@ export default function HomeworkList() {
                   page={listPage}
                   rowsPerPage={listRowsPerPage}
                   onPageChange={setListPage}
-                  onRowsPerPageChange={(value) => {
-                    setListRowsPerPage(value);
-                    setListPage(0);
-                  }}
+                  onRowsPerPageChange={setListRowsPerPage}
                   columns={tableColumns}
                   data={paginatedHomeworkList}
-                  loading={controller.tableLoading}
+                  loading={controller.loading}
                   emptyMessage="No tasks found."
                   getRowKey={(row) => row.id}
                   renderRowActions={renderHomeworkActions}
                   stickyHeader
                   size="small"
-                  showPagination={showAudiencePagination}
                   showInfoBar={false}
                 />
               </AppCard>
@@ -755,7 +748,7 @@ export default function HomeworkList() {
                   overflow: "hidden",
                 }}
               >
-                {controller.tableLoading ? (
+                {controller.loading ? (
                   <Box
                     sx={{
                       display: "flex",
@@ -1077,24 +1070,20 @@ export default function HomeworkList() {
       >
         <EntityTableSection<HomeworkRow>
           label=""
+          showInfoBar={false}
           totalRows={controller.total}
           page={controller.page}
           rowsPerPage={controller.rowsPerPage}
           onPageChange={controller.setPage}
-          onRowsPerPageChange={(value) => {
-            controller.setRowsPerPage(value);
-            controller.setPage(0);
-          }}
+          onRowsPerPageChange={controller.setRowsPerPage}
           columns={tableColumns}
           data={controller.homework}
-          loading={controller.tableLoading}
+          loading={controller.loading}
           emptyMessage={listConfig.uiPolicy.emptyMessage}
           getRowKey={(row) => row.id}
           renderRowActions={renderHomeworkActions}
           stickyHeader
           size="small"
-          showPagination={controller.total > 10}
-          showInfoBar={false}
         />
       </Box>
 
