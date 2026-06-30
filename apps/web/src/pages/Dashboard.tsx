@@ -50,6 +50,7 @@ import {
   Edit as EditIcon,
   CheckBox as QuickMarkIcon,
   DragIndicator as DragHandleIcon,
+  HelpOutline as HelpOutlineIcon,
 } from "@mui/icons-material";
 import {
   DndContext,
@@ -72,6 +73,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
+import { useSupportPermissions } from "../hooks/useSupportPermissions";
 import dashboardService, {
   DashboardResponse,
   AdminDashboardData,
@@ -1203,7 +1205,9 @@ const WelcomeBanner: React.FC<{
   lastLoginLabel: string;
   refreshing: boolean;
   onRefresh: () => void;
-}> = ({ schoolName, lastLoginLabel, refreshing, onRefresh }) => {
+  showSupport?: boolean;
+  onSupportClick?: () => void;
+}> = ({ schoolName, lastLoginLabel, refreshing, onRefresh, showSupport, onSupportClick }) => {
   const today = new Date().toLocaleDateString("en-IN", {
     weekday: "long",
     year: "numeric",
@@ -1341,6 +1345,27 @@ const WelcomeBanner: React.FC<{
             </Typography>
           </Box>
         </Box>
+        {showSupport && onSupportClick && (
+          <Tooltip title="Support">
+            <IconButton
+              id="support-icon"
+              data-testid="support-icon"
+              onClick={onSupportClick}
+              size="small"
+              aria-label="Open Support"
+              sx={{
+                width: 34,
+                height: 34,
+                bgcolor: "rgba(255,255,255,0.1)",
+                color: "rgba(255,255,255,0.85)",
+                border: "1px solid rgba(255,255,255,0.15)",
+                "&:hover": { bgcolor: "rgba(255,255,255,0.18)" },
+              }}
+            >
+              <HelpOutlineIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Tooltip>
+        )}
         <Tooltip title={refreshing ? "Syncing…" : "Refresh dashboard"}>
           <IconButton
             onClick={onRefresh}
@@ -2887,6 +2912,8 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
 export default function Dashboard() {
   const { user } = useAuth();
   const { roles } = useRBAC();
+  const navigate = useNavigate();
+  const supportPerms = useSupportPermissions();
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -3097,6 +3124,8 @@ export default function Dashboard() {
         lastLoginLabel={lastLoginLabel}
         refreshing={refreshing}
         onRefresh={() => fetchData(true)}
+        showSupport={supportPerms.canAccessSupport}
+        onSupportClick={() => navigate("/support/faqs")}
       />
 
       {/* ── Error banner ── */}
