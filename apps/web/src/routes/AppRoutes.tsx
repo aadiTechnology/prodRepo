@@ -89,14 +89,7 @@ const DemoSetupVideoFormPage = lazy(() => import("../pages/configuration/DemoSet
 const DemoSetupVideoDetail = lazy(() => import("../pages/configuration/DemoSetupVideoDetail"));
 const DigitalMarketingHub = lazy(() => import("../pages/marketing/DigitalMarketingHub"));
 const MarketingPlatformFormPage = lazy(() => import("../pages/marketing/MarketingPlatformFormPage"));
-const FaqList = lazy(() => import("../pages/support/FaqList"));
-const AddFaq = lazy(() => import("../pages/support/AddFaq"));
-const FaqDetail = lazy(() => import("../pages/support/FaqDetail"));
-const ContactSupport = lazy(() => import("../pages/support/ContactSupport"));
-const ProductUpdates = lazy(() => import("../pages/support/ProductUpdates"));
-const ProductUpdateDetail = lazy(() => import("../pages/support/ProductUpdateDetail"));
-const AddProductUpdate = lazy(() => import("../pages/support/AddProductUpdate"));
-import SupportRouteLayout from "./SupportRouteLayout";
+
 // Loading fallback component
 const PageLoader = () => (
   <Box
@@ -532,48 +525,7 @@ export default function AppRoutes() {
           />
           <Route path="/admissions/enrollment/print" element={<ProtectedRoute requiredPermissions="ADMISSIONS_MGMT:view"><EnrollmentPrintPage /></ProtectedRoute>} />
 
-          {/* Support Foundation */}
-          <Route
-            path="/support"
-            element={
-              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN", "TENANT_ADMIN", "ADMIN", "SCHOOL_ADMIN", "TEACHER"]}>
-                <SupportRouteLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="faqs" replace />} />
-            <Route path="faqs" element={<FaqList />} />
-            <Route
-              path="faqs/add"
-              element={
-                <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN", "TENANT_ADMIN", "ADMIN", "SCHOOL_ADMIN"]}>
-                  <AddFaq />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="faqs/:id/edit"
-              element={
-                <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN", "TENANT_ADMIN", "ADMIN", "SCHOOL_ADMIN"]}>
-                  <AddFaq />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="faqs/:id" element={<FaqDetail />} />
-            <Route path="contact" element={<ContactSupport />} />
-            <Route path="updates" element={<ProductUpdates />} />
-            <Route path="updates/add" element={
-              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN"]}>
-                <AddProductUpdate />
-              </ProtectedRoute>
-            } />
-            <Route path="updates/:id/edit" element={
-              <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN"]}>
-                <AddProductUpdate />
-              </ProtectedRoute>
-            } />
-            <Route path="updates/:id" element={<ProductUpdateDetail />} />
-          </Route>
+  
         </Route>
 
       </Routes>
