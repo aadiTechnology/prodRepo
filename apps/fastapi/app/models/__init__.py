@@ -44,6 +44,12 @@ from app.models.activity_gallery import (
     ActivityGalleryClassMapping,
     ActivityGalleryMedia,
 )
+from app.models.support import (
+    SupportFaq,
+    SupportFaqAttachment,
+    SupportFaqFeedback,
+    SupportProductUpdate,
+)
 
 # Export all models for convenience
 __all__ = [
@@ -103,5 +109,9 @@ __all__ = [
     "ActivityGallery",
     "ActivityGalleryMedia",
     "ActivityGalleryClassMapping",
+    "SupportFaq",
+    "SupportFaqAttachment",
+    "SupportFaqFeedback",
+    "SupportProductUpdate",
 ]
 
