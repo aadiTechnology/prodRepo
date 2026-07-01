@@ -250,11 +250,13 @@ class EnrollmentService:
             self.db.refresh(student)
 
             # Create User for Student
+            created_user = None
             try:
-                from app.services import user_service
+                from app.services import user_service, profile_image_service
                 from app.schemas.user import UserCreate
                 from app.models.user import User
                 from app.utils.student_login_email import normalize_email, resolve_student_login_email
+                from app.core.exceptions import ConflictException
 
                 taken = {
                     normalize_email(row[0])
@@ -273,16 +275,36 @@ class EnrollmentService:
                     role="STUDENT",
                     tenant_id=tenant_id
                 )
-                user_service.create_user(
-                    self.db,
-                    user=user_create,
-                    role="STUDENT",
-                    created_by=user_id,
-                    tenant_id=tenant_id
-                )
+                try:
+                    created_user = user_service.create_user(
+                        self.db,
+                        user=user_create,
+                        role="STUDENT",
+                        created_by=user_id,
+                        tenant_id=tenant_id
+                    )
+                except ConflictException:
+                    created_user = profile_image_service._resolve_user_for_student(self.db, student)
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).error(f"Failed to create user for enrolled student {student.id}: {e}")
+
+            if payload.photo_url:
+                from app.services import profile_image_service
+
+                login_user = created_user or profile_image_service._resolve_user_for_student(self.db, student)
+                if login_user:
+                    profile_image_service.save_user_profile_image(
+                        self.db,
+                        login_user.id,
+                        payload.photo_url,
+                    )
+                else:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "Enrollment photo saved for student %s but no login user was found to sync profile image",
+                        student.id,
+                    )
 
             printable = {
                 "student": {

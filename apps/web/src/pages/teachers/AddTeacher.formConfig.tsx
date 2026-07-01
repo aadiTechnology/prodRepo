@@ -74,7 +74,7 @@ export function addTeacherFormConfig({
       date_of_birth: {
         name: "date_of_birth",
         label: "Date of Birth",
-        type: "date",
+        type: "dob",
       },
       gender: {
         name: "gender",

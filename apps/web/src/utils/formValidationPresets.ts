@@ -13,7 +13,26 @@ export function emailRequiredPatternRules<
 export function optionalPhonePatternRules<
   T extends Record<string, unknown> = Record<string, unknown>,
 >(): ValidationRule<T>[] {
-  return [{ type: "pattern", regex: PHONE_PATTERN, message: "Invalid phone." }];
+  return [
+    {
+      type: "pattern",
+      regex: PHONE_PATTERN,
+      message: "Contact number must contain digits only (10-15 digits).",
+    },
+  ];
+}
+
+export function requiredContactNumberRules<
+  T extends Record<string, unknown> = Record<string, unknown>,
+>(): ValidationRule<T>[] {
+  return [
+    { type: "required", message: "Contact number is required." },
+    {
+      type: "pattern",
+      regex: PHONE_PATTERN,
+      message: "Contact number must contain digits only (10-15 digits).",
+    },
+  ];
 }
 
 export function optionalNumericPatternRules<

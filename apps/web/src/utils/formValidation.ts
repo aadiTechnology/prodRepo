@@ -1,3 +1,5 @@
+import { isFutureDateInputValue } from "./dateInput";
+
 export type ValidationRule<T extends Record<string, unknown> = Record<string, unknown>> =
   | { type: "required"; message?: string }
   | { type: "minLength"; value: number; message?: string }
@@ -5,6 +7,20 @@ export type ValidationRule<T extends Record<string, unknown> = Record<string, un
   | { type: "pattern"; regex: RegExp; message?: string }
   | { type: "matchField"; field: keyof T & string; message?: string }
   | { type: "custom"; validate: (formData: T, fieldName: keyof T & string) => string };
+
+export function dateOfBirthNotFutureRule<T extends Record<string, unknown>>(
+  message = "Date of birth cannot be in the future."
+): ValidationRule<T> {
+  return {
+    type: "custom",
+    validate: (formData, fieldName) => {
+      const value = formData[fieldName];
+      if (value == null || value === "") return "";
+      if (typeof value !== "string") return "";
+      return isFutureDateInputValue(value) ? message : "";
+    },
+  };
+}
 
 export type FormValidationConfig<T extends Record<string, unknown>> = Partial<
   Record<keyof T & string, ValidationRule<T>[]>
@@ -131,6 +147,16 @@ export function mapApiErrorsToFields(err: unknown): {
 
   if (msg.toLowerCase().includes("email already exists")) {
     fieldErrors.email = "Email already exists.";
+  }
+
+  if (msg.toLowerCase().includes("role code must be unique")) {
+    fieldErrors.code = "A role with this code already exists.";
+    msg = "Please fix the highlighted errors.";
+  }
+
+  if (msg.toLowerCase().includes("role name must be unique")) {
+    fieldErrors.name = "A role with this name already exists.";
+    msg = "Please fix the highlighted errors.";
   }
 
   const endDateMsg = "End date must be after start date.";

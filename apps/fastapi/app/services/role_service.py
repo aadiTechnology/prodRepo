@@ -18,6 +18,34 @@ _NOT_DELETED = Role.is_deleted == 0
 _ACTIVE = Role.is_active == 1
 
 
+def _tenant_scope_filter(query, tenant_id: int | None):
+    if tenant_id is not None:
+        return query.filter(Role.tenant_id == tenant_id)
+    return query.filter(Role.tenant_id.is_(None))
+
+
+def _find_duplicate_role(
+    db: Session,
+    *,
+    tenant_id: int | None,
+    code: str | None = None,
+    name: str | None = None,
+    exclude_role_id: int | None = None,
+) -> Role | None:
+    query = _tenant_scope_filter(db.query(Role).filter(_NOT_DELETED), tenant_id)
+    if exclude_role_id is not None:
+        query = query.filter(Role.id != exclude_role_id)
+    if code:
+        match = query.filter(func.lower(Role.code) == code.strip().lower()).first()
+        if match:
+            return match
+    if name:
+        match = query.filter(func.lower(Role.name) == name.strip().lower()).first()
+        if match:
+            return match
+    return None
+
+
 def get_roles(
     db: Session,
     search: str = None,
@@ -114,23 +142,26 @@ def get_role(db: Session, role_id: int) -> Role:
 
 def create_role(db: Session, data: RoleCreate, created_by: int | None = None) -> Role:
     """Create a new role."""
-    # Validate code uniqueness, scope, tenant_id
-    if not data.code or " " in data.code or not data.code.isupper():
+    code = (data.code or "").strip().upper()
+    name = (data.name or "").strip()
+
+    if not code or " " in code:
         raise ConflictException("Role code required, uppercase, no spaces")
-    if db.query(Role).filter(
-        Role.code == data.code,
-        Role.tenant_id == data.tenant_id,
-        _NOT_DELETED,
-    ).first():
+    if not name:
+        raise ConflictException("Role name is required")
+
+    if _find_duplicate_role(db, tenant_id=data.tenant_id, code=code):
         raise ConflictException("Role code must be unique")
+    if _find_duplicate_role(db, tenant_id=data.tenant_id, name=name):
+        raise ConflictException("Role name must be unique")
     if data.scope_type == "Tenant" and not data.tenant_id:
         raise ConflictException("Tenant ID required for tenant scope")
     if data.scope_type == "Platform" and data.tenant_id is not None:
         raise ConflictException("Platform role cannot have tenant_id")
 
     role = Role(
-        code=data.code,
-        name=data.name,
+        code=code,
+        name=name,
         scope_type=data.scope_type,
         description=data.description,
         is_active=data.is_active,
@@ -164,7 +195,17 @@ def update_role(db: Session, role_id: int, data: RoleUpdate, updated_by: int | N
     """Update an existing role."""
     role = get_role(db, role_id)
     if data.name is not None:
-        role.name = data.name
+        name = data.name.strip()
+        if not name:
+            raise ConflictException("Role name is required")
+        if _find_duplicate_role(
+            db,
+            tenant_id=role.tenant_id,
+            name=name,
+            exclude_role_id=role.id,
+        ):
+            raise ConflictException("Role name must be unique")
+        role.name = name
     if data.description is not None:
         role.description = data.description
     if data.is_active is not None:

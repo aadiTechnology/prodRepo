@@ -1,8 +1,10 @@
 from datetime import date
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.core.contact_validators import validate_contact_number
+from app.core.date_validators import validate_not_future_date
 
 class NextAdmissionNoResponse(BaseModel):
     admission_no: str
@@ -43,7 +45,7 @@ class EnrollmentCreateRequest(BaseModel):
 
     parent_name: str
     mobile_number: str
-    email: Optional[str] = None
+    email: EmailStr
 
     fee_structure_id: int
     discount_id: Optional[int] = None
@@ -52,6 +54,15 @@ class EnrollmentCreateRequest(BaseModel):
     birth_certificate_url: Optional[str] = None
     photo_url: Optional[str] = None
 
+    @field_validator("date_of_birth")
+    @classmethod
+    def validate_date_of_birth(cls, value: Optional[date]) -> Optional[date]:
+        return validate_not_future_date(value)
+
+    @field_validator("mobile_number")
+    @classmethod
+    def validate_mobile_number(cls, value: str) -> str:
+        return validate_contact_number(value, required=True)
 
 class EnrollmentCreateResponse(BaseModel):
     message: str

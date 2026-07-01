@@ -9,8 +9,8 @@ import HomeIcon from "@mui/icons-material/Home";
 import teacherService, { type TeacherCreate, type TeacherResponse, type TeacherUpdate } from "../../api/services/teacherService";
 import schoolClassService, { type SchoolClass } from "../../api/services/schoolClassService";
 import { useAuth } from "../../context/AuthContext";
-import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
-import { emailRequiredPatternRules } from "../../utils/formValidationPresets";
+import { mapApiErrorsToFields, type FormValidationConfig, dateOfBirthNotFutureRule } from "../../utils/formValidation";
+import { emailRequiredPatternRules, requiredContactNumberRules } from "../../utils/formValidationPresets";
 import { useFormManager } from "../../hooks/useFormManager";
 import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import BaseForm from "../../components/reusable/BaseForm";
@@ -67,10 +67,7 @@ export default function AddTeacher() {
       { type: "required", message: "Teacher Name is required" },
       { type: "minLength", value: 2, message: "Min 2 characters." },
     ],
-    mobile_number: [
-      { type: "required", message: "Mobile number is required" },
-      { type: "pattern", regex: /^[0-9]{10}$/, message: "Invalid mobile number" }
-    ],
+    mobile_number: requiredContactNumberRules<AddTeacherFormData>(),
     email: emailRequiredPatternRules<AddTeacherFormData>(),
     experience_years: [
       { type: "pattern", regex: /^\d*$/, message: "Must be a whole number" }
@@ -78,6 +75,7 @@ export default function AddTeacher() {
     pincode: [
       { type: "pattern", regex: /^\d{6}$/, message: "Pincode must be a 6-digit number" }
     ],
+    date_of_birth: [dateOfBirthNotFutureRule<AddTeacherFormData>()],
   }), []);
 
   const {

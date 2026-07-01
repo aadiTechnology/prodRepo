@@ -57,8 +57,8 @@ def get_login_context(
             theme_config=theme_template_service.get_template_config(db, tenant.theme_template_id) if getattr(tenant, "theme_template_id", None) else None,
         )
 
-    # 3. Profile Image Fetch (UserProfile + teacher photo fallback)
-    profile_image_path = profile_image_service.resolve_user_profile_image_path(db, user.id)
+    # 3. Profile Image Fetch (UserProfile + teacher/student photo fallback)
+    profile_image_path = profile_image_service.ensure_user_profile_image_from_student(db, user.id)
 
     # 4. RBAC Resolution
     roles = [role.code for role in rbac_service.get_user_roles(db, user.id)]

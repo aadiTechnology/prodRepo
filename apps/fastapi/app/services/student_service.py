@@ -13,6 +13,70 @@ class StudentService:
     def __init__(self, db: Session):
         self.db = db
 
+    class NotFound(Exception):
+        pass
+
+    class AccessDenied(Exception):
+        pass
+
+    class DeleteNotAllowed(Exception):
+        pass
+
+    def _get_current_academic_year_id(self, tenant_id: int) -> int | None:
+        current = (
+            self.db.query(AcademicYear)
+            .filter(
+                AcademicYear.tenant_id == tenant_id,
+                AcademicYear.is_deleted == False,  # noqa: E712
+                AcademicYear.is_active == True,  # noqa: E712
+                AcademicYear.is_current == True,  # noqa: E712
+            )
+            .order_by(AcademicYear.start_date.desc(), AcademicYear.id.desc())
+            .first()
+        )
+        if current:
+            return current.id
+
+        fallback = (
+            self.db.query(AcademicYear)
+            .filter(
+                AcademicYear.tenant_id == tenant_id,
+                AcademicYear.is_deleted == False,  # noqa: E712
+                AcademicYear.is_active == True,  # noqa: E712
+            )
+            .order_by(AcademicYear.start_date.desc(), AcademicYear.id.desc())
+            .first()
+        )
+        return fallback.id if fallback else None
+
+    def _get_student_effective_academic_year_id(self, student: Student) -> int | None:
+        if student.academic_year_id:
+            return student.academic_year_id
+
+        latest_assignment = (
+            self.db.query(StudentFeeAssignment)
+            .filter(StudentFeeAssignment.student_id == student.id)
+            .order_by(StudentFeeAssignment.id.desc())
+            .first()
+        )
+        if latest_assignment and latest_assignment.academic_year_id:
+            return latest_assignment.academic_year_id
+
+        if student.class_id:
+            cls = self.db.query(SchoolClass).filter(SchoolClass.id == student.class_id).first()
+            if cls and cls.academic_year_id:
+                return cls.academic_year_id
+
+        return None
+
+    def _is_student_assigned_to_current_academic_year(self, student: Student, tenant_id: int) -> bool:
+        current_year_id = self._get_current_academic_year_id(tenant_id)
+        if not current_year_id:
+            return False
+
+        effective_year_id = self._get_student_effective_academic_year_id(student)
+        return effective_year_id == current_year_id if effective_year_id else False
+
     def get_students(self, page=1, limit=10, search=None, class_id=None, class_=None, status=None, tenant_id=None, division_id=None):
         from app.schemas.student_schema import StudentListItem, Pagination, StudentListResponse
         query = (
@@ -40,6 +104,7 @@ class StudentService:
             query = query.filter(and_(*filters))
         total = query.count()
         results = query.order_by(Student.id).offset((page - 1) * limit).limit(limit).all()
+        current_year_id = self._get_current_academic_year_id(tenant_id) if tenant_id else None
         data = []
         for student, school_class, class_division in results:
             class_name = school_class.name if school_class else ""
@@ -50,6 +115,12 @@ class StudentService:
                 class_display = class_name
             else:
                 class_display = f"Class {student.class_id}" if student.class_id else "Unknown"
+            effective_year_id = self._get_student_effective_academic_year_id(student)
+            can_delete = not (
+                current_year_id is not None
+                and effective_year_id is not None
+                and effective_year_id == current_year_id
+            )
             data.append(
                 StudentListItem(
                     id=str(student.id),
@@ -60,16 +131,12 @@ class StudentService:
                     class_=class_display,
                     class_id=student.class_id,
                     class_division_id=student.class_division_id,
-                    status="Active" if student.is_active else "Inactive"
+                    status="Active" if student.is_active else "Inactive",
+                    can_delete=can_delete,
                 )
             )
         pagination = Pagination(page=page, limit=limit, total=total)
         return StudentListResponse(data=data, pagination=pagination)
-
-    class NotFound(Exception):
-        pass
-    class AccessDenied(Exception):
-        pass
 
     def get_student_by_id(self, student_id: str, tenant_id: int = None) -> Optional[StudentDetailResponse]:
         query = self.db.query(Student)
@@ -217,11 +284,13 @@ class StudentService:
             self.db.refresh(student)
 
             # Create User for Student
+            created_user = None
             try:
-                from app.services import user_service
+                from app.services import user_service, profile_image_service
                 from app.schemas.user import UserCreate
                 from app.models.user import User
                 from app.utils.student_login_email import normalize_email, resolve_student_login_email
+                from app.core.exceptions import ConflictException
 
                 taken = {
                     normalize_email(row[0])
@@ -240,16 +309,30 @@ class StudentService:
                     role="STUDENT",
                     tenant_id=tenant_id
                 )
-                user_service.create_user(
-                    self.db,
-                    user=user_create,
-                    role="STUDENT",
-                    created_by=getattr(user, "id", None) if user else None,
-                    tenant_id=tenant_id
-                )
+                try:
+                    created_user = user_service.create_user(
+                        self.db,
+                        user=user_create,
+                        role="STUDENT",
+                        created_by=getattr(user, "id", None) if user else None,
+                        tenant_id=tenant_id
+                    )
+                except ConflictException:
+                    created_user = profile_image_service._resolve_user_for_student(self.db, student)
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).error(f"Failed to create user for student {student.id}: {e}")
+
+            if student.photo_url:
+                from app.services import profile_image_service
+
+                login_user = created_user or profile_image_service._resolve_user_for_student(self.db, student)
+                if login_user:
+                    profile_image_service.save_user_profile_image(
+                        self.db,
+                        login_user.id,
+                        student.photo_url,
+                    )
 
             return StudentCreateResponse(message="Student created successfully", student_id=student.id)
         except Exception as e:
@@ -267,12 +350,26 @@ class StudentService:
             student = query.filter(Student.student_code == student_id).first()
         if not student:
             raise StudentService.NotFound()
-        for field, value in req.dict(exclude_unset=True).items():
+        update_data = req.dict(exclude_unset=True)
+        photo_url_provided = "photo_url" in update_data
+        photo_url_value = update_data.pop("photo_url", None) if photo_url_provided else None
+
+        for field, value in update_data.items():
             if field == "parent":
                 continue
             setattr(student, field, value)
+
+        if photo_url_provided:
+            student.photo_url = photo_url_value
+
         self.db.commit()
         self.db.refresh(student)
+
+        if photo_url_provided:
+            from app.services import profile_image_service
+
+            profile_image_service.sync_student_user_photo(self.db, student, photo_url_value)
+
         return {"success": True}
 
     def soft_delete_student(self, student_id: str, tenant_id: int = None):
@@ -287,7 +384,12 @@ class StudentService:
             
         if not student:
             raise StudentService.NotFound()
-            
+
+        if tenant_id and self._is_student_assigned_to_current_academic_year(student, tenant_id):
+            raise StudentService.DeleteNotAllowed(
+                "Student cannot be deleted because they are assigned to the current academic year."
+            )
+
         student.is_active = False
         self.db.commit()
         return {"success": True}

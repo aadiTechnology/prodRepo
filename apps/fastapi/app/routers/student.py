@@ -96,6 +96,8 @@ def delete_student(
         raise HTTPException(status_code=404, detail="Student not found")
     except StudentService.AccessDenied:
         raise HTTPException(status_code=401, detail="Access denied")
+    except StudentService.DeleteNotAllowed as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         print("Error in delete_student:", e)
         import traceback; traceback.print_exc()

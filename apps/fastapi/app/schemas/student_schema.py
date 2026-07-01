@@ -81,6 +81,7 @@ class StudentListItem(BaseModel):
         "from_attributes": True,
     }
     status: str
+    can_delete: bool = True
 
 
 class Pagination(BaseModel):

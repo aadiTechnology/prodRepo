@@ -146,22 +146,39 @@ def _resolve_student_record(db: Session, *, tenant_id: int, user_id: int, email:
     if student:
         return student
 
-    # Fallback to matching by user full_name
-    user = db.query(User).filter(User.id == user_id).first()
-    if user and user.full_name:
-        name_match = (
-            db.query(Student)
-            .filter(
-                Student.tenant_id == tenant_id,
-                Student.is_active == True,  # noqa: E712
-                Student.student_name.ilike(user.full_name.strip())
+    if "@" in email_norm and "+" in email_norm.split("@", 1)[0]:
+        local_part, _domain = email_norm.rsplit("@", 1)
+        admission_tag = local_part.split("+", 1)[1]
+        if admission_tag:
+            tagged_student = (
+                db.query(Student)
+                .filter(
+                    Student.tenant_id == tenant_id,
+                    Student.is_active == True,  # noqa: E712
+                    or_(
+                        Student.admission_no.ilike(admission_tag),
+                        Student.student_code.ilike(admission_tag),
+                    ),
+                )
+                .first()
             )
-            .first()
-        )
-        if name_match:
-            return name_match
+            if tagged_student:
+                return tagged_student
 
     if not email_norm.endswith("@student.local"):
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and user.full_name:
+            name_match = (
+                db.query(Student)
+                .filter(
+                    Student.tenant_id == tenant_id,
+                    Student.is_active == True,  # noqa: E712
+                    Student.student_name.ilike(user.full_name.strip())
+                )
+                .first()
+            )
+            if name_match:
+                return name_match
         return None
 
     local_part = email_norm.split("@", 1)[0]
@@ -174,8 +191,8 @@ def _resolve_student_record(db: Session, *, tenant_id: int, user_id: int, email:
             Student.tenant_id == tenant_id,
             Student.is_active == True,  # noqa: E712
             or_(
-                Student.student_code == local_part,
-                Student.admission_no == local_part,
+                Student.student_code.ilike(local_part),
+                Student.admission_no.ilike(local_part),
             ),
         )
         .first()

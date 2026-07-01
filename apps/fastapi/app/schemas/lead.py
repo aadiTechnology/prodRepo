@@ -2,6 +2,9 @@ from typing import Optional, List
 from pydantic import BaseModel, Field, validator
 from datetime import datetime, date
 
+from app.core.date_validators import validate_not_future_date
+from app.core.contact_validators import validate_contact_number
+
 
 # ──────────────────────────────────────────────────────────────
 # Parent Schemas
@@ -26,11 +29,11 @@ class ParentCreate(BaseModel):
 
     @validator("mobile_number")
     def mobile_required(cls, v):
-        if not v or not v.strip():
-            raise ValueError("Contact number is required")
-        if not v.strip().isdigit() or len(v.strip()) < 10:
-            raise ValueError("Invalid mobile number")
-        return v.strip()
+        return validate_contact_number(v, required=True)
+
+    @validator("alternate_mobile")
+    def alternate_mobile_valid(cls, v):
+        return validate_contact_number(v, required=False, field_label="Alternate contact number")
 
 
 class ParentResponse(BaseModel):
@@ -155,6 +158,10 @@ class LeadCreate(BaseModel):
     assigned_to: Optional[int] = None
     society: Optional[str] = Field(None, max_length=200)
 
+    @validator("child_dob")
+    def validate_child_dob(cls, value: Optional[date]) -> Optional[date]:
+        return validate_not_future_date(value)
+
     @validator("parent_name")
     def name_required(cls, v):
         if not v or not v.strip():
@@ -163,11 +170,11 @@ class LeadCreate(BaseModel):
 
     @validator("mobile_number")
     def mobile_required(cls, v):
-        if not v or not v.strip():
-            raise ValueError("Contact number is required")
-        if not v.strip().isdigit() or len(v.strip()) < 10:
-            raise ValueError("Invalid mobile number")
-        return v.strip()
+        return validate_contact_number(v, required=True)
+
+    @validator("alternate_mobile")
+    def alternate_mobile_valid(cls, v):
+        return validate_contact_number(v, required=False, field_label="Alternate contact number")
 
     @validator("child_name")
     def child_name_required(cls, v):
@@ -200,6 +207,18 @@ class LeadUpdate(BaseModel):
     remarks: Optional[str] = None
     assigned_to: Optional[int] = None
     society: Optional[str] = Field(None, max_length=200)
+
+    @validator("child_dob")
+    def validate_child_dob(cls, value: Optional[date]) -> Optional[date]:
+        return validate_not_future_date(value)
+
+    @validator("mobile_number")
+    def validate_mobile_number(cls, value: Optional[str]) -> Optional[str]:
+        return validate_contact_number(value, required=False)
+
+    @validator("alternate_mobile")
+    def validate_alternate_mobile(cls, value: Optional[str]) -> Optional[str]:
+        return validate_contact_number(value, required=False, field_label="Alternate contact number")
 
 
 class LeadListItem(BaseModel):

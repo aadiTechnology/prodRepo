@@ -2,6 +2,9 @@ from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
 
+from app.core.date_validators import validate_not_future_date
+from app.core.contact_validators import validate_contact_number
+
 class TeacherAssignmentDivision(BaseModel):
     id: int
     division_name: str
@@ -33,8 +36,18 @@ class TeacherBase(BaseModel):
     state: Optional[str] = None
     pincode: Optional[str] = None
 
+    @field_validator("mobile_number")
+    @classmethod
+    def validate_mobile_number(cls, value: str) -> str:
+        return validate_contact_number(value, required=True)
+
 # Properties to receive on creation
 class TeacherCreate(TeacherBase):
+    @field_validator("date_of_birth")
+    @classmethod
+    def validate_date_of_birth(cls, value: Optional[date]) -> Optional[date]:
+        return validate_not_future_date(value)
+
     @field_validator("pincode")
     @classmethod
     def validate_pincode(cls, value: Optional[str]) -> Optional[str]:
@@ -68,6 +81,16 @@ class TeacherUpdate(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     pincode: Optional[str] = None
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def validate_date_of_birth(cls, value: Optional[date]) -> Optional[date]:
+        return validate_not_future_date(value)
+
+    @field_validator("mobile_number")
+    @classmethod
+    def validate_mobile_number(cls, value: Optional[str]) -> Optional[str]:
+        return validate_contact_number(value, required=False)
 
     @field_validator("pincode")
     @classmethod

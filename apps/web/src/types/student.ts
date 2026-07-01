@@ -6,6 +6,7 @@ export interface Student {
   mobile?: string;
   class?: string;
   status: "Active" | "Inactive";
+  can_delete?: boolean;
 }
 
 export interface StudentListResponse {
