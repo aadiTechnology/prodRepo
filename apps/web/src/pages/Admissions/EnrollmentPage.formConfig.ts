@@ -50,9 +50,8 @@ export function createEnrollmentFormConfig({
       date_of_birth: {
         name: "date_of_birth",
         label: "Date of Birth",
-        type: "text",
+        type: "dob",
         required: false,
-        props: { type: "date", InputLabelProps: { shrink: true } },
       },
       gender: {
         name: "gender",
@@ -132,17 +131,17 @@ export function createEnrollmentFormConfig({
       mobile_number: {
         name: "mobile_number",
         label: "Contact Number",
-        type: "text",
+        type: "phone",
         placeholder: "10-15 digit mobile number",
         required: true,
         props: { htmlInput: { maxLength: 15 } },
       },
       email: {
         name: "email",
-        label: "Email",
+        label: "Email Address",
         type: "email",
         placeholder: "parent@email.com",
-        required: false,
+        required: true,
       },
       fee_structure_id: {
         name: "fee_structure_id",

@@ -31,7 +31,7 @@ export interface EnrollmentCreatePayload {
   roll_no?: string | null;
   parent_name: string;
   mobile_number: string;
-  email?: string | null;
+  email: string;
   fee_structure_id: number;
   discount_id?: number | null;
   additional_fee?: number | null;

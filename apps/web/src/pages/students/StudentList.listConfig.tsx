@@ -8,9 +8,11 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import VisibilityIcon from "@mui/icons-material/Visibility";
-import StatusChip from "../../components/roles/StatusChip";
 import type { Student } from "../../types/student";
 import type { ListConfig } from "../../components/reusable";
+
+const STUDENT_DELETE_BLOCKED_MESSAGE =
+  "Student cannot be deleted because they are assigned to the current academic year.";
 
 export function createStudentListConfig({
   navigate,
@@ -51,11 +53,6 @@ export function createStudentListConfig({
         label: "Class",
         field: "class",
       },
-      {
-        id: "status",
-        label: "Status",
-        render: (row) => <StatusChip status={row.status === "Active" ? "ACTIVE" : "INACTIVE"} />,
-      },
     ],
     uiPolicy: {
       emptyMessage: "No students available",
@@ -88,8 +85,11 @@ export function renderStudentRowActions({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const canDelete = row.can_delete !== false;
+  const deleteTooltip = canDelete ? "Delete" : STUDENT_DELETE_BLOCKED_MESSAGE;
+
   return (
-    <Box sx={{ display: "flex", gap: 1 }}>
+    <Box sx={{ display: "flex", gap: 1, justifyContent: "center", alignItems: "center" }}>
       <Tooltip title="View">
         <IconButton
           size="small"
@@ -114,17 +114,21 @@ export function renderStudentRowActions({
           <EditIcon fontSize="small" />
         </IconButton>
       </Tooltip>
-      <Tooltip title="Delete">
-        <IconButton
-          size="small"
-          onClick={(event) => {
-            event.stopPropagation();
-            onDelete();
-          }}
-          color="error"
-        >
-          <DeleteIcon fontSize="small" />
-        </IconButton>
+      <Tooltip title={deleteTooltip}>
+        <span>
+          <IconButton
+            size="small"
+            onClick={(event) => {
+              event.stopPropagation();
+              if (!canDelete) return;
+              onDelete();
+            }}
+            color="error"
+            disabled={!canDelete}
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </span>
       </Tooltip>
     </Box>
   );

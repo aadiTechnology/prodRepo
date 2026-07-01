@@ -24,11 +24,6 @@ export const createRoleListConfig = ({
       render: (r: Role) => r.name,
     },
     {
-      id: "description",
-      label: "Description",
-      field: "description",
-    },
-    {
       id: "status",
       label: "Status",
       render: (r: Role) => <StatusChip status={r.status} />,

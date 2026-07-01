@@ -1,10 +1,11 @@
-import { useId, useState, type FormEvent } from "react";
+import { useId, useMemo, useState, type FormEvent } from "react";
 import { Alert, Snackbar } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import { FormHeaderIconAction, Box, CircularProgress } from "../primitives";
 import { SaveButton, CancelButton } from "../semantic";
 import { PageHeader } from "../layout";
 import ConfirmDialog from "../semantic/ConfirmDialog";
+import ValidationErrorDialog from "../semantic/ValidationErrorDialog";
 import ListPageLayout from "./ListPageLayout";
 import FormSectionLabel from "./FormSectionLabel";
 import FormFieldRenderer from "./FormFieldRenderer";
@@ -18,10 +19,11 @@ import type {
 function runSubmit<T extends Record<string, unknown>>(
   e: FormEvent | React.MouseEvent,
   handleSubmit: BaseFormProps<T>["handleSubmit"],
-  onValid: () => void
+  onValid: () => void,
+  onInvalid: () => void
 ) {
   e.preventDefault();
-  handleSubmit(e as FormEvent, onValid);
+  handleSubmit(e as FormEvent, onValid, onInvalid);
 }
 
 export default function BaseForm<T extends Record<string, unknown>>({
@@ -53,7 +55,6 @@ export default function BaseForm<T extends Record<string, unknown>>({
   hideFooterActions = false,
   hideHeaderCancel = false,
   footerActionOrder = "cancel-first",
-  useErrorSnackbar = false,
   gridSpacing = 2,
   pageTestId,
   formTestId,
@@ -61,6 +62,30 @@ export default function BaseForm<T extends Record<string, unknown>>({
 }: BaseFormProps<T>) {
   const formId = useId();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [fieldValidationOpen, setFieldValidationOpen] = useState(false);
+
+  const fieldErrorItems = useMemo(() => {
+    return Object.entries(fieldErrors)
+      .filter(([, message]) => Boolean(message))
+      .map(([name, message]) => {
+        const label = formConfig.fields[name as keyof T & string]?.label ?? name;
+        return `${label}: ${message}`;
+      });
+  }, [fieldErrors, formConfig.fields]);
+
+  const showValidationDialog = Boolean(error) || fieldValidationOpen;
+  const validationDialogMessage =
+    error ??
+    (fieldValidationOpen ? "Please fix the highlighted errors." : null);
+
+  const closeValidationDialog = () => {
+    onErrorDismiss();
+    setFieldValidationOpen(false);
+  };
+
+  const openFieldValidationDialog = () => {
+    setFieldValidationOpen(true);
+  };
 
   const layoutCtx: FormLayoutContext = { isEditMode };
 
@@ -91,7 +116,8 @@ export default function BaseForm<T extends Record<string, unknown>>({
     setConfirmOpen(true);
   };
 
-  const handleFormSubmit = (e: FormEvent) => runSubmit(e, handleSubmit, openConfirmDialog);
+  const handleFormSubmit = (e: FormEvent) =>
+    runSubmit(e, handleSubmit, openConfirmDialog, openFieldValidationDialog);
 
   const handleConfirm = async () => {
     await onConfirmSubmit();
@@ -136,7 +162,9 @@ export default function BaseForm<T extends Record<string, unknown>>({
                   ) : null}
                   <FormHeaderIconAction
                     variant="save"
-                    onClick={(e) => runSubmit(e, handleSubmit, openConfirmDialog)}
+                    onClick={(e) =>
+                      runSubmit(e, handleSubmit, openConfirmDialog, openFieldValidationDialog)
+                    }
                     loading={loading}
                     disabled={!canSubmit}
                     tooltipTitle={saveTooltip}
@@ -150,16 +178,6 @@ export default function BaseForm<T extends Record<string, unknown>>({
                 {headerRightBelowSlot}
               </Box>
             ) : null}
-            {error && !useErrorSnackbar && (
-              <Alert
-                severity="error"
-                variant="filled"
-                sx={{ mt: 2, borderRadius: "12px" }}
-                onClose={onErrorDismiss}
-              >
-                {error}
-              </Alert>
-            )}
           </Box>
         }
       >
@@ -214,7 +232,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
             >
               {footerActionOrder === "cancel-first" ? (
                 <>
-                  <CancelButton onClick={onCancelNavigate} disabled={loading} data-testid="btn-cancel">
+                  <CancelButton type="button" onClick={onCancelNavigate} disabled={loading} data-testid="btn-cancel">
                     Cancel
                   </CancelButton>
                   <SaveButton type="submit" disabled={!canSubmit} loading={loading} data-testid="btn-save">
@@ -226,7 +244,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
                   <SaveButton type="submit" disabled={!canSubmit} loading={loading} data-testid="btn-save">
                     {isEditMode ? submitLabelEdit : submitLabelCreate}
                   </SaveButton>
-                  <CancelButton onClick={onCancelNavigate} disabled={loading} data-testid="btn-cancel">
+                  <CancelButton type="button" onClick={onCancelNavigate} disabled={loading} data-testid="btn-cancel">
                     Cancel
                   </CancelButton>
                 </>
@@ -237,20 +255,28 @@ export default function BaseForm<T extends Record<string, unknown>>({
       </ListPageLayout>
 
       <Snackbar
-        open={!!snackbar || (!!error && useErrorSnackbar)}
+        open={!!snackbar}
         autoHideDuration={3000}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        onClose={snackbar ? onSnackbarClose : onErrorDismiss}
+        onClose={onSnackbarClose}
       >
         <Alert
-          onClose={snackbar ? onSnackbarClose : onErrorDismiss}
-          severity={snackbar ? "success" : "error"}
+          onClose={onSnackbarClose}
+          severity="success"
           variant="filled"
           sx={{ width: "100%", borderRadius: "12px" }}
         >
-          {snackbar || error}
+          {snackbar}
         </Alert>
       </Snackbar>
+
+      <ValidationErrorDialog
+        open={showValidationDialog}
+        onClose={closeValidationDialog}
+        message={validationDialogMessage}
+        items={fieldErrorItems}
+        data-testid="validation-error-dialog"
+      />
 
       <ConfirmDialog
         open={confirmOpen}

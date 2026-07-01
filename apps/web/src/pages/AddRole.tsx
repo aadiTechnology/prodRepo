@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useState, useEffect, useCallback, useMemo } from "react";import { useNavigate, useParams } from "react-router-dom";
 import roleService from "../api/services/roleService";
 import { useAuth } from "../context/AuthContext";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../utils/formValidation";
@@ -43,6 +42,11 @@ export default function RolePage() {
     code: [
       { type: "required", message: "Role Code is required." },
       { type: "minLength", value: 2, message: "Min 2 characters." },
+      {
+        type: "pattern",
+        regex: /^[A-Z0-9_]+$/,
+        message: "Use uppercase letters, numbers, or underscores only.",
+      },
     ],
   }), []);
 
@@ -54,11 +58,34 @@ export default function RolePage() {
     handleChange,
     handleFieldValueChange,
     handleSubmit,
-  } = useFormManager<AddRoleFormData>({
-    initialValues,
+    resetForm,
+  } = useFormManager<AddRoleFormData>({    initialValues,
     validationConfig,
     onClearError: () => setError(null),
   });
+
+  const handleRoleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const { name, value } = e.target;
+      if (name === "code") {
+        handleFieldValueChange(name as keyof AddRoleFormData & string, value.toUpperCase());
+        return;
+      }
+      handleChange(e);
+    },
+    [handleChange, handleFieldValueChange]
+  );
+
+  const handleRoleFieldValueChange = useCallback(
+    (name: keyof AddRoleFormData & string, value: unknown) => {
+      if (name === "code" && typeof value === "string") {
+        handleFieldValueChange(name, value.toUpperCase());
+        return;
+      }
+      handleFieldValueChange(name, value);
+    },
+    [handleFieldValueChange]
+  );
 
   const formConfig = useMemo(
     () => createAddRoleFormConfig({ isEditMode }),
@@ -142,11 +169,44 @@ export default function RolePage() {
       }
 
       const payload: Record<string, unknown> = {
-        name: formData.name,
-        code: formData.code,
+        name: formData.name.trim(),
+        code: formData.code.trim().toUpperCase(),
         description: formData.description,
         permission_ids: [], // TODO: add permission selection support
       };
+
+      if (!isEditMode) {
+        const { items } = await roleService.getRoles({ pageSize: 1000 });
+        const normalizedName = payload.name as string;
+        const normalizedCode = payload.code as string;
+        const duplicateName = items.some(
+          (role) => role.name.trim().toLowerCase() === normalizedName.toLowerCase()
+        );
+        const duplicateCode = items.some(
+          (role) => role.code.trim().toUpperCase() === normalizedCode
+        );
+        if (duplicateName || duplicateCode) {
+          setFieldErrors({
+            ...(duplicateName ? { name: "A role with this name already exists." } : {}),
+            ...(duplicateCode ? { code: "A role with this code already exists." } : {}),
+          });
+          setError("Please fix the highlighted errors.");
+          return;
+        }
+      } else if (id) {
+        const { items } = await roleService.getRoles({ pageSize: 1000 });
+        const normalizedName = payload.name as string;
+        const duplicateName = items.some(
+          (role) =>
+            role.id !== id &&
+            role.name.trim().toLowerCase() === normalizedName.toLowerCase()
+        );
+        if (duplicateName) {
+          setFieldErrors({ name: "A role with this name already exists." });
+          setError("Please fix the highlighted errors.");
+          return;
+        }
+      }
 
       if (!isEditMode) {
         payload.is_active = formData.is_active;
@@ -182,14 +242,24 @@ export default function RolePage() {
     }
   };
 
+  const handleCancel = useCallback(() => {
+    if (isEditMode) {
+      navigateToList(listPath);
+      return;
+    }
+    resetForm(emptyForm());
+    setError(null);
+    setSnackbar(null);
+  }, [isEditMode, navigateToList, resetForm]);
+
   return (
     <BaseForm<AddRoleFormData>
       formConfig={formConfig}
       formData={formData}
       setFormData={setFormData}
       fieldErrors={fieldErrors}
-      handleChange={handleChange}
-      handleFieldValueChange={handleFieldValueChange}
+      handleChange={handleRoleChange}
+      handleFieldValueChange={handleRoleFieldValueChange}
       handleSubmit={handleSubmit}
       setFormError={setError}
       onConfirmSubmit={handleConfirmSubmit}
@@ -210,7 +280,7 @@ export default function RolePage() {
         saveTooltipCreate: "Save",
         saveTooltipEdit: "Update",
       }}
-      onCancelNavigate={() => navigateToList(listPath)}
+      onCancelNavigate={handleCancel}
       confirmMessage={(ctx) =>
         ctx.isEditMode
           ? "Are you sure you want to update this role?"

@@ -7,6 +7,8 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import leadService from "../../api/services/leadService";
 import { useFormManager } from "../../hooks/useFormManager";
+import { dateOfBirthNotFutureRule } from "../../utils/formValidation";
+import { optionalPhonePatternRules, requiredContactNumberRules } from "../../utils/formValidationPresets";
 import BaseForm from "../../components/reusable/BaseForm";
 import {
   createAddLeadFormConfig,
@@ -148,11 +150,13 @@ export default function AddLeadPage() {
   const validationConfig = useMemo(
     () => ({
       parent_name: [{ type: "required" as const, message: "Parent name is required." }],
-      mobile_number: [{ type: "required" as const, message: "Contact number is required." }],
+      mobile_number: requiredContactNumberRules<AddLeadFormData>(),
+      alternate_mobile: optionalPhonePatternRules<AddLeadFormData>(),
       child_name: [{ type: "required" as const, message: "Child name is required." }],
       lead_source_id: [{ type: "required" as const, message: "Lead source is required." }],
       lead_status_id: [{ type: "required" as const, message: "Lead status is required." }],
       preferred_academic_year_id: [{ type: "required" as const, message: "Academic year is required." }],
+      child_dob: [dateOfBirthNotFutureRule<AddLeadFormData>()],
     }),
     []
   );

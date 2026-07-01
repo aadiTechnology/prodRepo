@@ -27,7 +27,11 @@ export type UseFormManagerResult<T extends Record<string, unknown>> = {
   >;
   handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   handleFieldValueChange: (name: keyof T & string, value: unknown) => void;
-  handleSubmit: (e: React.FormEvent, onValid?: () => void) => void;
+  handleSubmit: (
+    e: React.FormEvent,
+    onValid?: () => void,
+    onInvalid?: (errors: Partial<Record<keyof T & string, string>>) => void
+  ) => void;
   resetForm: (next?: T) => void;
 };
 
@@ -110,11 +114,16 @@ export function useFormManager<T extends Record<string, unknown>>(
   );
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent, onValid?: () => void) => {
+    (
+      e: React.FormEvent,
+      onValid?: () => void,
+      onInvalid?: (errors: Partial<Record<keyof T & string, string>>) => void
+    ) => {
       e.preventDefault();
       const errors = validateForm(validationConfig, formData);
       setFieldErrors(errors);
       if (Object.keys(errors).length === 0) onValid?.();
+      else onInvalid?.(errors);
     },
     [validationConfig, formData]
   );

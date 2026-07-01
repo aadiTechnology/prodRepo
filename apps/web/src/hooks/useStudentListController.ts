@@ -24,16 +24,16 @@ type UseStudentListControllerResult = {
   totalStudents: number;
   loading: boolean;
   error: string | null;
-  snackbar: string | null;
   confirmDialogOpen: boolean;
   studentToDelete: Student | null;
   deleteLoading: boolean;
   fetchStudents: () => Promise<void>;
-  closeSnackbar: () => void;
   openDeleteConfirm: (student: Student) => void;
   closeDeleteConfirm: () => void;
   confirmDelete: () => Promise<void>;
 };
+
+const SNACKBAR_ANCHOR = { vertical: "top", horizontal: "center" } as const;
 
 export function useStudentListController({
   navigate,
@@ -46,7 +46,6 @@ export function useStudentListController({
   const [totalStudents, setTotalStudents] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [snackbar, setSnackbar] = useState<string | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -90,6 +89,17 @@ export function useStudentListController({
   }, [fetchStudents, ready]);
 
   const openDeleteConfirm = (student: Student) => {
+    if (student.can_delete === false) {
+      enqueueSnackbar(
+        "Student cannot be deleted because they are assigned to the current academic year.",
+        {
+          variant: "warning",
+          autoHideDuration: 4000,
+          anchorOrigin: SNACKBAR_ANCHOR,
+        }
+      );
+      return;
+    }
     setStudentToDelete(student);
     setConfirmDialogOpen(true);
   };
@@ -104,17 +114,27 @@ export function useStudentListController({
     setDeleteLoading(true);
     try {
       await studentService.delete(studentToDelete.id);
-      setSnackbar("Student deleted successfully");
+      const deletedName = studentToDelete.name?.trim();
+      enqueueSnackbar(
+        deletedName ? `${deletedName} was deleted successfully.` : "Student deleted successfully.",
+        {
+          variant: "success",
+          autoHideDuration: 3000,
+          anchorOrigin: SNACKBAR_ANCHOR,
+        }
+      );
       fetchStudents();
     } catch (err: any) {
-      enqueueSnackbar(err?.message || "Failed to delete student", { variant: "error" });
+      enqueueSnackbar(err?.message || "Failed to delete student", {
+        variant: "error",
+        autoHideDuration: 4000,
+        anchorOrigin: SNACKBAR_ANCHOR,
+      });
     } finally {
       setDeleteLoading(false);
       closeDeleteConfirm();
     }
   };
-
-  const closeSnackbar = () => setSnackbar(null);
 
   const sortedStudents = useMemo(() => {
     // Add sorting logic if needed
@@ -128,12 +148,10 @@ export function useStudentListController({
     totalStudents,
     loading,
     error,
-    snackbar,
     confirmDialogOpen,
     studentToDelete,
     deleteLoading,
     fetchStudents,
-    closeSnackbar,
     openDeleteConfirm,
     closeDeleteConfirm,
     confirmDelete,

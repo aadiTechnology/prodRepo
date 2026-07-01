@@ -1,4 +1,5 @@
 import { IconButton, Tooltip, alpha } from "@mui/material";
+import { Box } from "../primitives";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
@@ -36,7 +37,7 @@ export default function TableRowActions({
     : colorTokens.preschool.lavender.main;
 
   return (
-    <>
+    <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
       {onView != null && (
         <Tooltip title={viewAsRedirect ? "Visit link" : "View"}>
           <IconButton 
@@ -101,6 +102,6 @@ export default function TableRowActions({
           </IconButton>
         </Tooltip>
       )}
-    </>
+    </Box>
   );
 }

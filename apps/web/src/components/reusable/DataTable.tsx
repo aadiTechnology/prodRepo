@@ -193,7 +193,9 @@ export default function DataTable<T extends object>({
                   ))}
                   {hasActions && (
                     <TableCell align="center" sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${colorTokens.border.subtle}`, whiteSpace: { xs: 'nowrap', sm: 'normal' } }}>
-                      {renderRowActions(row)}
+                      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+                        {renderRowActions(row)}
+                      </Box>
                     </TableCell>
                   )}
                 </TableRow>

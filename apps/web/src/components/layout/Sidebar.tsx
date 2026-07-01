@@ -36,6 +36,7 @@ import { useRBAC } from "../../context/RBACContext";
 import { colorTokens } from "../../tokens/colors";
 import { normalizeMenuPath, hasMenuChildren } from "../../utils/menuNavigation";
 import { toRoleLabel } from "../../utils/formatters";
+import { toMediaUrl } from "../../utils/mediaUrl";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Asset Icons - Menu item icons
@@ -581,7 +582,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
 
       <ProfileCard collapsed={collapsed}>
         <Avatar
-          src={(user?.profile_image_path as string | undefined)}
+          src={toMediaUrl(user?.profile_image_path)}
           sx={{
             width: collapsed ? 44 : 46,
             height: collapsed ? 44 : 46,

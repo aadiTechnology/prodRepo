@@ -21,6 +21,9 @@ import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
 import { useFormManager } from "../../hooks/useFormManager";
+import { dateOfBirthNotFutureRule } from "../../utils/formValidation";
+import { requiredContactNumberRules } from "../../utils/formValidationPresets";
+import { EMAIL_PATTERN } from "../../utils/validationPatterns";
 import leadService from "../../api/services/leadService";
 import enrollmentService, { type EnrollmentCreatePayload } from "../../api/services/enrollmentService";
 import studentService, { type StudentDetails } from "../../api/services/studentService";
@@ -243,9 +246,11 @@ export default function EnrollmentPage() {
       academic_year_id: [{ type: "required" as const, message: "Academic year is required." }],
       class_id: [{ type: "required" as const, message: "Class is required." }],
       fee_structure_id: [{ type: "required" as const, message: "Fee plan is required." }],
-      mobile_number: [
-        { type: "required" as const, message: "Contact number is required." },
-        { type: "pattern" as const, regex: /^\d{10,15}$/, message: "Contact number must be 10 to 15 digits." },
+      mobile_number: requiredContactNumberRules<EnrollmentFormData>(),
+      date_of_birth: [dateOfBirthNotFutureRule<EnrollmentFormData>()],
+      email: [
+        { type: "required" as const, message: "Email address is required." },
+        { type: "pattern" as const, regex: EMAIL_PATTERN, message: "Invalid email address." },
       ],
     }),
     []
@@ -259,6 +264,7 @@ export default function EnrollmentPage() {
     handleChange,
     handleFieldValueChange,
     handleSubmit,
+    resetForm,
   } = useFormManager<EnrollmentFormData>({
     initialValues,
     validationConfig,
@@ -607,7 +613,7 @@ export default function EnrollmentPage() {
     roll_no: formData.roll_no.trim() || null,
     parent_name: formData.parent_name.trim(),
     mobile_number: formData.mobile_number.trim(),
-    email: formData.email.trim() || null,
+    email: formData.email.trim(),
     fee_structure_id: Number(formData.fee_structure_id),
     discount_id: formData.discount_id ? Number(formData.discount_id) : null,
     additional_fee: null,
@@ -630,14 +636,14 @@ export default function EnrollmentPage() {
           gender: formData.gender || null,
           date_of_birth: formData.date_of_birth || null,
           mobile_number: formData.mobile_number.trim(),
-          email: formData.email.trim() || null,
+          email: formData.email.trim(),
           class_id: Number(formData.class_id),
           class_division_id: formData.class_division_id ? Number(formData.class_division_id) : null,
           roll_no: formData.roll_no.trim() || null,
           parent: {
             parent_name: formData.parent_name.trim(),
             mobile_number: formData.mobile_number.trim(),
-            email: formData.email.trim() || null,
+            email: formData.email.trim(),
           },
           admission_no: formData.admission_no.trim() || null,
           birth_certificate_url: formData.birth_certificate_url.trim() || null,
@@ -871,6 +877,76 @@ export default function EnrollmentPage() {
     setBirthCertName(fileNameFromUrl(prefill.birth_certificate_url));
     setPhotoName(fileNameFromUrl(prefill.photo_url));
   };
+
+  const handleCancel = useCallback(() => {
+    if (isEditMode && studentRecord) {
+      setFormData({
+        student_name: studentRecord.name ?? "",
+        date_of_birth: toDateInputValue(studentRecord.date_of_birth),
+        gender: normalizeGender(studentRecord.gender),
+        admission_no: studentRecord.admission_no ?? "",
+        roll_no: (studentRecord as { roll_no?: string }).roll_no ?? "",
+        admission_date: studentRecord.created_at
+          ? dayjs(studentRecord.created_at).format("YYYY-MM-DD")
+          : dayjs().format("YYYY-MM-DD"),
+        academic_year_id: studentRecord.academic_year_id
+          ? String(studentRecord.academic_year_id)
+          : "",
+        class_id: studentRecord.class_id ? String(studentRecord.class_id) : "",
+        class_division_id: studentRecord.class_division_id
+          ? String(studentRecord.class_division_id)
+          : "",
+        fee_structure_id: studentRecord.fee_structure_id
+          ? String(studentRecord.fee_structure_id)
+          : "",
+        discount_id: studentRecord.discount_id ? String(studentRecord.discount_id) : "",
+        parent_name: studentRecord.parent_name ?? "",
+        mobile_number: studentRecord.mobile ?? "",
+        email: studentRecord.email ?? "",
+        birth_certificate_url: studentRecord.birth_certificate_url ?? "",
+        photo_url: studentRecord.photo_url ?? "",
+      });
+      setBirthCertName(fileNameFromUrl(studentRecord.birth_certificate_url));
+      setPhotoName(fileNameFromUrl(studentRecord.photo_url));
+      setFieldErrors({});
+      setDocumentDeleteTarget(null);
+      setError(null);
+      setSnackbar(null);
+      if (birthCertInputRef.current) birthCertInputRef.current.value = "";
+      if (photoInputRef.current) photoInputRef.current.value = "";
+      return;
+    }
+
+    const cleared = emptyForm();
+    const currentYearId = resolveCurrentAcademicYearId(academicYears);
+    if (currentYearId) cleared.academic_year_id = currentYearId;
+
+    resetForm(cleared);
+    setSelectedLead(null);
+    setBirthCertName("");
+    setPhotoName("");
+    setDocumentDeleteTarget(null);
+    setError(null);
+    setSnackbar(null);
+    if (birthCertInputRef.current) birthCertInputRef.current.value = "";
+    if (photoInputRef.current) photoInputRef.current.value = "";
+
+    enrollmentService
+      .getNextAdmissionNo()
+      .then((admissionNo) => {
+        if (admissionNo) {
+          setFormData((prev) => ({ ...prev, admission_no: admissionNo }));
+        }
+      })
+      .catch(() => {});
+  }, [
+    academicYears,
+    isEditMode,
+    resetForm,
+    setFieldErrors,
+    setFormData,
+    studentRecord,
+  ]);
 
   const formConfig = useMemo(() => {
     const config = createEnrollmentFormConfig({
@@ -1262,19 +1338,19 @@ export default function EnrollmentPage() {
     );
   }
 
-  const documentDeleteLabel =
-    documentDeleteTarget === "birth_certificate"
-      ? "birth certificate"
-      : documentDeleteTarget === "photo"
-        ? "student photo"
-        : "document";
+  const documentDeleteMessage =
+    documentDeleteTarget === "photo"
+      ? "Are you sure you want to remove this student photo?"
+      : documentDeleteTarget === "birth_certificate"
+        ? "Are you sure you want to remove this birth certificate?"
+        : "Are you sure you want to remove this document?";
 
   return (
     <>
       <ConfirmDialog
         open={documentDeleteTarget != null}
         title="Please Confirm"
-        message={`Are you sure you want to remove this ${documentDeleteLabel}?`}
+        message={documentDeleteMessage}
         confirmLabel="Confirm"
         onConfirm={confirmDocumentDelete}
         onClose={() => setDocumentDeleteTarget(null)}
@@ -1317,13 +1393,7 @@ export default function EnrollmentPage() {
           saveTooltipCreate: isEditMode ? "Save Student" : "Enroll Student",
           saveTooltipEdit: "Save Student",
         }}
-        onCancelNavigate={() => {
-          if (isStudentFlow && fromConfigHub) {
-            navigateToList(studentListPath);
-            return;
-          }
-          navigate(-1);
-        }}
+        onCancelNavigate={handleCancel}
         confirmMessage={() =>
           isViewMode
             ? "This page is in view-only mode."

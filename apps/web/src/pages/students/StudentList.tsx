@@ -2,7 +2,6 @@ import React, { useMemo, useEffect, useState, useCallback } from "react";
 import {
   Box,
   Typography,
-  Snackbar,
   Select,
   MenuItem,
   Button,
@@ -125,9 +124,7 @@ const StudentList = () => {
     totalStudents,
     loading,
     error,
-    snackbar,
     fetchStudents,
-    closeSnackbar,
     confirmDialogOpen,
     studentToDelete,
     deleteLoading,
@@ -261,7 +258,7 @@ const StudentList = () => {
       }
     >
       <EntityTableSection
-        label="Student Directory"
+        label="Student List"
         totalRows={totalStudents}
         page={page}
         rowsPerPage={rowsPerPage}
@@ -299,14 +296,6 @@ const StudentList = () => {
         onConfirm={confirmDelete}
         onClose={closeDeleteConfirm}
         loading={deleteLoading}
-      />
-
-      <Snackbar
-        open={!!snackbar}
-        autoHideDuration={3000}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        onClose={closeSnackbar}
-        message={snackbar}
       />
     </ListPageLayout>
   );

@@ -21,6 +21,9 @@ export type { TextFieldInputProps } from "./TextFieldInput";
 export { default as PhoneInput } from "./PhoneInput";
 export type { PhoneInputProps } from "./PhoneInput";
 
+export { default as DateOfBirthInput } from "./DateOfBirthInput";
+export type { DateOfBirthInputProps } from "./DateOfBirthInput";
+
 export { default as NumericInput } from "./NumericInput";
 export type { NumericInputProps } from "./NumericInput";
 
@@ -44,6 +47,9 @@ export type { RejectButtonProps } from "./RejectButton";
 
 export { default as ArtifactRejectDialog } from "./ArtifactRejectDialog";
 export type { ArtifactRejectDialogProps } from "./ArtifactRejectDialog";
+
+export { default as ValidationErrorDialog } from "./ValidationErrorDialog";
+export type { ValidationErrorDialogProps } from "./ValidationErrorDialog";
 
 export { default as StoryDisplay } from "./StoryDisplay";
 export type { StoryDisplayProps } from "./StoryDisplay";

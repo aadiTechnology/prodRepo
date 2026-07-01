@@ -60,7 +60,7 @@ export function createAddLeadFormConfig({
       mobile_number: {
         name: "mobile_number",
         label: "Contact Number",
-        type: "text",
+        type: "phone",
         placeholder: "10-digit mobile number",
         required: true,
         props: { htmlInput: { maxLength: 15 } },
@@ -68,7 +68,7 @@ export function createAddLeadFormConfig({
       alternate_mobile: {
         name: "alternate_mobile",
         label: "Alternate Contact",
-        type: "text",
+        type: "phone",
         placeholder: "Optional",
         required: false,
         props: { htmlInput: { maxLength: 15 } },
@@ -138,7 +138,7 @@ export function createAddLeadFormConfig({
       child_dob: {
         name: "child_dob",
         label: "Date of Birth",
-        type: "date",
+        type: "dob",
         required: false,
       },
       child_gender: {

@@ -24,7 +24,8 @@ export type FormFieldType =
   | "phone"
   | "numeric"
   | "custom"
-  | "date";
+  | "date"
+  | "dob";
 
 export type FormRenderContext<T extends Record<string, unknown>> = {
   formData: T;
@@ -94,7 +95,11 @@ export type BaseFormProps<T extends Record<string, unknown>> = {
   fieldErrors: Partial<Record<keyof T & string, string>>;
   handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   handleFieldValueChange: (name: keyof T & string, value: unknown) => void;
-  handleSubmit: (e: React.FormEvent, onValid?: () => void) => void;
+  handleSubmit: (
+    e: React.FormEvent,
+    onValid?: () => void,
+    onInvalid?: (errors: Partial<Record<keyof T & string, string>>) => void
+  ) => void;
   /** For custom slots (e.g. upload validation) to set the same banner error as the page. */
   setFormError: (msg: string | null) => void;
   onConfirmSubmit: () => Promise<void>;
@@ -125,7 +130,7 @@ export type BaseFormProps<T extends Record<string, unknown>> = {
   hideHeaderCancel?: boolean;
   /** Controls footer action order; defaults to cancel (left) then save (right). */
   footerActionOrder?: "save-first" | "cancel-first";
-  /** If true, error message will be shown in a snackbar instead of an inline alert. */
+  /** @deprecated Errors are shown in ValidationErrorDialog by default. */
   useErrorSnackbar?: boolean;
   /** MUI Grid spacing between form field blocks (default 2). */
   gridSpacing?: number;

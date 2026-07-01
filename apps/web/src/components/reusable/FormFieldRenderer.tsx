@@ -8,6 +8,7 @@ import {
 } from "../semantic";
 import TextFieldInput from "../semantic/TextFieldInput";
 import PhoneInput from "../semantic/PhoneInput";
+import DateOfBirthInput from "../semantic/DateOfBirthInput";
 import NumericInput from "../semantic/NumericInput";
 import type { FormFieldConfig, FormRenderContext } from "./formFramework.types";
 
@@ -89,6 +90,19 @@ export default function FormFieldRenderer<T extends Record<string, unknown>>({
           error={showError}
           helperText={helperText}
           InputLabelProps={{ shrink: true }}
+          {...(extra as Record<string, unknown>)}
+        />
+      );
+    case "dob":
+      return (
+        <DateOfBirthInput
+          label={field.label}
+          name={name}
+          value={String(formData[name] ?? "")}
+          onChange={handleChange}
+          required={field.required}
+          error={showError}
+          helperText={helperText}
           {...(extra as Record<string, unknown>)}
         />
       );
