@@ -9,6 +9,9 @@ from app.models.user import User, UserRole
 from app.schemas.ai import (
     InterpretRequest,
     InterpretResponse,
+    ChatSessionResponse,
+    ChatMessageResponse,
+    SaveChatMessageRequest,
     GenerateStoryAndTestsRequest,
     RejectArtifactRequest,
     UpdateUserStoryRequest,
@@ -20,6 +23,12 @@ from app.schemas.ai import (
     SkeletonGenerationRequest,
 )
 from app.services.intent_service import interpret
+from app.services.ai_chat_service import (
+    append_message,
+    clear_chat,
+    list_messages,
+    persist_interpret_exchange,
+)
 from app.services.ai_service import (
     generate_story_and_tests,
     generate_development_tasks,
@@ -157,6 +166,70 @@ def _serialize_test_case(tc) -> dict:
     }
 
 
+def _impersonator_id(current_user: CurrentUser) -> int | None:
+    if current_user.is_impersonation and current_user.original_user_id:
+        return int(current_user.original_user_id)
+    return None
+
+
+def _message_to_response(msg) -> ChatMessageResponse:
+    return ChatMessageResponse(
+        id=int(msg.id),
+        client_message_id=msg.client_message_id,
+        role=msg.role,
+        message_text=msg.message_text,
+        is_error=bool(msg.is_error),
+        input_source=msg.input_source,
+        route=msg.route,
+        created_at=msg.created_at,
+    )
+
+
+@router.get("/chat", response_model=ChatSessionResponse)
+async def ai_chat_get(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ChatSessionResponse:
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    session, rows = list_messages(db, user)
+    return ChatSessionResponse(
+        session_id=int(session.id),
+        messages=[_message_to_response(m) for m in rows],
+    )
+
+
+@router.post("/chat/messages", response_model=ChatMessageResponse)
+async def ai_chat_save_message(
+    body: SaveChatMessageRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ChatMessageResponse:
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    msg = append_message(
+        db,
+        user,
+        body,
+        impersonated_by=_impersonator_id(current_user),
+    )
+    return _message_to_response(msg)
+
+
+@router.delete("/chat", response_model=ChatSessionResponse)
+async def ai_chat_clear(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ChatSessionResponse:
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    session = clear_chat(db, user, impersonated_by=_impersonator_id(current_user))
+    return ChatSessionResponse(session_id=int(session.id), messages=[])
+
+
 @router.post("/interpret", response_model=InterpretResponse)
 async def ai_interpret(
     body: InterpretRequest,
@@ -179,7 +252,21 @@ async def ai_interpret(
             error_type="SAFE_ERROR",
             error_message="User not found.",
         )
-    return interpret(db, user, body.user_text)
+    result, usage = interpret(db, user, body.user_text)
+    try:
+        persist_interpret_exchange(
+            db,
+            user,
+            body.user_text,
+            result,
+            input_source=body.input_source,
+            client_message_id=body.client_message_id,
+            impersonated_by=_impersonator_id(current_user),
+            usage=usage,
+        )
+    except Exception:
+        logger.exception("Failed to persist AI chat messages for user_id=%s", current_user.id)
+    return result
 
 
 @router.post("/generate-story-and-tests")

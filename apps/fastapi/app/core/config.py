@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, Field, computed_field
 from typing import List
 import os
@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     Centralized application settings with environment variable support.
     Includes validation for production readiness.
     """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+    )
 
     # Application
     APP_NAME: str = "FastAPI SQL Server CRUD"
@@ -29,9 +34,8 @@ class Settings(BaseSettings):
    
     # CORS - comma-separated string in .env (parsed to list via CORS_ORIGINS property)
     CORS_ORIGINS_STR: str = Field(
-        env="CORS_ORIGINS",
         default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://localhost,http://localhost,capacitor://localhost,http://erpui.aaditechnology.com,https://erpui.aaditechnology.com,http://erpui1.aaditechnology.com,https://app.smartkidzwakad.com",
-        
+        validation_alias="CORS_ORIGINS",
     )
     CORS_CREDENTIALS: bool = True
     CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
@@ -42,7 +46,25 @@ class Settings(BaseSettings):
     def CORS_ORIGINS(self) -> List[str]:
         return [x.strip() for x in self.CORS_ORIGINS_STR.split(",") if x.strip()]
     
-    OPENAI_API_KEY: str = Field(default="", description="OpenAI API key for AI interpret; set in .env")
+    OPENAI_API_KEY: str = Field(default="", description="OpenAI API key for AI assistant navigation")
+    OPENAI_BASE_URL: str = Field(
+        default="https://api.openai.com/v1",
+        description="OpenAI API base URL (optional; for Azure/OpenAI-compatible proxies)",
+    )
+    OPENAI_MODEL: str = Field(default="gpt-4o-mini", description="OpenAI chat model for AI assistant")
+    AI_NAV_MAX_OUTPUT_TOKENS: int = Field(default=150, description="Max completion tokens per navigation AI call")
+    AI_NAV_LLM_CANDIDATE_LIMIT: int = Field(default=8, description="Max menu candidates sent to LLM per request")
+    GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key (optional fallback)")
+    GEMINI_MODEL: str = Field(default="gemini-2.5-flash", description="Gemini model (optional fallback)")
+    NVIDIA_API_KEY: str = Field(default="", description="NVIDIA NVAPI key for AI assistant navigation")
+    NVIDIA_BASE_URL: str = Field(
+        default="https://integrate.api.nvidia.com/v1",
+        description="NVIDIA API base URL (OpenAI-compatible)",
+    )
+    NVIDIA_MODEL: str = Field(
+        default="meta/llama-3.1-8b-instruct",
+        description="NVIDIA NIM model for AI assistant navigation",
+    )
     # JWT Authentication
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
@@ -114,10 +136,6 @@ class Settings(BaseSettings):
                 errors.append("CORS_ORIGINS should not contain '*' in production")
         
         return errors
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 # Create settings instance
 settings = Settings()

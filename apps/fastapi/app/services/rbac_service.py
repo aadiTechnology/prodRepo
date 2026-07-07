@@ -24,6 +24,16 @@ logger = get_logger(__name__)
 SYSTEM_ADMIN_ROLE_CODE = "SYSTEM_ADMIN"
 TENANT_ADMIN_ROLE_CODE = "TENANT_ADMIN"
 
+
+def _as_int(value: object) -> int:
+    """Coerce ORM scalar values to int for runtime and type checkers."""
+    return int(value)  # type: ignore[arg-type]
+
+
+def _as_bool(value: object) -> bool:
+    """Coerce ORM scalar values to bool for runtime and type checkers."""
+    return bool(value)  # type: ignore[arg-type]
+
 # Menus that may lack feature_id in the catalog but still map to a feature for permission codes.
 MENU_PATH_FEATURE_CODES: dict[str, str] = {
     "/communication/notices": "COMMUNICATION_MGMT",
@@ -31,7 +41,7 @@ MENU_PATH_FEATURE_CODES: dict[str, str] = {
 
 
 def _feature_code_for_menu(menu: Menu) -> str | None:
-    if menu.feature_id and menu.feature:
+    if menu.feature_id is not None and menu.feature is not None:
         return str(menu.feature.code)
     path = (menu.path or "").strip()
     if path:
@@ -366,7 +376,7 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
                 .first()
             )
             if tenant_admin_role:
-                tenant_admin_role_id = int(tenant_admin_role.id)
+                tenant_admin_role_id = _as_int(tenant_admin_role.id)
                 assigned_codes_upper = {c.upper() for c in role_codes}
                 if "ADMIN" not in assigned_codes_upper and "TENANT_ADMIN" not in assigned_codes_upper:
                     is_tenant_non_admin = True
@@ -399,8 +409,8 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
         # Aggregate permissions for user roles (union)
         user_menu_perms = {}
         for p in perms:
-            if int(p.role_id) in role_ids:
-                menu_id = int(p.menu_id)
+            if _as_int(p.role_id) in role_ids:
+                menu_id = _as_int(p.menu_id)
                 if menu_id not in user_menu_perms:
                     user_menu_perms[menu_id] = {
                         "can_view": False,
@@ -418,8 +428,8 @@ def resolve_user_permissions_and_menus(db: Session, user: User) -> Tuple[List[st
         admin_menu_perms = {}
         if is_tenant_non_admin and tenant_admin_role_id is not None:
             for p in perms:
-                if int(p.role_id) == tenant_admin_role_id:
-                    menu_id = int(p.menu_id)
+                if _as_int(p.role_id) == tenant_admin_role_id:
+                    menu_id = _as_int(p.menu_id)
                     if menu_id not in admin_menu_perms:
                         admin_menu_perms[menu_id] = {
                             "can_view": False,
@@ -535,7 +545,7 @@ def compute_rbac_version(db: Session, user: User) -> str:
                 .first()
             )
             if tenant_admin_role:
-                tenant_admin_id = int(tenant_admin_role.id)
+                tenant_admin_id = _as_int(tenant_admin_role.id)
 
     version_role_ids = list(set(role_ids + ([tenant_admin_id] if tenant_admin_id is not None else [])))
 
@@ -686,7 +696,7 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
     # Snapshot existing role permissions before replacement so delegation checks can
     # distinguish "newly granted now" vs "already existed on the role".
     existing_perms_map: dict[int, RoleMenuPermission] = {
-        int(row.menu_id): row
+        _as_int(row.menu_id): row
         for row in db.query(RoleMenuPermission).filter(RoleMenuPermission.role_id == role.id).all()
     }
 
@@ -713,30 +723,30 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
                         continue
                         
                     f_code = menu.feature.code
-                    existing = existing_perms_map.get(int(p.menu_id))
+                    existing = existing_perms_map.get(_as_int(p.menu_id))
                     
                     # Only validate when permission is newly enabled in this request.
                     if (
                         p.can_view
-                        and not (existing.can_view if existing else False)
+                        and not (_as_bool(existing.can_view) if existing else False)
                         and f"{f_code}:view" not in user_perms
                     ):
                         raise ForbiddenException(f"You cannot grant 'view' access to '{menu.name}' because you don't have it.")
                     if (
                         p.can_create
-                        and not (existing.can_create if existing else False)
+                        and not (_as_bool(existing.can_create) if existing else False)
                         and f"{f_code}:create" not in user_perms
                     ):
                         raise ForbiddenException(f"You cannot grant 'create' access to '{menu.name}' because you don't have it.")
                     if (
                         p.can_edit
-                        and not (existing.can_edit if existing else False)
+                        and not (_as_bool(existing.can_edit) if existing else False)
                         and f"{f_code}:edit" not in user_perms
                     ):
                         raise ForbiddenException(f"You cannot grant 'edit' access to '{menu.name}' because you don't have it.")
                     if (
                         p.can_delete
-                        and not (existing.can_delete if existing else False)
+                        and not (_as_bool(existing.can_delete) if existing else False)
                         and f"{f_code}:delete" not in user_perms
                     ):
                         raise ForbiddenException(f"You cannot grant 'delete' access to '{menu.name}' because you don't have it.")

@@ -45,14 +45,16 @@ def cleanup_deprecated_menus(db: Session) -> None:
     seen_ids: set[int] = set()
     for menu_name in deprecated_menu_names:
         for menu in db.query(Menu).filter(Menu.name == menu_name).all():
-            if menu.id not in seen_ids:
-                seen_ids.add(menu.id)
+            menu_id = int(menu.id)  # type: ignore[arg-type]
+            if menu_id not in seen_ids:
+                seen_ids.add(menu_id)
                 _purge_menu(menu)
 
     for menu_path in deprecated_menu_paths:
         for menu in db.query(Menu).filter(Menu.path == menu_path).all():
-            if menu.id not in seen_ids:
-                seen_ids.add(menu.id)
+            menu_id = int(menu.id)  # type: ignore[arg-type]
+            if menu_id not in seen_ids:
+                seen_ids.add(menu_id)
                 _purge_menu(menu)
 
     db.flush()

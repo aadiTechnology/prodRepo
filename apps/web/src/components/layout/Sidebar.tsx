@@ -320,21 +320,6 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
     setLogoError(false);
   }, [user?.tenant?.id, user?.tenant?.logo_url]);
 
-  // Initialize expandedSections based on current path and menuItems
-  useEffect(() => {
-    const initialExpanded: Record<string, boolean> = {};
-    menuItems.forEach(item => {
-      if (
-        location.pathname === item.path ||
-        (item.children?.some(child => location.pathname === child.path) ?? false)
-      ) {
-        initialExpanded[item.id] = true;
-      }
-    });
-    setExpandedSections(initialExpanded);
-    // Only run when menuItems or location.pathname changes
-  }, [menus, user, location.pathname]);
-
   const menuItems: MenuItemData[] = useMemo(() => {
     if (rbacRoles.includes("super_admin")) {
       return SYSTEM_ADMIN_MENU;
@@ -400,6 +385,38 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
 
     return items;
   }, [menus, user, rbacRoles]);
+
+  // Initialize expandedSections based on current path and menuItems
+  useEffect(() => {
+    const initialExpanded: Record<string, boolean> = {};
+    menuItems.forEach((item) => {
+      if (
+        location.pathname === item.path ||
+        (item.children?.some((child) => location.pathname === child.path) ?? false)
+      ) {
+        initialExpanded[item.id] = true;
+      }
+    });
+    setExpandedSections(initialExpanded);
+  }, [menuItems, location.pathname]);
+
+  // AI Assistant: expand parent section when navigating via voice/text command
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { parentId } = (e as CustomEvent<{ parentId: string }>).detail;
+      if (!parentId) return;
+      setExpandedSections((prev) => {
+        const next: Record<string, boolean> = {};
+        Object.keys(prev).forEach((key) => {
+          next[key] = false;
+        });
+        next[parentId] = true;
+        return next;
+      });
+    };
+    window.addEventListener("sidebar-expand", handler);
+    return () => window.removeEventListener("sidebar-expand", handler);
+  }, []);
 
   const toggleSection = (id: string) => {
     setExpandedSections((prev) => {

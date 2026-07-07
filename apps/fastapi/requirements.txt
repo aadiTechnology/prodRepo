@@ -12,5 +12,6 @@ python-jose[cryptography]
 alembic
 python-multipart
 openai
+google-generativeai
 langchain-openai
 langchain-core

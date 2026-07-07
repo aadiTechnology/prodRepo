@@ -1,4 +1,5 @@
 from typing import Literal, Any
+from datetime import datetime
 from pydantic import BaseModel, Field
 
 
@@ -62,6 +63,54 @@ class GenerateStoryAndTestsRequest(BaseModel):
 
 class InterpretRequest(BaseModel):
     user_text: str = Field(..., min_length=1, max_length=2000)
+    input_source: str | None = Field(None, max_length=30)
+    client_message_id: str | None = Field(None, max_length=64)
+
+
+class ChatMessageResponse(BaseModel):
+    id: int
+    client_message_id: str | None = None
+    role: Literal["user", "assistant", "system"]
+    message_text: str
+    is_error: bool = False
+    input_source: str | None = None
+    route: str | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChatSessionResponse(BaseModel):
+    session_id: int
+    messages: list[ChatMessageResponse] = Field(default_factory=list)
+
+
+class SaveChatMessageRequest(BaseModel):
+    role: Literal["user", "assistant"]
+    message_text: str = Field(..., min_length=1, max_length=8000)
+    is_error: bool = False
+    input_source: str | None = Field(None, max_length=30)
+    client_message_id: str | None = Field(None, max_length=64)
+    action: Literal["NAVIGATE", "CALL_API"] | None = None
+    menu_id: int | None = None
+    menu_name: str | None = Field(None, max_length=200)
+    parent_menu_id: int | None = None
+    parent_menu_name: str | None = Field(None, max_length=200)
+    route: str | None = Field(None, max_length=500)
+    error_type: Literal["SAFE_ERROR", "NEED_CLARIFICATION"] | None = None
+    error_message: str | None = Field(None, max_length=1000)
+    interpret_response: dict[str, Any] | None = None
+
+
+class InterpretOption(BaseModel):
+    """A selectable navigation suggestion shown when the assistant is unsure."""
+
+    menu_id: int | None = None
+    menu_name: str = ""
+    route: str = ""
+    parent_menu_id: int | None = None
+    parent_menu_name: str = ""
 
 
 class InterpretResponse(BaseModel):
@@ -77,6 +126,7 @@ class InterpretResponse(BaseModel):
     requires_confirmation: bool = False
     error_type: Literal["SAFE_ERROR", "NEED_CLARIFICATION"] | None = None
     error_message: str | None = None
+    options: list[InterpretOption] = Field(default_factory=list)
 
 
 class RejectArtifactRequest(BaseModel):
