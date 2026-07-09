@@ -78,10 +78,19 @@ class LoginContextResponse(BaseModel):
     """Opaque version string that changes whenever this user's effective RBAC changes.
     Frontends can poll /auth/rbac/context and compare this to decide if state
     should be replaced, enabling near real-time sidebar/permission updates."""
+    ai_assistant: Optional[AiAssistantPlanInfo] = None
 
 class RBACVersionResponse(BaseModel):
     """Lightweight response for the cheap version-check poll endpoint."""
     version: str
+
+
+class AiAssistantPlanInfo(BaseModel):
+    """Per-tenant AI Assistant entitlement returned at login."""
+    plan_tier: str = "basic"
+    ai_enabled: bool = True
+    llm_enabled: bool = False
+    monthly_llm_unit_cap: Optional[int] = None
 
 
 def create_user_with_role(user):

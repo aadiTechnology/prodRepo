@@ -51,6 +51,7 @@ from app.models.support import (
     SupportProductUpdate,
 )
 from app.models.ai_assistant_chat import AiAssistantSession, AiAssistantMessage
+from app.models.ai_assistant_tenant_config import AiAssistantTenantConfig
 
 # Export all models for convenience
 __all__ = [
@@ -116,5 +117,6 @@ __all__ = [
     "SupportProductUpdate",
     "AiAssistantSession",
     "AiAssistantMessage",
+    "AiAssistantTenantConfig",
 ]
 

@@ -10,6 +10,7 @@ from app.schemas.ai import InterpretResponse, InterpretOption
 from app.core.config import settings
 from app.core.logging_config import get_logger
 from app.services.rbac_service import get_allowed_menus_tree_for_ai, resolve_user_permissions_and_menus
+from app.services.ai_tenant_config_service import get_ai_tenant_plan
 
 logger = get_logger(__name__)
 
@@ -649,11 +650,46 @@ def interpret(db: Session, user: User, user_text: str) -> tuple[InterpretRespons
             error_message="No pages are assigned to your role yet. Ask your system admin.",
         ), None
 
+    plan = get_ai_tenant_plan(db, user.tenant_id)
+    if not plan.ai_enabled:
+        return InterpretResponse(
+            menu_id=None,
+            menu_name="",
+            parent_menu_id=None,
+            parent_menu_name="",
+            route="",
+            action="NAVIGATE",
+            method=None,
+            endpoint=None,
+            payload={},
+            requires_confirmation=False,
+            error_type="SAFE_ERROR",
+            error_message="AI Assistant is not enabled for your school. Contact your administrator.",
+        ), None
+
     local = _local_match(user_text, allowed_menus)
     if local:
         logger.info("[AI-NAV] local match menu_id=%s (0 tokens)", local.get("menu_id"))
         data = _validate_response(local, allowed_menus)
         return _to_interpret_response(data), dict(_LOCAL_USAGE)
+
+    if not plan.llm_enabled:
+        logger.info("[AI-NAV] basic plan tenant_id=%s — LLM blocked (0 tokens)", user.tenant_id)
+        response = InterpretResponse(
+            menu_id=None,
+            menu_name="",
+            parent_menu_id=None,
+            parent_menu_name="",
+            route="",
+            action="NAVIGATE",
+            method=None,
+            endpoint=None,
+            payload={},
+            requires_confirmation=False,
+            error_type="NEED_CLARIFICATION",
+            error_message="Pick a page below, or type the exact screen name (Basic plan — smart AI is not included).",
+        )
+        return _attach_options(response, user_text, allowed_menus), dict(_LOCAL_USAGE)
 
     data, usage = _call_llm(user_text, allowed_menus)
     data = _validate_response(data, allowed_menus)

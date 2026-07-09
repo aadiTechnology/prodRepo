@@ -23,4 +23,11 @@ export interface LoginContextResponse {
   tenant?: TenantInfo | null;
   /** Opaque version string from backend; changes when effective RBAC changes. */
   rbac_version?: string | null;
+  /** Per-tenant AI plan: basic (no LLM) vs advanced (LLM). */
+  ai_assistant?: {
+    plan_tier: string;
+    ai_enabled: boolean;
+    llm_enabled: boolean;
+    monthly_llm_unit_cap?: number | null;
+  } | null;
 }
