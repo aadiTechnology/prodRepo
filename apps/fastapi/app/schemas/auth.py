@@ -65,6 +65,13 @@ class CurrentUser(BaseModel):
     class Config:
         from_attributes = True
 
+class AiAssistantPlanInfo(BaseModel):
+    """Per-tenant AI Assistant entitlement returned at login."""
+    plan_tier: str = "basic"
+    ai_enabled: bool = True
+    llm_enabled: bool = False
+    monthly_llm_unit_cap: Optional[int] = None
+
 class LoginContextResponse(BaseModel):
     """Extended login response including RBAC context."""
     access_token: Optional[str] = None
@@ -83,14 +90,6 @@ class LoginContextResponse(BaseModel):
 class RBACVersionResponse(BaseModel):
     """Lightweight response for the cheap version-check poll endpoint."""
     version: str
-
-
-class AiAssistantPlanInfo(BaseModel):
-    """Per-tenant AI Assistant entitlement returned at login."""
-    plan_tier: str = "basic"
-    ai_enabled: bool = True
-    llm_enabled: bool = False
-    monthly_llm_unit_cap: Optional[int] = None
 
 
 def create_user_with_role(user):
