@@ -443,6 +443,32 @@ const FeeStructureForm = () => {
     }
   };
 
+  const handleCancel = useCallback(() => {
+    if (isEditMode) {
+      navigateToList(listPath);
+      return;
+    }
+
+    const currentYearId = resolveCurrentAcademicYearId(academicYears);
+    resetForm({
+      ...initialValues,
+      academic_year_id: currentYearId || "",
+    });
+    setInstallments([]);
+    setFieldErrors({});
+    setError(null);
+    setSnackbar(null);
+    setHasTriedSubmit(false);
+  }, [
+    isEditMode,
+    navigateToList,
+    listPath,
+    academicYears,
+    resetForm,
+    initialValues,
+    setFieldErrors,
+  ]);
+
   return (
     <BaseForm<FeeStructureFormData>
       formConfig={formConfig}
@@ -470,8 +496,9 @@ const FeeStructureForm = () => {
           isEditMode ? "Edit Structure" : "New Structure"
         ),
         homePath: "/",
+        cancelTooltip: isEditMode ? "Cancel" : "Reset",
       }}
-      onCancelNavigate={() => navigateToList(listPath)}
+      onCancelNavigate={handleCancel}
       confirmMessage={
         isEditMode
           ? "Are you sure you want to update this fee structure?"
