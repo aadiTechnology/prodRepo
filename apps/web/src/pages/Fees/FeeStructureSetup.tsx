@@ -43,6 +43,10 @@ const FeeStructureSetup = () => {
     controller.totalRecords
   );
 
+  const showPagination =
+    !controller.loading &&
+    controller.totalRecords > controller.listState.rowsPerPage;
+
   return (
     <ListPageLayout
       header={
@@ -147,13 +151,15 @@ const FeeStructureSetup = () => {
           />
         )}
       />
-      <TablePaginationBar
-        page={controller.listState.page}
-        rowsPerPage={controller.listState.rowsPerPage}
-        totalRows={controller.totalRecords}
-        onPageChange={controller.listState.setPage}
-        onRowsPerPageChange={controller.listState.onRowsPerPageChange}
-      />
+      {showPagination && (
+        <TablePaginationBar
+          page={controller.listState.page}
+          rowsPerPage={controller.listState.rowsPerPage}
+          totalRows={controller.totalRecords}
+          onPageChange={controller.listState.setPage}
+          onRowsPerPageChange={controller.listState.onRowsPerPageChange}
+        />
+      )}
 
       <ConfirmDialog
         open={controller.confirmOpen}
