@@ -174,7 +174,7 @@ export function createFeeStructureFormConfig({
           const selected = (ctx.formData.fee_category_ids as string[]) ?? [];
           const error = ctx.fieldErrors["fee_category_ids"];
           return (
-            <FormControl fullWidth error={Boolean(error)} required>
+            <FormControl fullWidth error={Boolean(error)}>
               <InputLabel
                 shrink={selected.length > 0}
                 sx={{
@@ -182,7 +182,12 @@ export function createFeeStructureFormConfig({
                   color: error ? "error.main" : "primary.main",
                 }}
               >
-                Fee Category
+                <span>
+                  Fee Category
+                  <Box component="span" sx={{ color: "error.main", ml: 0.5 }}>
+                    *
+                  </Box>
+                </span>
               </InputLabel>
               <Select
                 multiple
