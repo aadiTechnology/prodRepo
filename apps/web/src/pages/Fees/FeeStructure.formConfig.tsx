@@ -322,10 +322,12 @@ export function createFeeStructureFormConfig({
       {
         kind: "fields",
         grid: { xs: 12, md: 6 },
-        fieldNames: [
-          "num_installments",
-          "description",
-        ],
+        fieldNames: ["num_installments"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12 },
+        fieldNames: ["description"],
       },
       {
         kind: "custom",
