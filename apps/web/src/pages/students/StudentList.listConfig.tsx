@@ -10,9 +10,14 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import type { Student } from "../../types/student";
 import type { ListConfig } from "../../components/reusable";
+import StatusChip from "../../components/roles/StatusChip";
 
 const STUDENT_DELETE_BLOCKED_MESSAGE =
   "Student cannot be deleted because they are assigned to the current academic year.";
+
+function isInactiveStudent(row: Student): boolean {
+  return row.status?.toLowerCase() === "inactive";
+}
 
 export function createStudentListConfig({
   navigate,
@@ -52,6 +57,14 @@ export function createStudentListConfig({
         id: "class",
         label: "Class",
         field: "class",
+      },
+      {
+        id: "status",
+        label: "Status",
+        align: "center" as const,
+        render: (row) => (
+          <StatusChip status={isInactiveStudent(row) ? "INACTIVE" : "ACTIVE"} />
+        ),
       },
     ],
     uiPolicy: {

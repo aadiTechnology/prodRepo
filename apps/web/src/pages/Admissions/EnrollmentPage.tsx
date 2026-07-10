@@ -117,6 +117,7 @@ const emptyForm = (): EnrollmentFormData => ({
   discount_id: "",
   birth_certificate_url: "",
   photo_url: "",
+  is_active: true,
 });
 
 const toDateInputValue = (value?: string | null): string => {
@@ -457,6 +458,7 @@ export default function EnrollmentPage() {
           email: student.email ?? prev.email,
           photo_url: student.photo_url ?? prev.photo_url,
           birth_certificate_url: student.birth_certificate_url ?? prev.birth_certificate_url,
+          is_active: student.is_active !== false,
         }));
         setBirthCertName(fileNameFromUrl(student.birth_certificate_url));
         setPhotoName(fileNameFromUrl(student.photo_url));
@@ -648,6 +650,7 @@ export default function EnrollmentPage() {
           admission_no: formData.admission_no.trim() || null,
           birth_certificate_url: formData.birth_certificate_url.trim() || null,
           photo_url: formData.photo_url.trim() || null,
+          is_active: formData.is_active,
         });
         setSnackbar(res?.message || "Student updated successfully");
       } else {
@@ -905,6 +908,7 @@ export default function EnrollmentPage() {
         email: studentRecord.email ?? "",
         birth_certificate_url: studentRecord.birth_certificate_url ?? "",
         photo_url: studentRecord.photo_url ?? "",
+        is_active: studentRecord.is_active !== false,
       });
       setBirthCertName(fileNameFromUrl(studentRecord.birth_certificate_url));
       setPhotoName(fileNameFromUrl(studentRecord.photo_url));
@@ -956,6 +960,7 @@ export default function EnrollmentPage() {
       feePlanOptions,
       discountOptions,
       autoAssignAdmissionNo: !isEditMode && !isViewMode,
+      isEditMode,
     });
 
     if (!isStudentFlow) {

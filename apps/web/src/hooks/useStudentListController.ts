@@ -136,10 +136,7 @@ export function useStudentListController({
     }
   };
 
-  const sortedStudents = useMemo(() => {
-    // Add sorting logic if needed
-    return students;
-  }, [students]);
+  const sortedStudents = useMemo(() => students, [students]);
 
   return {
     listState,

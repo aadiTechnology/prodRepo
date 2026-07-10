@@ -17,6 +17,7 @@ export type EnrollmentFormData = {
   discount_id: string;
   birth_certificate_url: string;
   photo_url: string;
+  is_active: boolean;
 };
 
 type Option = { id: string; label: string; value: string };
@@ -28,6 +29,7 @@ type CreateEnrollmentFormConfigArgs = {
   feePlanOptions: Option[];
   discountOptions: Option[];
   autoAssignAdmissionNo?: boolean;
+  isEditMode?: boolean;
 };
 
 export function createEnrollmentFormConfig({
@@ -37,6 +39,7 @@ export function createEnrollmentFormConfig({
   feePlanOptions,
   discountOptions,
   autoAssignAdmissionNo = false,
+  isEditMode = false,
 }: CreateEnrollmentFormConfigArgs): FormConfig<EnrollmentFormData> {
   return {
     fields: {
@@ -175,6 +178,19 @@ export function createEnrollmentFormConfig({
         type: "custom",
         required: false,
       },
+      is_active: {
+        name: "is_active",
+        label: "Status",
+        type: "switch",
+        helperText: "Active students are available for use",
+        props: {
+          sx: {
+            width: "fit-content",
+            maxWidth: "100%",
+            p: 1.25,
+          },
+        },
+      },
     },
     layoutRows: [
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["student_name"] },
@@ -198,6 +214,15 @@ export function createEnrollmentFormConfig({
 
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["birth_certificate_url"] },
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["photo_url"] },
+      ...(isEditMode
+        ? [
+            {
+              kind: "fields" as const,
+              grid: { xs: 12, sm: 6 },
+              fieldNames: ["is_active"] as (keyof EnrollmentFormData & string)[],
+            },
+          ]
+        : []),
     ],
   };
 }
