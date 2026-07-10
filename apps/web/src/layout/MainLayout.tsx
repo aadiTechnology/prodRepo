@@ -18,13 +18,14 @@ import { apiBaseUrl } from "../config";
 import { colorTokens } from "../tokens/colors";
 import { toRoleLabel } from "../utils/formatters";
 import { getTimeGreeting, getFirstName } from "../utils/greeting";
+import { hasAiAssistantAccess } from "../utils/menuNavigation";
 
 function MainLayout() {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAuthenticated, exitImpersonation, refreshUser } = useAuth();
-  const { roles: rbacRoles, clearRBACData } = useRBAC();
+  const { roles: rbacRoles, clearRBACData, grantedMenuPaths, menus, isInitialized } = useRBAC();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -527,7 +528,9 @@ function MainLayout() {
           <Box sx={{ width: "100px", display: { xs: "none", sm: "block" } }} />
         </Box>
       </Box>
-      {isAuthenticated && <AIAssistant />}
+      {isAuthenticated && isInitialized && hasAiAssistantAccess(grantedMenuPaths, menus) && (
+        <AIAssistant />
+      )}
       <style>{`
         @keyframes headerWaveHand {
           0%  { transform: rotate(0deg); }

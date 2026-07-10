@@ -11,6 +11,12 @@ from app.core.config import settings
 from app.core.logging_config import get_logger
 from app.services.rbac_service import get_allowed_menus_tree_for_ai, resolve_user_permissions_and_menus
 from app.services.ai_tenant_config_service import get_ai_tenant_plan
+from app.services.ai_permission_sync_service import (
+    resolve_effective_llm_enabled,
+    user_has_llm_permission,
+    user_has_ai_assistant_access,
+    ensure_ai_tenant_plan_synced,
+)
 
 logger = get_logger(__name__)
 
@@ -633,6 +639,25 @@ def interpret(db: Session, user: User, user_text: str) -> tuple[InterpretRespons
             error_message="Please specify which page you want to open.",
         ), None
 
+    if user.tenant_id is not None:
+        ensure_ai_tenant_plan_synced(db, int(user.tenant_id))
+
+    if not user_has_ai_assistant_access(db, user):
+        return InterpretResponse(
+            menu_id=None,
+            menu_name="",
+            parent_menu_id=None,
+            parent_menu_name="",
+            route="",
+            action="NAVIGATE",
+            method=None,
+            endpoint=None,
+            payload={},
+            requires_confirmation=False,
+            error_type="SAFE_ERROR",
+            error_message="AI Assistant is not enabled for your school. Contact your administrator.",
+        ), None
+
     allowed_menus = _build_allowed_menus(db, user)
     if not allowed_menus:
         return InterpretResponse(
@@ -651,21 +676,6 @@ def interpret(db: Session, user: User, user_text: str) -> tuple[InterpretRespons
         ), None
 
     plan = get_ai_tenant_plan(db, user.tenant_id)
-    if not plan.ai_enabled:
-        return InterpretResponse(
-            menu_id=None,
-            menu_name="",
-            parent_menu_id=None,
-            parent_menu_name="",
-            route="",
-            action="NAVIGATE",
-            method=None,
-            endpoint=None,
-            payload={},
-            requires_confirmation=False,
-            error_type="SAFE_ERROR",
-            error_message="AI Assistant is not enabled for your school. Contact your administrator.",
-        ), None
 
     local = _local_match(user_text, allowed_menus)
     if local:
@@ -673,8 +683,23 @@ def interpret(db: Session, user: User, user_text: str) -> tuple[InterpretRespons
         data = _validate_response(local, allowed_menus)
         return _to_interpret_response(data), dict(_LOCAL_USAGE)
 
-    if not plan.llm_enabled:
-        logger.info("[AI-NAV] basic plan tenant_id=%s — LLM blocked (0 tokens)", user.tenant_id)
+    llm_allowed = resolve_effective_llm_enabled(db, user, plan)
+    if not llm_allowed:
+        logger.info(
+            "[AI-NAV] basic plan tenant_id=%s user_id=%s — LLM blocked (0 tokens)",
+            user.tenant_id,
+            user.id,
+        )
+        if plan.llm_enabled and not user_has_llm_permission(db, user):
+            basic_msg = (
+                "Smart AI is not enabled for your role. Pick a page below "
+                "or type the exact screen name."
+            )
+        else:
+            basic_msg = (
+                "Pick a page below, or type the exact screen name "
+                "(Basic plan — smart AI is not included)."
+            )
         response = InterpretResponse(
             menu_id=None,
             menu_name="",
@@ -687,7 +712,7 @@ def interpret(db: Session, user: User, user_text: str) -> tuple[InterpretRespons
             payload={},
             requires_confirmation=False,
             error_type="NEED_CLARIFICATION",
-            error_message="Pick a page below, or type the exact screen name (Basic plan — smart AI is not included).",
+            error_message=basic_msg,
         )
         return _attach_options(response, user_text, allowed_menus), dict(_LOCAL_USAGE)
 

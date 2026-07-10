@@ -40,7 +40,7 @@ def get_ai_tenant_plan(db: Session, tenant_id: int | None) -> AiTenantPlan:
     if not row:
         return AiTenantPlan(
             tenant_id=int(tenant_id),
-            ai_enabled=True,
+            ai_enabled=False,
             plan_tier="basic",
             llm_enabled=False,
         )

@@ -23,6 +23,7 @@ from app.schemas.ai import (
     SkeletonGenerationRequest,
 )
 from app.services.intent_service import interpret
+from app.services.ai_permission_sync_service import user_has_ai_assistant_access
 from app.services.ai_chat_service import (
     append_message,
     clear_chat,
@@ -172,6 +173,14 @@ def _impersonator_id(current_user: CurrentUser) -> int | None:
     return None
 
 
+def _require_campus_buddy_access(db: Session, user: User) -> None:
+    if not user_has_ai_assistant_access(db, user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="AI Assistant is not enabled for your school. Contact your administrator.",
+        )
+
+
 def _message_to_response(msg) -> ChatMessageResponse:
     return ChatMessageResponse(
         id=int(msg.id),
@@ -193,6 +202,7 @@ async def ai_chat_get(
     user = db.query(User).filter(User.id == current_user.id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    _require_campus_buddy_access(db, user)
     session, rows = list_messages(db, user)
     return ChatSessionResponse(
         session_id=int(session.id),
@@ -209,6 +219,7 @@ async def ai_chat_save_message(
     user = db.query(User).filter(User.id == current_user.id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    _require_campus_buddy_access(db, user)
     msg = append_message(
         db,
         user,
@@ -226,6 +237,7 @@ async def ai_chat_clear(
     user = db.query(User).filter(User.id == current_user.id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    _require_campus_buddy_access(db, user)
     session = clear_chat(db, user, impersonated_by=_impersonator_id(current_user))
     return ChatSessionResponse(session_id=int(session.id), messages=[])
 
@@ -251,6 +263,21 @@ async def ai_interpret(
             requires_confirmation=False,
             error_type="SAFE_ERROR",
             error_message="User not found.",
+        )
+    if not user_has_ai_assistant_access(db, user):
+        return InterpretResponse(
+            menu_id=None,
+            menu_name="",
+            parent_menu_id=None,
+            parent_menu_name="",
+            route="",
+            action="NAVIGATE",
+            method=None,
+            endpoint=None,
+            payload={},
+            requires_confirmation=False,
+            error_type="SAFE_ERROR",
+            error_message="AI Assistant is not enabled for your school. Contact your administrator.",
         )
     result, usage = interpret(db, user, body.user_text)
     try:

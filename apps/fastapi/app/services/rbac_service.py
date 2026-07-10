@@ -789,6 +789,17 @@ def set_role_menu_permissions(db: Session, role: Role, data: PermissionBulkUpdat
             f"[RBAC] Updated {len(new_perms)} granular permissions and "
             f"{len(granted_menu_ids)} role_menus rows for role {role.code} (id={role.id})"
         )
+        if role.tenant_id is not None:
+            from app.services.ai_permission_sync_service import sync_ai_tenant_plan_from_permissions
+
+            try:
+                sync_ai_tenant_plan_from_permissions(db, int(role.tenant_id))
+            except Exception as sync_err:
+                logger.warning(
+                    "[RBAC] AI plan sync failed for tenant_id=%s: %s",
+                    role.tenant_id,
+                    sync_err,
+                )
     except (IntegrityError, DataError) as e:
         db.rollback()
         logger.error(f"[RBAC] Failed to update permissions for role {role.code} (id={role.id}): {str(e)}")

@@ -9,7 +9,7 @@ from app.services import profile_image_service
 from app.schemas.auth import LoginContextResponse, TenantInfo, UserWithRole, AiAssistantPlanInfo
 from app.utils.security import create_access_token
 from app.services import rbac_service, theme_template_service
-from app.services.ai_tenant_config_service import get_ai_tenant_plan
+from app.services.ai_permission_sync_service import get_effective_ai_plan_for_user
 from app.core.exceptions import UnauthorizedException, ForbiddenException
 from app.core.logging_config import get_logger
 
@@ -85,7 +85,7 @@ def get_login_context(
 
     ai_plan = None
     if user.tenant_id:
-        plan = get_ai_tenant_plan(db, user.tenant_id)
+        plan = get_effective_ai_plan_for_user(db, user)
         ai_plan = AiAssistantPlanInfo(
             plan_tier=plan.plan_tier,
             ai_enabled=plan.ai_enabled,
