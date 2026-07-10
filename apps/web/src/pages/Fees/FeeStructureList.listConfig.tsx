@@ -59,7 +59,6 @@ export function createFeeStructureListConfig({
     },
     uiPolicy: {
       emptyMessage: "No fee structures found. Click 'Setup Fee' to begin.",
-      title: "Fee Structure Directory",
     },
   };
 }

@@ -7,7 +7,7 @@ import { Box, Typography } from "@mui/material";
 import { colorTokens } from "../../tokens/colors";
 
 export interface DirectoryInfoBarProps {
-  label: string;
+  label?: string;
   rangeStart: number;
   rangeEnd: number;
   total: number;
@@ -20,7 +20,7 @@ export default function DirectoryInfoBar({ label, rangeStart, rangeEnd, total }:
         py: 1.5,
         px: { xs: 2, sm: 3 },
         display: "flex",
-        justifyContent: "space-between",
+        justifyContent: label ? "space-between" : "flex-end",
         alignItems: "center",
         flexWrap: "wrap",
         gap: 0.5,
@@ -28,18 +28,20 @@ export default function DirectoryInfoBar({ label, rangeStart, rangeEnd, total }:
         bgcolor: colorTokens.background.default,
       })}
     >
-      <Typography
-        variant="body2"
-        sx={(theme) => ({
-          fontSize: theme.typography.caption.fontSize,
-          color: theme.palette.text.secondary,
-          fontWeight: theme.typography.fontWeightMedium,
-          textTransform: "uppercase",
-          letterSpacing: "0.5px",
-        })}
-      >
-        {label}
-      </Typography>
+      {label ? (
+        <Typography
+          variant="body2"
+          sx={(theme) => ({
+            fontSize: theme.typography.caption.fontSize,
+            color: theme.palette.text.secondary,
+            fontWeight: theme.typography.fontWeightMedium,
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+          })}
+        >
+          {label}
+        </Typography>
+      ) : null}
       <Typography
         variant="body2"
         sx={(theme) => ({

@@ -1,29 +1,18 @@
 import React from "react";
-import {
-  Box,
-  Typography,
-  Select,
-  MenuItem,
-  Alert,
-  Snackbar,
-} from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { Typography, Select, MenuItem, Alert } from "@mui/material";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { PageHeader } from "../../components/layout";
 import {
   ListPageLayout,
   ListPageToolbar,
-  DirectoryInfoBar,
-  DataTable,
-  TableRowActions,
-  TablePaginationBar,
+  EntityTableSection,
 } from "../../components/reusable";
+import type { FeeStructure } from "../../types/fee";
 import { useFeeStructureListController } from "../../hooks/useFeeStructureListController";
 import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { createFeeStructureListConfig } from "./FeeStructureList.listConfig";
 
 const FeeStructureSetup = () => {
-  const navigate = useNavigate();
   const controller = useFeeStructureListController();
   const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
 
@@ -34,21 +23,10 @@ const FeeStructureSetup = () => {
     onDeleteClick: controller.handleDeleteClick,
   });
 
-  const rangeStart =
-    controller.totalRecords > 0
-      ? controller.listState.page * controller.listState.rowsPerPage + 1
-      : 0;
-  const rangeEnd = Math.min(
-    (controller.listState.page + 1) * controller.listState.rowsPerPage,
-    controller.totalRecords
-  );
-
-  const showPagination =
-    !controller.loading &&
-    controller.totalRecords > controller.listState.rowsPerPage;
-
   return (
     <ListPageLayout
+      pageBackground
+      contentPaddingSize="none"
       header={
         <PageHeader
           links={breadcrumbLinks}
@@ -133,33 +111,25 @@ const FeeStructureSetup = () => {
         </Alert>
       )}
 
-      <DirectoryInfoBar
-        label={config.uiPolicy.title}
-        rangeStart={rangeStart}
-        rangeEnd={rangeEnd}
-        total={controller.totalRecords}
-      />
-      <DataTable
+      <EntityTableSection<FeeStructure>
+        label="Fee Structures"
+        showInfoBar={false}
+        totalRows={controller.totalRecords}
+        page={controller.listState.page}
+        rowsPerPage={controller.listState.rowsPerPage}
+        onPageChange={controller.listState.setPage}
+        onRowsPerPageChange={controller.listState.onRowsPerPageChange}
         columns={config.columns}
         data={controller.structures}
         loading={controller.loading}
         emptyMessage={config.uiPolicy.emptyMessage}
-        renderRowActions={(s) => (
-          <TableRowActions
-            onEdit={() => config.rowActions.onEdit(s)}
-            onDelete={() => config.rowActions.onDelete(s)}
-          />
-        )}
+        rowActions={(structure) => ({
+          onEdit: () => config.rowActions.onEdit(structure),
+          onDelete: () => config.rowActions.onDelete(structure),
+        })}
+        stickyHeader
+        size="small"
       />
-      {showPagination && (
-        <TablePaginationBar
-          page={controller.listState.page}
-          rowsPerPage={controller.listState.rowsPerPage}
-          totalRows={controller.totalRecords}
-          onPageChange={controller.listState.setPage}
-          onRowsPerPageChange={controller.listState.onRowsPerPageChange}
-        />
-      )}
 
       <ConfirmDialog
         open={controller.confirmOpen}

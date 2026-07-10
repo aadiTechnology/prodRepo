@@ -58,6 +58,13 @@ export function createFeeCategoryFormConfig({
         label: "Status",
         type: "switch",
         helperText: "Active categories are available for use",
+        props: {
+          sx: {
+            width: "fit-content",
+            maxWidth: "100%",
+            p: 1.25,
+          },
+        },
       },
     },
     layoutRows: [
@@ -85,7 +92,7 @@ export function createFeeCategoryFormConfig({
         ? [
             {
               kind: "fields" as const,
-              grid: { xs: 12 },
+              grid: { xs: 12, sm: 6 },
               fieldNames: ["status"] as (keyof FeeCategoryFormData & string)[],
             },
           ]
