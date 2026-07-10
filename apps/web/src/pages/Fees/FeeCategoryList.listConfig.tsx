@@ -31,7 +31,7 @@ export function createFeeCategoryListConfig({
         label: "Amount (₹)",
         render: (cat: FeeCategoryResponse) =>
           cat.amount != null ? `₹${Number(cat.amount).toLocaleString()}` : "—",
-        align: "right" as const,
+        align: "left" as const,
       },
       {
         id: "status",
