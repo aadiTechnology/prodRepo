@@ -14,9 +14,9 @@ import {
 import MicIcon from "@mui/icons-material/Mic";
 import SendIcon from "@mui/icons-material/Send";
 import CloseIcon from "@mui/icons-material/Close";
-import SmartToyIcon from "@mui/icons-material/SmartToy";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import FolderRoundedIcon from "@mui/icons-material/FolderRounded";
+import CampusBuddyMascot from "./CampusBuddyMascot";
 import apiClient from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
@@ -153,20 +153,15 @@ const PanelHeader = styled(Box)(({ theme }) => ({
 }));
 
 const FabButton = styled(IconButton)(() => ({
-  position: "fixed",
-  bottom: 24,
-  right: 24,
-  zIndex: 1300,
-  width: 56,
-  height: 56,
-  background: brandGradient,
-  color: "#ffffff",
-  border: `2px solid ${alpha("#ffffff", 0.9)}`,
-  boxShadow: `0 8px 20px ${alpha(P.turquoise.main, 0.28)}`,
-  transition: "transform 0.25s ease, box-shadow 0.25s ease",
+  position: "relative",
+  width: 68,
+  height: 68,
+  padding: 0,
+  overflow: "visible",
+  background: "transparent",
+  transition: "transform 0.25s ease",
   "&:hover": {
-    transform: "scale(1.05)",
-    boxShadow: `0 10px 24px ${alpha(P.turquoise.main, 0.35)}`,
+    transform: "scale(1.08)",
   },
 }));
 
@@ -508,6 +503,15 @@ export default function AIAssistant() {
   const transcriptRef = useRef("");
   const submittedRef = useRef(false);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastUserIdRef = useRef<number | null>(null);
+
+  const resetChatUi = useCallback(() => {
+    setMessages([]);
+    setOptionsById({});
+    setInput("");
+    setTypeaheadOpen(false);
+    setChatState("idle");
+  }, []);
 
   const loadChat = useCallback(async () => {
     if (!user?.id) {
@@ -526,8 +530,29 @@ export default function AIAssistant() {
   }, [user?.id]);
 
   useEffect(() => {
-    void loadChat();
-  }, [loadChat]);
+    const uid = user?.id ?? null;
+    if (uid === lastUserIdRef.current) {
+      return;
+    }
+    lastUserIdRef.current = uid;
+    resetChatUi();
+    setOpen(false);
+    setMenuListOpen(false);
+    if (uid) {
+      void loadChat();
+    }
+  }, [user?.id, loadChat, resetChatUi]);
+
+  const handleFabToggle = useCallback(() => {
+    setOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setMenuListOpen(true);
+        setTypeaheadOpen(false);
+      }
+      return next;
+    });
+  }, []);
 
   const persistExchange = useCallback(
     async (
@@ -833,8 +858,31 @@ export default function AIAssistant() {
 
   return (
     <>
-      <FabButton onClick={() => setOpen((o) => !o)} aria-label={open ? "Close Campus Buddy" : "Open Campus Buddy"}>
-        {open ? <CloseIcon sx={{ fontSize: 24 }} /> : <SmartToyIcon sx={{ fontSize: 26 }} />}
+      <FabButton
+        onClick={handleFabToggle}
+        sx={{ position: "fixed", bottom: 24, right: 24, zIndex: 1300 }}
+        aria-label={open ? "Close Campus Buddy" : "Open Campus Buddy"}
+        aria-expanded={open}
+      >
+        {open ? (
+          <Box
+            sx={{
+              width: 52,
+              height: 52,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: brandGradient,
+              border: `2px solid #ffffff`,
+              boxShadow: `0 6px 16px ${alpha(PRIMARY.main, 0.3)}`,
+            }}
+          >
+            <CloseIcon sx={{ fontSize: 22, color: "#fff" }} />
+          </Box>
+        ) : (
+          <CampusBuddyMascot size={64} badge listening={listening} processing={processing} />
+        )}
       </FabButton>
 
       <Collapse
@@ -846,31 +894,33 @@ export default function AIAssistant() {
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, position: "relative", zIndex: 1 }}>
               <IconButton
                 onClick={() => setMenuListOpen((v) => !v)}
-                aria-label={menuListOpen ? "Hide my pages" : "Show my pages"}
-                title="My pages"
+                aria-label={menuListOpen ? "Back to chat" : "Show my pages"}
+                title={menuListOpen ? "Back to chat" : "My pages"}
                 sx={{
                   p: 0,
-                  width: 42,
-                  height: 42,
+                  width: 52,
+                  height: 52,
                   borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  bgcolor: menuListOpen ? alpha("#ffffff", 0.34) : alpha("#ffffff", 0.2),
-                  border: `2px solid ${alpha("#ffffff", 0.4)}`,
-                  transition: "transform 0.35s ease, background-color 0.2s ease",
-                  transform: menuListOpen ? "rotate(180deg)" : "rotate(0deg)",
-                  "&:hover": { bgcolor: alpha("#ffffff", 0.3) },
+                  overflow: "visible",
+                  transition: "transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                  transform: menuListOpen ? "scale(1.05)" : "scale(1)",
+                  "&:hover": { transform: "scale(1.08)" },
                 }}
               >
-                <SmartToyIcon sx={{ fontSize: 24, color: "#ffffff" }} />
+                <CampusBuddyMascot
+                  size={56}
+                  badge
+                  active={menuListOpen}
+                  listening={listening}
+                  processing={processing}
+                />
               </IconButton>
               <Box>
                 <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2}>
                   Campus Buddy
                 </Typography>
                 <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                  Your friendly guide around school
+                  {menuListOpen ? "Tap a page to go there" : "Your friendly guide around school"}
                 </Typography>
               </Box>
             </Box>
@@ -984,21 +1034,14 @@ export default function AIAssistant() {
 
             {messages.length === 0 && !chatLoading && (
               <WelcomeCard>
-                <Box
-                  sx={{
-                    width: 52,
-                    height: 52,
-                    mx: "auto",
-                    mb: 1.25,
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: brandGradient,
-                    boxShadow: `0 6px 16px ${alpha(P.turquoise.main, 0.22)}`,
-                  }}
-                >
-                  <SmartToyIcon sx={{ fontSize: 28, color: "#fff" }} />
+                <Box sx={{ display: "flex", justifyContent: "center", mb: 1.25 }}>
+                  <CampusBuddyMascot
+                    size={88}
+                    badge
+                    active={menuListOpen}
+                    listening={listening}
+                    processing={processing}
+                  />
                 </Box>
                 <Typography variant="subtitle2" fontWeight={700} color={colorTokens.sidebar.text.primary} gutterBottom>
                   Hi there!
@@ -1032,7 +1075,6 @@ export default function AIAssistant() {
 
             {messages.map((m) => {
               const isUser = m.role === "user";
-              const avatarVariant = isUser ? "user" : m.isError ? "error" : "assistant";
               const options = !isUser ? optionsById[m.id] : undefined;
               return (
                 <Box key={m.id} sx={{ mb: 1.25 }}>
@@ -1044,15 +1086,13 @@ export default function AIAssistant() {
                       gap: 0.75,
                     }}
                   >
-                    <BuddyAvatar variant={avatarVariant}>
-                      {isUser ? (
-                        userInitial
-                      ) : m.isError ? (
-                        "!"
-                      ) : (
-                        <SmartToyIcon sx={{ fontSize: 16 }} />
-                      )}
-                    </BuddyAvatar>
+                    {isUser ? (
+                      <BuddyAvatar variant="user">{userInitial}</BuddyAvatar>
+                    ) : m.isError ? (
+                      <BuddyAvatar variant="error">!</BuddyAvatar>
+                    ) : (
+                      <CampusBuddyMascot size={34} compact badge />
+                    )}
                     <MessageBubble isUser={isUser} isError={m.isError}>
                       <Typography
                         variant="body2"

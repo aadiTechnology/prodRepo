@@ -15,6 +15,7 @@ import { useRBAC } from "./RBACContext";
 import { enqueueSnackbar } from "notistack";
 import { getJwtExpiryMs } from "../utils/jwt";
 import { recordUserLogin } from "../utils/lastLoginStorage";
+import { clearAiChatSession } from "../api/services/aiChatService";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Type Definitions
@@ -192,6 +193,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         rbac_version: response.rbac_version ?? null,
       });
 
+      await clearAiChatSession();
+
       return response;
     } catch (error) {
       clearAuthData();
@@ -223,6 +226,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       permissions: response.permissions,
       rbac_version: response.rbac_version ?? null,
     });
+    void clearAiChatSession();
   }, [setRBACData]);
 
   /**
@@ -231,6 +235,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = useCallback(async (isTimeout: boolean = false) => {
     setLogoutLoading(true);
     try {
+      await clearAiChatSession();
       if (!isTimeout) {
         await authService.logout();
       }
