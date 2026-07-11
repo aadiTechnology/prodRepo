@@ -13,6 +13,7 @@ export const CONFIG_HUB_PATH = "/configuration";
 export type ConfigHubLocationState = {
   fromConfigHub?: boolean;
   fromInternal?: boolean;
+  returnPath?: string;
 };
 
 export function useConfigHubNavigation() {
@@ -43,11 +44,15 @@ export function useConfigHubNavigation() {
     (pageTitle: string): NavLink[] =>
       fromConfigHub
         ? [
-            { title: "Basic Configuration", path: CONFIG_HUB_PATH },
+            { 
+              title: "Basic Configuration", 
+              path: CONFIG_HUB_PATH,
+              state: { returnPath: location.pathname }
+            },
             { title: pageTitle, path: "#" },
           ]
         : [{ title: pageTitle, path: "#" }],
-    [fromConfigHub]
+    [fromConfigHub, location.pathname]
   );
 
   const buildFormBreadcrumbs = useCallback(
@@ -59,7 +64,11 @@ export function useConfigHubNavigation() {
 
       if (fromConfigHub) {
         return [
-          { title: "Basic Configuration", path: CONFIG_HUB_PATH },
+          { 
+            title: "Basic Configuration", 
+            path: CONFIG_HUB_PATH,
+            state: { returnPath: listSegment.path }
+          },
           listLink,
           { title: currentTitle, path: "#" },
         ];

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Box,
   CircularProgress,
@@ -18,20 +18,19 @@ import { ListPageLayout } from "../../components/reusable";
 type ConfigFeature = {
   id: string;
   label: string;
-  path: string;        // used for navigate()
-  permission: string;  // kept for route-guard fallback
-  /** RBAC menu paths that grant visibility (seed + tenant DB may use different paths). */
+  path: string;
+  permission: string;
   menuPaths: string[];
 };
-
-const hasAnyGrantedMenuPath = (granted: Set<string>, paths: string[]) =>
-  paths.some((menuPath) => granted.has(menuPath));
 
 type ConfigSection = {
   id: string;
   label: string;
   features: ConfigFeature[];
 };
+
+const hasAnyGrantedMenuPath = (granted: Set<string>, paths: string[]) =>
+  paths.some((menuPath) => granted.has(menuPath));
 
 const CONFIG_SECTIONS: ConfigSection[] = [
   {
@@ -87,8 +86,8 @@ const CONFIG_SECTIONS: ConfigSection[] = [
         menuPaths: ["/students"],
       },
       {
-        id: "user Permission ",
-        label: "User Permission ",
+        id: "user-permission",
+        label: "User Permission",
         path: "/admin/permission-management",
         permission: "ADMIN_MGMT:view",
         menuPaths: ["/admin/permission-management"],
@@ -126,8 +125,10 @@ const CONFIG_SECTIONS: ConfigSection[] = [
 
 export default function ConfigurationHub() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { grantedMenuPaths, isInitialized } = useRBAC();
 
+  // Filter sections based on permissions
   const visibleSections = useMemo(() => {
     if (!isInitialized) return [];
     return CONFIG_SECTIONS.map((section) => ({
@@ -138,23 +139,63 @@ export default function ConfigurationHub() {
     })).filter((section) => section.features.length > 0);
   }, [grantedMenuPaths, isInitialized]);
 
-  const [selectedSectionId, setSelectedSectionId] = useState<string>(visibleSections[0]?.id ?? "");
-
-  useEffect(() => {
-    if (visibleSections.length === 0) {
-      setSelectedSectionId("");
-      return;
+  // Determine initial selection based on returnPath from navigation state
+  const getInitialSectionId = () => {
+    const state = location.state as { returnPath?: string } | null;
+    if (state?.returnPath && visibleSections.length > 0) {
+      for (const section of visibleSections) {
+        if (section.features.some((f) => f.path === state.returnPath)) {
+          return section.id;
+        }
+      }
     }
-    const hasSelectedSection = visibleSections.some((section) => section.id === selectedSectionId);
-    if (!hasSelectedSection) {
+    return visibleSections[0]?.id ?? "";
+  };
+
+  const [selectedSectionId, setSelectedSectionId] = useState<string>(() => getInitialSectionId());
+
+  // Update selection when visibleSections change
+  useEffect(() => {
+    if (visibleSections.length === 0) return;
+    
+    const validSelection = visibleSections.find((s) => s.id === selectedSectionId);
+    if (!validSelection) {
       setSelectedSectionId(visibleSections[0].id);
     }
   }, [visibleSections, selectedSectionId]);
 
+  // Handle returnPath from navigation
+  useEffect(() => {
+    const state = location.state as { returnPath?: string } | null;
+    if (state?.returnPath && visibleSections.length > 0) {
+      for (const section of visibleSections) {
+        if (section.features.some((f) => f.path === state.returnPath)) {
+          setSelectedSectionId(section.id);
+          break;
+        }
+      }
+    }
+  }, [location.state, visibleSections]);
+
+  // Get currently selected section
   const selectedSection = useMemo(
-    () => visibleSections.find((section) => section.id === selectedSectionId) ?? visibleSections[0] ?? null,
+    () => visibleSections.find((s) => s.id === selectedSectionId) || visibleSections[0] || null,
     [visibleSections, selectedSectionId]
   );
+
+  const handleSectionClick = (sectionId: string) => {
+    console.log("Section clicked:", sectionId);
+    setSelectedSectionId(sectionId);
+  };
+
+  const handleFeatureClick = (featurePath: string) => {
+    navigate(featurePath, { 
+      state: { 
+        fromConfigHub: true, 
+        returnPath: featurePath 
+      } 
+    });
+  };
 
   if (!isInitialized) {
     return (
@@ -206,7 +247,7 @@ export default function ConfigurationHub() {
                   <ListItemButton
                     key={section.id}
                     selected={isActive}
-                    onClick={() => setSelectedSectionId(section.id)}
+                    onClick={() => handleSectionClick(section.id)}
                     sx={{
                       px: 1.5,
                       py: 0.6,
@@ -218,7 +259,12 @@ export default function ConfigurationHub() {
                       },
                     }}
                   >
-                    <ListItemText primary={section.label} primaryTypographyProps={{ fontSize: "0.9rem", fontWeight: 600 }} />
+                    <ListItemText 
+                      primary={section.label} 
+                      slotProps={{
+                        primary: { sx: { fontSize: "0.9rem", fontWeight: 600 } }
+                      }}
+                    />
                   </ListItemButton>
                 );
               })}
@@ -233,7 +279,7 @@ export default function ConfigurationHub() {
               {selectedSection?.features.map((feature) => (
                 <ListItemButton
                   key={feature.id}
-                  onClick={() => navigate(feature.path, { state: { fromConfigHub: true } })}
+                  onClick={() => handleFeatureClick(feature.path)}
                   sx={{
                     px: 1.5,
                     py: 0.6,

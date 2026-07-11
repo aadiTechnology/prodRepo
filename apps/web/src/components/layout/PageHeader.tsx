@@ -16,6 +16,7 @@ export type NavLink = {
   title: string;
   path: string;
   onClick?: (e: React.MouseEvent) => void;
+  state?: Record<string, unknown>;
 };
 
 const homeButtonSx = {
@@ -53,12 +54,13 @@ export default function PageHeader({
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleNav = (path: string) => {
+  const handleNav = (link: NavLink) => {
     const locState = location.state as ConfigHubLocationState | null;
-    navigate(resolvePath(path), {
+    navigate(resolvePath(link.path), {
       state: {
         fromInternal: true,
         ...(locState?.fromConfigHub ? { fromConfigHub: true } : {}),
+        ...(link.state || {}),
       },
     });
   };
@@ -103,7 +105,7 @@ export default function PageHeader({
                 "&:hover": { fontWeight: theme.typography.fontWeightBold },
               })}
               onClick={(e) =>
-                link.onClick ? link.onClick(e) : handleNav(link.path)
+                link.onClick ? link.onClick(e) : handleNav(link)
               }
             >
               {link.title}
