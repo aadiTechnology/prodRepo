@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Box,
   Paper,
@@ -620,6 +620,7 @@ function resolveAssistantError(err: unknown): string {
 
 export default function AIAssistant() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { menus, hasPermission } = useRBAC();
   const [open, setOpen] = useState(false);
@@ -638,6 +639,15 @@ export default function AIAssistant() {
   const submittedRef = useRef(false);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastUserIdRef = useRef<number | null>(null);
+  const pathnameWhenOpenedRef = useRef<string | null>(null);
+
+  const closeAssistant = useCallback(() => {
+    setOpen(false);
+    setMenuListOpen(false);
+    setHighlightHeaderIcon(false);
+    setTypeaheadOpen(false);
+    pathnameWhenOpenedRef.current = null;
+  }, []);
 
   const resetChatUi = useCallback(() => {
     setMessages([]);
@@ -839,10 +849,27 @@ export default function AIAssistant() {
         dismissFabTooltip();
         setMenuListOpen(false);
         setTypeaheadOpen(false);
+        pathnameWhenOpenedRef.current = location.pathname;
+      } else {
+        pathnameWhenOpenedRef.current = null;
       }
       return next;
     });
-  }, [dismissFabTooltip]);
+  }, [dismissFabTooltip, location.pathname]);
+
+  useEffect(() => {
+    if (!open) {
+      pathnameWhenOpenedRef.current = null;
+      return;
+    }
+    if (pathnameWhenOpenedRef.current === null) {
+      pathnameWhenOpenedRef.current = location.pathname;
+      return;
+    }
+    if (location.pathname !== pathnameWhenOpenedRef.current) {
+      closeAssistant();
+    }
+  }, [open, location.pathname, closeAssistant]);
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -857,9 +884,10 @@ export default function AIAssistant() {
             : (ROUTE_TO_SIDEBAR_PARENT[data.route] ?? "");
         dispatchSidebarExpand(parentId);
         navigate(data.route);
+        closeAssistant();
       }
     },
-    [navigate]
+    [navigate, closeAssistant]
   );
 
   const navigateToMenu = useCallback(
@@ -870,6 +898,8 @@ export default function AIAssistant() {
           : (ROUTE_TO_SIDEBAR_PARENT[item.path] ?? "");
       dispatchSidebarExpand(parentId);
       const spoken = userText?.trim() || `Open ${item.name}`;
+      navigate(item.path);
+      closeAssistant();
       try {
         await persistExchange(spoken, `Opening ${item.name}.`, {
           route: item.path,
@@ -881,9 +911,8 @@ export default function AIAssistant() {
         appendLocal("user", spoken);
         appendLocal("assistant", `Opening ${item.name}.`);
       }
-      navigate(item.path);
     },
-    [appendLocal, navigate, persistExchange]
+    [appendLocal, navigate, persistExchange, closeAssistant]
   );
 
   const openPageDirect = useCallback(
@@ -1214,7 +1243,7 @@ export default function AIAssistant() {
             </Box>
             <IconButton
               size="small"
-              onClick={() => setOpen(false)}
+              onClick={closeAssistant}
               sx={{
                 position: "relative",
                 zIndex: 1,
