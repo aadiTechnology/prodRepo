@@ -221,6 +221,15 @@ async def logout(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Revoke the current JWT token and log the user out."""
+    from app.services.ai_chat_service import clear_chat
+
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if user:
+        try:
+            clear_chat(db, user)
+        except Exception:
+            logger.warning("Failed to clear AI chat on logout for user_id=%s", current_user.id)
+
     auth_header = request.headers.get("Authorization", "")
     token = auth_header.split()[1] if auth_header.startswith("Bearer ") else None
     if token:
