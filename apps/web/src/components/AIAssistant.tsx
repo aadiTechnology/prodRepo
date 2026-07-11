@@ -16,6 +16,9 @@ import SendIcon from "@mui/icons-material/Send";
 import CloseIcon from "@mui/icons-material/Close";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import FolderRoundedIcon from "@mui/icons-material/FolderRounded";
+import TouchAppIcon from "@mui/icons-material/TouchApp";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import ListAltIcon from "@mui/icons-material/ListAlt";
 import CampusBuddyMascot from "./CampusBuddyMascot";
 import apiClient from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -37,6 +40,7 @@ interface ChatMessage {
   text: string;
   timestamp: number;
   isError?: boolean;
+  variant?: "guide" | "greeting";
 }
 
 interface InterpretOption {
@@ -92,6 +96,11 @@ interface SaveChatMessageBody {
 
 const SILENCE_MS = 1800;
 const MAX_TYPEAHEAD = 6;
+const FAB_TOOLTIP_KEY = "campus_buddy_fab_tooltip_dismissed";
+
+const GREETING_RE =
+  /^(hi|hello|hey|hiya|howdy|good\s*(morning|afternoon|evening)|namaste)\b/i;
+const HELP_RE = /^(help|guide|how\s+to\s+use|tutorial|instructions?)\b/i;
 
 interface NavigableMenu {
   id: number | string;
@@ -166,6 +175,40 @@ const FabButton = styled(IconButton)(() => ({
   transition: "transform 0.25s ease",
   "&:hover": {
     transform: "scale(1.08)",
+  },
+}));
+
+const FabTooltipCard = styled(Paper)(() => ({
+  position: "fixed",
+  bottom: 100,
+  right: 24,
+  zIndex: 1301,
+  maxWidth: 260,
+  padding: "12px 14px",
+  borderRadius: 16,
+  border: `1px solid ${alpha(P.turquoise.main, 0.25)}`,
+  boxShadow: "0 10px 28px rgba(0, 0, 0, 0.12)",
+}));
+
+const PulseRing = styled(Box)(() => ({
+  position: "absolute",
+  inset: -5,
+  borderRadius: "50%",
+  border: `2px solid ${alpha("#ffffff", 0.95)}`,
+  animation: "buddyHeaderPulse 1.35s ease-in-out infinite",
+  pointerEvents: "none",
+  "@keyframes buddyHeaderPulse": {
+    "0%, 100%": { transform: "scale(1)", opacity: 0.95 },
+    "50%": { transform: "scale(1.14)", opacity: 0.3 },
+  },
+}));
+
+const TapHintIcon = styled(TouchAppIcon)(() => ({
+  color: P.turquoise.main,
+  animation: "buddyTapBounce 1s ease-in-out infinite",
+  "@keyframes buddyTapBounce": {
+    "0%, 100%": { transform: "translateY(0)" },
+    "50%": { transform: "translateY(-3px)" },
   },
 }));
 
@@ -436,17 +479,100 @@ function isClearChatCommand(text: string): boolean {
   return /^(clear|reset|clear chat|clear history)$/i.test(text.trim());
 }
 
+function isGreetingCommand(text: string): boolean {
+  return GREETING_RE.test(text.trim());
+}
+
+function isHelpCommand(text: string): boolean {
+  return HELP_RE.test(text.trim());
+}
+
+function firstNameFromUser(fullName?: string | null): string {
+  const part = fullName?.trim().split(/\s+/)[0];
+  return part || "there";
+}
+
+function navigableToOptions(menus: NavigableMenu[], limit = 6): InterpretOption[] {
+  return menus
+    .filter((m) => !m.isAction)
+    .slice(0, limit)
+    .map((m) => ({
+      menu_id: typeof m.id === "number" ? m.id : null,
+      menu_name: m.name,
+      route: m.path,
+      parent_menu_id: typeof m.parentId === "number" ? m.parentId : null,
+      parent_menu_name: "",
+    }));
+}
+
+function greetingReply(name: string): string {
+  return `Hello ${name}! I'm Campus Buddy. Which page would you like to open today?`;
+}
+
+const GUIDE_INTRO =
+  "Here's how to use Campus Buddy. You can do all of this on Basic and Advanced plans.";
+
 function newClientMessageId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function variantFromInputSource(inputSource: string | null): ChatMessage["variant"] {
+  if (inputSource === "help_guide") return "guide";
+  if (inputSource === "greeting") return "greeting";
+  return undefined;
+}
+
+function buildGuideOptions(pages: NavigableMenu[]): InterpretOption[] {
+  return [
+    {
+      menu_id: null,
+      menu_name: "Show my pages",
+      route: "__action:pages__",
+      parent_menu_id: null,
+      parent_menu_name: "",
+    },
+    ...(pages[0]
+      ? [
+          {
+            menu_id: typeof pages[0].id === "number" ? pages[0].id : null,
+            menu_name: `Try: ${pages[0].name}`,
+            route: pages[0].path,
+            parent_menu_id: typeof pages[0].parentId === "number" ? pages[0].parentId : null,
+            parent_menu_name: "",
+          },
+        ]
+      : []),
+  ];
+}
+
+function restoreOptionsForMessages(
+  msgs: ChatMessage[],
+  pages: NavigableMenu[]
+): Record<string, InterpretOption[]> {
+  const opts: Record<string, InterpretOption[]> = {};
+  for (const m of msgs) {
+    if (m.role !== "assistant") continue;
+    if (m.variant === "guide") {
+      opts[m.id] = buildGuideOptions(pages);
+    } else if (m.variant === "greeting") {
+      const pageOpts = navigableToOptions(pages);
+      if (pageOpts.length > 0) {
+        opts[m.id] = pageOpts;
+      }
+    }
+  }
+  return opts;
+}
+
 function toChatMessage(m: ApiChatMessage): ChatMessage {
+  const variant = m.role === "assistant" ? variantFromInputSource(m.input_source) : undefined;
   return {
     id: m.client_message_id || String(m.id),
     role: m.role === "assistant" ? "assistant" : "user",
     text: m.message_text,
     timestamp: new Date(m.created_at).getTime(),
     isError: m.is_error,
+    variant,
   };
 }
 
@@ -504,6 +630,8 @@ export default function AIAssistant() {
   const [typeaheadOpen, setTypeaheadOpen] = useState(false);
   const [optionsById, setOptionsById] = useState<Record<string, InterpretOption[]>>({});
   const [menuListOpen, setMenuListOpen] = useState(false);
+  const [showFabTooltip, setShowFabTooltip] = useState(false);
+  const [highlightHeaderIcon, setHighlightHeaderIcon] = useState(false);
   const listEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const transcriptRef = useRef("");
@@ -522,18 +650,22 @@ export default function AIAssistant() {
   const loadChat = useCallback(async () => {
     if (!user?.id) {
       setMessages([]);
+      setOptionsById({});
       return;
     }
     setChatLoading(true);
     try {
       const { data } = await apiClient.get<ChatSessionResponse>("/api/ai/chat");
-      setMessages(data.messages.map(toChatMessage));
+      const loaded = data.messages.map(toChatMessage);
+      const pages = buildNavigableMenus(menus, hasPermission).filter((m) => !m.isAction);
+      setMessages(loaded);
+      setOptionsById(restoreOptionsForMessages(loaded, pages));
     } catch {
       // Keep in-memory messages if chat API is unavailable
     } finally {
       setChatLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, menus, hasPermission]);
 
   useEffect(() => {
     const uid = user?.id ?? null;
@@ -549,17 +681,6 @@ export default function AIAssistant() {
     }
   }, [user?.id, loadChat, resetChatUi]);
 
-  const handleFabToggle = useCallback(() => {
-    setOpen((prev) => {
-      const next = !prev;
-      if (next) {
-        setMenuListOpen(true);
-        setTypeaheadOpen(false);
-      }
-      return next;
-    });
-  }, []);
-
   const persistExchange = useCallback(
     async (
       userText: string,
@@ -570,28 +691,33 @@ export default function AIAssistant() {
         menuName?: string;
         parentMenuId?: number | null;
         inputSource: string;
+        clientIds?: { user: string; assistant: string };
+        reload?: boolean;
       }
     ) => {
-      const clientId = newClientMessageId();
+      const userClientId = opts.clientIds?.user ?? newClientMessageId();
+      const assistantClientId = opts.clientIds?.assistant ?? `${userClientId}-assistant`;
       const userBody: SaveChatMessageBody = {
         role: "user",
         message_text: userText,
         input_source: opts.inputSource,
-        client_message_id: clientId,
+        client_message_id: userClientId,
       };
       const assistantBody: SaveChatMessageBody = {
         role: "assistant",
         message_text: assistantText,
         is_error: opts.isError ?? false,
         input_source: opts.inputSource,
-        client_message_id: `${clientId}-assistant`,
+        client_message_id: assistantClientId,
         route: opts.route,
         menu_name: opts.menuName,
         parent_menu_id: opts.parentMenuId ?? undefined,
       };
       await apiClient.post("/api/ai/chat/messages", userBody);
       await apiClient.post("/api/ai/chat/messages", assistantBody);
-      await loadChat();
+      if (opts.reload !== false) {
+        await loadChat();
+      }
     },
     [loadChat]
   );
@@ -617,6 +743,106 @@ export default function AIAssistant() {
   );
   const menuGroups = useMemo(() => buildMenuGroups(menus), [menus]);
   const userInitial = (user?.full_name?.trim()?.[0] || "Y").toUpperCase();
+  const displayName = useMemo(() => firstNameFromUser(user?.full_name), [user?.full_name]);
+  const pageSuggestions = useMemo(
+    () => navigableMenus.filter((m) => !m.isAction),
+    [navigableMenus]
+  );
+
+  useEffect(() => {
+    try {
+      setShowFabTooltip(localStorage.getItem(FAB_TOOLTIP_KEY) !== "1");
+    } catch {
+      setShowFabTooltip(true);
+    }
+  }, []);
+
+  const dismissFabTooltip = useCallback(() => {
+    setShowFabTooltip(false);
+    try {
+      localStorage.setItem(FAB_TOOLTIP_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const attachPageOptions = useCallback((assistantId: string, pages: NavigableMenu[]) => {
+    const opts = navigableToOptions(pages);
+    if (opts.length > 0) {
+      setOptionsById((prev) => ({ ...prev, [assistantId]: opts }));
+    }
+  }, []);
+
+  const showGreetingInChat = useCallback(
+    (userText: string) => {
+      const userId = newClientMessageId();
+      const assistantId = newClientMessageId();
+      const reply = greetingReply(displayName);
+      setMessages((prev) => [
+        ...prev,
+        { id: userId, role: "user", text: userText, timestamp: Date.now() },
+        {
+          id: assistantId,
+          role: "assistant",
+          text: reply,
+          timestamp: Date.now(),
+          variant: "greeting",
+        },
+      ]);
+      attachPageOptions(assistantId, pageSuggestions);
+      void persistExchange(userText, reply, {
+        inputSource: "greeting",
+        clientIds: { user: userId, assistant: assistantId },
+        reload: false,
+      }).catch(() => {});
+    },
+    [attachPageOptions, displayName, pageSuggestions, persistExchange]
+  );
+
+  const showGuideInChat = useCallback(
+    (userText?: string) => {
+      setMenuListOpen(false);
+      setHighlightHeaderIcon(true);
+      const spoken = userText?.trim() || "help";
+      const userId = newClientMessageId();
+      const assistantId = newClientMessageId();
+      setMessages((prev) => [
+        ...prev,
+        ...(userText
+          ? [{ id: userId, role: "user" as const, text: spoken, timestamp: Date.now() }]
+          : []),
+        {
+          id: assistantId,
+          role: "assistant",
+          text: GUIDE_INTRO,
+          timestamp: Date.now(),
+          variant: "guide",
+        },
+      ]);
+      const guideChips = buildGuideOptions(pageSuggestions);
+      setOptionsById((prev) => ({ ...prev, [assistantId]: guideChips }));
+      if (userText) {
+        void persistExchange(spoken, GUIDE_INTRO, {
+          inputSource: "help_guide",
+          clientIds: { user: userId, assistant: assistantId },
+          reload: false,
+        }).catch(() => {});
+      }
+    },
+    [pageSuggestions, persistExchange]
+  );
+
+  const handleFabToggle = useCallback(() => {
+    setOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        dismissFabTooltip();
+        setMenuListOpen(false);
+        setTypeaheadOpen(false);
+      }
+      return next;
+    });
+  }, [dismissFabTooltip]);
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -676,6 +902,11 @@ export default function AIAssistant() {
         delete next[messageId];
         return next;
       });
+      if (option.route === "__action:pages__") {
+        setHighlightHeaderIcon(false);
+        setMenuListOpen(true);
+        return;
+      }
       const item: NavigableMenu = {
         id: option.menu_id ?? `opt:${option.route}`,
         name: option.menu_name,
@@ -734,6 +965,19 @@ export default function AIAssistant() {
       setInput("");
       setTypeaheadOpen(false);
       setChatState("processing");
+
+      if (isGreetingCommand(trimmed)) {
+        showGreetingInChat(trimmed);
+        setChatState("idle");
+        return;
+      }
+
+      if (isHelpCommand(trimmed)) {
+        showGuideInChat(trimmed);
+        setChatState("idle");
+        return;
+      }
+
       setOptionsById({});
 
       const exact = navigableMenus.find(
@@ -770,7 +1014,7 @@ export default function AIAssistant() {
         setChatState("idle");
       }
     },
-    [chatState, appendLocal, executeAction, navigableMenus, navigateToMenu, persistExchange, loadChat]
+    [chatState, appendLocal, executeAction, navigableMenus, navigateToMenu, persistExchange, loadChat, showGreetingInChat, showGuideInChat]
   );
 
   const handleSend = useCallback(() => {
@@ -864,6 +1108,35 @@ export default function AIAssistant() {
 
   return (
     <>
+      {showFabTooltip && !open && (
+        <FabTooltipCard elevation={0}>
+          <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+            Campus Buddy
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.25, lineHeight: 1.45 }}>
+            Your school navigation helper. Tap to find pages, type where you want to go, or use voice.
+          </Typography>
+          <Box
+            component="button"
+            type="button"
+            onClick={dismissFabTooltip}
+            sx={{
+              border: "none",
+              cursor: "pointer",
+              borderRadius: "10px",
+              px: 1.5,
+              py: 0.75,
+              fontWeight: 700,
+              fontSize: "0.8125rem",
+              color: "#fff",
+              bgcolor: P.turquoise.main,
+            }}
+          >
+            Got it
+          </Box>
+        </FabTooltipCard>
+      )}
+
       <FabButton
         onClick={handleFabToggle}
         sx={{ position: "fixed", bottom: 24, right: 24, zIndex: 1300 }}
@@ -899,7 +1172,10 @@ export default function AIAssistant() {
           <PanelHeader>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, position: "relative", zIndex: 1 }}>
               <IconButton
-                onClick={() => setMenuListOpen((v) => !v)}
+                onClick={() => {
+                  setHighlightHeaderIcon(false);
+                  setMenuListOpen((v) => !v);
+                }}
                 aria-label={menuListOpen ? "Back to chat" : "Show my pages"}
                 title={menuListOpen ? "Back to chat" : "My pages"}
                 sx={{
@@ -908,11 +1184,13 @@ export default function AIAssistant() {
                   height: 52,
                   borderRadius: "50%",
                   overflow: "visible",
+                  position: "relative",
                   transition: "transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
                   transform: menuListOpen ? "scale(1.05)" : "scale(1)",
                   "&:hover": { transform: "scale(1.08)" },
                 }}
               >
+                {highlightHeaderIcon && <PulseRing />}
                 <CampusBuddyMascot
                   size={56}
                   badge
@@ -926,7 +1204,11 @@ export default function AIAssistant() {
                   Campus Buddy
                 </Typography>
                 <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                  {menuListOpen ? "Tap a page to go there" : "Your friendly guide around school"}
+                  {menuListOpen
+                    ? "Tap a page to go there"
+                    : highlightHeaderIcon
+                      ? "Tap my icon above to see your pages"
+                      : "Ask me where you want to go"}
                 </Typography>
               </Box>
             </Box>
@@ -1050,14 +1332,35 @@ export default function AIAssistant() {
                   />
                 </Box>
                 <Typography variant="subtitle2" fontWeight={700} color={colorTokens.sidebar.text.primary} gutterBottom>
-                  Hi there!
+                  Hi, {displayName}!
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1.75, lineHeight: 1.5, px: 1 }}>
-                  Type where you want to go — I&apos;ll show pages from your menu. You can also use your voice!
+                  I can help you open screens in your school app. Type a page name, pick a suggestion, or use the mic.
                 </Typography>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, justifyContent: "center", mb: quickPicks.length > 0 ? 0.75 : 0 }}>
+                  <SuggestionChip
+                    onClick={() => {
+                      setHighlightHeaderIcon(true);
+                      setMenuListOpen(true);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <ListAltIcon sx={{ fontSize: 14, color: P.turquoise.main }} />
+                    Show my pages
+                  </SuggestionChip>
+                  <SuggestionChip
+                    onClick={() => showGuideInChat()}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <HelpOutlineIcon sx={{ fontSize: 14, color: P.turquoise.main }} />
+                    How do I use this?
+                  </SuggestionChip>
+                </Box>
                 {quickPicks.length > 0 && (
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, justifyContent: "center" }}>
-                    {quickPicks.map((item) => (
+                    {quickPicks.slice(0, 3).map((item) => (
                       <SuggestionChip
                         key={item.path}
                         onClick={() => openPageDirect(item)}
@@ -1076,6 +1379,9 @@ export default function AIAssistant() {
                     ))}
                   </Box>
                 )}
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.25 }}>
+                  Tip: type &quot;help&quot; anytime for a quick guide.
+                </Typography>
               </WelcomeCard>
             )}
 
@@ -1100,16 +1406,48 @@ export default function AIAssistant() {
                       <CampusBuddyMascot size={34} compact badge />
                     )}
                     <MessageBubble isUser={isUser} isError={m.isError}>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: m.isError ? colorTokens.error.dark : colorTokens.sidebar.text.primary,
-                          fontWeight: isUser ? 600 : 400,
-                          lineHeight: 1.45,
-                        }}
-                      >
-                        {m.text}
-                      </Typography>
+                      {m.variant === "guide" ? (
+                        <Box>
+                          <Typography
+                            variant="body2"
+                            fontWeight={700}
+                            sx={{ color: colorTokens.sidebar.text.primary, mb: 1 }}
+                          >
+                            How to use Campus Buddy
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.25, lineHeight: 1.45 }}>
+                            {m.text}
+                          </Typography>
+                          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9 }}>
+                            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.75 }}>
+                              <TapHintIcon sx={{ fontSize: 18, mt: 0.15 }} />
+                              <Typography variant="body2" sx={{ lineHeight: 1.45 }}>
+                                Tap my icon at the top-left of this panel to open <strong>My pages</strong>.
+                              </Typography>
+                            </Box>
+                            <Typography variant="body2" sx={{ lineHeight: 1.45 }}>
+                              2. Tap any page in the list to go there instantly.
+                            </Typography>
+                            <Typography variant="body2" sx={{ lineHeight: 1.45 }}>
+                              3. Type in the box below (e.g. &quot;attendance&quot;, &quot;teachers&quot;).
+                            </Typography>
+                            <Typography variant="body2" sx={{ lineHeight: 1.45 }}>
+                              4. Pick a suggestion while typing, or tap the mic for voice.
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ) : (
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: m.isError ? colorTokens.error.dark : colorTokens.sidebar.text.primary,
+                            fontWeight: isUser ? 600 : 400,
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {m.text}
+                        </Typography>
+                      )}
                     </MessageBubble>
                   </Box>
                   {options && options.length > 0 && (
@@ -1230,7 +1568,7 @@ export default function AIAssistant() {
               <TextField
                 size="small"
                 fullWidth
-                placeholder="Where would you like to go?"
+                placeholder="Try: teachers, attendance, fee setup…"
                 value={input}
                 onChange={(e) => handleInputChange(e.target.value)}
                 onFocus={() => input.trim() && setTypeaheadOpen(true)}
