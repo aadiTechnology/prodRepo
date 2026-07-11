@@ -137,9 +137,9 @@ const PanelRoot = styled(Paper)(() => ({
   flexDirection: "column",
   overflow: "hidden",
   borderRadius: 24,
-  border: `1px solid ${alpha(colorTokens.sidebar.text.muted, 0.12)}`,
-  background: colorTokens.background.paper,
-  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.04)",
+  border: `1px solid ${colorTokens.border.default}`,
+  background: "#FFF9F0", // Warm cream background matching app theme
+  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.06)",
 }));
 
 const PanelHeader = styled(Box)(({ theme }) => ({
@@ -217,7 +217,7 @@ const ChatScrollArea = styled(Box)(() => ({
   overflow: "auto",
   padding: "12px 14px",
   position: "relative",
-  background: colorTokens.sidebar.background,
+  background: "#FFF9F0", // Warm cream background matching app theme
   "&::-webkit-scrollbar": { width: 4 },
   "&::-webkit-scrollbar-thumb": {
     backgroundColor: alpha(P.turquoise.main, 0.25),
@@ -234,23 +234,24 @@ const SuggestionChip = styled(Box)(() => ({
   fontSize: "0.8125rem",
   fontWeight: 600,
   cursor: "pointer",
-  border: `1px solid ${alpha(P.turquoise.main, 0.22)}`,
-  background: "#ffffff",
+  border: `1px solid ${alpha(P.turquoise.main, 0.3)}`,
+  background: "#FFFFFF",
   color: colorTokens.sidebar.text.primary,
   boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
   transition: "all 0.2s ease",
   "&:hover": {
-    background: alpha(P.turquoise.main, 0.08),
+    background: alpha(P.turquoise.main, 0.1),
     borderColor: P.turquoise.main,
     transform: "translateX(2px)",
+    boxShadow: "0 4px 12px rgba(78, 205, 196, 0.15)",
   },
 }));
 
 const InputFooter = styled(Box)(() => ({
   position: "relative",
   padding: "12px 14px",
-  borderTop: `1px solid ${colorTokens.sidebar.border}`,
-  background: "#ffffff",
+  borderTop: `1px solid ${colorTokens.border.default}`,
+  background: "#FFFBF5", // Slightly elevated warm background
 }));
 
 const TypeaheadPanel = styled(Paper)(() => ({
@@ -262,8 +263,8 @@ const TypeaheadPanel = styled(Paper)(() => ({
   maxHeight: 220,
   overflow: "auto",
   borderRadius: 16,
-  border: `1px solid ${alpha(colorTokens.sidebar.text.muted, 0.12)}`,
-  background: "#ffffff",
+  border: `1px solid ${colorTokens.border.default}`,
+  background: "#FFFFFF",
   boxShadow: "0 10px 30px rgba(0, 0, 0, 0.08)",
   "&::-webkit-scrollbar": { width: 4 },
   "&::-webkit-scrollbar-thumb": {
@@ -315,27 +316,27 @@ const MessageBubble = styled(Box)<{ isUser: boolean; isError?: boolean }>(({ isU
   padding: "10px 14px",
   borderRadius: isUser ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
   background: isUser
-    ? alpha(P.turquoise.main, 0.12)
+    ? alpha(P.turquoise.main, 0.15)
     : isError
-      ? alpha(colorTokens.error.main, 0.06)
-      : "#ffffff",
+      ? alpha(colorTokens.error.main, 0.1)
+      : "#FFFFFF",
   border: `1px solid ${
     isUser
-      ? alpha(P.turquoise.main, 0.22)
+      ? alpha(P.turquoise.main, 0.3)
       : isError
-        ? alpha(colorTokens.error.main, 0.2)
-        : alpha(colorTokens.sidebar.text.muted, 0.12)
+        ? alpha(colorTokens.error.main, 0.3)
+        : colorTokens.border.default
   }`,
-  boxShadow: isUser ? "none" : "0 2px 8px rgba(0, 0, 0, 0.04)",
+  boxShadow: isUser ? "0 2px 8px rgba(78, 205, 196, 0.12)" : "0 2px 8px rgba(0, 0, 0, 0.04)",
 }));
 
 const WelcomeCard = styled(Box)(() => ({
   textAlign: "center",
   padding: "18px 16px 14px",
   borderRadius: 24,
-  background: "#ffffff",
-  border: `1px solid ${alpha(colorTokens.sidebar.text.muted, 0.1)}`,
-  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.03)",
+  background: "#FFFFFF",
+  border: `1px solid ${colorTokens.border.default}`,
+  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.04)",
   marginBottom: 12,
 }));
 
@@ -1451,7 +1452,7 @@ export default function AIAssistant() {
                             <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.75 }}>
                               <TapHintIcon sx={{ fontSize: 18, mt: 0.15 }} />
                               <Typography variant="body2" sx={{ lineHeight: 1.45 }}>
-                                Tap my icon at the top-left of this panel to open <strong>My pages</strong>.
+                                Tap To Campus Buddy Icon at the top-left of this panel to open <strong>My pages</strong>.
                               </Typography>
                             </Box>
                             <Typography variant="body2" sx={{ lineHeight: 1.45 }}>
