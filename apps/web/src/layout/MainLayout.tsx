@@ -528,7 +528,7 @@ function MainLayout() {
           <Box sx={{ width: "100px", display: { xs: "none", sm: "block" } }} />
         </Box>
       </Box>
-      {isAuthenticated && isInitialized && hasAiAssistantAccess(grantedMenuPaths, menus) && (
+      {isAuthenticated && isInitialized && hasAiAssistantAccess(grantedMenuPaths) && (
         <AIAssistant />
       )}
       <style>{`

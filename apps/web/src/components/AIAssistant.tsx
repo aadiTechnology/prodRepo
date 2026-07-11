@@ -22,6 +22,10 @@ import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
 import { colorTokens } from "../tokens/colors";
 import { NAV_ACTION_PAGES, hintForPage } from "../config/navigationAssistant";
+import {
+  isAiAssistantPermissionPath,
+  isSidebarHiddenModule,
+} from "../utils/menuNavigation";
 import type { MenuNode } from "../types/menu";
 
 type MessageRole = "user" | "assistant";
@@ -302,8 +306,9 @@ function dispatchSidebarExpand(parentId: string): void {
 function flattenNavigableMenus(nodes: MenuNode[]): NavigableMenu[] {
   const byPath = new Map<string, NavigableMenu>();
   const visit = (node: MenuNode, parent: number | null) => {
+    if (isSidebarHiddenModule(node.name)) return;
     const path = (node.path || "").trim();
-    if (path && !path.includes(":") && !byPath.has(path)) {
+    if (path && !path.includes(":") && !isAiAssistantPermissionPath(path) && !byPath.has(path)) {
       byPath.set(path, {
         id: node.id,
         name: node.name,
@@ -355,7 +360,7 @@ function buildMenuGroups(menus: MenuNode[]): MenuGroup[] {
 
   const toPage = (node: MenuNode, parentId: number | null): NavigableMenu | null => {
     const path = (node.path || "").trim();
-    if (!path || path.includes(":") || seen.has(path)) return null;
+    if (!path || path.includes(":") || isAiAssistantPermissionPath(path) || seen.has(path)) return null;
     seen.add(path);
     return {
       id: node.id,
@@ -367,6 +372,7 @@ function buildMenuGroups(menus: MenuNode[]): MenuGroup[] {
   };
 
   for (const node of menus) {
+    if (isSidebarHiddenModule(node.name)) continue;
     const children = node.children ?? [];
     if (children.length > 0) {
       const pages: NavigableMenu[] = [];

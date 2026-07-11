@@ -34,7 +34,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
 import { colorTokens } from "../../tokens/colors";
-import { normalizeMenuPath, hasMenuChildren } from "../../utils/menuNavigation";
+import { normalizeMenuPath, hasMenuChildren, isSidebarHiddenModule } from "../../utils/menuNavigation";
 import { toRoleLabel } from "../../utils/formatters";
 import { toMediaUrl } from "../../utils/mediaUrl";
 
@@ -327,9 +327,10 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
 
     if (!menus || menus.length === 0) return [];
 
-    // Exclude modules that belong inside ConfigurationHub only
+    // Exclude hub-only modules and AI Assistant (floating icon only, not sidebar nav)
     const sidebarMenus = menus.filter(
-      node => !HUB_CHILD_MODULE_NAMES.has(node.name)
+      (node) =>
+        !HUB_CHILD_MODULE_NAMES.has(node.name) && !isSidebarHiddenModule(node.name)
     );
 
     const items = sidebarMenus.map(node => {
