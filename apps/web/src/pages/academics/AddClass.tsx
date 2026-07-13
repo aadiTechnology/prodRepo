@@ -374,9 +374,18 @@ export default function AddClass() {
         }
     };
 
-    const handleCancel = () => {
-        navigateToList(listPath);
-    };
+    const handleCancel = useCallback(() => {
+        if (isEditMode) {
+            navigateToList(listPath);
+            return;
+        }
+        resetForm({
+            ...initialValues,
+            academic_year_id: defaultAcademicYearId,
+        });
+        setError(null);
+        setSnackbar(null);
+    }, [isEditMode, navigateToList, resetForm, initialValues, defaultAcademicYearId]);
 
     return (
         <BaseForm<AddClassFormData>
