@@ -507,7 +507,7 @@ function navigableToOptions(menus: NavigableMenu[], limit = 6): InterpretOption[
 }
 
 function greetingReply(name: string): string {
-  return `Hello ${name}! I'm Campus Buddy. Which page would you like to open today?`;
+  return `Hello ${name}! I'm Campus Buddy. Pick a section below, or type a page name.`;
 }
 
 const GUIDE_INTRO =
@@ -521,6 +521,63 @@ function variantFromInputSource(inputSource: string | null): ChatMessage["varian
   if (inputSource === "help_guide") return "guide";
   if (inputSource === "greeting") return "greeting";
   return undefined;
+}
+
+/**
+ * Build greeting options based on user's permissions.
+ * Shows chips for Basic Configuration, Demo Setup, Communication, and Guide.
+ */
+function buildGreetingOptions(grantedMenuPaths: Set<string>, hasRole: (role: string) => boolean): InterpretOption[] {
+  const options: InterpretOption[] = [];
+
+  // Basic Configuration - check if user has access to config hub
+  if (grantedMenuPaths.has("/configuration/hub") || 
+      grantedMenuPaths.has("/academics/academic-years") ||
+      grantedMenuPaths.has("/academics/classes") ||
+      grantedMenuPaths.has("/roles") ||
+      grantedMenuPaths.has("/teachers") ||
+      grantedMenuPaths.has("/students")) {
+    options.push({
+      menu_id: null,
+      menu_name: "Basic Configuration",
+      route: "/configuration",
+      parent_menu_id: null,
+      parent_menu_name: "",
+    });
+  }
+
+  // Demo Setup - check if user has SUPER_ADMIN, SYSTEM_ADMIN, or ADMIN role
+  if (hasRole("SUPER_ADMIN") || hasRole("SYSTEM_ADMIN") || hasRole("ADMIN")) {
+    options.push({
+      menu_id: null,
+      menu_name: "Demo Setup",
+      route: "/demo-setup-videos",
+      parent_menu_id: null,
+      parent_menu_name: "",
+    });
+  }
+
+  // Communication - check if user has access to notices
+  if (grantedMenuPaths.has("/communication/notices")) {
+    options.push({
+      menu_id: null,
+      menu_name: "Communication",
+      route: "/communication/notices",
+      parent_menu_id: null,
+      parent_menu_name: "",
+    });
+  }
+
+  // Guide - always show this
+  options.push({
+    menu_id: null,
+    menu_name: "Guide",
+    route: "__action:guide__",
+    parent_menu_id: null,
+    parent_menu_name: "",
+  });
+
+  return options;
 }
 
 function buildGuideOptions(pages: NavigableMenu[]): InterpretOption[] {
@@ -548,7 +605,9 @@ function buildGuideOptions(pages: NavigableMenu[]): InterpretOption[] {
 
 function restoreOptionsForMessages(
   msgs: ChatMessage[],
-  pages: NavigableMenu[]
+  pages: NavigableMenu[],
+  grantedMenuPaths: Set<string>,
+  hasRole: (role: string) => boolean
 ): Record<string, InterpretOption[]> {
   const opts: Record<string, InterpretOption[]> = {};
   for (const m of msgs) {
@@ -556,10 +615,7 @@ function restoreOptionsForMessages(
     if (m.variant === "guide") {
       opts[m.id] = buildGuideOptions(pages);
     } else if (m.variant === "greeting") {
-      const pageOpts = navigableToOptions(pages);
-      if (pageOpts.length > 0) {
-        opts[m.id] = pageOpts;
-      }
+      opts[m.id] = buildGreetingOptions(grantedMenuPaths, hasRole);
     }
   }
   return opts;
@@ -623,7 +679,7 @@ export default function AIAssistant() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { menus, hasPermission } = useRBAC();
+  const { menus, hasPermission, hasRole } = useRBAC();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
@@ -669,14 +725,23 @@ export default function AIAssistant() {
       const { data } = await apiClient.get<ChatSessionResponse>("/api/ai/chat");
       const loaded = data.messages.map(toChatMessage);
       const pages = buildNavigableMenus(menus, hasPermission).filter((m) => !m.isAction);
+      const grantedPaths = new Set(menus.flatMap(m => {
+        const paths: string[] = [];
+        const traverse = (node: MenuNode) => {
+          if (node.path) paths.push(node.path);
+          node.children?.forEach(traverse);
+        };
+        traverse(m);
+        return paths;
+      }));
       setMessages(loaded);
-      setOptionsById(restoreOptionsForMessages(loaded, pages));
+      setOptionsById(restoreOptionsForMessages(loaded, pages, grantedPaths, hasRole));
     } catch {
       // Keep in-memory messages if chat API is unavailable
     } finally {
       setChatLoading(false);
     }
-  }, [user?.id, menus, hasPermission]);
+  }, [user?.id, menus, hasPermission, hasRole]);
 
   useEffect(() => {
     const uid = user?.id ?? null;
@@ -800,14 +865,27 @@ export default function AIAssistant() {
           variant: "greeting",
         },
       ]);
-      attachPageOptions(assistantId, pageSuggestions);
+      // Build greeting options with Basic Configuration, Demo Setup, Communication, Guide
+      const greetingChips = buildGreetingOptions(
+        new Set(menus.flatMap(m => {
+          const paths: string[] = [];
+          const traverse = (node: MenuNode) => {
+            if (node.path) paths.push(node.path);
+            node.children?.forEach(traverse);
+          };
+          traverse(m);
+          return paths;
+        })),
+        hasRole
+      );
+      setOptionsById((prev) => ({ ...prev, [assistantId]: greetingChips }));
       void persistExchange(userText, reply, {
         inputSource: "greeting",
         clientIds: { user: userId, assistant: assistantId },
         reload: false,
       }).catch(() => {});
     },
-    [attachPageOptions, displayName, pageSuggestions, persistExchange]
+    [displayName, menus, hasRole, persistExchange]
   );
 
   const showGuideInChat = useCallback(
@@ -937,6 +1015,10 @@ export default function AIAssistant() {
         setMenuListOpen(true);
         return;
       }
+      if (option.route === "__action:guide__") {
+        showGuideInChat();
+        return;
+      }
       const item: NavigableMenu = {
         id: option.menu_id ?? `opt:${option.route}`,
         name: option.menu_name,
@@ -946,7 +1028,7 @@ export default function AIAssistant() {
       };
       void navigateToMenu(item, "option_pick");
     },
-    [navigateToMenu]
+    [navigateToMenu, showGuideInChat]
   );
 
   const openFromList = useCallback(
