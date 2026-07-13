@@ -67,6 +67,7 @@ const RoleManagementPage = () => {
 
       <EntityTableSection<Role>
         label="Role List"
+        showInfoBar={false}
         totalRows={controller.totalRoles}
         page={controller.page}
         rowsPerPage={controller.rowsPerPage}
