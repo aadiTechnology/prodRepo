@@ -158,9 +158,15 @@ const AddAcademicYear = () => {
     }
   };
 
-  const handleCancel = () => {
-    navigateToList(listPath);
-  };
+  const handleCancel = useCallback(() => {
+    if (isEditMode) {
+      navigateToList(listPath);
+      return;
+    }
+    resetForm(initialValues);
+    setError(null);
+    setSnackbar(null);
+  }, [isEditMode, navigateToList, resetForm, initialValues]);
 
   return (
     <BaseForm<AddAcademicYearFormData>
