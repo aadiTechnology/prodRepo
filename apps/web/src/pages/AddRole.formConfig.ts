@@ -45,6 +45,13 @@ export function createAddRoleFormConfig(_args: AddRoleFormConfigArgs): FormConfi
           rows: 3,
         },
       },
+      is_active: {
+        name: "is_active",
+        label: "Status",
+        type: "switch",
+        helperText: "Active roles are available for assignment",
+        conditionalRender: () => _args.isEditMode,
+      },
     },
     layoutRows: [
       {
@@ -62,6 +69,15 @@ export function createAddRoleFormConfig(_args: AddRoleFormConfigArgs): FormConfi
         grid: { xs: 12 },
         fieldNames: ["description"],
       },
+      ...(_args.isEditMode
+        ? [
+            {
+              kind: "fields" as const,
+              grid: { xs: 12, sm: 6 },
+              fieldNames: ["is_active"] as (keyof AddRoleFormData & string)[],
+            },
+          ]
+        : []),
     ],
   };
 }

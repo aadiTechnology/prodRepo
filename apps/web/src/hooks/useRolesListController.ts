@@ -30,7 +30,6 @@ export function useRolesListController() {
         pageSize: rowsPerPage,
         sortBy: sortBy === 'createdAt' ? 'created_at' : sortBy,
         sortOrder,
-        activeOnly: true,
       });
       setRoles(data.items ?? []);
       setTotalRoles(data.totalCount);

@@ -208,9 +208,7 @@ export default function RolePage() {
         }
       }
 
-      if (!isEditMode) {
-        payload.is_active = formData.is_active;
-      }
+      payload.is_active = formData.is_active;
 
       if (userRole === "SUPER_ADMIN") {
         payload.scope_type = "Platform";
