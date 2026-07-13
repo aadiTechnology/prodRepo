@@ -259,6 +259,7 @@ const StudentList = () => {
     >
       <EntityTableSection
         label="Student List"
+        showInfoBar={false}
         totalRows={totalStudents}
         page={page}
         rowsPerPage={rowsPerPage}
