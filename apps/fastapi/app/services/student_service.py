@@ -22,33 +22,6 @@ class StudentService:
     class DeleteNotAllowed(Exception):
         pass
 
-    def _get_current_academic_year_id(self, tenant_id: int) -> int | None:
-        current = (
-            self.db.query(AcademicYear)
-            .filter(
-                AcademicYear.tenant_id == tenant_id,
-                AcademicYear.is_deleted == False,  # noqa: E712
-                AcademicYear.is_active == True,  # noqa: E712
-                AcademicYear.is_current == True,  # noqa: E712
-            )
-            .order_by(AcademicYear.start_date.desc(), AcademicYear.id.desc())
-            .first()
-        )
-        if current:
-            return current.id
-
-        fallback = (
-            self.db.query(AcademicYear)
-            .filter(
-                AcademicYear.tenant_id == tenant_id,
-                AcademicYear.is_deleted == False,  # noqa: E712
-                AcademicYear.is_active == True,  # noqa: E712
-            )
-            .order_by(AcademicYear.start_date.desc(), AcademicYear.id.desc())
-            .first()
-        )
-        return fallback.id if fallback else None
-
     def _get_student_effective_academic_year_id(self, student: Student) -> int | None:
         if student.academic_year_id:
             return student.academic_year_id
@@ -69,13 +42,13 @@ class StudentService:
 
         return None
 
-    def _is_student_assigned_to_current_academic_year(self, student: Student, tenant_id: int) -> bool:
-        current_year_id = self._get_current_academic_year_id(tenant_id)
-        if not current_year_id:
-            return False
-
-        effective_year_id = self._get_student_effective_academic_year_id(student)
-        return effective_year_id == current_year_id if effective_year_id else False
+    def _is_student_assigned_to_class_for_academic_year(self, student: Student) -> bool:
+        """True when student is enrolled in a class / academic year — delete must be blocked."""
+        if student.class_id is not None:
+            return True
+        if student.academic_year_id is not None:
+            return True
+        return self._get_student_effective_academic_year_id(student) is not None
 
     def get_students(self, page=1, limit=10, search=None, class_id=None, class_=None, status=None, tenant_id=None, division_id=None):
         from app.schemas.student_schema import StudentListItem, Pagination, StudentListResponse
@@ -104,7 +77,6 @@ class StudentService:
             query = query.filter(and_(*filters))
         total = query.count()
         results = query.order_by(Student.id).offset((page - 1) * limit).limit(limit).all()
-        current_year_id = self._get_current_academic_year_id(tenant_id) if tenant_id else None
         data = []
         for student, school_class, class_division in results:
             class_name = school_class.name if school_class else ""
@@ -115,12 +87,7 @@ class StudentService:
                 class_display = class_name
             else:
                 class_display = f"Class {student.class_id}" if student.class_id else "Unknown"
-            effective_year_id = self._get_student_effective_academic_year_id(student)
-            can_delete = not (
-                current_year_id is not None
-                and effective_year_id is not None
-                and effective_year_id == current_year_id
-            )
+            can_delete = not self._is_student_assigned_to_class_for_academic_year(student)
             data.append(
                 StudentListItem(
                     id=str(student.id),
@@ -385,9 +352,9 @@ class StudentService:
         if not student:
             raise StudentService.NotFound()
 
-        if tenant_id and self._is_student_assigned_to_current_academic_year(student, tenant_id):
+        if self._is_student_assigned_to_class_for_academic_year(student):
             raise StudentService.DeleteNotAllowed(
-                "Student cannot be deleted because they are assigned to the current academic year."
+                "Student cannot be deleted because they are assigned to a class for an academic year."
             )
 
         student.is_active = False

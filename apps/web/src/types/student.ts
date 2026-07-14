@@ -5,6 +5,7 @@ export interface Student {
   gender?: string;
   mobile?: string;
   class?: string;
+  class_id?: number | null;
   status: "Active" | "Inactive";
   can_delete?: boolean;
 }

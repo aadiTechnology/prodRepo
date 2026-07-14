@@ -89,9 +89,12 @@ export function useStudentListController({
   }, [fetchStudents, ready]);
 
   const openDeleteConfirm = (student: Student) => {
-    if (student.can_delete === false) {
+    if (
+      student.can_delete === false ||
+      (student.class_id != null && student.class_id !== undefined)
+    ) {
       enqueueSnackbar(
-        "Student cannot be deleted because they are assigned to the current academic year.",
+        "Student cannot be deleted because they are assigned to a class for an academic year.",
         {
           variant: "warning",
           autoHideDuration: 4000,

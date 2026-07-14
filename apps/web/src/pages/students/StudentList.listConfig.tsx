@@ -13,7 +13,7 @@ import type { ListConfig } from "../../components/reusable";
 import StatusChip from "../../components/roles/StatusChip";
 
 const STUDENT_DELETE_BLOCKED_MESSAGE =
-  "Student cannot be deleted because they are assigned to the current academic year.";
+  "Student cannot be deleted because they are assigned to a class for an academic year.";
 
 function isInactiveStudent(row: Student): boolean {
   return row.status?.toLowerCase() === "inactive";
@@ -98,7 +98,8 @@ export function renderStudentRowActions({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const canDelete = row.can_delete !== false;
+  const canDelete =
+    row.can_delete !== false && (row.class_id == null || row.class_id === undefined);
   const deleteTooltip = canDelete ? "Delete" : STUDENT_DELETE_BLOCKED_MESSAGE;
 
   return (
