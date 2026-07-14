@@ -549,7 +549,12 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
           division_id: nextFilters.division_id,
           academic_year_id: nextFilters.academic_year_id || undefined,
         });
-        setStudents(data.attendance);
+        setStudents(
+          data.attendance.map((student) => ({
+            ...student,
+            status: student.status || "Present",
+          }))
+        );
         prevAutoFetchKey.current = buildAutoFetchKey(nextFilters);
       } catch (err) {
         console.error("Failed to fetch students", err);

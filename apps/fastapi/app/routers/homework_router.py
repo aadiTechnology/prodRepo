@@ -18,7 +18,9 @@ from app.schemas.homework_schema import (
     HomeworkAttachmentResponse,
     HomeworkCreate,
     HomeworkListResponse,
+    HomeworkMarkViewedResponse,
     HomeworkResponse,
+    HomeworkUnreadCountResponse,
     HomeworkUpdate,
     SubjectOption,
 )
@@ -102,6 +104,74 @@ def get_teacher_subjects(
 
 
 # ---------------------------------------------------------------------------
+# Unread badge (WhatsApp-style: open details -> count decreases)
+# ---------------------------------------------------------------------------
+
+@router.get("/unread-count", response_model=HomeworkUnreadCountResponse)
+def get_unread_count(
+    class_id: Optional[int] = Query(None, ge=1),
+    class_division_id: Optional[int] = Query(None, ge=1),
+    subject_id: Optional[int] = Query(None, ge=1),
+    academic_year_id: Optional[int] = Query(None, ge=1),
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_user),
+):
+    """
+    Active homework in the caller's role/class scope that they have not opened yet.
+    Optional filters (class/division/subject/year) narrow the badge for teachers.
+    """
+    viewer_context = homework_service.get_viewer_context(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+    )
+    count = homework_service.count_unread_homework(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        viewer_context=viewer_context,
+        class_id=class_id,
+        class_division_id=class_division_id,
+        subject_id=subject_id,
+        academic_year_id=academic_year_id,
+    )
+    return HomeworkUnreadCountResponse(count=count)
+
+
+@router.post(
+    "/{homework_id}/mark-viewed",
+    response_model=HomeworkMarkViewedResponse,
+)
+def mark_homework_viewed(
+    homework_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_user),
+):
+    """Record that the current user opened this homework (sidebar badge -1)."""
+    viewer_context = homework_service.get_viewer_context(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+    )
+    already_viewed, hw_id = homework_service.mark_homework_viewed(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        homework_id=homework_id,
+        viewer_context=viewer_context,
+    )
+    return HomeworkMarkViewedResponse(
+        message="Homework marked as viewed",
+        homework_id=hw_id,
+        already_viewed=already_viewed,
+    )
+
+
+# ---------------------------------------------------------------------------
 # CRUD
 # ---------------------------------------------------------------------------
 
@@ -174,6 +244,14 @@ def get_homework(
     hw = homework_service.get_homework(
         db,
         tenant_id=current_user.tenant_id,
+        homework_id=homework_id,
+        viewer_context=viewer_context,
+    )
+    # Opening details counts as "read" for the sidebar badge.
+    homework_service.mark_homework_viewed(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
         homework_id=homework_id,
         viewer_context=viewer_context,
     )

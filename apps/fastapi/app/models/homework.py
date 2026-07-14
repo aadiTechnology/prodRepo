@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Boolean, Text
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Boolean, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -66,3 +66,23 @@ class HomeworkAttachment(Base):
     uploaded_by = Column(Integer, nullable=True)
 
     homework = relationship("Homework", back_populates="attachments")
+
+
+class HomeworkView(Base):
+    """Per-user homework open/read tracking for WhatsApp-style sidebar unread badge."""
+
+    __tablename__ = "homework_views"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "homework_id",
+            "user_id",
+            name="UQ_homework_views_user_hw",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    homework_id = Column(Integer, ForeignKey("homework.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    viewed_at = Column(DateTime, default=datetime.utcnow, nullable=False)

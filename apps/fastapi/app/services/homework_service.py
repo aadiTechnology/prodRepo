@@ -223,6 +223,56 @@ def get_homework(
     return hw
 
 
+def count_unread_homework(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    viewer_context: HomeworkViewerContext,
+    class_id: Optional[int] = None,
+    class_division_id: Optional[int] = None,
+    subject_id: Optional[int] = None,
+    academic_year_id: Optional[int] = None,
+) -> int:
+    return repo.count_unread_homework(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        class_id=class_id,
+        class_division_id=class_division_id,
+        subject_id=subject_id,
+        academic_year_id=academic_year_id,
+        viewer_context=viewer_context,
+    )
+
+
+def mark_homework_viewed(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    homework_id: int,
+    viewer_context: Optional[HomeworkViewerContext] = None,
+) -> tuple[bool, int]:
+    """
+    Mark homework as viewed by current user.
+    Returns (already_viewed, homework_id).
+    """
+    hw = get_homework(
+        db,
+        tenant_id=tenant_id,
+        homework_id=homework_id,
+        viewer_context=viewer_context,
+    )
+    _row, already_viewed = repo.mark_homework_viewed(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        homework_id=int(hw.id),
+    )
+    return already_viewed, int(hw.id)
+
+
 def create_homework(
     db: Session,
     *,

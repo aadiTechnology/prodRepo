@@ -159,4 +159,19 @@ export const homeworkService = {
   async deleteAttachment(homeworkId: number, attachmentId: number): Promise<void> {
     await apiClient.delete(`/api/homework/${homeworkId}/attachments/${attachmentId}`);
   },
+
+  async getUnreadCount(params?: {
+    class_id?: number;
+    class_division_id?: number;
+    subject_id?: number;
+    academic_year_id?: number;
+  }): Promise<{ count: number }> {
+    const response = await apiClient.get("/api/homework/unread-count", { params });
+    return response.data;
+  },
+
+  async markViewed(id: number): Promise<{ message: string; homework_id: number; already_viewed: boolean }> {
+    const response = await apiClient.post(`/api/homework/${id}/mark-viewed`);
+    return response.data;
+  },
 };

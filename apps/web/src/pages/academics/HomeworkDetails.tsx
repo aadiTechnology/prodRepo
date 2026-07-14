@@ -27,6 +27,7 @@ import { PageHeader } from "../../components/layout";
 import { useRBAC } from "../../context/RBACContext";
 import { homeworkService, type HomeworkResponse } from "../../api/services/homeworkService";
 import { isDraftHomeworkStatus } from "../../utils/homeworkStatus";
+import { notifyHomeworkUnreadChanged } from "../../utils/homeworkUnreadEvents";
 import { apiBaseUrl } from "../../config/env";
 import { colorTokens } from "../../tokens/colors";
 
@@ -111,6 +112,13 @@ export default function HomeworkDetails() {
       setError(null);
       const data = await homeworkService.getById(homeworkId);
       setHw(data);
+      // Backend getById also marks viewed; call markViewed + refresh badge for sidebar.
+      try {
+        await homeworkService.markViewed(homeworkId);
+      } catch {
+        // Non-blocking: details still usable if mark-viewed fails.
+      }
+      notifyHomeworkUnreadChanged();
     } catch {
       setHw(null);
       setError("Unable to load homework details");

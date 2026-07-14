@@ -24,6 +24,7 @@ import {
   alpha,
   Slide,
   InputBase,
+  Badge,
 } from "@mui/material";
 import {
   ExpandMore as ExpandMoreIcon,
@@ -37,6 +38,7 @@ import { colorTokens } from "../../tokens/colors";
 import { normalizeMenuPath, hasMenuChildren, isSidebarHiddenModule } from "../../utils/menuNavigation";
 import { toRoleLabel } from "../../utils/formatters";
 import { toMediaUrl } from "../../utils/mediaUrl";
+import { useHomeworkSidebarCount } from "../../hooks/useHomeworkSidebarCount";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Asset Icons - Menu item icons
@@ -191,7 +193,15 @@ interface MenuItemData {
   icon: string;
   path?: string;
   color?: string;
-  children?: { id: string; label: string; path: string }[];
+  badgeCount?: number;
+  children?: { id: string; label: string; path: string; badgeCount?: number }[];
+}
+
+function isHomeworkMenuEntry(label: string, path?: string): boolean {
+  const normalizedLabel = label.trim().toLowerCase();
+  const normalizedPath = (path ?? "").trim().toLowerCase();
+  if (normalizedLabel === "homework details") return false;
+  return normalizedLabel === "homework" || normalizedPath === "/homework";
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -452,6 +462,35 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
     );
   }, [searchTerm, menuItems]);
 
+  const hasHomeworkMenu = useMemo(
+    () =>
+      menuItems.some(
+        (item) =>
+          isHomeworkMenuEntry(item.label, item.path) ||
+          item.children?.some((child) => isHomeworkMenuEntry(child.label, child.path))
+      ),
+    [menuItems]
+  );
+  const homeworkPendingCount = useHomeworkSidebarCount(hasHomeworkMenu);
+
+  const renderMenuBadge = (count?: number) => {
+    if (!count || count <= 0) return null;
+    return (
+      <Badge
+        badgeContent={count > 99 ? "99+" : count}
+        color="error"
+        sx={{
+          "& .MuiBadge-badge": {
+            fontWeight: 800,
+            fontSize: "0.65rem",
+            minWidth: 18,
+            height: 18,
+          },
+        }}
+      />
+    );
+  };
+
   const drawerContent = (
     <SidebarContainer>
       <HeaderGradient>
@@ -521,6 +560,9 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
           {filteredItems.map((item) => {
             const isActive = location.pathname === item.path || (item.children?.some(child => location.pathname === child.path) ?? false);
             const isSectionExpanded = !!expandedSections[item.id];
+            const itemBadgeCount = isHomeworkMenuEntry(item.label, item.path)
+              ? homeworkPendingCount
+              : undefined;
 
             return (
               <Box key={item.id} sx={{ mb: 0.5 }}>
@@ -542,7 +584,29 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                     itemColor={item.color}
                   >
                     <ListItemIcon>
-                      <img src={item.icon} alt={item.label} />
+                      <Badge
+                        color="error"
+                        badgeContent={
+                          collapsed && itemBadgeCount && itemBadgeCount > 0
+                            ? itemBadgeCount > 99
+                              ? "99+"
+                              : itemBadgeCount
+                            : 0
+                        }
+                        invisible={!collapsed || !itemBadgeCount}
+                        overlap="circular"
+                        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                        sx={{
+                          "& .MuiBadge-badge": {
+                            fontWeight: 800,
+                            fontSize: "0.6rem",
+                            minWidth: 16,
+                            height: 16,
+                          },
+                        }}
+                      >
+                        <img src={item.icon} alt={item.label} />
+                      </Badge>
                     </ListItemIcon>
                     {!collapsed && (
                       <>
@@ -550,6 +614,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                           primary={item.label}
                           primaryTypographyProps={{ fontSize: "0.9rem", fontWeight: isActive ? 800 : 600 }}
                         />
+                        {renderMenuBadge(itemBadgeCount)}
                         {hasMenuChildren(item.children) && (
                           <ExpandMoreIcon
                             sx={{
@@ -570,6 +635,9 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                     <List component="div" disablePadding>
                       {item.children!.map((child) => {
                         const isChildActive = location.pathname === child.path;
+                        const childBadgeCount = isHomeworkMenuEntry(child.label, child.path)
+                          ? homeworkPendingCount
+                          : undefined;
                         return (
                           <SubNavItem
                             key={child.id}
@@ -578,6 +646,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                               if (route) handleMenuNavigate(route);
                             }}
                             active={isChildActive}
+                            sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
                           >
                             <ListItemText
                               primary={child.label}
@@ -586,6 +655,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                                 fontWeight: isChildActive ? 700 : 500,
                               }}
                             />
+                            {renderMenuBadge(childBadgeCount)}
                           </SubNavItem>
                         );
                       })}

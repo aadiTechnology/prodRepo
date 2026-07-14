@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, text
 
-from app.models.homework import Homework, HomeworkAttachment
+from app.models.homework import Homework, HomeworkAttachment, HomeworkView
 from app.utils.homework_status import (
     DB_DRAFT_HOMEWORK_STATUSES,
     DB_LIVE_HOMEWORK_STATUSES,
@@ -133,6 +133,103 @@ def list_homework(
     total = query.count()
     items = query.order_by(Homework.created_at.desc()).offset(skip).limit(limit).all()
     return items, total
+
+
+def count_unread_homework(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    class_id: Optional[int] = None,
+    class_division_id: Optional[int] = None,
+    subject_id: Optional[int] = None,
+    academic_year_id: Optional[int] = None,
+    viewer_context: Optional[object] = None,
+) -> int:
+    """
+    Active/published homework in the viewer's scope that this user has not opened yet.
+    """
+    query = db.query(Homework).filter(
+        Homework.tenant_id == tenant_id,
+        Homework.is_deleted == False,  # noqa: E712
+        Homework.status.in_(tuple(DB_LIVE_HOMEWORK_STATUSES)),
+    )
+
+    viewer_kind = getattr(viewer_context, "kind", None) if viewer_context else None
+    if viewer_kind in ("teacher", "student", "parent"):
+        query = query.filter(
+            _build_class_division_scope_filter(getattr(viewer_context, "scopes", ()))
+        )
+    if class_id is not None:
+        query = query.filter(Homework.class_id == class_id)
+    if class_division_id is not None:
+        query = query.filter(Homework.class_division_id == class_division_id)
+    if subject_id is not None:
+        query = query.filter(Homework.subject_id == subject_id)
+    if academic_year_id is not None:
+        query = query.filter(Homework.academic_year_id == academic_year_id)
+
+    query = query.outerjoin(
+        HomeworkView,
+        and_(
+            HomeworkView.homework_id == Homework.id,
+            HomeworkView.tenant_id == tenant_id,
+            HomeworkView.user_id == user_id,
+        ),
+    ).filter(HomeworkView.id.is_(None))
+
+    return int(query.count() or 0)
+
+
+def mark_homework_viewed(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    homework_id: int,
+) -> Tuple[HomeworkView, bool]:
+    """
+    Upsert a view row for (tenant, homework, user).
+    Returns (row, already_viewed).
+    """
+    existing = (
+        db.query(HomeworkView)
+        .filter(
+            HomeworkView.tenant_id == tenant_id,
+            HomeworkView.homework_id == homework_id,
+            HomeworkView.user_id == user_id,
+        )
+        .first()
+    )
+    if existing:
+        return existing, True
+
+    row = HomeworkView(
+        tenant_id=tenant_id,
+        homework_id=homework_id,
+        user_id=user_id,
+        viewed_at=datetime.utcnow(),
+    )
+    db.add(row)
+    try:
+        db.commit()
+        db.refresh(row)
+        return row, False
+    except Exception:
+        db.rollback()
+        # Race: another request inserted the same unique key
+        existing = (
+            db.query(HomeworkView)
+            .filter(
+                HomeworkView.tenant_id == tenant_id,
+                HomeworkView.homework_id == homework_id,
+                HomeworkView.user_id == user_id,
+            )
+            .first()
+        )
+        if existing:
+            return existing, True
+        raise
 
 
 def get_homework(db: Session, *, tenant_id: int, homework_id: int) -> Homework:

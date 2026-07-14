@@ -36,7 +36,7 @@ from app.models.student_invoice import StudentInvoice
 from app.models.notice import Notice, NoticeTarget, NoticeAttachment
 from app.models.subject import Subject, SubjectClass
 from app.models.holiday import Holiday
-from app.models.homework import Homework, HomeworkAttachment
+from app.models.homework import Homework, HomeworkAttachment, HomeworkView
 from app.models.demo_video import DemoVideo
 from app.models.marketing_hub import MarketingPlatform, MarketingSocialMediaLink
 from app.models.activity_gallery import (
@@ -105,6 +105,7 @@ __all__ = [
     "Holiday",
     "Homework",
     "HomeworkAttachment",
+    "HomeworkView",
     "DemoVideo",
     "MarketingPlatform",
     "MarketingSocialMediaLink",

@@ -13,6 +13,7 @@ import {
 import { isTeacherNoticeUser } from "../utils/noticeAudience";
 import { resolveCurrentAcademicYearId } from "../utils/academicYear";
 import { HOMEWORK_STATUS_ACTIVE } from "../utils/homeworkStatus";
+import { notifyHomeworkUnreadChanged } from "../utils/homeworkUnreadEvents";
 
 export function useHomeworkListController() {
   const { user } = useAuth();
@@ -217,6 +218,16 @@ export function useHomeworkListController() {
     setPage(0);
   }, [search, statusFilter, classFilter, divisionFilter, subjectFilter, academicYearFilter]);
 
+  // Keep sidebar unread badge aligned with list class/division filters (teacher multi-class).
+  useEffect(() => {
+    notifyHomeworkUnreadChanged({
+      classId: classFilter || null,
+      divisionId: divisionFilter || null,
+      subjectId: subjectFilter || null,
+      academicYearId: academicYearFilter || null,
+    });
+  }, [classFilter, divisionFilter, subjectFilter, academicYearFilter]);
+
   const handleDeleteClick = (row: HomeworkResponse) => {
     if (!isHomeworkEditDeleteAllowed(row)) {
       setError(homeworkEditDeleteLockMessage());
@@ -234,6 +245,12 @@ export function useHomeworkListController() {
       setSuccess("Homework deleted successfully");
       setDeleteDialogOpen(false);
       fetchHomework();
+      notifyHomeworkUnreadChanged({
+        classId: classFilter || null,
+        divisionId: divisionFilter || null,
+        subjectId: subjectFilter || null,
+        academicYearId: academicYearFilter || null,
+      });
     } catch (err: any) {
       setError(err?.response?.data?.detail || "Unable to delete homework");
       setDeleteDialogOpen(false);

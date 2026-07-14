@@ -132,6 +132,16 @@ class HomeworkListResponse(BaseModel):
     pages: int
 
 
+class HomeworkUnreadCountResponse(BaseModel):
+    count: int
+
+
+class HomeworkMarkViewedResponse(BaseModel):
+    message: str
+    homework_id: int
+    already_viewed: bool = False
+
+
 # ---------------------------------------------------------------------------
 # Dropdown helpers
 # ---------------------------------------------------------------------------
