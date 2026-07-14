@@ -635,9 +635,6 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                     <List component="div" disablePadding>
                       {item.children!.map((child) => {
                         const isChildActive = location.pathname === child.path;
-                        const childBadgeCount = isHomeworkMenuEntry(child.label, child.path)
-                          ? homeworkPendingCount
-                          : undefined;
                         return (
                           <SubNavItem
                             key={child.id}
@@ -655,7 +652,6 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                                 fontWeight: isChildActive ? 700 : 500,
                               }}
                             />
-                            {renderMenuBadge(childBadgeCount)}
                           </SubNavItem>
                         );
                       })}
