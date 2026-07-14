@@ -212,8 +212,8 @@ export function createEnrollmentFormConfig({
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["fee_structure_id"] },
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["discount_id"] },
 
-      { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["birth_certificate_url"] },
-      { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["photo_url"] },
+      // birth_certificate_url / photo_url are rendered by EnrollmentPage custom upload UI
+      // (kept in fields map above; not as empty layout rows — that created a large gap).
       ...(isEditMode
         ? [
             {

@@ -1153,146 +1153,166 @@ export default function EnrollmentPage() {
       });
     }
 
-    // 9. Documents Section Header
-    const birthCertIdx = config.layoutRows.findIndex(
-      (row) => row.kind === "fields" && row.fieldNames.includes("birth_certificate_url")
+    // 9-10. Documents Upload: header immediately followed by upload controls
+    // (empty birth/photo placeholder field rows were removed from formConfig).
+    let docsInsertAt = config.layoutRows.length;
+    const discountIdxForDocs = config.layoutRows.findIndex(
+      (row) => row.kind === "fields" && row.fieldNames.includes("discount_id")
     );
-    if (birthCertIdx >= 0) {
-      config.layoutRows.splice(birthCertIdx, 0, {
-        kind: "custom" as const,
-        grid: { xs: 12 },
-        render: (ctx) => <FormSectionLabel title="Documents Upload" icon={<UploadFileIcon />} sx={sectionTitleSx} />,
-      });
+    if (discountIdxForDocs >= 0) {
+      docsInsertAt = discountIdxForDocs + 1;
+      // Skip discount preview custom row when present
+      if (config.layoutRows[docsInsertAt]?.kind === "custom") {
+        docsInsertAt += 1;
+      }
+    }
+    const statusIdxForDocs = config.layoutRows.findIndex(
+      (row) => row.kind === "fields" && row.fieldNames.includes("is_active")
+    );
+    if (statusIdxForDocs >= 0) {
+      docsInsertAt = Math.min(docsInsertAt, statusIdxForDocs);
     }
 
-    // 10. Document Upload Buttons
-    const photoIdx = config.layoutRows.findIndex(
-      (row) => row.kind === "fields" && row.fieldNames.includes("photo_url")
-    );
-    if (photoIdx >= 0 && !isViewMode) {
-      config.layoutRows.splice(photoIdx + 1, 0, {
-        kind: "custom" as const,
-        grid: { xs: 12 },
-        render: (ctx) => (
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Box sx={{ border: "1px solid", borderColor: "grey.200", borderRadius: 2, p: 1.25 }}>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<UploadFileIcon />}
-                  onClick={() => birthCertInputRef.current?.click()}
-                  disabled={uploadingBirthCert}
-                  sx={{ justifyContent: "flex-start", textTransform: "none" }}
+    const documentUploadRow = {
+      kind: "custom" as const,
+      grid: { xs: 12 },
+      render: () => (
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <Box sx={{ border: "1px solid", borderColor: "grey.200", borderRadius: 2, p: 1.25 }}>
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={<UploadFileIcon />}
+                onClick={() => birthCertInputRef.current?.click()}
+                disabled={uploadingBirthCert}
+                sx={{ justifyContent: "flex-start", textTransform: "none" }}
+              >
+                {uploadingBirthCert ? "Uploading birth certificate..." : "Upload Birth Certificate"}
+              </Button>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
+                {ENROLLMENT_DOCUMENT_SIZE_HINT}
+              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, minHeight: 24, gap: 0.25 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                 >
-                  {uploadingBirthCert ? "Uploading birth certificate..." : "Upload Birth Certificate"}
-                </Button>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
-                  {ENROLLMENT_DOCUMENT_SIZE_HINT}
+                  {birthCertName ||
+                    fileNameFromUrl(formData.birth_certificate_url) ||
+                    "No file selected"}
                 </Typography>
-                <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, minHeight: 24, gap: 0.25 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                  >
-                    {birthCertName ||
-                      fileNameFromUrl(formData.birth_certificate_url) ||
-                      "No file selected"}
-                  </Typography>
-                  {formData.birth_certificate_url ? (
-                    <>
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        aria-label="View birth certificate"
-                        onClick={() => openDocumentInNewTab(formData.birth_certificate_url)}
-                        sx={{ p: 0.5 }}
-                      >
-                        <VisibilityIcon sx={{ fontSize: 18 }} />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        aria-label="Delete birth certificate"
-                        onClick={() => requestDocumentDelete("birth_certificate")}
-                        sx={{ p: 0.5 }}
-                      >
-                        <DeleteOutlineIcon sx={{ fontSize: 18 }} />
-                      </IconButton>
-                    </>
-                  ) : null}
-                </Box>
-              </Box>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Box sx={{ border: "1px solid", borderColor: "grey.200", borderRadius: 2, p: 1.25 }}>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<UploadFileIcon />}
-                  onClick={() => photoInputRef.current?.click()}
-                  disabled={uploadingPhoto}
-                  sx={{ justifyContent: "flex-start", textTransform: "none" }}
-                >
-                  {uploadingPhoto ? "Uploading photo..." : "Upload Student Photo"}
-                </Button>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
-                  {ENROLLMENT_DOCUMENT_SIZE_HINT}
-                </Typography>
-                <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, minHeight: 24, gap: 0.25 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                  >
-                    {photoName || fileNameFromUrl(formData.photo_url) || "No file selected"}
-                  </Typography>
-                  {formData.photo_url ? (
-                    <>
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        aria-label="View student photo"
-                        onClick={() => openDocumentInNewTab(formData.photo_url)}
-                        sx={{ p: 0.5 }}
-                      >
-                        <VisibilityIcon sx={{ fontSize: 18 }} />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        aria-label="Delete student photo"
-                        onClick={() => requestDocumentDelete("photo")}
-                        sx={{ p: 0.5 }}
-                      >
-                        <DeleteOutlineIcon sx={{ fontSize: 18 }} />
-                      </IconButton>
-                    </>
-                  ) : null}
-                </Box>
-                {formData.photo_url ? (
-                  <Box
-                    component="img"
-                    src={toAbsoluteAssetUrl(formData.photo_url)}
-                    alt="Student preview"
-                    sx={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: 1,
-                      objectFit: "cover",
-                      border: "1px solid",
-                      borderColor: "grey.300",
-                      mt: 1,
-                    }}
-                  />
+                {formData.birth_certificate_url ? (
+                  <>
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      aria-label="View birth certificate"
+                      onClick={() => openDocumentInNewTab(formData.birth_certificate_url)}
+                      sx={{ p: 0.5 }}
+                    >
+                      <VisibilityIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      aria-label="Delete birth certificate"
+                      onClick={() => requestDocumentDelete("birth_certificate")}
+                      sx={{ p: 0.5 }}
+                    >
+                      <DeleteOutlineIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </>
                 ) : null}
               </Box>
-            </Grid>
+            </Box>
           </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <Box sx={{ border: "1px solid", borderColor: "grey.200", borderRadius: 2, p: 1.25 }}>
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={<UploadFileIcon />}
+                onClick={() => photoInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                sx={{ justifyContent: "flex-start", textTransform: "none" }}
+              >
+                {uploadingPhoto ? "Uploading photo..." : "Upload Student Photo"}
+              </Button>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
+                {ENROLLMENT_DOCUMENT_SIZE_HINT}
+              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", mt: 0.5, minHeight: 24, gap: 0.25 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                >
+                  {photoName || fileNameFromUrl(formData.photo_url) || "No file selected"}
+                </Typography>
+                {formData.photo_url ? (
+                  <>
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      aria-label="View student photo"
+                      onClick={() => openDocumentInNewTab(formData.photo_url)}
+                      sx={{ p: 0.5 }}
+                    >
+                      <VisibilityIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      aria-label="Delete student photo"
+                      onClick={() => requestDocumentDelete("photo")}
+                      sx={{ p: 0.5 }}
+                    >
+                      <DeleteOutlineIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </>
+                ) : null}
+              </Box>
+              {formData.photo_url ? (
+                <Box
+                  component="img"
+                  src={toAbsoluteAssetUrl(formData.photo_url)}
+                  alt="Student preview"
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 1,
+                    objectFit: "cover",
+                    border: "1px solid",
+                    borderColor: "grey.300",
+                    mt: 1,
+                  }}
+                />
+              ) : null}
+            </Box>
+          </Grid>
+        </Grid>
+      ),
+    };
+
+    config.layoutRows.splice(
+      docsInsertAt,
+      0,
+      {
+        kind: "custom" as const,
+        grid: { xs: 12 },
+        render: () => (
+          <FormSectionLabel
+            title="Documents Upload"
+            icon={<UploadFileIcon />}
+            spacing={1}
+            sx={sectionTitleSx}
+          />
         ),
-      });
-    }
+      },
+      ...(!isViewMode ? [documentUploadRow] : [])
+    );
 
     return config;
   }, [
