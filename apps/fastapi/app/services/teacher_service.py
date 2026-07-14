@@ -22,11 +22,14 @@ def get_teacher_assignment_rows(db: Session, tenant_id: int, teacher_id: int) ->
                     ta.class_division_id,
                     cd.division_name
                 FROM teacher_assignments ta
-                LEFT JOIN classes c ON c.id = ta.class_id
+                INNER JOIN classes c ON c.id = ta.class_id
+                                     AND c.is_deleted = 0
+                                     AND c.is_active = 1
                 LEFT JOIN class_divisions cd ON cd.id = ta.class_division_id
                 WHERE ta.tenant_id = :tenant_id
                   AND ta.teacher_id = :teacher_id
                   AND ta.is_active = 1
+                  AND (ta.class_division_id IS NULL OR cd.is_active = 1)
                 ORDER BY c.name ASC, cd.division_name ASC, ta.id ASC
                 """
             ),
@@ -119,7 +122,10 @@ def get_all_teachers(
                         lcd.division_name AS legacy_division_name
                     FROM teachers t
                     LEFT JOIN classes lc ON lc.id = t.class_id
+                                        AND lc.is_deleted = 0
+                                        AND lc.is_active = 1
                     LEFT JOIN class_divisions lcd ON lcd.id = t.class_division_id
+                                                 AND lcd.is_active = 1
                     WHERE t.tenant_id = :tenant_id
                       AND t.is_deleted = 0
                       AND (
@@ -162,10 +168,13 @@ def get_all_teachers(
                         ta.class_division_id,
                         cd.division_name
                     FROM teacher_assignments ta
-                    LEFT JOIN classes c ON c.id = ta.class_id
+                    INNER JOIN classes c ON c.id = ta.class_id
+                                         AND c.is_deleted = 0
+                                         AND c.is_active = 1
                     LEFT JOIN class_divisions cd ON cd.id = ta.class_division_id
                     WHERE ta.tenant_id = :tenant_id
                       AND ta.is_active = 1
+                      AND (ta.class_division_id IS NULL OR cd.is_active = 1)
                     """
                 ),
                 {"tenant_id": tenant_id},

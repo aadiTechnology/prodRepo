@@ -180,9 +180,14 @@ def get_assigned_map(
             ta.class_id,
             ta.class_division_id
         FROM teacher_assignments ta
+        INNER JOIN classes c ON c.id = ta.class_id
+                             AND c.is_deleted = 0
+                             AND c.is_active = 1
+        LEFT JOIN class_divisions cd ON cd.id = ta.class_division_id
         WHERE ta.is_active = 1
           AND ta.subject_id IS NULL
           AND ta.academic_year_id = :academic_year_id
+          AND (ta.class_division_id IS NULL OR cd.is_active = 1)
           AND (:tenant_id IS NULL OR ta.tenant_id = :tenant_id)
         """
     )
@@ -192,11 +197,15 @@ def get_assigned_map(
             t.class_id,
             t.class_division_id
         FROM teachers t
-        LEFT JOIN classes c ON c.id = t.class_id
+        INNER JOIN classes c ON c.id = t.class_id
+                             AND c.is_deleted = 0
+                             AND c.is_active = 1
+        LEFT JOIN class_divisions cd ON cd.id = t.class_division_id
         WHERE t.is_active = 1
           AND t.is_deleted = 0
           AND t.class_id IS NOT NULL
           AND c.academic_year_id = :academic_year_id
+          AND (t.class_division_id IS NULL OR cd.is_active = 1)
           AND (:tenant_id IS NULL OR t.tenant_id = :tenant_id)
         """
     )
@@ -232,6 +241,8 @@ def get_assigned_map(
         FROM classes c
         INNER JOIN class_divisions cd ON cd.class_id = c.id
         WHERE c.is_deleted = 0
+          AND c.is_active = 1
+          AND cd.is_active = 1
           AND c.academic_year_id = :academic_year_id
           AND (:tenant_id IS NULL OR c.tenant_id = :tenant_id)
         """
@@ -624,11 +635,14 @@ def get_teacher_assignments(
         INNER JOIN teachers t ON t.id = ta.teacher_id
                              AND t.is_active = 1
                              AND t.is_deleted = 0
-        LEFT JOIN classes c ON c.id = ta.class_id
+        INNER JOIN classes c ON c.id = ta.class_id
+                             AND c.is_deleted = 0
+                             AND c.is_active = 1
         LEFT JOIN class_divisions cd ON cd.id = ta.class_division_id
         LEFT JOIN subjects s ON s.id = ta.subject_id
                             AND s.is_deleted = 0
         WHERE ta.is_active = 1
+          AND (ta.class_division_id IS NULL OR cd.is_active = 1)
           AND (:tenant_id IS NULL OR ta.tenant_id = :tenant_id)
           AND (:search_like IS NULL
                OR c.name LIKE :search_like
@@ -654,11 +668,14 @@ def get_teacher_assignments(
             NULL AS subject_name,
             'ASSIGNED' AS status
         FROM teachers t
-        LEFT JOIN classes c ON c.id = t.class_id
+        INNER JOIN classes c ON c.id = t.class_id
+                             AND c.is_deleted = 0
+                             AND c.is_active = 1
         LEFT JOIN class_divisions cd ON cd.id = t.class_division_id
         WHERE t.is_active = 1
           AND t.is_deleted = 0
           AND t.class_id IS NOT NULL
+          AND (t.class_division_id IS NULL OR cd.is_active = 1)
           AND (:tenant_id IS NULL OR t.tenant_id = :tenant_id)
           AND (:search_like IS NULL
                OR c.name LIKE :search_like

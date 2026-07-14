@@ -391,9 +391,63 @@ def update_class(
 
     db_obj.updated_by = updated_by
     db_obj.updated_at = datetime.utcnow()
+    db.flush()
+
+    # Hide related teacher assignment data when class/division becomes inactive
+    _sync_teacher_assignments_for_class_activity(db, tenant_id, db_obj)
+
     db.commit()
     db.refresh(db_obj)
     return db_obj
+
+
+def _sync_teacher_assignments_for_class_activity(
+    db: Session,
+    tenant_id: int,
+    school_class: SchoolClass,
+) -> None:
+    """Deactivate teacher_assignments rows for inactive class or divisions."""
+    from sqlalchemy import text
+
+    try:
+        if not school_class.is_active:
+            db.execute(
+                text(
+                    """
+                    UPDATE teacher_assignments
+                    SET is_active = 0, updated_at = GETDATE()
+                    WHERE tenant_id = :tenant_id
+                      AND class_id = :class_id
+                      AND is_active = 1
+                    """
+                ),
+                {"tenant_id": tenant_id, "class_id": school_class.id},
+            )
+            return
+
+        inactive_division_ids = [
+            int(d.id) for d in (school_class.divisions or []) if d.id and not d.is_active
+        ]
+        if not inactive_division_ids:
+            return
+        id_list = ", ".join(str(i) for i in inactive_division_ids)
+        db.execute(
+            text(
+                f"""
+                UPDATE teacher_assignments
+                SET is_active = 0, updated_at = GETDATE()
+                WHERE tenant_id = :tenant_id
+                  AND class_id = :class_id
+                  AND is_active = 1
+                  AND class_division_id IN ({id_list})
+                """
+            ),
+            {"tenant_id": tenant_id, "class_id": school_class.id},
+        )
+    except Exception:
+        # Table may not exist in some environments; listing filters still protect UI
+        pass
+
 
 def soft_delete_class(db: Session, class_id: int, tenant_id: int, deleted_by: int):
     db_obj = get_class_by_id(db, class_id, tenant_id)
