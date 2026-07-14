@@ -393,8 +393,9 @@ def update_class(
     db_obj.updated_at = datetime.utcnow()
     db.flush()
 
-    # Hide related teacher assignment data when class/division becomes inactive
+    # Hide related teacher/subject assignment data when class/division becomes inactive
     _sync_teacher_assignments_for_class_activity(db, tenant_id, db_obj)
+    _sync_subject_mappings_for_class_activity(db, tenant_id, db_obj)
 
     db.commit()
     db.refresh(db_obj)
@@ -446,6 +447,53 @@ def _sync_teacher_assignments_for_class_activity(
         )
     except Exception:
         # Table may not exist in some environments; listing filters still protect UI
+        pass
+
+
+def _sync_subject_mappings_for_class_activity(
+    db: Session,
+    tenant_id: int,
+    school_class: SchoolClass,
+) -> None:
+    """Deactivate subject_classes mappings for inactive class or divisions."""
+    from sqlalchemy import text
+
+    try:
+        if not school_class.is_active:
+            db.execute(
+                text(
+                    """
+                    UPDATE subject_classes
+                    SET is_active = 0
+                    WHERE tenant_id = :tenant_id
+                      AND class_id = :class_id
+                      AND is_active = 1
+                    """
+                ),
+                {"tenant_id": tenant_id, "class_id": school_class.id},
+            )
+            return
+
+        inactive_division_ids = [
+            int(d.id) for d in (school_class.divisions or []) if d.id and not d.is_active
+        ]
+        if not inactive_division_ids:
+            return
+        id_list = ", ".join(str(i) for i in inactive_division_ids)
+        db.execute(
+            text(
+                f"""
+                UPDATE subject_classes
+                SET is_active = 0
+                WHERE tenant_id = :tenant_id
+                  AND class_id = :class_id
+                  AND is_active = 1
+                  AND class_division_id IN ({id_list})
+                """
+            ),
+            {"tenant_id": tenant_id, "class_id": school_class.id},
+        )
+    except Exception:
         pass
 
 

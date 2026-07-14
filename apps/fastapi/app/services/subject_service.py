@@ -57,6 +57,15 @@ class SubjectService:
     ) -> None:
         mappings: list[dict] = []
         for sc in subject.subject_classes:
+            if not sc.is_active:
+                continue
+            cls = sc.class_model
+            if cls is None or cls.is_deleted or not cls.is_active:
+                continue
+            if sc.class_division_id is not None:
+                div = sc.division_model
+                if div is None or not div.is_active:
+                    continue
             if class_id is not None and sc.class_id != class_id:
                 continue
             if academic_year_id is not None:
@@ -95,7 +104,16 @@ class SubjectService:
             query = query.filter(Subject.is_active == is_active)
 
         if class_id is not None or academic_year_id is not None:
-            query = query.join(SubjectClass).options(_SUBJECT_CLASS_CONTAINS_EAGER)
+            query = (
+                query.join(SubjectClass)
+                .join(SchoolClass, SchoolClass.id == SubjectClass.class_id)
+                .options(_SUBJECT_CLASS_CONTAINS_EAGER)
+                .filter(
+                    SubjectClass.is_active == True,  # noqa: E712
+                    SchoolClass.is_deleted == False,  # noqa: E712
+                    SchoolClass.is_active == True,  # noqa: E712
+                )
+            )
             if class_id is not None:
                 query = query.filter(SubjectClass.class_id == class_id)
             if academic_year_id is not None:
