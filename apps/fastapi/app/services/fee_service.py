@@ -7,6 +7,7 @@ from app.models.academic import SchoolClass, AcademicYear
 from app.models.fee_payment import FeePayment
 from app.models.student import Student
 from app.models.student_fee_assignment import StudentFeeAssignment, StudentFeeInstallment
+from app.services.school_class_service import require_active_class, require_active_division
 from app.models.student_invoice import StudentInvoice
 from app.schemas.fee import FeeStructureCreate, FeeStructureUpdate, FeeCategoryCreate, FeeCategoryUpdate
 from app.core.exceptions import AppException, NotFoundException, ConflictException
@@ -85,6 +86,9 @@ def create_fee_category(db: Session, obj_in: FeeCategoryCreate, tenant_id: int, 
     """Create a new fee category. Code is auto-derived from name + academic year for uniqueness."""
     name = obj_in.name.strip()
     base_code = name[:4].upper().replace(" ", "")
+
+    if obj_in.class_id is not None:
+        require_active_class(db, tenant_id, int(obj_in.class_id))
 
     # Fetch academic year code to make the auto-code unique across years
     ay_code = ""
@@ -295,15 +299,9 @@ def get_fee_structure(db: Session, structure_id: int, tenant_id: int) -> FeeStru
     return obj
 
 def create_fee_structure(db: Session, obj_in: FeeStructureCreate, tenant_id: int, user_id: int) -> FeeStructure:
-    # Verify the class exists for this tenant
-    target_class = db.query(SchoolClass).filter(
-        SchoolClass.id == obj_in.class_id,
-        SchoolClass.tenant_id == tenant_id,
-        SchoolClass.is_deleted == False
-    ).first()
-
-    if not target_class:
-        raise NotFoundException("SchoolClass", obj_in.class_id)
+    # Verify the class exists and is active for this tenant
+    require_active_class(db, tenant_id, obj_in.class_id)
+    require_active_division(db, tenant_id, obj_in.class_id, obj_in.class_division_id)
 
     # User explicitly wants multiple fee structures for same class + category + year 
     # so we no longer do the ConflictException check here.

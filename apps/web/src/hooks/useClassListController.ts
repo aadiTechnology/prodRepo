@@ -42,6 +42,7 @@ export function useClassListController() {
       setError(null);
       const classData = await schoolClassService.getAll({
         academic_year_id: academicYearFilter ? Number(academicYearFilter) : undefined,
+        active_only: false,
       });
       setClasses(classData);
     } catch (err: any) {

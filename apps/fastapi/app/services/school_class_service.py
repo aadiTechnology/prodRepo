@@ -2,7 +2,7 @@ from datetime import datetime
 import re
 from fastapi import HTTPException
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, with_loader_criteria
 from app.models import SchoolClass, ClassDivision, AcademicYear, Student
 from app.schemas.school_class_schema import SchoolClassCreate, SchoolClassUpdate
 from app.services.teacher_assignment_guards import class_has_teacher_assignment
@@ -88,16 +88,83 @@ def _attach_division_student_counts(db: Session, tenant_id: int, classes: list[S
         for div in cls.divisions or []:
             setattr(div, "student_count", counts.get(div.id, 0))
 
+
+def require_active_class(
+    db: Session,
+    tenant_id: int,
+    class_id: int,
+) -> SchoolClass:
+    """Raise 400 if class missing, deleted, or inactive."""
+    cls = (
+        db.query(SchoolClass)
+        .filter(
+            SchoolClass.id == class_id,
+            SchoolClass.tenant_id == tenant_id,
+            SchoolClass.is_deleted == False,  # noqa: E712
+        )
+        .first()
+    )
+    if not cls:
+        raise HTTPException(status_code=400, detail="Class not found")
+    if not cls.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="This class is inactive. Activate it before using it.",
+        )
+    return cls
+
+
+def require_active_division(
+    db: Session,
+    tenant_id: int,
+    class_id: int,
+    division_id: int | None,
+) -> ClassDivision | None:
+    """Raise 400 if division is set but missing/inactive, or does not belong to class."""
+    if division_id is None:
+        return None
+    division = (
+        db.query(ClassDivision)
+        .join(SchoolClass, SchoolClass.id == ClassDivision.class_id)
+        .filter(
+            ClassDivision.id == division_id,
+            ClassDivision.class_id == class_id,
+            SchoolClass.tenant_id == tenant_id,
+            SchoolClass.is_deleted == False,  # noqa: E712
+        )
+        .first()
+    )
+    if not division:
+        raise HTTPException(status_code=400, detail="Division not found for this class")
+    if not division.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="This class division is inactive. Activate it before using it.",
+        )
+    return division
+
+
 def get_all_classes(
     db: Session,
     tenant_id: int,
     academic_year_id: int | None = None,
     search: str | None = None,
+    *,
+    active_only: bool = True,
 ):
+    """
+    List classes for a tenant.
+
+    active_only=True (default): used by filters/dropdowns — only active classes
+    and their active divisions.
+    active_only=False: Class admin page — include inactive so they can be reactivated.
+    """
     query = db.query(SchoolClass).filter(
         SchoolClass.tenant_id == tenant_id,
-        SchoolClass.is_deleted == False,
+        SchoolClass.is_deleted == False,  # noqa: E712
     )
+    if active_only:
+        query = query.filter(SchoolClass.is_active == True)  # noqa: E712
     if academic_year_id is not None:
         query = query.filter(SchoolClass.academic_year_id == academic_year_id)
 
@@ -110,7 +177,26 @@ def get_all_classes(
             )
         )
 
-    classes = query.options(joinedload(SchoolClass.divisions), joinedload(SchoolClass.academic_year)).order_by(SchoolClass.name.asc()).distinct().all()
+    load_options = [
+        joinedload(SchoolClass.divisions),
+        joinedload(SchoolClass.academic_year),
+    ]
+    if active_only:
+        # Load-only filter — does not mutate/delete inactive divisions in DB
+        load_options.append(
+            with_loader_criteria(
+                ClassDivision,
+                ClassDivision.is_active == True,  # noqa: E712
+                include_aliases=True,
+            )
+        )
+
+    classes = (
+        query.options(*load_options)
+        .order_by(SchoolClass.name.asc())
+        .distinct()
+        .all()
+    )
     _attach_division_student_counts(db, tenant_id, classes)
     return classes
 

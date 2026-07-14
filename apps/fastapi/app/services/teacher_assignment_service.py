@@ -79,6 +79,7 @@ def get_classes(db: Session, tenant_id: Optional[int], academic_year_id: int) ->
             c.name
         FROM classes c
         WHERE c.is_deleted = 0
+          AND c.is_active = 1
           AND (:tenant_id IS NULL OR c.tenant_id = :tenant_id)
           AND c.academic_year_id = :academic_year_id
         ORDER BY c.name ASC
@@ -103,6 +104,8 @@ def get_divisions(db: Session, tenant_id: Optional[int], class_id: int) -> list[
         FROM class_divisions cd
         INNER JOIN classes c ON c.id = cd.class_id
         WHERE c.is_deleted = 0
+          AND c.is_active = 1
+          AND cd.is_active = 1
           AND c.id = :class_id
           AND (:tenant_id IS NULL OR c.tenant_id = :tenant_id)
         ORDER BY cd.division_name ASC
@@ -271,6 +274,16 @@ def assign_teacher(
     subject_id: Optional[int] = None,
     class_division_ids: Optional[list[int]] = None,
 ) -> dict:
+    from fastapi import HTTPException
+    from app.services.school_class_service import require_active_class, require_active_division
+
+    if tenant_id is None:
+        raise HTTPException(status_code=400, detail="Tenant is required")
+    require_active_class(db, tenant_id, class_id)
+    division_ids = class_division_ids or ([class_division_id] if class_division_id is not None else [])
+    for div_id in division_ids:
+        require_active_division(db, tenant_id, class_id, div_id)
+
     teacher_exists_query = text(
         """
         SELECT TOP 1 t.id, t.tenant_id

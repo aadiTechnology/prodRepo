@@ -45,8 +45,19 @@ def create_academic_year(db: Session, obj_in: AcademicYearCreate, tenant_id: int
     db.refresh(db_obj)
     return db_obj
 
-def get_classes(db: Session, tenant_id: int, academic_year_id: int = None) -> list[SchoolClass]:
-    return school_class_service.get_all_classes(db, tenant_id, academic_year_id=academic_year_id)
+def get_classes(
+    db: Session,
+    tenant_id: int,
+    academic_year_id: int = None,
+    *,
+    active_only: bool = True,
+) -> list[SchoolClass]:
+    return school_class_service.get_all_classes(
+        db,
+        tenant_id,
+        academic_year_id=academic_year_id,
+        active_only=active_only,
+    )
 
 def get_class(db: Session, class_id: int, tenant_id: int) -> SchoolClass:
     return school_class_service.get_class_by_id(db, class_id, tenant_id)

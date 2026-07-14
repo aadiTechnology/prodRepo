@@ -71,7 +71,12 @@ const BASE_URL = "/api/classes";
 // School Class Service - CRUD operations
 // ═══════════════════════════════════════════════════════════════════════════
 const schoolClassService = {
-  getAll: async (params?: { search?: string; academic_year_id?: number }): Promise<SchoolClass[]> => {
+  getAll: async (params?: {
+    search?: string;
+    academic_year_id?: number;
+    /** Default true on API. Pass false only for Class admin (show inactive). */
+    active_only?: boolean;
+  }): Promise<SchoolClass[]> => {
     const response = await apiClient.get(BASE_URL, { params });
     return response.data;
   },

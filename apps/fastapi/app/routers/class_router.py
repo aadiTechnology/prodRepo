@@ -22,6 +22,11 @@ router = APIRouter(prefix="/api/classes", tags=["Classes"])
 def list_classes(
     search: str | None = Query(default=None),
     academic_year_id: int | None = Query(default=None),
+    active_only: bool = Query(
+        default=True,
+        description="When true (default), only active classes and active divisions. "
+        "Pass false for Class admin so inactive classes remain manageable.",
+    ),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_permission("Classes", "view")),
 ):
@@ -32,6 +37,7 @@ def list_classes(
         tenant_id=current_user.tenant_id,
         academic_year_id=academic_year_id,
         search=search,
+        active_only=active_only,
     )
 
 

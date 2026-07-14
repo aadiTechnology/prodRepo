@@ -7,6 +7,7 @@ from app.models.subject import Subject, SubjectClass
 from app.models.academic import SchoolClass
 from app.schemas.subject_schema import SubjectCreate, SubjectUpdate
 from app.services.teacher_assignment_guards import subject_has_teacher_and_class_assignment
+from app.services.school_class_service import require_active_class, require_active_division
 
 _SUBJECT_CLASS_LOAD = joinedload(Subject.subject_classes).options(
     joinedload(SubjectClass.academic_year),
@@ -185,6 +186,10 @@ class SubjectService:
                 ))
         elif subject.class_mappings:
             for mapping in subject.class_mappings:
+                require_active_class(db, tenant_id, mapping.class_id)
+                require_active_division(
+                    db, tenant_id, mapping.class_id, mapping.class_division_id
+                )
                 db_mapping = SubjectClass(
                     tenant_id=tenant_id,
                     subject_id=db_subject.id,
@@ -273,7 +278,15 @@ class SubjectService:
             for mapping in class_mappings:
                 class_id = mapping.get('class_id')
                 year_id = mapping.get('academic_year_id')
-                
+                if class_id is not None:
+                    require_active_class(db, tenant_id, int(class_id))
+                    require_active_division(
+                        db,
+                        tenant_id,
+                        int(class_id),
+                        mapping.get("class_division_id"),
+                    )
+
                 # Delete existing mapping for this specific class and year
                 db.query(SubjectClass).filter(
                     SubjectClass.subject_id == subject_id,

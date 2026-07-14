@@ -20,6 +20,8 @@ def add_student(
     try:
         result = StudentService(db).add_student(req, user)
         return result
+    except HTTPException:
+        raise
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
@@ -75,6 +77,8 @@ def update_student(
 ):
     try:
         return StudentService(db).update_student(student_id, req, tenant_id=current_user.tenant_id)
+    except HTTPException:
+        raise
     except StudentService.NotFound:
         raise HTTPException(status_code=404, detail="Student not found")
     except StudentService.AccessDenied:

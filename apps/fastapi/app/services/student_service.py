@@ -5,8 +5,8 @@ from app.models.fee import FeeStructure
 from app.models.fee_discount import FeeDiscount
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
-from app.models.academic import SchoolClass, ClassDivision
 from app.schemas.student_schema import StudentListResponse, StudentUpdateRequest, StudentDetailResponse
+from app.services.school_class_service import require_active_class, require_active_division
 from typing import Optional
 
 class StudentService:
@@ -73,6 +73,22 @@ class StudentService:
         if status is not None and isinstance(status, str) and status.strip() != "":
             is_active = status.lower() == "active"
             filters.append(Student.is_active == is_active)
+        # Inactive class/division data is not operable — keep those students out of lists
+        filters.append(
+            or_(
+                Student.class_id.is_(None),
+                and_(
+                    SchoolClass.is_active == True,  # noqa: E712
+                    SchoolClass.is_deleted == False,  # noqa: E712
+                ),
+            )
+        )
+        filters.append(
+            or_(
+                Student.class_division_id.is_(None),
+                ClassDivision.is_active == True,  # noqa: E712
+            )
+        )
         if filters:
             query = query.filter(and_(*filters))
         total = query.count()
@@ -208,6 +224,13 @@ class StudentService:
                 raise ValueError("Missing required fields")
             if not re.fullmatch(r"\d{10}", req.mobile_number):
                 raise ValueError("Invalid mobile number. Must be 10 digits.")
+            require_active_class(self.db, tenant_id, int(req.class_id))
+            require_active_division(
+                self.db,
+                tenant_id,
+                int(req.class_id),
+                int(req.class_division_id) if getattr(req, "class_division_id", None) is not None else None,
+            )
             # Check/Create parent
             parent = self.db.query(LeadParent).filter(
                 LeadParent.mobile_number == req.parent.mobile_number,
@@ -320,6 +343,19 @@ class StudentService:
         update_data = req.dict(exclude_unset=True)
         photo_url_provided = "photo_url" in update_data
         photo_url_value = update_data.pop("photo_url", None) if photo_url_provided else None
+
+        next_class_id = update_data.get("class_id", student.class_id)
+        next_division_id = update_data.get("class_division_id", student.class_division_id)
+        if next_class_id is not None and (
+            "class_id" in update_data or "class_division_id" in update_data
+        ):
+            require_active_class(self.db, tenant_id or student.tenant_id, int(next_class_id))
+            require_active_division(
+                self.db,
+                tenant_id or student.tenant_id,
+                int(next_class_id),
+                int(next_division_id) if next_division_id is not None else None,
+            )
 
         for field, value in update_data.items():
             if field == "parent":
