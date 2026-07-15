@@ -34,15 +34,20 @@ export default function LabeledSwitch({
   inputTestId,
 }: LabeledSwitchProps) {
   const rootSx: SxProps<Theme> = (theme) => ({
-    p: 2,
+    px: 1.5,
+    py: 1,
     bgcolor: theme.palette.grey[100],
     borderRadius: 2,
     border: `1px solid ${theme.palette.divider}`,
     display: "flex",
-    flexDirection: { xs: "column", sm: "row" },
-    alignItems: { xs: "flex-start", sm: "center" },
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: 1,
+    alignSelf: "flex-start",
+    gap: 1.5,
+    width: "fit-content",
+    minWidth: { xs: 128, sm: 160 },
+    maxWidth: "100%",
   });
 
   const labelSx: SxProps<Theme> = (theme) => ({

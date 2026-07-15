@@ -197,7 +197,88 @@ export default function AddClass() {
                             </Button>
                         </Box>
 
+                        <Box sx={{ display: { xs: "flex", sm: "none" }, flexDirection: "column", gap: 1.5 }}>
+                            {formData.divisions.map((division, index) => (
+                                <Box
+                                    key={division.id ?? index}
+                                    sx={{
+                                        p: 1.5,
+                                        border: `1px solid ${colorTokens.border.default}`,
+                                        borderRadius: "12px",
+                                        bgcolor: "background.paper",
+                                        boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
+                                    }}
+                                >
+                                    <TextFieldInput
+                                        label="Division Name"
+                                        placeholder="Enter Division (e.g. A)"
+                                        value={division.division_name}
+                                        onChange={(e) => handleDivisionChange(index, "division_name", e.target.value)}
+                                        fullWidth
+                                        size="small"
+                                        required
+                                        sx={{ mb: 1.5 }}
+                                    />
+                                    <TextFieldInput
+                                        label="Capacity"
+                                        placeholder="Enter capacity (e.g. 50)"
+                                        type="text"
+                                        value={division.capacity}
+                                        htmlInput={{ inputMode: "numeric", pattern: "[0-9]*" }}
+                                        onChange={(e) =>
+                                            handleDivisionChange(
+                                                index,
+                                                "capacity",
+                                                e.target.value.replace(/\D/g, "")
+                                            )
+                                        }
+                                        fullWidth
+                                        size="small"
+                                        required
+                                    />
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            gap: 1,
+                                            mt: 1.5,
+                                        }}
+                                    >
+                                        {isEditMode ? (
+                                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                                <Typography sx={{ fontWeight: 700, fontSize: "0.875rem" }}>
+                                                    Status
+                                                </Typography>
+                                                <Switch
+                                                    checked={division.is_active}
+                                                    onChange={(e) =>
+                                                        handleDivisionChange(index, "is_active", e.target.checked)
+                                                    }
+                                                    color="primary"
+                                                    size="small"
+                                                />
+                                            </Box>
+                                        ) : <Box />}
+                                        <IconButton
+                                            color="error"
+                                            onClick={() => handleRemoveDivision(index)}
+                                            size="small"
+                                            disabled={formData.divisions.length <= 1}
+                                            sx={{
+                                                bgcolor: alpha(colorTokens.preschool.coral.main, 0.08),
+                                                "&:hover": { bgcolor: colorTokens.preschool.coral.main, color: "white" },
+                                            }}
+                                        >
+                                            <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                    </Box>
+                                </Box>
+                            ))}
+                        </Box>
+
                         <Box sx={{ 
+                            display: { xs: "none", sm: "block" },
                             border: `1px solid ${colorTokens.border.default}`, 
                             borderRadius: "12px", 
                             overflow: "hidden",
