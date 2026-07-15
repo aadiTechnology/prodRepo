@@ -10,9 +10,11 @@ from app.services.notice_attachment_storage import ALLOWED_MIME_TYPES, MAX_FILE_
 from app.services.notice_service import NOTICE_MENU_PATH
 from app.schemas.notice import (
     NoticeAttachmentResponse,
+    NoticeCountResponse,
     NoticeCreateRequest,
     NoticeDropdownOptionsResponse,
     NoticeListResponse,
+    NoticeMarkViewedResponse,
     NoticeResponse,
     NoticeStatusUpdateResponse,
     NoticeUpdateRequest,
@@ -63,6 +65,7 @@ async def list_notices(
         notice_type=notice_type.upper() if notice_type else None,
         is_published=is_published,
         viewer_context=viewer_context,
+        current_user_id=current_user.id,
     )
 
 
@@ -72,6 +75,58 @@ async def get_notice_dropdown_options(
 ):
     _ = current_user
     return notice_service.get_dropdown_options()
+
+
+@router.get("/unread-count", response_model=NoticeCountResponse)
+async def get_notice_unread_count(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "view")),
+):
+    viewer_context = notice_service.get_viewer_context(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+        manage=False,
+    )
+    return NoticeCountResponse(
+        count=notice_service.count_unread_notices(
+            db,
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            viewer_context=viewer_context,
+        )
+    )
+
+
+@router.post("/{notice_id}/mark-viewed", response_model=NoticeMarkViewedResponse)
+async def mark_notice_viewed(
+    notice_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "view")),
+):
+    can_manage = notice_service.user_can_manage_notices(db, current_user)
+    viewer_context = notice_service.get_viewer_context(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+        manage=can_manage,
+    )
+    already_viewed, marked_notice_id = notice_service.mark_notice_viewed(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        notice_id=notice_id,
+        viewer_context=viewer_context,
+    )
+    return NoticeMarkViewedResponse(
+        message="Notice marked as viewed",
+        notice_id=marked_notice_id,
+        already_viewed=already_viewed,
+    )
 
 
 @router.get("/{notice_id}", response_model=NoticeResponse)
@@ -94,6 +149,7 @@ async def get_notice(
         tenant_id=current_user.tenant_id,
         notice_id=notice_id,
         viewer_context=viewer_context,
+        current_user_id=current_user.id,
     )
 
 

@@ -96,6 +96,10 @@ export interface NoticeListResponse {
   size: number;
 }
 
+export interface NoticeCountResponse {
+  count: number;
+}
+
 export interface NoticeStatusUpdateResponse {
   message: string;
   notice: Notice;

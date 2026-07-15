@@ -39,6 +39,7 @@ import { normalizeMenuPath, hasMenuChildren, isSidebarHiddenModule } from "../..
 import { toRoleLabel } from "../../utils/formatters";
 import { toMediaUrl } from "../../utils/mediaUrl";
 import { useHomeworkSidebarCount } from "../../hooks/useHomeworkSidebarCount";
+import { useNoticeSidebarCount } from "../../hooks/useNoticeSidebarCount";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Asset Icons - Menu item icons
@@ -202,6 +203,16 @@ function isHomeworkMenuEntry(label: string, path?: string): boolean {
   const normalizedPath = (path ?? "").trim().toLowerCase();
   if (normalizedLabel === "homework details") return false;
   return normalizedLabel === "homework" || normalizedPath === "/homework";
+}
+
+function isNoticeMenuEntry(label: string, path?: string): boolean {
+  const normalizedLabel = label.trim().toLowerCase();
+  const normalizedPath = (path ?? "").trim().toLowerCase();
+  return (
+    normalizedPath === "/communication/notices" ||
+    normalizedLabel === "notice board" ||
+    normalizedLabel === "notices"
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -473,6 +484,17 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   );
   const homeworkPendingCount = useHomeworkSidebarCount(hasHomeworkMenu);
 
+  const hasNoticeMenu = useMemo(
+    () =>
+      menuItems.some(
+        (item) =>
+          isNoticeMenuEntry(item.label, item.path) ||
+          item.children?.some((child) => isNoticeMenuEntry(child.label, child.path))
+      ),
+    [menuItems]
+  );
+  const noticeCount = useNoticeSidebarCount(hasNoticeMenu);
+
   const renderMenuBadge = (count?: number) => {
     if (!count || count <= 0) return null;
     return (
@@ -560,9 +582,13 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
           {filteredItems.map((item) => {
             const isActive = location.pathname === item.path || (item.children?.some(child => location.pathname === child.path) ?? false);
             const isSectionExpanded = !!expandedSections[item.id];
-            const itemBadgeCount = isHomeworkMenuEntry(item.label, item.path)
-              ? homeworkPendingCount
-              : undefined;
+            const itemBadgeCount =
+              isHomeworkMenuEntry(item.label, item.path)
+                ? homeworkPendingCount
+                : isNoticeMenuEntry(item.label, item.path) ||
+                    item.children?.some((child) => isNoticeMenuEntry(child.label, child.path))
+                  ? noticeCount
+                  : undefined;
 
             return (
               <Box key={item.id} sx={{ mb: 0.5 }}>

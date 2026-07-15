@@ -16,6 +16,7 @@ import noticeService from "../../api/services/noticeService";
 import { createNoticeFormConfig, type CreateNoticeFormData, type SelectOption } from "./CreateNotice.formConfig";
 import type { Notice, NoticeAudienceType, NoticeCreateTarget } from "../../types/notice";
 import { audienceTypeLabel, noticeTypeLabel } from "../../utils/noticeLabels";
+import { notifyNoticeCountChanged } from "../../utils/noticeCountEvents";
 
 const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 255;
@@ -532,6 +533,7 @@ export default function CreateNotice() {
           const updated = await noticeService.update(editId, updatePayload);
           let noticeId = editId;
           setLoadedStatus(updated.status);
+          notifyNoticeCountChanged();
 
           if (pendingFile) {
             try {
@@ -553,6 +555,7 @@ export default function CreateNotice() {
             attachments: [],
           });
           const noticeId = created.id;
+          notifyNoticeCountChanged();
 
           if (pendingFile) {
             try {

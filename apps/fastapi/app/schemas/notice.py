@@ -113,6 +113,16 @@ class NoticeListResponse(BaseModel):
     size: int
 
 
+class NoticeCountResponse(BaseModel):
+    count: int
+
+
+class NoticeMarkViewedResponse(BaseModel):
+    message: str
+    notice_id: int
+    already_viewed: bool
+
+
 class NoticeStatusUpdateResponse(BaseModel):
     message: str
     notice: NoticeResponse

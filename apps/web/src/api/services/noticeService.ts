@@ -1,6 +1,7 @@
 import { apiClient } from "../client";
 import type {
   Notice,
+  NoticeCountResponse,
   NoticeCreateRequest,
   NoticeDropdownOptionsResponse,
   NoticeListResponse,
@@ -26,6 +27,16 @@ const noticeService = {
 
   getDropdownOptions: async (): Promise<NoticeDropdownOptionsResponse> => {
     const res = await apiClient.get(`${BASE}/dropdown/options`);
+    return res.data;
+  },
+
+  getUnreadCount: async (): Promise<NoticeCountResponse> => {
+    const res = await apiClient.get(`${BASE}/unread-count`);
+    return res.data;
+  },
+
+  markViewed: async (id: number): Promise<{ message: string; notice_id: number; already_viewed: boolean }> => {
+    const res = await apiClient.post(`${BASE}/${id}/mark-viewed`);
     return res.data;
   },
 

@@ -10,6 +10,7 @@ import type {
 } from "../types/notice";
 import { audienceTypeLabel, noticeStatusLabel, noticeTypeLabel } from "../utils/noticeLabels";
 import { useNoticePermissions } from "./useNoticePermissions";
+import { notifyNoticeCountChanged } from "../utils/noticeCountEvents";
 
 const STATIC_STATUS_VALUES = ["DRAFT", "PUBLISHED", "UNPUBLISHED", "EXPIRED"] as const satisfies readonly NoticeStatus[];
 
@@ -20,7 +21,7 @@ const STATIC_NOTICE_TYPE_VALUES = ["GENERAL", "FEE", "EVENT", "HOLIDAY", "EXAM"]
 const FETCH_PAGE_SIZE = 100;
 
 export function useNoticeListController() {
-  const { readOnlyAudience, canEdit, canCreate } = useNoticePermissions();
+  const { readOnlyAudience, canEdit, canCreate, isTeacherUser } = useNoticePermissions();
   const canUseAdminFilters = canEdit || canCreate;
 
   const [allItems, setAllItems] = useState<Notice[]>([]);
@@ -127,8 +128,11 @@ export function useNoticeListController() {
   const audienceFilterOptions = useMemo(() => {
     const raw = dropdowns?.audience_types ?? [];
     const source: readonly NoticeAudienceType[] = raw.length > 0 ? raw : STATIC_AUDIENCE_VALUES;
-    return source.map((v) => ({ value: v, label: audienceTypeLabel(v) }));
-  }, [dropdowns]);
+    const visibleSource = isTeacherUser
+      ? source.filter((v) => v === "TEACHER" || v === "STUDENT")
+      : source;
+    return visibleSource.map((v) => ({ value: v, label: audienceTypeLabel(v) }));
+  }, [dropdowns, isTeacherUser]);
 
   const noticeTypeFilterOptions = useMemo(() => {
     const raw = dropdowns?.notice_types ?? [];
@@ -202,6 +206,7 @@ export function useNoticeListController() {
     try {
       setDeleteLoading(true);
       await noticeService.delete(noticeToDelete.id);
+      notifyNoticeCountChanged();
       setSnackbar("Notice deleted successfully.");
       closeDeleteConfirm();
       await fetchNotices();

@@ -27,15 +27,20 @@ export function useNoticePermissions() {
     [user?.role, roles],
   );
 
+  const isTeacherUser = useMemo(
+    () => isTeacherNoticeUser(user?.role, roles),
+    [user?.role, roles],
+  );
+
   const isNoticeConsumerView = useMemo(() => {
     if (canManage) return false;
     if (!canView) return false;
     return (
       readOnlyAudience ||
-      isTeacherNoticeUser(user?.role, roles) ||
+      isTeacherUser ||
       isStudentNoticeUser(user?.role, roles)
     );
-  }, [canManage, canView, readOnlyAudience, user?.role, roles]);
+  }, [canManage, canView, isTeacherUser, readOnlyAudience, user?.role, roles]);
 
   const isViewOnly = canView && !canManage;
 
@@ -46,6 +51,7 @@ export function useNoticePermissions() {
     canDelete,
     canManage,
     readOnlyAudience,
+    isTeacherUser,
     isViewOnly,
     isNoticeConsumerView,
   };

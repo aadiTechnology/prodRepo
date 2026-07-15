@@ -241,6 +241,7 @@ def list_notices(
     notice_type: str | None = None,
     is_published: bool | None = None,
     viewer_context: NoticeViewerContext | None = None,
+    current_user_id: int | None = None,
 ) -> NoticeListResponse:
     if viewer_context and is_notice_consumer(viewer_context) and viewer_context.published_only:
         status = None
@@ -264,6 +265,70 @@ def list_notices(
         page=page,
         size=size,
     )
+
+
+def count_unread_notices(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    viewer_context: NoticeViewerContext | None = None,
+) -> int:
+    """Count list-visible notices that the current user has not opened."""
+    page = 0
+    size = 500
+    visible_ids: list[int] = []
+
+    while True:
+        rows, total = notice_repository.list_notices(
+            db,
+            tenant_id=tenant_id,
+            search=None,
+            status=None,
+            audience_type=None,
+            notice_type=None,
+            is_published=None,
+            page=page,
+            size=size,
+            viewer_context=viewer_context,
+        )
+        visible_ids.extend(int(row["id"]) for row in rows)
+        if len(visible_ids) >= total or not rows:
+            break
+        page += 1
+
+    viewed_ids = notice_repository.get_viewed_notice_ids(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        notice_ids=visible_ids,
+    )
+    return sum(1 for notice_id in visible_ids if notice_id not in viewed_ids)
+
+
+def mark_notice_viewed(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    notice_id: int,
+    viewer_context: NoticeViewerContext | None = None,
+) -> tuple[bool, int]:
+    """Mark notice as viewed by current user. Returns (already_viewed, notice_id)."""
+    row = _assert_notice_visible(
+        db,
+        tenant_id=tenant_id,
+        notice_id=notice_id,
+        viewer_context=viewer_context,
+        current_user_id=user_id,
+    )
+    marked_notice_id, already_viewed = notice_repository.mark_notice_viewed(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        notice_id=int(row["id"]),
+    )
+    return already_viewed, marked_notice_id
 
 
 def _targets_match_scopes(targets: list[dict], scopes: tuple[ClassDivisionScope, ...]) -> bool:
@@ -294,7 +359,7 @@ def _consumer_can_view_notice(
     if viewer_context.kind == "teacher":
         if audience == "TEACHER":
             return True
-        if audience not in {"STUDENT", "ALL"}:
+        if audience != "STUDENT":
             return False
         if not viewer_context.scopes:
             return False
@@ -314,6 +379,7 @@ def _assert_notice_visible(
     tenant_id: int,
     notice_id: int,
     viewer_context: NoticeViewerContext | None,
+    current_user_id: int | None = None,
 ) -> dict:
     row = notice_repository.get_notice_by_id(db, tenant_id=tenant_id, notice_id=notice_id)
     if not row:
@@ -331,12 +397,14 @@ def get_notice(
     tenant_id: int,
     notice_id: int,
     viewer_context: NoticeViewerContext | None = None,
+    current_user_id: int | None = None,
 ) -> NoticeResponse:
     row = _assert_notice_visible(
         db,
         tenant_id=tenant_id,
         notice_id=notice_id,
         viewer_context=viewer_context,
+        current_user_id=current_user_id,
     )
     return _to_notice_response(db, row)
 

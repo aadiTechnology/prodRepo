@@ -29,6 +29,7 @@ import noticeService from "../../api/services/noticeService";
 import { apiBaseUrl } from "../../config";
 import { useNoticePermissions } from "../../hooks/useNoticePermissions";
 import type { Notice, NoticeStatus } from "../../types/notice";
+import { notifyNoticeCountChanged } from "../../utils/noticeCountEvents";
 
 function buildAttachmentUrl(filePath: string): string {
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
@@ -169,6 +170,12 @@ export default function NoticeDetails() {
       setError(null);
       const data = await noticeService.getById(noticeId);
       setNotice(data);
+      try {
+        await noticeService.markViewed(noticeId);
+        notifyNoticeCountChanged();
+      } catch {
+        // Viewing the notice should not fail if read-tracking is temporarily unavailable.
+      }
     } catch {
       setNotice(null);
       setError("Unable to load notice details");
@@ -196,6 +203,7 @@ export default function NoticeDetails() {
       setActionLoading(true);
       const res = await noticeService.publish(notice.id);
       setNotice(res.notice);
+      notifyNoticeCountChanged();
       setSnackbar({ message: res.message, severity: "success" });
     } catch {
       setSnackbar({ message: "Failed to publish notice", severity: "error" });
@@ -210,6 +218,7 @@ export default function NoticeDetails() {
       setActionLoading(true);
       const res = await noticeService.unpublish(notice.id);
       setNotice(res.notice);
+      notifyNoticeCountChanged();
       setSnackbar({ message: res.message, severity: "success" });
     } catch {
       setSnackbar({ message: "Action not allowed in current state", severity: "error" });

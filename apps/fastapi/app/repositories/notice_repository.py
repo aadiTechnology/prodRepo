@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Tuple
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -101,7 +102,7 @@ def _apply_consumer_visibility(
         if scopes:
             scope_clauses = _build_target_scope_exists_clauses(scopes, params, param_prefix="tc")
             visibility_parts.append(
-                f"(n.audience_type IN ('STUDENT', 'ALL') AND ({' OR '.join(scope_clauses)}))"
+                f"(n.audience_type = 'STUDENT' AND ({' OR '.join(scope_clauses)}))"
             )
         where_sql.append(f"({' OR '.join(visibility_parts)})")
     elif viewer_context.kind in ("student", "parent"):
@@ -156,6 +157,7 @@ def list_notices(
     page: int,
     size: int,
     viewer_context: NoticeViewerContext | None = None,
+    created_by: int | None = None,
 ) -> tuple[list[dict], int]:
     where_sql = ["n.tenant_id = :tenant_id", "n.is_deleted = 0"]
     params: dict = {"tenant_id": tenant_id}
@@ -176,6 +178,9 @@ def list_notices(
     if is_published is not None:
         where_sql.append("n.is_published = :is_published")
         params["is_published"] = 1 if is_published else 0
+    if created_by is not None:
+        where_sql.append("n.created_by = :created_by")
+        params["created_by"] = created_by
 
     where_clause = " AND ".join(where_sql)
     params["offset"] = page * size
@@ -195,6 +200,123 @@ def list_notices(
     rows = db.execute(list_sql, params).mappings().all()
     total = db.execute(count_sql, params).scalar() or 0
     return [dict(r) for r in rows], int(total)
+
+
+def count_unread_notices(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    viewer_context: NoticeViewerContext | None = None,
+) -> int:
+    """Published visible notices that this user has not opened yet."""
+    where_sql = [
+        "n.tenant_id = :tenant_id",
+        "n.is_deleted = 0",
+        "n.is_published = 1",
+        "n.status = 'PUBLISHED'",
+        "(n.expiry_date IS NULL OR n.expiry_date >= GETUTCDATE())",
+        "nv.id IS NULL",
+    ]
+    params: dict = {"tenant_id": tenant_id, "user_id": user_id}
+
+    _apply_consumer_visibility(where_sql, params, viewer_context)
+    where_clause = " AND ".join(where_sql)
+
+    sql = text(
+        f"""
+        SELECT COUNT(1)
+        FROM communication_notices n
+        LEFT JOIN notice_views nv
+          ON nv.notice_id = n.id
+         AND nv.tenant_id = :tenant_id
+         AND nv.user_id = :user_id
+        WHERE {where_clause}
+        """
+    )
+    return int(db.execute(sql, params).scalar() or 0)
+
+
+def get_viewed_notice_ids(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    notice_ids: list[int],
+) -> set[int]:
+    if not notice_ids:
+        return set()
+    id_list = ", ".join(str(int(i)) for i in notice_ids)
+    rows = db.execute(
+        text(
+            f"""
+            SELECT notice_id
+            FROM notice_views
+            WHERE tenant_id = :tenant_id
+              AND user_id = :user_id
+              AND notice_id IN ({id_list})
+            """
+        ),
+        {"tenant_id": tenant_id, "user_id": user_id},
+    ).mappings().all()
+    return {int(row["notice_id"]) for row in rows}
+
+
+def mark_notice_viewed(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    notice_id: int,
+) -> Tuple[int, bool]:
+    """
+    Upsert a view row for (tenant, notice, user).
+    Returns (notice_id, already_viewed).
+    """
+    existing = db.execute(
+        text(
+            """
+            SELECT TOP 1 id
+            FROM notice_views
+            WHERE tenant_id = :tenant_id
+              AND notice_id = :notice_id
+              AND user_id = :user_id
+            """
+        ),
+        {"tenant_id": tenant_id, "notice_id": notice_id, "user_id": user_id},
+    ).mappings().first()
+    if existing:
+        return notice_id, True
+
+    try:
+        db.execute(
+            text(
+                """
+                INSERT INTO notice_views (tenant_id, notice_id, user_id, viewed_at)
+                VALUES (:tenant_id, :notice_id, :user_id, GETDATE())
+                """
+            ),
+            {"tenant_id": tenant_id, "notice_id": notice_id, "user_id": user_id},
+        )
+        db.commit()
+        return notice_id, False
+    except Exception:
+        db.rollback()
+        existing = db.execute(
+            text(
+                """
+                SELECT TOP 1 id
+                FROM notice_views
+                WHERE tenant_id = :tenant_id
+                  AND notice_id = :notice_id
+                  AND user_id = :user_id
+                """
+            ),
+            {"tenant_id": tenant_id, "notice_id": notice_id, "user_id": user_id},
+        ).mappings().first()
+        if existing:
+            return notice_id, True
+        raise
 
 
 def get_notice_by_id(db: Session, *, tenant_id: int, notice_id: int) -> dict | None:
