@@ -14,7 +14,7 @@ export interface NavActionPage {
 export const NAV_ACTION_PAGES: NavActionPage[] = [
   { name: "Add Teacher", path: "/teachers/add", hint: "Create a new teacher here", permission: "TEACHER_MGMT:create" },
   { name: "Add User", path: "/user/create", hint: "Create a new user here", permission: "ADMIN_MGMT:create" },
-  { name: "Add Class", path: "/classes/new", hint: "Create a new class here", permission: "ACADEMIC_MGMT:create" },
+  { name: "Add Class - Division", path: "/classes/new", hint: "Create a new class division setup here", permission: "ACADEMIC_MGMT:create" },
   { name: "Add Subject", path: "/subjects/new", hint: "Create a new subject here", permission: "ACADEMIC_MGMT:create" },
   { name: "Add Academic Year", path: "/academic-years/new", hint: "Create a new academic year here", permission: "ACADEMIC_MGMT:create" },
   { name: "Add Fee Category", path: "/fees/categories/add", hint: "Create a new fee category here", permission: "FEE_MGMT:create" },
@@ -32,7 +32,7 @@ export const NAV_PAGE_HINTS: Record<string, string> = {
   "/roles": "View and manage roles",
   "/teachers": "View and manage teachers",
   "/teacher-assignments": "View class teacher assignments",
-  "/classes": "View and manage classes",
+  "/classes": "View and manage class divisions",
   "/subjects": "View and manage subjects",
   "/academic-years": "View and manage academic years",
   "/homework": "View and manage homework",

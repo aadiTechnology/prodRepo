@@ -488,8 +488,8 @@ export default function AddClass() {
             onSnackbarClose={() => setSnackbar(null)}
             headerConfig={{
                 links: buildFormBreadcrumbs(
-                    { title: "Classes", path: listPath },
-                    isEditMode ? "Edit Class" : "Add Class"
+                    { title: "Class - Division", path: listPath },
+                    isEditMode ? "Edit Class - Division" : "Add Class - Division"
                 ),
                 homePath: "/",
                 cancelTooltip: "Cancel",
@@ -499,8 +499,8 @@ export default function AddClass() {
             onCancelNavigate={handleCancel}
             confirmMessage={(ctx) =>
                 ctx.isEditMode
-                    ? "Are you sure you want to update this class and its divisions?"
-                    : "Are you sure you want to create this class?"
+                    ? "Are you sure you want to update this class division setup?"
+                    : "Are you sure you want to create this class division setup?"
             }
         />
     );

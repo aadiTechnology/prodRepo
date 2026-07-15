@@ -70,8 +70,8 @@ export const createClassListConfig = ({
     { id: "name-desc", label: "Name (Z-A)", sortBy: "name", sortOrder: "desc" },
   ],
   uiPolicy: {
-    emptyMessage: "No classes found. Click 'Add Class' to begin.",
-    errorFallbackMessage: "Failed to load classes.",
+    emptyMessage: "No class divisions found. Click 'Add Class - Division' to begin.",
+    errorFallbackMessage: "Failed to load class divisions.",
     retryLabel: "Retry",
   },
   actions: {

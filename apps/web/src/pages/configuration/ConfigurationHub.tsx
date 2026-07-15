@@ -46,7 +46,7 @@ const CONFIG_SECTIONS: ConfigSection[] = [
       },
       {
         id: "class-div-setup",
-        label: "Class-Div Setup",
+        label: "Class - Division",
         path: "/academics/classes",
         permission: "ACADEMIC_MGMT:view",
         menuPaths: ["/academics/classes", "/classes"],

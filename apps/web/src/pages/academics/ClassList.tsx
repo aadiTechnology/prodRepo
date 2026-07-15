@@ -34,7 +34,7 @@ export default function ClassList() {
         controller.setError(null);
     }, [controller.error, controller.setError, enqueueSnackbar]);
 
-    const breadcrumbLinks = buildListBreadcrumbs("Classes");
+    const breadcrumbLinks = buildListBreadcrumbs("Class - Division");
 
     const listConfig = createClassListConfig({
         navigate: navigateWithConfigHub,
@@ -53,7 +53,7 @@ export default function ClassList() {
                         <ListPageToolbar
                             searchValue={controller.search}
                             onSearchChange={controller.setSearch}
-                            searchPlaceholder="Search classes..."
+                            searchPlaceholder="Search class divisions..."
                             filters={[
                                 {
                                     label: "Academic Year",
@@ -63,7 +63,7 @@ export default function ClassList() {
                                 },
                             ]}
                             onAddClick={() => navigateWithConfigHub("/classes/new")}
-                            addLabel="Add Class"
+                            addLabel="Add Class - Division"
                             addIcon={<AddIcon sx={{ fontSize: 24 }} />}
                         />
                     }
@@ -71,7 +71,7 @@ export default function ClassList() {
             }
         >
             <EntityTableSection<SchoolClass>
-                label="Classes"
+                label="Class - Division"
                 showInfoBar={false}
                 totalRows={controller.totalClasses}
                 page={controller.page}
@@ -90,7 +90,7 @@ export default function ClassList() {
             <ConfirmDialog
                 open={controller.deleteDialogOpen}
                 title="Please Confirm"
-                message="Are you sure you want to delete this class?"
+                message="Are you sure you want to delete this class division setup?"
                 confirmText={controller.deleteLoading ? "Deleting…" : "Confirm"}
                 onConfirm={controller.handleConfirmDelete}
                 onCancel={() => controller.setDeleteDialogOpen(false)}
