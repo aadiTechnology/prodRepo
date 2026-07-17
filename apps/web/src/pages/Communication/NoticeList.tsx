@@ -126,6 +126,11 @@ export default function NoticeList() {
         loading={c.tableLoading}
         emptyMessage={listConfig.uiPolicy.emptyMessage}
         getRowKey={(row) => row.id}
+        getRowSx={(row) =>
+          !row.is_viewed
+            ? { fontWeight: 700, color: "text.primary" }
+            : { fontWeight: 500 }
+        }
         renderRowActions={(row) => {
           const actions = listConfig.actions.rowActions(row);
           return renderNoticeRowActions({

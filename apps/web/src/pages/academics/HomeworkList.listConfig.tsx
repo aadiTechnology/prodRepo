@@ -1,5 +1,4 @@
 import { Box, Chip } from "@mui/material";
-import { colorTokens } from "../../tokens/colors";
 import type { ListConfig } from "../../components/reusable/listFramework.types";
 import TableRowActions from "../../components/reusable/TableRowActions";
 import type { HomeworkResponse } from "../../api/services/homeworkService";
@@ -50,20 +49,9 @@ export const createHomeworkListConfig = ({
     {
       id: "title",
       label: "Title",
-      render: (row: HomeworkRow) => {
-        const isUnread = !row.is_viewed;
-        return (
-          <Box
-            sx={{
-              fontWeight: isUnread ? 700 : 400,
-              color: isUnread ? colorTokens.text.primary : "inherit",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {row.title}
-          </Box>
-        );
-      },
+      render: (row: HomeworkRow) => (
+        <Box sx={{ whiteSpace: "nowrap" }}>{row.title}</Box>
+      ),
     },
     {
       id: "subject_name",

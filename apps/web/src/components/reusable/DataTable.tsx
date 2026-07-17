@@ -164,6 +164,8 @@ export default function DataTable<T extends object>({
                   data-testid={rowTestId?.(row, idx)}
                   hover
                   sx={(theme) => ({
+                    fontWeight: 500,
+                    color: colorTokens.text.secondary,
                     "&.MuiTableRow-hover:hover": {
                       bgcolor: alpha(colorTokens.background.default, 0.6),
                     },
@@ -179,12 +181,12 @@ export default function DataTable<T extends object>({
                       align={col.align}
                       sx={(theme) => ({
                         width: col.width,
-                        color: colorTokens.text.secondary,
+                        color: "inherit",
                         py: 1.5,
                         px: 2,
                         fontSize: "0.875rem",
                         borderBottom: `1px solid ${colorTokens.border.subtle}`,
-                        fontWeight: 500,
+                        fontWeight: "inherit",
                         whiteSpace: { xs: 'nowrap', sm: 'normal' },
                       })}
                     >

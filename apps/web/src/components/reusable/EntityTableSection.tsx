@@ -22,6 +22,7 @@ export interface EntityTableSectionProps<T extends object> {
   maxHeight?: DataTableProps<T>["maxHeight"];
   onRowClick?: DataTableProps<T>["onRowClick"];
   getRowKey?: DataTableProps<T>["getRowKey"];
+  getRowSx?: DataTableProps<T>["getRowSx"];
   renderRowActions?: DataTableProps<T>["renderRowActions"];
   rowActions?: RowActionsFactory<T>;
   showInfoBar?: boolean;
@@ -49,6 +50,7 @@ export default function EntityTableSection<T extends object>({
   maxHeight,
   onRowClick,
   getRowKey,
+  getRowSx,
   renderRowActions,
   rowActions,
   showInfoBar,
@@ -92,6 +94,7 @@ export default function EntityTableSection<T extends object>({
         maxHeight={maxHeight}
         onRowClick={onRowClick}
         getRowKey={getRowKey}
+        getRowSx={getRowSx}
       />
       {shouldShowPagination && (
         <TablePaginationBar

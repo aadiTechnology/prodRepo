@@ -728,6 +728,11 @@ export default function HomeworkList() {
                   loading={controller.loading}
                   emptyMessage="No tasks found."
                   getRowKey={(row) => row.id}
+                  getRowSx={(row) =>
+                    !row.is_viewed
+                      ? { fontWeight: 700, color: colorTokens.text.primary }
+                      : { fontWeight: 500 }
+                  }
                   renderRowActions={renderHomeworkActions}
                   stickyHeader
                   size="small"
@@ -792,6 +797,7 @@ export default function HomeworkList() {
                             display: "flex",
                             flexDirection: "column",
                             gap: 1.5,
+                            fontWeight: hw.is_viewed ? 500 : 700,
                           }}
                         >
                           {/* Subject and State */}
@@ -807,7 +813,7 @@ export default function HomeworkList() {
                               label={hw.subject_name || "General"}
                               size="small"
                               sx={{
-                                fontWeight: 700,
+                                fontWeight: "inherit",
                                 fontSize: "0.7rem",
                                 bgcolor: subColor.bg,
                                 color: subColor.text,
@@ -819,7 +825,7 @@ export default function HomeworkList() {
                               label={statusLabel}
                               size="small"
                               sx={{
-                                fontWeight: 700,
+                                fontWeight: "inherit",
                                 fontSize: "0.7rem",
                                 borderRadius: "8px",
                                 bgcolor:
@@ -839,7 +845,7 @@ export default function HomeworkList() {
                           <Typography
                             variant="h6"
                             sx={{
-                              fontWeight: hw.is_viewed ? 400 : 800,
+                              fontWeight: "inherit",
                               color: colorTokens.text.primary,
                               lineHeight: 1.35,
                               display: "-webkit-box",
@@ -870,7 +876,7 @@ export default function HomeworkList() {
                                 variant="caption"
                                 sx={{
                                   color: colorTokens.text.secondary,
-                                  fontWeight: 600,
+                                  fontWeight: "inherit",
                                   fontSize: "0.8rem",
                                 }}
                               >
@@ -894,7 +900,7 @@ export default function HomeworkList() {
                                 variant="caption"
                                 sx={{
                                   color: colorTokens.text.secondary,
-                                  fontWeight: 600,
+                                  fontWeight: "inherit",
                                   fontSize: "0.8rem",
                                 }}
                               >
@@ -919,7 +925,7 @@ export default function HomeworkList() {
                                   variant="caption"
                                   sx={{
                                     color: colorTokens.warning.dark,
-                                    fontWeight: 700,
+                                    fontWeight: "inherit",
                                     fontSize: "0.8rem",
                                   }}
                                 >
@@ -955,7 +961,7 @@ export default function HomeworkList() {
                               <Typography
                                 variant="caption"
                                 sx={{
-                                  fontWeight: 700,
+                                  fontWeight: "inherit",
                                   color: colorTokens.primary.main,
                                   fontSize: "0.75rem",
                                 }}
@@ -1081,6 +1087,11 @@ export default function HomeworkList() {
           loading={controller.loading}
           emptyMessage={listConfig.uiPolicy.emptyMessage}
           getRowKey={(row) => row.id}
+          getRowSx={(row) =>
+            !row.is_viewed
+              ? { fontWeight: 700, color: colorTokens.text.primary }
+              : { fontWeight: 500 }
+          }
           renderRowActions={renderHomeworkActions}
           stickyHeader
           size="small"

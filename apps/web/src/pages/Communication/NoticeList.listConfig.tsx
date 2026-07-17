@@ -1,4 +1,4 @@
-import { Box, Chip, Tooltip, Typography } from "@mui/material";
+import { Box, Chip, Typography } from "@mui/material";
 import type { NavigateFunction } from "react-router-dom";
 import type { Notice, NoticeStatus } from "../../types/notice";
 import type { ListConfig } from "../../components/reusable/listFramework.types";
@@ -42,26 +42,20 @@ export function createNoticeListConfig({
       {
         id: "title",
         label: "Title",
-        render: (row) => {
-          const isUnread = !row.is_viewed;
-          return (
-            <Tooltip title={row.title}>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: isUnread ? 700 : 400,
-                  color: isUnread ? "text.primary" : "inherit",
-                  maxWidth: 280,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {row.title}
-              </Typography>
-            </Tooltip>
-          );
-        },
+        render: (row) => (
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: "inherit",
+              maxWidth: 280,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {row.title}
+          </Typography>
+        ),
       },
       {
         id: "notice_type",
