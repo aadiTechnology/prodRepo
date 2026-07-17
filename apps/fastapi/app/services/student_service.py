@@ -6,7 +6,11 @@ from app.models.fee_discount import FeeDiscount
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from app.schemas.student_schema import StudentListResponse, StudentUpdateRequest, StudentDetailResponse
-from app.services.school_class_service import require_active_class, require_active_division
+from app.services.school_class_service import (
+    require_active_class,
+    require_active_division,
+    require_class_division_capacity,
+)
 from typing import Optional
 
 class StudentService:
@@ -231,6 +235,12 @@ class StudentService:
                 int(req.class_id),
                 int(req.class_division_id) if getattr(req, "class_division_id", None) is not None else None,
             )
+            require_class_division_capacity(
+                self.db,
+                tenant_id,
+                int(req.class_id),
+                int(req.class_division_id) if getattr(req, "class_division_id", None) is not None else None,
+            )
             # Check/Create parent
             parent = self.db.query(LeadParent).filter(
                 LeadParent.mobile_number == req.parent.mobile_number,
@@ -355,6 +365,13 @@ class StudentService:
                 tenant_id or student.tenant_id,
                 int(next_class_id),
                 int(next_division_id) if next_division_id is not None else None,
+            )
+            require_class_division_capacity(
+                self.db,
+                tenant_id or student.tenant_id,
+                int(next_class_id),
+                int(next_division_id) if next_division_id is not None else None,
+                exclude_student_id=student.id,
             )
 
         for field, value in update_data.items():

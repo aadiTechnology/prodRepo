@@ -144,6 +144,121 @@ def require_active_division(
     return division
 
 
+def count_active_students_in_division(
+    db: Session,
+    tenant_id: int,
+    class_division_id: int,
+    *,
+    exclude_student_id: int | None = None,
+) -> int:
+    """Active students assigned to a division (for capacity checks)."""
+    query = db.query(func.count(Student.id)).filter(
+        Student.tenant_id == tenant_id,
+        Student.class_division_id == class_division_id,
+        Student.is_active == True,  # noqa: E712
+    )
+    if exclude_student_id is not None:
+        query = query.filter(Student.id != exclude_student_id)
+    return int(query.scalar() or 0)
+
+
+def count_active_students_in_class_no_division(
+    db: Session,
+    tenant_id: int,
+    class_id: int,
+    *,
+    exclude_student_id: int | None = None,
+) -> int:
+    """Active students on a class with no division assigned."""
+    query = db.query(func.count(Student.id)).filter(
+        Student.tenant_id == tenant_id,
+        Student.class_id == class_id,
+        Student.class_division_id.is_(None),
+        Student.is_active == True,  # noqa: E712
+    )
+    if exclude_student_id is not None:
+        query = query.filter(Student.id != exclude_student_id)
+    return int(query.scalar() or 0)
+
+
+def require_class_division_capacity(
+    db: Session,
+    tenant_id: int,
+    class_id: int,
+    division_id: int | None,
+    *,
+    exclude_student_id: int | None = None,
+) -> None:
+    """
+    Block assigning a student when division (or class-without-division) is at capacity.
+    Raises HTTP 400 with a user-facing message when full.
+    """
+    if division_id is not None:
+        division = (
+            db.query(ClassDivision)
+            .join(SchoolClass, SchoolClass.id == ClassDivision.class_id)
+            .filter(
+                ClassDivision.id == division_id,
+                ClassDivision.class_id == class_id,
+                SchoolClass.tenant_id == tenant_id,
+                SchoolClass.is_deleted == False,  # noqa: E712
+            )
+            .first()
+        )
+        if not division:
+            return
+        capacity = division.capacity
+        if capacity is None:
+            cls = (
+                db.query(SchoolClass)
+                .filter(
+                    SchoolClass.id == class_id,
+                    SchoolClass.tenant_id == tenant_id,
+                    SchoolClass.is_deleted == False,  # noqa: E712
+                )
+                .first()
+            )
+            capacity = cls.capacity if cls else None
+        if capacity is None:
+            return
+        enrolled = count_active_students_in_division(
+            db, tenant_id, division_id, exclude_student_id=exclude_student_id
+        )
+        if enrolled >= int(capacity):
+            label = (division.division_name or "division").strip()
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Class limit is full for {label}. "
+                    f"Capacity is {capacity} and all seats are taken."
+                ),
+            )
+        return
+
+    cls = (
+        db.query(SchoolClass)
+        .filter(
+            SchoolClass.id == class_id,
+            SchoolClass.tenant_id == tenant_id,
+            SchoolClass.is_deleted == False,  # noqa: E712
+        )
+        .first()
+    )
+    if not cls or cls.capacity is None:
+        return
+    enrolled = count_active_students_in_class_no_division(
+        db, tenant_id, class_id, exclude_student_id=exclude_student_id
+    )
+    if enrolled >= int(cls.capacity):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Class limit is full for {cls.name}. "
+                f"Capacity is {cls.capacity} and all seats are taken."
+            ),
+        )
+
+
 def get_all_classes(
     db: Session,
     tenant_id: int,

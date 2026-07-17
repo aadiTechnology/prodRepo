@@ -12,6 +12,11 @@ from app.models.student import Student
 from app.models.student_fee_assignment import StudentFeeAssignment
 from app.schemas.student_fee_assignment import StudentFeeAssignmentCreate
 from app.services import student_fee_assignment_service
+from app.services.school_class_service import (
+    require_active_class,
+    require_active_division,
+    require_class_division_capacity,
+)
 
 
 class EnrollmentService:
@@ -187,6 +192,20 @@ class EnrollmentService:
             )
 
             admission_no = (payload.admission_no or "").strip() or self._generate_admission_no(tenant_id)
+
+            require_active_class(self.db, tenant_id, int(payload.class_id))
+            require_active_division(
+                self.db,
+                tenant_id,
+                int(payload.class_id),
+                int(payload.class_division_id) if payload.class_division_id is not None else None,
+            )
+            require_class_division_capacity(
+                self.db,
+                tenant_id,
+                int(payload.class_id),
+                int(payload.class_division_id) if payload.class_division_id is not None else None,
+            )
 
             student = Student(
                 tenant_id=tenant_id,
