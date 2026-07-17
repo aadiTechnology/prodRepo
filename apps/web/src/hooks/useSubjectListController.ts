@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import { subjectService } from "../api/services/subjectService";
-import { classService, academicYearService } from "../api/services/dropdownServices";
+import { academicYearService } from "../api/services/dropdownServices";
+import schoolClassService from "../api/services/schoolClassService";
 import { type SubjectClassRow } from "../pages/academics/SubjectList.listConfig";
 import { formatClassDisplayLabel } from "../utils/formatters";
 
@@ -48,23 +49,8 @@ export function useSubjectListController() {
     const [selectedRow, setSelectedRow] = useState<SubjectClassRow | null>(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
 
-    // Load filter options
+    // Load academic year options (class options load per selected year below)
     useEffect(() => {
-        // Load class options
-        classService.list()
-            .then((classes: any[]) => {
-                setClassOptions(
-                    classes
-                        .filter((c: any) => c.is_active && !c.is_deleted)
-                        .map((c: any) => ({
-                            label: formatClassDisplayLabel(c.name) || String(c.id),
-                            value: String(c.id),
-                        })),
-                );
-            })
-            .catch(() => { });
-
-        // Load academic year options
         academicYearService.list()
             .then((data: unknown) => {
                 const yearsRaw =
@@ -96,6 +82,36 @@ export function useSubjectListController() {
         setAcademicYearFilter(String(locationYearId));
         setPage(0);
     }, [locationYearId, listRefreshAt]);
+
+    // Class filter options follow the selected academic year
+    useEffect(() => {
+        if (!academicYearFilter) {
+            setClassOptions([]);
+            setClassFilter("");
+            return;
+        }
+        let cancelled = false;
+        schoolClassService
+            .getAll({ academic_year_id: Number(academicYearFilter), active_only: true })
+            .then((classes) => {
+                if (cancelled) return;
+                const options = (classes || []).map((c) => ({
+                    label: formatClassDisplayLabel(c.name) || String(c.id),
+                    value: String(c.id),
+                }));
+                setClassOptions(options);
+                // Clear class filter if it doesn't belong to the newly selected year
+                setClassFilter((prev) =>
+                    prev && !options.some((o) => o.value === prev) ? "" : prev,
+                );
+            })
+            .catch(() => {
+                if (!cancelled) setClassOptions([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [academicYearFilter]);
 
     const fetchSubjects = async () => {
         try {
