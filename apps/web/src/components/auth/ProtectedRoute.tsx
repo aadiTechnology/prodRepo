@@ -16,6 +16,14 @@ import { ReactNode } from "react";
 // ═══════════════════════════════════════════════════════════════════════════
 const normalizeRole = (value: string | undefined | null): string => (value || "").trim().toLowerCase();
 
+const normalizeRequiredPermissions = (requiredPermissions: string | string[]): string[] =>
+  typeof requiredPermissions === "string" ? [requiredPermissions] : requiredPermissions;
+
+const canUseMenuPathFallback = (requiredPermissions: string | string[]): boolean =>
+  normalizeRequiredPermissions(requiredPermissions).every((permission) =>
+    permission.trim().toLowerCase().endsWith(":view")
+  );
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Props Interface
 // ═══════════════════════════════════════════════════════════════════════════
@@ -205,7 +213,7 @@ export default function ProtectedRoute({
       }
     }
 
-    if (!hasRequiredPermission) {
+    if (!hasRequiredPermission && canUseMenuPathFallback(requiredPermissions)) {
       hasRequiredPermission = hasGrantedMenuAccess(location.pathname, grantedMenuPaths);
     }
 

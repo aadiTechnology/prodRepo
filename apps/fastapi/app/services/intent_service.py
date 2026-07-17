@@ -65,6 +65,15 @@ def _path_from_name(name: str) -> str:
     return "/" + name.strip().lower().replace(" ", "-").replace("_", "-")
 
 
+def _normalize_route(route: str | None) -> str:
+    route = (route or "").strip()
+    if not route:
+        return ""
+    if route == "/":
+        return "/"
+    return route if route.startswith("/") else f"/{route}"
+
+
 def _is_synthetic_parent_route(name: str, route: str) -> bool:
     """Hub/parent modules without a real DB path get a slug route — not navigable."""
     if name.lower() in ("dashboard", "overview"):
@@ -135,9 +144,7 @@ def _filter_menus_for_ai(allowed_menus: list[dict]) -> list[dict]:
 
 
 def _success_from_menu(menu: dict) -> dict:
-    route = (menu.get("route") or "").strip()
-    if route and not route.startswith("/"):
-        route = "/" + route
+    route = _normalize_route(menu.get("route"))
     return {
         "menu_id": menu.get("menu_id"),
         "menu_name": (menu.get("menu_name") or "").strip(),
@@ -473,12 +480,16 @@ def _call_llm(user_text: str, allowed_menus: list[dict]) -> tuple[dict, dict | N
 
 
 def _recover_menu(data: dict, allowed_menus: list[dict]) -> dict | None:
-    route = (data.get("route") or "").strip()
+    menu_id = data.get("menu_id")
+    if menu_id is not None:
+        match = next((m for m in allowed_menus if m.get("menu_id") == menu_id), None)
+        if match:
+            return _success_from_menu(match)
+
+    route = _normalize_route(data.get("route"))
     name = (data.get("menu_name") or "").strip()
     if route:
-        if not route.startswith("/"):
-            route = "/" + route
-        match = next((m for m in allowed_menus if m["route"] == route), None)
+        match = next((m for m in allowed_menus if _normalize_route(m.get("route")) == route), None)
         if match:
             return _success_from_menu(match)
     if name:
@@ -522,9 +533,31 @@ def _validate_response(data: dict, allowed_menus: list[dict]) -> dict:
             "error_type": "SAFE_ERROR",
             "error_message": "That page is not in your menu list. Type to see pages you can access.",
         }
-    route = (data.get("route") or "").strip()
-    if route and not route.startswith("/"):
-        data["route"] = "/" + route
+    route = _normalize_route(data.get("route"))
+    if route:
+        route_match = next(
+            (m for m in allowed_menus if _normalize_route(m.get("route")) == route),
+            None,
+        )
+        if route_match:
+            return _success_from_menu(route_match)
+        recovered = _recover_menu(data, allowed_menus)
+        if recovered:
+            return recovered
+        return {
+            **data,
+            "menu_id": None,
+            "menu_name": "",
+            "parent_menu_id": None,
+            "parent_menu_name": "",
+            "route": "",
+            "error_type": "SAFE_ERROR",
+            "error_message": "That page is not in your menu list. Type to see pages you can access.",
+        }
+    if not route:
+        recovered = _recover_menu(data, allowed_menus)
+        if recovered:
+            return recovered
     data["action"] = "NAVIGATE"
     data["method"] = None
     data["endpoint"] = None
@@ -533,9 +566,7 @@ def _validate_response(data: dict, allowed_menus: list[dict]) -> dict:
 
 
 def _to_interpret_response(data: dict) -> InterpretResponse:
-    route = (data.get("route") or "").strip()
-    if route and not route.startswith("/"):
-        route = "/" + route
+    route = _normalize_route(data.get("route"))
     return InterpretResponse(
         menu_id=data.get("menu_id"),
         menu_name=data.get("menu_name") or "",

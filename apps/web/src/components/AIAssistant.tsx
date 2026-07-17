@@ -111,6 +111,8 @@ interface NavigableMenu {
   isAction?: boolean;
 }
 
+type ExecuteActionResult = "none" | "navigated" | "blocked";
+
 const ROUTE_TO_SIDEBAR_PARENT: Record<string, string> = {
   "/roles": "config",
   "/menus": "config",
@@ -475,6 +477,50 @@ function filterTypeahead(query: string, menus: NavigableMenu[]): NavigableMenu[]
 
 const AI_QUOTA_MESSAGE =
   "OpenAI quota exceeded. Add billing at platform.openai.com, then restart the API server.";
+const ASSISTANT_ACCESS_DENIED_MESSAGE =
+  "That page is not assigned to your account. Open My pages to see what you can access.";
+
+function normalizeRoute(route: string | null | undefined): string {
+  const trimmed = (route || "").trim();
+  if (!trimmed) return "";
+  if (trimmed === "/") return "/";
+  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+}
+
+function findNavigableByRoute(route: string | null | undefined, menus: NavigableMenu[]): NavigableMenu | null {
+  const normalized = normalizeRoute(route);
+  if (!normalized) return null;
+  return menus.find((m) => normalizeRoute(m.path) === normalized) ?? null;
+}
+
+function canOpenTrustedAssistantRoute(
+  route: string | null | undefined,
+  grantedMenuPaths: Set<string>,
+  hasPermission: (permission: string) => boolean,
+  hasRole: (role: string) => boolean
+): boolean {
+  const normalized = normalizeRoute(route);
+  if (normalized === "/configuration") {
+    return (
+      hasPermission("ACADEMIC_MGMT:view") ||
+      hasPermission("ADMIN_MGMT:view") ||
+      hasPermission("TEACHER_MGMT:view") ||
+      hasPermission("FEE_MGMT:view") ||
+      grantedMenuPaths.has("/configuration/hub") ||
+      grantedMenuPaths.has("/academics/academic-years") ||
+      grantedMenuPaths.has("/academic-years") ||
+      grantedMenuPaths.has("/academics/classes") ||
+      grantedMenuPaths.has("/classes") ||
+      grantedMenuPaths.has("/roles") ||
+      grantedMenuPaths.has("/teachers") ||
+      grantedMenuPaths.has("/students")
+    );
+  }
+  if (normalized === "/demo-setup-videos") {
+    return hasRole("SUPER_ADMIN") || hasRole("SYSTEM_ADMIN") || hasRole("ADMIN");
+  }
+  return false;
+}
 
 function isClearChatCommand(text: string): boolean {
   return /^(clear|reset|clear chat|clear history)$/i.test(text.trim());
@@ -679,7 +725,7 @@ export default function AIAssistant() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { menus, hasPermission, hasRole } = useRBAC();
+  const { menus, hasPermission, hasRole, grantedMenuPaths } = useRBAC();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
@@ -725,23 +771,14 @@ export default function AIAssistant() {
       const { data } = await apiClient.get<ChatSessionResponse>("/api/ai/chat");
       const loaded = data.messages.map(toChatMessage);
       const pages = buildNavigableMenus(menus, hasPermission).filter((m) => !m.isAction);
-      const grantedPaths = new Set(menus.flatMap(m => {
-        const paths: string[] = [];
-        const traverse = (node: MenuNode) => {
-          if (node.path) paths.push(node.path);
-          node.children?.forEach(traverse);
-        };
-        traverse(m);
-        return paths;
-      }));
       setMessages(loaded);
-      setOptionsById(restoreOptionsForMessages(loaded, pages, grantedPaths, hasRole));
+      setOptionsById(restoreOptionsForMessages(loaded, pages, grantedMenuPaths, hasRole));
     } catch {
       // Keep in-memory messages if chat API is unavailable
     } finally {
       setChatLoading(false);
     }
-  }, [user?.id, menus, hasPermission, hasRole]);
+  }, [user?.id, menus, hasPermission, hasRole, grantedMenuPaths]);
 
   useEffect(() => {
     const uid = user?.id ?? null;
@@ -867,15 +904,7 @@ export default function AIAssistant() {
       ]);
       // Build greeting options with Basic Configuration, Demo Setup, Communication, Guide
       const greetingChips = buildGreetingOptions(
-        new Set(menus.flatMap(m => {
-          const paths: string[] = [];
-          const traverse = (node: MenuNode) => {
-            if (node.path) paths.push(node.path);
-            node.children?.forEach(traverse);
-          };
-          traverse(m);
-          return paths;
-        })),
+        grantedMenuPaths,
         hasRole
       );
       setOptionsById((prev) => ({ ...prev, [assistantId]: greetingChips }));
@@ -885,7 +914,7 @@ export default function AIAssistant() {
         reload: false,
       }).catch(() => {});
     },
-    [displayName, menus, hasRole, persistExchange]
+    [displayName, grantedMenuPaths, hasRole, persistExchange]
   );
 
   const showGuideInChat = useCallback(
@@ -955,43 +984,58 @@ export default function AIAssistant() {
   }, [messages, chatState]);
 
   const executeAction = useCallback(
-    async (data: InterpretResponse) => {
+    async (data: InterpretResponse): Promise<ExecuteActionResult> => {
       if (data.action === "NAVIGATE" && data.route && !data.error_type) {
+        const item = findNavigableByRoute(data.route, navigableMenus);
+        if (!item && !canOpenTrustedAssistantRoute(data.route, grantedMenuPaths, hasPermission, hasRole)) {
+          return "blocked";
+        }
+        const targetPath = item?.path ?? normalizeRoute(data.route);
         const parentId =
-          data.parent_menu_id != null
-            ? String(data.parent_menu_id)
-            : (ROUTE_TO_SIDEBAR_PARENT[data.route] ?? "");
+          item?.parentId != null
+            ? String(item.parentId)
+            : data.parent_menu_id != null
+              ? String(data.parent_menu_id)
+              : (ROUTE_TO_SIDEBAR_PARENT[targetPath] ?? "");
         dispatchSidebarExpand(parentId);
-        navigate(data.route);
+        navigate(targetPath);
         closeAssistant();
+        return "navigated";
       }
+      return "none";
     },
-    [navigate, closeAssistant]
+    [navigate, closeAssistant, navigableMenus, grantedMenuPaths, hasPermission, hasRole]
   );
 
   const navigateToMenu = useCallback(
     async (item: NavigableMenu, inputSource: string, userText?: string) => {
+      const allowedItem = findNavigableByRoute(item.path, navigableMenus);
+      if (!allowedItem && !canOpenTrustedAssistantRoute(item.path, grantedMenuPaths, hasPermission, hasRole)) {
+        appendLocal("assistant", ASSISTANT_ACCESS_DENIED_MESSAGE, true);
+        return;
+      }
+      const target = allowedItem ?? item;
       const parentId =
-        item.parentId != null
-          ? String(item.parentId)
-          : (ROUTE_TO_SIDEBAR_PARENT[item.path] ?? "");
+        target.parentId != null
+          ? String(target.parentId)
+          : (ROUTE_TO_SIDEBAR_PARENT[target.path] ?? "");
       dispatchSidebarExpand(parentId);
-      const spoken = userText?.trim() || `Open ${item.name}`;
-      navigate(item.path);
+      const spoken = userText?.trim() || `Open ${target.name}`;
+      navigate(target.path);
       closeAssistant();
       try {
-        await persistExchange(spoken, `Opening ${item.name}.`, {
-          route: item.path,
-          menuName: item.name,
-          parentMenuId: typeof item.parentId === "number" ? item.parentId : null,
+        await persistExchange(spoken, `Opening ${target.name}.`, {
+          route: target.path,
+          menuName: target.name,
+          parentMenuId: typeof target.parentId === "number" ? target.parentId : null,
           inputSource,
         });
       } catch {
         appendLocal("user", spoken);
-        appendLocal("assistant", `Opening ${item.name}.`);
+        appendLocal("assistant", `Opening ${target.name}.`);
       }
     },
-    [appendLocal, navigate, persistExchange, closeAssistant]
+    [appendLocal, navigate, persistExchange, closeAssistant, navigableMenus, grantedMenuPaths, hasPermission, hasRole]
   );
 
   const openPageDirect = useCallback(
@@ -1114,8 +1158,11 @@ export default function AIAssistant() {
           },
           { timeout: 90000 }
         );
-        await executeAction(data);
+        const actionResult = await executeAction(data);
         await loadChat();
+        if (actionResult === "blocked") {
+          appendLocal("assistant", ASSISTANT_ACCESS_DENIED_MESSAGE, true);
+        }
         if (data.error_type && data.options && data.options.length > 0) {
           const assistantId = `${clientMessageId}-assistant`;
           setOptionsById((prev) => ({ ...prev, [assistantId]: data.options ?? [] }));
