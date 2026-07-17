@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import { subjectService } from "../api/services/subjectService";
 import { classService, academicYearService } from "../api/services/dropdownServices";
@@ -16,6 +17,10 @@ const resolveCurrentAcademicYearId = (
 };
 
 export function useSubjectListController() {
+    const location = useLocation();
+    const locationYearId = (location.state as { academic_year_id?: number } | null)?.academic_year_id;
+    const listRefreshAt = (location.state as { subjectListRefreshAt?: number } | null)?.subjectListRefreshAt;
+
     const [subjects, setSubjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -26,11 +31,13 @@ export function useSubjectListController() {
     const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
     const [totalSubjects, setTotalSubjects] = useState(0);
 
-    // Filters
+    // Filters — default All so Active + Inactive both visible (homework still excludes inactive).
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [classFilter, setClassFilter] = useState("");
-    const [academicYearFilter, setAcademicYearFilter] = useState("");
+    const [academicYearFilter, setAcademicYearFilter] = useState(
+        locationYearId != null ? String(locationYearId) : "",
+    );
     const [academicYearFilterReady, setAcademicYearFilterReady] = useState(false);
 
     const [classOptions, setClassOptions] = useState<{ label: string; value: string }[]>([]);
@@ -72,13 +79,23 @@ export function useSubjectListController() {
                 setAcademicYearOptions(
                     years.map((y) => ({ label: y.name || y.code || String(y.id), value: String(y.id) })),
                 );
-                setAcademicYearFilter((prev) => prev || resolveCurrentAcademicYearId(years));
+                setAcademicYearFilter((prev) => {
+                    if (locationYearId != null) return String(locationYearId);
+                    return prev || resolveCurrentAcademicYearId(years);
+                });
             })
             .catch(() => { })
             .finally(() => {
                 setAcademicYearFilterReady(true);
             });
-    }, []);
+    }, [locationYearId]);
+
+    // After Edit Subject save, apply the saved year filter and refresh
+    useEffect(() => {
+        if (locationYearId == null) return;
+        setAcademicYearFilter(String(locationYearId));
+        setPage(0);
+    }, [locationYearId, listRefreshAt]);
 
     const fetchSubjects = async () => {
         try {
@@ -141,8 +158,12 @@ export function useSubjectListController() {
         }>();
 
         subjects.forEach((subject) => {
+            // When year/class filter is on, skip subjects with no mapping for that filter
+            // (avoids ghost rows with Academic Year "-" / Class "-").
             if (!subject.classes || subject.classes.length === 0) {
-                // If no classes, use a default key based on subject_type
+                if (academicYearFilter || classFilter) {
+                    return;
+                }
                 const key = `no-class-${subject.subject_type}-${subject.id}`;
                 groupedMap.set(key, {
                     subject_ids: [subject.id],
@@ -166,6 +187,7 @@ export function useSubjectListController() {
                             existing.subject_ids.push(subject.id);
                             existing.subject_names.push(subject.name);
                             existing.subject_codes.push(subject.code);
+                            existing.is_active = existing.is_active && Boolean(subject.is_active);
                         }
                     } else {
                         groupedMap.set(key, {
@@ -178,7 +200,7 @@ export function useSubjectListController() {
                             class_name: classMapping.class_name || "-",
                             class_id: classMapping.class_id,
                             subject_type: subject.subject_type,
-                            is_active: classMapping.is_active,
+                            is_active: Boolean(subject.is_active),
                             is_mandatory: classMapping.is_mandatory,
                         });
                     }
@@ -203,7 +225,7 @@ export function useSubjectListController() {
         }));
 
         return rows;
-    }, [subjects, resolveAcademicYearName]);
+    }, [subjects, resolveAcademicYearName, academicYearFilter, classFilter]);
 
 
 
@@ -211,7 +233,7 @@ export function useSubjectListController() {
         if (!academicYearFilterReady) return;
         fetchSubjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, rowsPerPage, search, statusFilter, classFilter, academicYearFilter, academicYearFilterReady]);
+    }, [page, rowsPerPage, search, statusFilter, classFilter, academicYearFilter, academicYearFilterReady, listRefreshAt]);
 
     useEffect(() => {
         setPage(0);
@@ -271,6 +293,7 @@ export function useSubjectListController() {
         handleConfirmDelete,
         deleteLoading,
         statusOptions: [
+            { label: "All", value: "" },
             { label: "Active", value: "active" },
             { label: "Inactive", value: "inactive" },
         ],

@@ -46,6 +46,11 @@ export default function AddSubject() {
     const [snackbar, setSnackbar] = useState<string | null>(null);
     // Track originally-loaded subject IDs so we can delete removed ones on save
     const [originalSubjectIds, setOriginalSubjectIds] = useState<number[]>([]);
+    // Year/class loaded for this edit — used to replace mapping when academic year changes
+    const [originalAssignment, setOriginalAssignment] = useState<{
+        academic_year_id: number;
+        class_id: number;
+    } | null>(null);
     
     const [academicYearOptions, setAcademicYearOptions] = useState<{ id: string; label: string; value: string }[]>([]);
     const [classOptions, setClassOptions] = useState<{ id: string; label: string; value: string }[]>([]);
@@ -267,15 +272,11 @@ export default function AddSubject() {
         return config;
     }, [isEditMode, academicYearOptions, classOptions, formData.subjects, handleAddSubjectRow, handleRemoveSubjectRow, handleSubjectChange]);
 
-    // Data Fetching
+    // Data Fetching — academic years once; classes filtered by selected academic year
     useEffect(() => {
-        const loadOptions = async () => {
+        const loadYears = async () => {
             try {
-                const [years, classes] = await Promise.all([
-                    academicYearService.listActive(),
-                    schoolClassService.getAll()
-                ]);
-                
+                const years = await academicYearService.listActive();
                 const yearsData = (years || []) as {
                     id: number;
                     name?: string;
@@ -298,27 +299,52 @@ export default function AddSubject() {
                         handleFieldValueChange("academic_year_id", yearId);
                     }
                 }
+            } catch (err) {
+                console.error("Failed to load academic years", err);
+            }
+        };
+        loadYears();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isEditMode, navigationState.academic_year_id]);
 
-                const classData = classes || [];
-                const options = classData.map((c: any) => ({
+    useEffect(() => {
+        const yearId = formData.academic_year_id;
+        if (!yearId) {
+            setClassOptions([]);
+            return;
+        }
+        let cancelled = false;
+        schoolClassService
+            .getAll({ academic_year_id: Number(yearId), active_only: true })
+            .then((classes) => {
+                if (cancelled) return;
+                const options = (classes || []).map((c) => ({
                     id: String(c.id),
                     label: formatClassDisplayLabel(c.name) || String(c.id),
-                    value: String(c.id)
+                    value: String(c.id),
                 }));
-                
-                // Add "All Classes" option
                 if (options.length > 0) {
                     options.unshift({ id: "all", label: "All Classes", value: "all" });
                 }
-                
                 setClassOptions(options);
-            } catch (err) {
-                console.error("Failed to load options", err);
-            }
+                // If current class is not in this year, clear it (keeps edit original until user changes year)
+                const current = formData.class_id;
+                if (
+                    current &&
+                    current !== "all" &&
+                    !options.some((o) => o.value === current)
+                ) {
+                    handleFieldValueChange("class_id", "");
+                }
+            })
+            .catch(() => {
+                if (!cancelled) setClassOptions([]);
+            });
+        return () => {
+            cancelled = true;
         };
-        loadOptions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isEditMode, navigationState.academic_year_id]);
+    }, [formData.academic_year_id]);
 
     const fetchSubjectForEdit = useCallback(async () => {
         if (!id || id === "new") return;
@@ -350,6 +376,10 @@ export default function AddSubject() {
                     is_active: s.is_active
                 }));
                 setOriginalSubjectIds(mappedSubjects.map(s => s.id!));
+                setOriginalAssignment({
+                    academic_year_id: Number(academicYearId),
+                    class_id: Number(classId),
+                });
                 setFormData({
                     academic_year_id: String(academicYearId),
                     class_id: String(classId),
@@ -359,17 +389,26 @@ export default function AddSubject() {
             } else {
                 // Fallback: load single subject by ID
                 const data = await subjectService.getSubject(Number(id));
+                const firstClass = (data.classes || [])[0];
                 setOriginalSubjectIds([data.id]);
+                if (firstClass?.academic_year_id != null && firstClass?.class_id != null) {
+                    setOriginalAssignment({
+                        academic_year_id: Number(firstClass.academic_year_id),
+                        class_id: Number(firstClass.class_id),
+                    });
+                } else {
+                    setOriginalAssignment(null);
+                }
                 setFormData({
-                    academic_year_id: (data.classes || [])[0]?.academic_year_id ? String((data.classes || [])[0].academic_year_id) : "",
-                    class_id: (data.classes || [])[0]?.class_id ? String((data.classes || [])[0].class_id) : "",
+                    academic_year_id: firstClass?.academic_year_id ? String(firstClass.academic_year_id) : "",
+                    class_id: firstClass?.class_id ? String(firstClass.class_id) : "",
                     description: data.description || "",
                     subjects: [{
                         id: data.id,
                         name: data.name,
                         code: data.code,
                         subject_type: data.subject_type,
-                        is_mandatory: (data.classes || [])[0]?.is_mandatory ?? true,
+                        is_mandatory: firstClass?.is_mandatory ?? true,
                         is_active: data.is_active
                     }]
                 });
@@ -413,6 +452,18 @@ export default function AddSubject() {
                 
                 // Update existing subjects
                 for (const sub of existingSubjects) {
+                    const mapping = isAllClasses ? undefined : {
+                        class_id: Number(formData.class_id),
+                        academic_year_id: Number(formData.academic_year_id),
+                        is_mandatory: sub.is_mandatory,
+                        is_active: sub.is_active,
+                        ...(originalAssignment
+                            ? {
+                                previous_class_id: originalAssignment.class_id,
+                                previous_academic_year_id: originalAssignment.academic_year_id,
+                            }
+                            : {}),
+                    };
                     const payload = {
                         name: sub.name.trim(),
                         code: sub.code.trim(),
@@ -422,12 +473,7 @@ export default function AddSubject() {
                         is_mandatory: sub.is_mandatory,
                         all_classes: isAllClasses,
                         academic_year_id: Number(formData.academic_year_id),
-                        class_mappings: isAllClasses ? [] : [{
-                            class_id: Number(formData.class_id),
-                            academic_year_id: Number(formData.academic_year_id),
-                            is_mandatory: sub.is_mandatory,
-                            is_active: sub.is_active
-                        }]
+                        class_mappings: isAllClasses ? [] : (mapping ? [mapping] : []),
                     };
                     await subjectService.updateSubject(sub.id!, payload);
                 }
@@ -454,7 +500,19 @@ export default function AddSubject() {
                 }
                 
                 const deletedCount = deletedSubjectIds.length;
+                const savedYearId = Number(formData.academic_year_id);
                 setSnackbar(`Subjects updated successfully.${deletedCount > 0 ? ` ${deletedCount} subject(s) deleted.` : ""}`);
+                setTimeout(
+                    () =>
+                        navigateWithConfigHub(listPath, {
+                            state: {
+                                academic_year_id: Number.isFinite(savedYearId) ? savedYearId : undefined,
+                                subjectListRefreshAt: Date.now(),
+                            },
+                        }),
+                    800,
+                );
+                return;
 
             } else {
                 const isAllClasses = formData.class_id === "all";
@@ -481,8 +539,19 @@ export default function AddSubject() {
                 });
                 await Promise.all(promises);
                 setSnackbar("Subjects created and assigned to class successfully.");
+                const savedYearId = Number(formData.academic_year_id);
+                setTimeout(
+                    () =>
+                        navigateWithConfigHub(listPath, {
+                            state: {
+                                academic_year_id: Number.isFinite(savedYearId) ? savedYearId : undefined,
+                                subjectListRefreshAt: Date.now(),
+                            },
+                        }),
+                    800,
+                );
+                return;
             }
-            setTimeout(() => navigateWithConfigHub(listPath), 1000);
         } catch (err: any) {
             const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
             if (apiFieldErrors) setFieldErrors(apiFieldErrors);

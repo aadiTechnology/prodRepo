@@ -16,6 +16,9 @@ class SubjectClassMapping(BaseModel):
     class_division_id: Optional[int] = None
     is_mandatory: bool = True
     is_active: bool = True
+    # Edit Subject: when changing year/class, remove this previous mapping first
+    previous_class_id: Optional[int] = None
+    previous_academic_year_id: Optional[int] = None
 
 class SubjectCreate(SubjectBase):
     class_mappings: List[SubjectClassMapping] = Field(default_factory=list, description="List of detailed class mappings")

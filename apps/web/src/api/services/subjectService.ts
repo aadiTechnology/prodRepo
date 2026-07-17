@@ -39,6 +39,9 @@ export interface SubjectClassMappingPayload {
   class_division_id?: number;
   is_mandatory: boolean;
   is_active: boolean;
+  /** Original mapping keys — required when changing academic year/class on edit */
+  previous_class_id?: number;
+  previous_academic_year_id?: number;
 }
 
 export interface CreateSubjectPayload {
@@ -47,6 +50,9 @@ export interface CreateSubjectPayload {
   description?: string;
   subject_type: string;
   is_active: boolean;
+  is_mandatory?: boolean;
+  all_classes?: boolean;
+  academic_year_id?: number;
   class_mappings: SubjectClassMappingPayload[];
 }
 
@@ -56,6 +62,9 @@ export interface UpdateSubjectPayload {
   description?: string;
   subject_type?: string;
   is_active?: boolean;
+  is_mandatory?: boolean;
+  all_classes?: boolean;
+  academic_year_id?: number;
   class_mappings?: SubjectClassMappingPayload[];
 }
 
