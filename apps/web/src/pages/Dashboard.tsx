@@ -2551,11 +2551,16 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
 // ═══════════════════════════════════════════════════════════════════════════════
 // 3. STUDENT DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
+/** Set true to show the student homework banner on the dashboard. */
+const STUDENT_SHOW_HOMEWORK = false;
+
 const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present"];
 // Pending HW KPI removed per QA — homework status remains on the s_homework card below.
 // const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw"];
 const STUDENT_CARDS_DEFAULT = ["s_att", "s_profile", "s_homework", "s_notices"];
-const STUDENT_FULL_WIDTH_CARDS = new Set(["s_homework", "s_notices"]);
+const STUDENT_FULL_WIDTH_CARDS = new Set(
+  STUDENT_SHOW_HOMEWORK ? ["s_homework", "s_notices"] : ["s_notices"]
+);
 const STUDENT_COMPACT_CARDS = new Set(["s_att", "s_profile"]);
 // Fee card hidden for students — restore when fee module is enabled:
 // const STUDENT_CARDS_DEFAULT = ["s_att", "s_profile", "s_fee", "s_homework", "s_notices"];
@@ -2570,6 +2575,10 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
 
   const kpiDrag = useSortableDrag("student_kpi_v2", STUDENT_KPI_DEFAULT);
   const cardDrag = useSortableDrag("student_cards_v6", STUDENT_CARDS_DEFAULT);
+  const visibleCardIds = React.useMemo(
+    () => cardDrag.order.filter((id) => STUDENT_SHOW_HOMEWORK || id !== "s_homework"),
+    [cardDrag.order]
+  );
 
   const renderKpi = (id: string) => {
     const totalDays = attendance.present + attendance.absent;
@@ -2796,6 +2805,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
       */
 
       case "s_homework":
+        if (!STUDENT_SHOW_HOMEWORK) return null;
         return (
           <Box
             sx={{
@@ -2856,8 +2866,8 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
 
       case "s_notices":
         return (
-          <GCard>
-            <CardContent sx={{ p: 3 }}>
+          <GCard sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 }, flex: 1, display: "flex", flexDirection: "column" }}>
               <CardHeader
                 title="Latest Notices & Holidays"
                 icon={<NoticeIcon color="error" sx={{ fontSize: 20 }} />}
@@ -2892,7 +2902,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
 
       <Grid item xs={12}>
         <SortableCardGrid
-          items={cardDrag.order}
+          items={visibleCardIds}
           activeId={cardDrag.activeId}
           onDragStart={cardDrag.onDragStart}
           onDragEnd={cardDrag.onDragEnd}
