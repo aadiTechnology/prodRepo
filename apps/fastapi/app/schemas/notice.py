@@ -104,6 +104,7 @@ class NoticeResponse(BaseModel):
     is_deleted: bool
     targets: list[NoticeTargetResponse] = Field(default_factory=list)
     attachments: list[NoticeAttachmentResponse] = Field(default_factory=list)
+    is_viewed: bool = False
 
 
 class NoticeListResponse(BaseModel):

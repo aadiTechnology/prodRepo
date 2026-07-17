@@ -181,6 +181,28 @@ def count_unread_homework(
     return int(query.count() or 0)
 
 
+def get_viewed_homework_ids(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    homework_ids: List[int],
+) -> set[int]:
+    """Return homework ids the user has already opened (from homework_views)."""
+    if not homework_ids:
+        return set()
+    rows = (
+        db.query(HomeworkView.homework_id)
+        .filter(
+            HomeworkView.tenant_id == tenant_id,
+            HomeworkView.user_id == user_id,
+            HomeworkView.homework_id.in_(homework_ids),
+        )
+        .all()
+    )
+    return {int(r[0]) for r in rows}
+
+
 def mark_homework_viewed(
     db: Session,
     *,

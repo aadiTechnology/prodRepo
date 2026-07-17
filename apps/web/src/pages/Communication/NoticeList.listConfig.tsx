@@ -42,22 +42,26 @@ export function createNoticeListConfig({
       {
         id: "title",
         label: "Title",
-        render: (row) => (
-          <Tooltip title={row.title}>
-            <Typography
-              variant="body2"
-              sx={{
-                fontWeight: 600,
-                maxWidth: 280,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {row.title}
-            </Typography>
-          </Tooltip>
-        ),
+        render: (row) => {
+          const isUnread = !row.is_viewed;
+          return (
+            <Tooltip title={row.title}>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: isUnread ? 700 : 400,
+                  color: isUnread ? "text.primary" : "inherit",
+                  maxWidth: 280,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {row.title}
+              </Typography>
+            </Tooltip>
+          );
+        },
       },
       {
         id: "notice_type",

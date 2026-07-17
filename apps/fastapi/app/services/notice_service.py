@@ -201,7 +201,9 @@ def _normalize_attachments(*, attachments: list[dict]) -> list[dict]:
     return normalized
 
 
-def _to_notice_response(db: Session, row: dict) -> NoticeResponse:
+def _to_notice_response(
+    db: Session, row: dict, *, is_viewed: bool = False
+) -> NoticeResponse:
     targets = notice_repository.get_notice_targets(db, notice_id=int(row["id"]))
     attachments = notice_repository.get_notice_attachments(db, notice_id=int(row["id"]))
     return NoticeResponse(
@@ -226,6 +228,7 @@ def _to_notice_response(db: Session, row: dict) -> NoticeResponse:
         is_deleted=bool(row["is_deleted"]),
         targets=[NoticeTargetResponse(**item) for item in targets],
         attachments=[NoticeAttachmentResponse(**item) for item in attachments],
+        is_viewed=is_viewed,
     )
 
 
@@ -259,8 +262,21 @@ def list_notices(
         size=size,
         viewer_context=viewer_context,
     )
+    viewed_ids: set[int] = set()
+    if current_user_id is not None and rows:
+        viewed_ids = notice_repository.get_viewed_notice_ids(
+            db,
+            tenant_id=tenant_id,
+            user_id=current_user_id,
+            notice_ids=[int(row["id"]) for row in rows],
+        )
     return NoticeListResponse(
-        items=[_to_notice_response(db, row) for row in rows],
+        items=[
+            _to_notice_response(
+                db, row, is_viewed=int(row["id"]) in viewed_ids
+            )
+            for row in rows
+        ],
         total=total,
         page=page,
         size=size,

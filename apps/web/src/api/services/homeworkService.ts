@@ -37,6 +37,8 @@ export interface HomeworkResponse {
   created_at: string;
   updated_at: string | null;
   attachments: HomeworkAttachment[];
+  /** True after the current user has opened this homework (sidebar unread). */
+  is_viewed?: boolean;
 }
 
 export interface HomeworkListResponse {

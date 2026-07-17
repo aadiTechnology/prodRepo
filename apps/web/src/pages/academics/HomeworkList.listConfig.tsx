@@ -50,11 +50,20 @@ export const createHomeworkListConfig = ({
     {
       id: "title",
       label: "Title",
-      render: (row: HomeworkRow) => (
-        <Box sx={{ fontWeight: 600, color: colorTokens.text.primary, whiteSpace: "nowrap" }}>
-          {row.title}
-        </Box>
-      ),
+      render: (row: HomeworkRow) => {
+        const isUnread = !row.is_viewed;
+        return (
+          <Box
+            sx={{
+              fontWeight: isUnread ? 700 : 400,
+              color: isUnread ? colorTokens.text.primary : "inherit",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {row.title}
+          </Box>
+        );
+      },
     },
     {
       id: "subject_name",

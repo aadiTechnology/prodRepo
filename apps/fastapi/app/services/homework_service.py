@@ -37,7 +37,31 @@ from app.utils.homework_status import (
 # Mapping helper (ORM → response schema)
 # ---------------------------------------------------------------------------
 
-def _to_response(hw: Homework) -> HomeworkResponse:
+def to_list_responses(
+    db: Session,
+    items: List[Homework],
+    *,
+    tenant_id: int,
+    user_id: int,
+) -> List[HomeworkResponse]:
+    """Map homework rows to API responses, including per-user is_viewed flags."""
+    viewed_ids = (
+        repo.get_viewed_homework_ids(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            homework_ids=[int(hw.id) for hw in items],
+        )
+        if items
+        else set()
+    )
+    return [
+        _to_response(hw, is_viewed=int(hw.id) in viewed_ids)
+        for hw in items
+    ]
+
+
+def _to_response(hw: Homework, *, is_viewed: bool = False) -> HomeworkResponse:
     return HomeworkResponse(
         id=hw.id,
         tenant_id=hw.tenant_id,
@@ -72,6 +96,7 @@ def _to_response(hw: Homework) -> HomeworkResponse:
             }
             for a in hw.attachments
         ],
+        is_viewed=is_viewed,
     )
 
 

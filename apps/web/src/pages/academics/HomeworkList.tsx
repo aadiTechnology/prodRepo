@@ -839,7 +839,7 @@ export default function HomeworkList() {
                           <Typography
                             variant="h6"
                             sx={{
-                              fontWeight: 800,
+                              fontWeight: hw.is_viewed ? 400 : 800,
                               color: colorTokens.text.primary,
                               lineHeight: 1.35,
                               display: "-webkit-box",

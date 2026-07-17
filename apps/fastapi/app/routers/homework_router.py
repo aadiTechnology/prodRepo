@@ -220,7 +220,12 @@ def list_homework(
     pages = math.ceil(total / limit) if limit > 0 else 0
     page = (skip // limit) + 1 if limit > 0 else 1
     return HomeworkListResponse(
-        data=[homework_service._to_response(hw) for hw in items],
+        data=homework_service.to_list_responses(
+            db,
+            items,
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+        ),
         total=total,
         page=page,
         size=limit,

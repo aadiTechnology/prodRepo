@@ -120,6 +120,7 @@ class HomeworkResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
     attachments: List[HomeworkAttachmentResponse] = []
+    is_viewed: bool = False
 
     model_config = {"from_attributes": True}
 

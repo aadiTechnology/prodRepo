@@ -46,6 +46,8 @@ export interface Notice {
   is_deleted: boolean;
   targets: NoticeTarget[];
   attachments: NoticeAttachment[];
+  /** True after the current user has opened this notice (sidebar unread). */
+  is_viewed?: boolean;
 }
 
 export interface NoticeCreateTarget {
