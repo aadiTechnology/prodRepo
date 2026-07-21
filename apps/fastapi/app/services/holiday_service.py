@@ -363,7 +363,7 @@ def list_holidays(
     other = max(0, total - typed_sum)
 
     rows = (
-        base_query.order_by(Holiday.start_date.asc(), Holiday.id.asc())
+        base_query.order_by(Holiday.created_at.desc(), Holiday.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
