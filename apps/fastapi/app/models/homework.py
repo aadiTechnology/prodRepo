@@ -1,5 +1,7 @@
 from datetime import datetime
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Boolean, Text, UniqueConstraint
+
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy.dialects.mssql import NVARCHAR
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -17,8 +19,8 @@ class Homework(Base):
     subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
     academic_year_id = Column(Integer, ForeignKey("academic_years.id", ondelete="CASCADE"), nullable=False)
 
-    title = Column(String(255), nullable=False)
-    instructions = Column(Text, nullable=True)
+    title = Column(NVARCHAR(255), nullable=False)
+    instructions = Column(NVARCHAR(length=None), nullable=True)
 
     assigned_date = Column(Date, nullable=False)
     submission_date = Column(Date, nullable=True)
@@ -58,7 +60,7 @@ class HomeworkAttachment(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     homework_id = Column(Integer, ForeignKey("homework.id", ondelete="CASCADE"), nullable=False)
-    file_name = Column(String(255), nullable=False)
+    file_name = Column(NVARCHAR(255), nullable=False)
     file_path = Column(String(500), nullable=False)
     file_type = Column(String(50), nullable=True)
     file_size_kb = Column(Integer, nullable=True)

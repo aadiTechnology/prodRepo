@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy.dialects.mssql import NVARCHAR
 
 from app.core.database import Base
 
@@ -10,8 +11,8 @@ class Notice(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="NO ACTION"), nullable=False)
-    title = Column(String(255), nullable=False)
-    description = Column(Text, nullable=False)
+    title = Column(NVARCHAR(255), nullable=False)
+    description = Column(NVARCHAR(length=None), nullable=False)
     notice_type = Column(String(30), nullable=False)
     audience_type = Column(String(30), nullable=False)
     status = Column(String(20), nullable=False, default="DRAFT")
