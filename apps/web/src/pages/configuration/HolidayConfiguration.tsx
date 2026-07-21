@@ -98,7 +98,7 @@ function useHolidayListController() {
       return holidayApi.delete(id);
     },
     onSuccess: async () => {
-      enqueueSnackbar("Holiday deleted successfully", {
+      enqueueSnackbar("Holiday deleted successfully.", {
         variant: "success",
         autoHideDuration: 3000,
         anchorOrigin: { vertical: "top", horizontal: "center" },

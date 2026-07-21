@@ -517,14 +517,14 @@ export function useHolidayFormController() {
       const payload = buildHolidayCreatePayload(formData);
       if (isEditMode && holidayId) {
         await updateMutation.mutateAsync({ editId: holidayId, payload });
-        enqueueSnackbar("Holiday updated successfully", {
+        enqueueSnackbar("Holiday updated successfully.", {
           variant: "success",
           autoHideDuration: 3000,
           anchorOrigin: { vertical: "top", horizontal: "center" },
         });
       } else {
         await createMutation.mutateAsync(payload);
-        enqueueSnackbar("Holiday created successfully", {
+        enqueueSnackbar("Holiday created successfully.", {
           variant: "success",
           autoHideDuration: 3000,
           anchorOrigin: { vertical: "top", horizontal: "center" },
