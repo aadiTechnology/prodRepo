@@ -1,64 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
-import {
-  Alert,
-  AlertTitle,
-  alpha,
-  Box,
-  Button as MuiButton,
-  FormControl,
-  InputAdornment,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  TextField,
-} from "@mui/material";
-import { Add as AddIcon, Search as SearchIcon } from "@mui/icons-material";
+import { Alert, AlertTitle, Box, Button as MuiButton, Typography } from "@mui/material";
+import { Add as AddIcon } from "@mui/icons-material";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import { useSnackbar } from "notistack";
 
 import { PageHeader } from "../../components/layout";
-import { EntityTableSection, ListPageLayout, PrimaryActionButton, TableRowActions } from "../../components/reusable";
+import { EntityTableSection, ListPageLayout, ListPageToolbar } from "../../components/reusable";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
-import { colorTokens } from "../../tokens/colors";
 import { academicYearService } from "../../api/services/academicYearService";
-import holidayApi, { HolidayListItem, holidayInclusiveDayCount, parseHolidayDateRange } from "../../services/holidayApi";
+import holidayApi, { HolidayListItem } from "../../services/holidayApi";
 import { useAuth } from "../../context/AuthContext";
 import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
-
-function createHolidayTableColumns() {
-  return [
-    { id: "holiday_name", label: "Holiday Name", field: "holiday_name" },
-    {
-      id: "start_date",
-      label: "Start Date",
-      render: (row: HolidayListItem) => {
-        const { start } = parseHolidayDateRange(row.holiday_date);
-        return start || "—";
-      },
-    },
-    {
-      id: "end_date",
-      label: "End Date",
-      render: (row: HolidayListItem) => {
-        const { start, end } = parseHolidayDateRange(row.holiday_date);
-        return end && end !== start ? end : start || "—";
-      },
-    },
-    {
-      id: "total_days",
-      label: "Total Days",
-      render: (row: HolidayListItem) =>
-        row.total_days != null ? String(row.total_days) : String(holidayInclusiveDayCount(row.holiday_date)),
-    },
-    { id: "applicable_for", label: "Applicable For", field: "applicable_for" },
-  ];
-}
+import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
+import { createHolidayListConfig } from "./HolidayConfiguration.listConfig";
 
 function useHolidayListController() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const queryClient = useQueryClient();
@@ -192,8 +149,6 @@ function useHolidayListController() {
   const rows: HolidayListItem[] = holidaysQuery.data?.data ?? [];
   const total = holidaysQuery.data?.total ?? 0;
 
-  const columns = useMemo(() => createHolidayTableColumns(), []);
-
   const retryAcademicYears = () => {
     void academicYearsQuery.refetch();
   };
@@ -230,8 +185,12 @@ function useHolidayListController() {
     lastDeleteAttemptIdRef.current = null;
   };
 
+  const academicYearOptions = useMemo(
+    () => academicYears.map((year) => ({ label: year.name, value: String(year.id) })),
+    [academicYears],
+  );
+
   return {
-    navigate,
     hasTenantContext,
     search,
     setSearch,
@@ -242,12 +201,11 @@ function useHolidayListController() {
     rowsPerPage,
     setRowsPerPage,
     academicYearsQuery,
-    academicYears,
+    academicYearOptions,
     holidaysQuery,
     loading,
     rows,
     total,
-    columns,
     deleteMutation,
     deleteTarget,
     setDeleteTarget,
@@ -261,6 +219,22 @@ function useHolidayListController() {
 
 export default function HolidayConfiguration() {
   const controller = useHolidayListController();
+  const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
+  const breadcrumbLinks = buildListBreadcrumbs("Holiday List");
+
+  const listConfig = useMemo(
+    () =>
+      createHolidayListConfig({
+        navigate: navigateWithConfigHub,
+        selectedAcademicYearId: controller.selectedAcademicYearId,
+        onDeleteClick: controller.setDeleteTarget,
+      }),
+    [controller.selectedAcademicYearId, controller.setDeleteTarget, navigateWithConfigHub],
+  );
+
+  const academicYearFilterValue =
+    controller.selectedAcademicYearId === "" ? "" : String(controller.selectedAcademicYearId);
+
   return (
     <ListPageLayout
       pageBackground
@@ -268,119 +242,62 @@ export default function HolidayConfiguration() {
       header={
         <>
           <PageHeader
-            links={[{ title: "Holiday list", path: "#" }]}
+            links={breadcrumbLinks}
             homePath="/"
             actions={
-              <Box
-                sx={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  gap: 2,
-                  width: "100%",
-                  justifyContent: "space-between",
-                }}
-              >
-                <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 220 } }}>
-                  <InputLabel id="holiday-academic-year-label">Academic Year</InputLabel>
-                  <Select
-                    labelId="holiday-academic-year-label"
-                    id="holiday-academic-year-select"
-                    label="Academic Year"
-                    value={controller.selectedAcademicYearId}
-                    displayEmpty
-                    disabled={controller.academicYearsQuery.isLoading || controller.academicYears.length === 0}
-                    renderValue={() => {
-                      if (controller.academicYearsQuery.isLoading) return null;
-                      if (controller.academicYears.length === 0) return null;
-                      const sel = controller.selectedAcademicYearId;
-                      if (sel === "" || sel === undefined) return null;
-                      const year = controller.academicYears.find((y) => y.id === sel);
-                      return year?.name ?? "";
-                    }}
-                    onChange={(e) => controller.setSelectedAcademicYearId(Number(e.target.value))}
-                  >
-                    <MenuItem value="" sx={{ display: "none" }} aria-hidden>
-                      &nbsp;
-                    </MenuItem>
-                    {controller.academicYears.map((year) => (
-                      <MenuItem key={year.id} value={year.id}>
-                        {year.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1, justifyContent: "flex-end", minWidth: 0 }}>
-                  <TextField
-                    placeholder="Search holidays..."
-                    value={controller.search}
-                    onChange={(e) => controller.setSearch(e.target.value)}
-                    variant="outlined"
-                    size="small"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchIcon sx={(theme) => ({ color: theme.palette.grey[500], fontSize: 20 })} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={(theme) => ({
-                      width: { xs: "100%", sm: 280 },
-                      maxWidth: "100%",
-                      "& .MuiOutlinedInput-root": {
-                        bgcolor: "#ffffff",
-                        borderRadius: "15px",
-                        fontSize: "0.85rem",
-                        fontWeight: 600,
-                        "& fieldset": { borderColor: colorTokens.border.subtle },
-                        "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
-                        "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
-                      },
-                    })}
-                  />
-                  <PrimaryActionButton
-                    onClick={() => controller.navigate("/academics/configuration/holidays/new")}
-                    icon={<AddIcon sx={{ fontSize: 24 }} />}
-                    label="Add Holiday"
-                  />
-                </Stack>
-              </Box>
+              <ListPageToolbar
+                searchValue={controller.search}
+                onSearchChange={controller.setSearch}
+                searchPlaceholder="Search holidays..."
+                filters={[
+                  {
+                    label: "Academic Year",
+                    value: academicYearFilterValue,
+                    onChange: (value) => controller.setSelectedAcademicYearId(value ? Number(value) : ""),
+                    options: controller.academicYearOptions,
+                    disabled:
+                      controller.academicYearsQuery.isLoading || controller.academicYearOptions.length === 0,
+                  },
+                ]}
+                onAddClick={() => navigateWithConfigHub("/academics/configuration/holidays/new")}
+                addLabel="Add Holiday"
+                addIcon={<AddIcon sx={{ fontSize: 24 }} />}
+              />
             }
           />
-        </>
-      }
-    >
-      <Box sx={{ px: 2, pb: 2 }}>
-        <Stack spacing={2}>
-          {controller.holidaysQuery.isError && (
+
+          {controller.holidaysQuery.isError ? (
+            <Box sx={{ m: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+              <Typography variant="body2" color="error">
+                {listConfig.uiPolicy.errorFallbackMessage}
+              </Typography>
+              <MuiButton
+                variant="outlined"
+                color="error"
+                size="small"
+                aria-label="Retry loading holidays"
+                onClick={controller.retryHolidays}
+                disabled={controller.loading}
+              >
+                {listConfig.uiPolicy.retryLabel}
+              </MuiButton>
+            </Box>
+          ) : null}
+
+          {controller.academicYearsQuery.isError ? (
             <Alert
               severity="error"
-              sx={{ mb: 0 }}
-              action={
-                <>
-                  <MuiButton size="small" aria-label="Retry loading holidays" onClick={controller.retryHolidays}>
-                    Retry
-                  </MuiButton>
-                  <MuiButton size="small" aria-label="Dismiss holidays error" onClick={controller.dismissHolidaysError}>
-                    Dismiss
-                  </MuiButton>
-                </>
-              }
-            >
-              <AlertTitle>Failed to load holidays</AlertTitle>
-              Try again or adjust your filters.
-            </Alert>
-          )}
-          {controller.academicYearsQuery.isError && (
-            <Alert
-              severity="error"
-              sx={{ mb: 0 }}
+              sx={{ m: 2 }}
               action={
                 <>
                   <MuiButton size="small" aria-label="Retry loading academic years" onClick={controller.retryAcademicYears}>
                     Retry
                   </MuiButton>
-                  <MuiButton size="small" aria-label="Dismiss academic years error" onClick={controller.dismissAcademicYearsError}>
+                  <MuiButton
+                    size="small"
+                    aria-label="Dismiss academic years error"
+                    onClick={controller.dismissAcademicYearsError}
+                  >
                     Dismiss
                   </MuiButton>
                 </>
@@ -389,57 +306,45 @@ export default function HolidayConfiguration() {
               <AlertTitle>Failed to load academic years</AlertTitle>
               Holiday list requires an academic year selection.
             </Alert>
-          )}
-          {!controller.hasTenantContext && (
-            <Alert severity="warning" sx={{ mb: 0 }}>
+          ) : null}
+
+          {!controller.hasTenantContext ? (
+            <Alert severity="warning" sx={{ m: 2 }}>
               This page requires tenant context. Switch to a tenant account (or impersonate a tenant) to configure holidays.
             </Alert>
-          )}
-        </Stack>
+          ) : null}
+        </>
+      }
+    >
+      <EntityTableSection<HolidayListItem>
+        label="Holiday List"
+        showInfoBar={false}
+        totalRows={controller.total}
+        page={controller.page}
+        rowsPerPage={controller.rowsPerPage}
+        onPageChange={controller.setPage}
+        onRowsPerPageChange={(value) => {
+          controller.setRowsPerPage(value);
+          controller.setPage(0);
+        }}
+        columns={listConfig.columns}
+        data={controller.rows}
+        loading={controller.loading}
+        emptyMessage={listConfig.uiPolicy.emptyMessage}
+        rowActions={listConfig.actions.rowActions}
+        stickyHeader
+        size="small"
+      />
 
-        <Box sx={{ mt: 3 }}>
-          <EntityTableSection<HolidayListItem>
-            label="Holidays"
-            totalRows={controller.total}
-            page={controller.page}
-            rowsPerPage={controller.rowsPerPage}
-            onPageChange={controller.setPage}
-            onRowsPerPageChange={(value) => {
-              controller.setRowsPerPage(value);
-              controller.setPage(0);
-            }}
-            columns={controller.columns}
-            data={controller.rows}
-            loading={controller.loading}
-            emptyMessage="No holidays found"
-            renderRowActions={(row) => (
-              <Box sx={{ display: "flex", alignItems: "center" }}>
-                <TableRowActions
-                  onEdit={() =>
-                    controller.navigate(
-                      controller.selectedAcademicYearId !== ""
-                        ? `/academics/configuration/holidays/${row.id}/edit?academic_year_id=${controller.selectedAcademicYearId}`
-                        : `/academics/configuration/holidays/${row.id}/edit`,
-                    )
-                  }
-                  onDelete={() => controller.setDeleteTarget(row)}
-                />
-              </Box>
-            )}
-            stickyHeader
-            size="small"
-          />
-        </Box>
-      </Box>
       <ConfirmDialog
         open={!!controller.deleteTarget}
-        title="Delete Holiday"
+        title="Please Confirm"
         message={
           controller.deleteTarget
-            ? `Delete "${controller.deleteTarget.holiday_name}"? This action cannot be undone.`
-            : "Delete selected holiday?"
+            ? `Are you sure you want to delete "${controller.deleteTarget.holiday_name}"?`
+            : "Are you sure you want to delete this holiday?"
         }
-        confirmText="Delete"
+        confirmText={controller.deleteMutation.isPending ? "Deleting…" : "Confirm"}
         onCancel={controller.dismissDeleteDialog}
         onConfirm={() => {
           if (!controller.deleteTarget) return;
