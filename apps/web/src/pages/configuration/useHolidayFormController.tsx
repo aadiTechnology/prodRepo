@@ -8,7 +8,7 @@ import { academicYearService } from "../../api/services/academicYearService";
 import schoolClassService from "../../api/services/schoolClassService";
 import holidayApi, { type HolidayCreatePayload, type HolidayUpdatePayload } from "../../services/holidayApi";
 import ApplicableToClassSelector from "../../components/reusable/ApplicableToClassSelector";
-import { Box, Typography } from "../../components/primitives";
+import { Typography } from "../../components/primitives";
 import type { SelectOption } from "../Communication/CreateNotice.formConfig";
 import { useFormManager, type DependentFieldPair } from "../../hooks/useFormManager";
 import { mapApiErrorsToFields, type FormValidationConfig } from "../../utils/formValidation";
@@ -471,34 +471,28 @@ export function useHolidayFormController() {
   );
 
   const associatedClassesSlot = useMemo(
-    () => (
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-          Associated classes
+    () =>
+      usesClassAudience ? (
+        <ApplicableToClassSelector
+          applicableTo={applicableTo}
+          isApplicableSelectAll={isApplicableSelectAll}
+          isClassSelectAll={isClassSelectAll}
+          classDivisionMap={classDivisionMap}
+          selectedClassIds={formData.class_ids}
+          selectedDivisionIds={formData.division_ids}
+          error={fieldErrors.class_ids ?? null}
+          onApplicableSelectAll={handleApplicableSelectAll}
+          onApplicableRoleToggle={handleApplicableRoleToggle}
+          onClassSelectAll={handleClassSelectAll}
+          onClassToggle={handleClassToggle}
+          onDivisionToggle={handleDivisionToggle}
+          hideApplicableRoleControls
+        />
+      ) : (
+        <Typography variant="body2" color="text.secondary">
+          This holiday is not scoped to classes (e.g. teachers or admin only).
         </Typography>
-        {usesClassAudience ? (
-          <ApplicableToClassSelector
-            applicableTo={applicableTo}
-            isApplicableSelectAll={isApplicableSelectAll}
-            isClassSelectAll={isClassSelectAll}
-            classDivisionMap={classDivisionMap}
-            selectedClassIds={formData.class_ids}
-            selectedDivisionIds={formData.division_ids}
-            error={fieldErrors.class_ids ?? null}
-            onApplicableSelectAll={handleApplicableSelectAll}
-            onApplicableRoleToggle={handleApplicableRoleToggle}
-            onClassSelectAll={handleClassSelectAll}
-            onClassToggle={handleClassToggle}
-            onDivisionToggle={handleDivisionToggle}
-            hideApplicableRoleControls
-          />
-        ) : (
-          <Typography variant="body2" color="text.secondary">
-            This holiday is not scoped to classes (e.g. teachers or admin only).
-          </Typography>
-        )}
-      </Box>
-    ),
+      ),
     [
       applicableTo,
       classDivisionMap,
