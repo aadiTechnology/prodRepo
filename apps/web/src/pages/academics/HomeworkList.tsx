@@ -58,7 +58,10 @@ import {
   renderHomeworkRowActions,
   type HomeworkRow,
 } from "./HomeworkList.listConfig";
-import { isDraftHomeworkStatus } from "../../utils/homeworkStatus";
+import {
+  getHomeworkStatusChipProps,
+  isDraftHomeworkStatus,
+} from "../../utils/homeworkStatus";
 
 // Subject pill color helper
 const getSubjectColor = (subjectName: string | null) => {
@@ -291,6 +294,7 @@ export default function HomeworkList() {
     onDeleteClick: controller.handleDeleteClick,
     canEdit: hasPermission("HOMEWORK_MGMT:edit"),
     canDelete: hasPermission("HOMEWORK_MGMT:delete"),
+    showStatusColumn: !controller.readOnlyAudience,
     emptyMessage: controller.readOnlyAudience
       ? "No homework assigned for your class yet."
       : "No homework found. Click 'Assign Homework' to create one.",
@@ -767,7 +771,8 @@ export default function HomeworkList() {
                 ) : (
                 <Grid container spacing={{ xs: 1.5, sm: 2, md: 2.5 }}>
                 {paginatedHomeworkList.map((hw) => {
-                  const statusLabel = isDraftHomeworkStatus(hw.status) ? "Draft" : "Active";
+                  const { label: statusLabel, color: statusColor, variant: statusVariant } =
+                    getHomeworkStatusChipProps(hw.status);
                   const subColor = getSubjectColor(hw.subject_name);
 
                   return (
@@ -821,24 +826,14 @@ export default function HomeworkList() {
                                 height: 24,
                               }}
                             />
-                            <Chip
-                              label={statusLabel}
-                              size="small"
-                              sx={{
-                                fontWeight: "inherit",
-                                fontSize: "0.7rem",
-                                borderRadius: "8px",
-                                bgcolor:
-                                  statusLabel === "Draft"
-                                    ? alpha(colorTokens.text.secondary, 0.1)
-                                    : alpha(colorTokens.success.main, 0.1),
-                                color:
-                                  statusLabel === "Draft"
-                                    ? colorTokens.text.secondary
-                                    : colorTokens.success.main,
-                                height: 24,
-                              }}
-                            />
+                            {!controller.readOnlyAudience ? (
+                              <Chip
+                                label={statusLabel}
+                                size="small"
+                                color={statusColor}
+                                variant={statusVariant}
+                              />
+                            ) : null}
                           </Box>
 
                           {/* Homework Title */}

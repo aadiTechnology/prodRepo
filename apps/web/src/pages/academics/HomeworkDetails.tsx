@@ -26,21 +26,15 @@ import { ListPageLayout } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
 import { useRBAC } from "../../context/RBACContext";
 import { homeworkService, type HomeworkResponse } from "../../api/services/homeworkService";
-import { isDraftHomeworkStatus } from "../../utils/homeworkStatus";
+import { getHomeworkStatusChipProps } from "../../utils/homeworkStatus";
 import { notifyHomeworkUnreadChanged } from "../../utils/homeworkUnreadEvents";
 import { apiBaseUrl } from "../../config/env";
 import { colorTokens } from "../../tokens/colors";
 
-// Status helpers
-type DisplayStatus = "Draft" | "Active";
-
-function computeDisplayStatus(hw: HomeworkResponse): DisplayStatus {
-  if (isDraftHomeworkStatus(hw.status)) return "Draft";
-  return "Active";
-}
-
-function statusChipColor(ds: DisplayStatus): "default" | "success" {
-  return ds === "Draft" ? "default" : "success";
+// Status helpers — same chip styling as Notice list / Activity Gallery
+function HomeworkStatusChip({ status }: { status: string }) {
+  const { label, color, variant } = getHomeworkStatusChipProps(status);
+  return <Chip label={label} color={color} variant={variant} size="small" />;
 }
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -187,7 +181,6 @@ export default function HomeworkDetails() {
     );
   }
 
-  const displayStatus = computeDisplayStatus(hw);
   const classLabel = [hw.class_name, hw.division_name].filter(Boolean).join(" - ");
 
   return (
@@ -235,10 +228,7 @@ export default function HomeworkDetails() {
                   </Typography>
                 </Stack>
                 <Stack direction="row" gap={1} sx={{ mt: 1 }} alignItems="center" flexWrap="wrap">
-                  <Chip label={displayStatus} color={statusChipColor(displayStatus)} size="small" />
-                  <Typography variant="caption" sx={{ color: colorTokens.text.secondary }}>
-                    {hw.status}
-                  </Typography>
+                  <HomeworkStatusChip status={hw.status} />
                 </Stack>
               </Box>
               <Typography

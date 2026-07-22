@@ -293,7 +293,6 @@ def create_homework(
     normalized_status = normalize_homework_status(hw_status)
     db_status = to_db_homework_status(normalized_status)
     published_at = now if normalized_status == HOMEWORK_STATUS_ACTIVE else None
-    effective_submission_date = submission_date if submission_date is not None else assigned_date
 
     hw = Homework(
         tenant_id=tenant_id,
@@ -305,7 +304,7 @@ def create_homework(
         title=title,
         instructions=instructions,
         assigned_date=assigned_date,
-        submission_date=effective_submission_date,
+        submission_date=submission_date,
         status=db_status,
         notify_parents=notify_parents,
         published_at=published_at,
@@ -331,9 +330,6 @@ def update_homework(
         app_status = normalize_homework_status(str(update_data["status"]))
         update_data["status"] = to_db_homework_status(app_status)
         publish_now = app_status == HOMEWORK_STATUS_ACTIVE
-
-    if "submission_date" in update_data and update_data["submission_date"] is None:
-        update_data["submission_date"] = update_data.get("assigned_date", hw.assigned_date)
 
     for key, value in update_data.items():
         setattr(hw, key, value)

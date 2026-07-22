@@ -4,7 +4,7 @@ import TableRowActions from "../../components/reusable/TableRowActions";
 import type { HomeworkResponse } from "../../api/services/homeworkService";
 import { formatHomeworkClassLabel } from "./AddHomework.formConfig";
 import { isHomeworkEditDeleteAllowed } from "../../utils/homeworkEditWindow";
-import { isDraftHomeworkStatus } from "../../utils/homeworkStatus";
+import { getHomeworkStatusChipProps } from "../../utils/homeworkStatus";
 
 export type HomeworkRow = HomeworkResponse;
 
@@ -17,17 +17,6 @@ function formatDate(dateStr: string | null | undefined): string {
   });
 }
 
-function computeDisplayStatus(row: HomeworkRow): {
-  label: string;
-  color: "default" | "success" | "error" | "warning";
-  variant: "filled" | "outlined";
-} {
-  if (isDraftHomeworkStatus(row.status)) {
-    return { label: "Draft", color: "default", variant: "outlined" };
-  }
-  return { label: "Active", color: "success", variant: "filled" };
-}
-
 type HomeworkListConfigArgs = {
   navigate: (path: string) => void;
   onDeleteClick?: (row: HomeworkRow) => void;
@@ -35,6 +24,8 @@ type HomeworkListConfigArgs = {
   canEdit?: boolean;
   canDelete?: boolean;
   emptyMessage?: string;
+  /** Hide status column for student/parent read-only audience. */
+  showStatusColumn?: boolean;
 };
 
 export const createHomeworkListConfig = ({
@@ -44,6 +35,7 @@ export const createHomeworkListConfig = ({
   canEdit = true,
   canDelete = true,
   emptyMessage = "No homework found. Click 'Assign Homework' to create one.",
+  showStatusColumn = true,
 }: HomeworkListConfigArgs): ListConfig<HomeworkRow> => ({
   columns: [
     {
@@ -81,23 +73,27 @@ export const createHomeworkListConfig = ({
       label: "Submission",
       render: (row: HomeworkRow) => formatDate(row.submission_date),
     },
-    {
-      id: "status",
-      label: "Status",
-      align: "center",
-      headerAlign: "center",
-      render: (row: HomeworkRow) => {
-        const { label, color, variant } = computeDisplayStatus(row);
-        return (
-          <Chip
-            label={label}
-            size="small"
-            color={color}
-            variant={variant}
-          />
-        );
-      },
-    },
+    ...(showStatusColumn
+      ? [
+          {
+            id: "status",
+            label: "Status",
+            align: "center" as const,
+            headerAlign: "center" as const,
+            render: (row: HomeworkRow) => {
+              const { label, color, variant } = getHomeworkStatusChipProps(row.status);
+              return (
+                <Chip
+                  label={label}
+                  size="small"
+                  color={color}
+                  variant={variant}
+                />
+              );
+            },
+          },
+        ]
+      : []),
     {
       id: "teacher_name",
       label: "Teacher",

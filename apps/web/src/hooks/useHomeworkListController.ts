@@ -294,7 +294,7 @@ export function useHomeworkListController() {
     deleteLoading,
     statusOptions: [
       { label: "Draft", value: "Draft" },
-      { label: "Active", value: "Active" },
+      { label: "Published", value: "Active" },
     ],
     readOnlyAudience,
     isTeacherScoped,

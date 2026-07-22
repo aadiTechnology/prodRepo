@@ -152,6 +152,14 @@ def _raise_homework_integrity(exc: IntegrityError) -> None:
             + (f" Detail: {hint}" if hint else "")
         ) from exc
 
+    if "cannot insert the value null" in db_err and "submission_date" in db_err:
+        raise ValidationException(
+            "Submission date is optional, but the database still requires it. "
+            "Run migration e5f6a7b8c9d0 or scripts/homework_submission_date_nullable.sql "
+            "on SQL Server to allow NULL submission_date."
+            + (f" Detail: {hint}" if hint else "")
+        ) from exc
+
     if "ck_homework_dates" in db_err or (
         "check constraint" in db_err and "submission_date" in db_err
     ):
