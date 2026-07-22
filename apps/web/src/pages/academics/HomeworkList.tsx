@@ -28,7 +28,8 @@ import {
   CalendarMonth as CalendarIcon,
   Book as SubjectIcon,
   Person as PersonIcon,
-  CheckCircle as ActiveIcon,
+  DoneAll as ReadIcon,
+  MarkEmailUnread as UnreadIcon,
   ChevronRight as ViewIcon,
   Download as DownloadIcon,
   ViewList as ListIcon,
@@ -58,10 +59,7 @@ import {
   renderHomeworkRowActions,
   type HomeworkRow,
 } from "./HomeworkList.listConfig";
-import {
-  getHomeworkStatusChipProps,
-  isDraftHomeworkStatus,
-} from "../../utils/homeworkStatus";
+import { getHomeworkStatusChipProps } from "../../utils/homeworkStatus";
 
 // Subject pill color helper
 const getSubjectColor = (subjectName: string | null) => {
@@ -237,37 +235,37 @@ export default function HomeworkList() {
     });
   }, [controller.homework, selectedChild]);
 
-  // Compute metrics and active ratio
+  // Compute metrics: total, read (seen), not seen (unread)
   const stats = useMemo(() => {
     const list = filteredHomeworkByChild;
-    const totalCount = list.length;
-
-    let activeCount = 0;
+    let readCount = 0;
+    let unreadCount = 0;
     const subjects = new Set<string>();
 
     list.forEach((h) => {
       if (h.subject_name) {
         subjects.add(h.subject_name);
       }
-      if (!isDraftHomeworkStatus(h.status)) {
-        activeCount += 1;
+      if (h.is_viewed) {
+        readCount += 1;
+      } else {
+        unreadCount += 1;
       }
     });
 
-    const activeRatio = totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0;
-
     return {
-      total: totalCount,
-      active: activeCount,
+      total: list.length,
+      read: readCount,
+      unread: unreadCount,
       subjectsCount: subjects.size,
-      activeRatio,
     };
   }, [filteredHomeworkByChild]);
 
-  // Filter homework by tab (All, Active)
+  // Filter homework by tab (All, Not Seen, Read)
   const finalHomeworkList = useMemo(() => {
     return filteredHomeworkByChild.filter((h) => {
-      if (tabValue === 1) return !isDraftHomeworkStatus(h.status);
+      if (tabValue === 1) return !h.is_viewed;
+      if (tabValue === 2) return Boolean(h.is_viewed);
       return true;
     });
   }, [filteredHomeworkByChild, tabValue]);
@@ -431,6 +429,7 @@ export default function HomeworkList() {
               gridTemplateColumns: {
                 xs: "1fr",
                 sm: "repeat(2, 1fr)",
+                md: "repeat(3, 1fr)",
               },
               gap: { xs: 1.5, sm: 2 },
             }}
@@ -493,7 +492,7 @@ export default function HomeworkList() {
               </Stack>
             </AppCard>
 
-            {/* Active / Due Soon Card */}
+            {/* Read (Seen) Card */}
             <AppCard
               sx={{
                 height: "100%",
@@ -535,17 +534,75 @@ export default function HomeworkList() {
                     flexShrink: 0,
                   }}
                 >
-                  <ActiveIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
+                  <ReadIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
                 </Box>
                 <Box flex={1} minWidth={0}>
                   <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', fontSize: '0.65rem' }}>
-                    Active
+                    Read
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 0.5, fontSize: '1.65rem', lineHeight: 1.1 }}>
-                    {stats.active}
+                    {stats.read}
                   </Typography>
                   <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.success.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
-                    Due soon
+                    Seen
+                  </Typography>
+                </Box>
+              </Stack>
+            </AppCard>
+
+            {/* Not Seen (Unread) Card */}
+            <AppCard
+              sx={{
+                height: "100%",
+                background: `linear-gradient(135deg, ${alpha(colorTokens.warning.main, 0.14)} 0%, ${alpha(colorTokens.warning.main, 0.06)} 100%)`,
+                border: `1.5px solid ${alpha(colorTokens.warning.main, 0.35)}`,
+                position: "relative",
+                overflow: "hidden",
+                transition: "all 0.25s ease",
+                "&:hover": {
+                  transform: "translateY(-4px)",
+                  boxShadow: `0 12px 24px ${alpha(colorTokens.warning.main, 0.2)}`,
+                  borderColor: alpha(colorTokens.warning.main, 0.45),
+                },
+                "&::before": {
+                  content: '""',
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  width: "100px",
+                  height: "100px",
+                  background: `radial-gradient(circle at top right, ${alpha(colorTokens.warning.main, 0.15)}, transparent 70%)`,
+                  pointerEvents: "none",
+                }
+              }}
+              paddingSize="dense"
+            >
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "16px",
+                    bgcolor: alpha(colorTokens.warning.main, 0.22),
+                    color: colorTokens.warning.main,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: `inset 0 0 0 1.5px ${alpha(colorTokens.warning.main, 0.3)}`,
+                    flexShrink: 0,
+                  }}
+                >
+                  <UnreadIcon sx={{ fontSize: 32, fontWeight: "bold" }} />
+                </Box>
+                <Box flex={1} minWidth={0}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: colorTokens.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', fontSize: '0.65rem' }}>
+                    Not Seen
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: colorTokens.text.primary, mt: 0.5, fontSize: '1.65rem', lineHeight: 1.1 }}>
+                    {stats.unread}
+                  </Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: colorTokens.warning.main, display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
+                    Unread
                   </Typography>
                 </Box>
               </Stack>
@@ -598,7 +655,8 @@ export default function HomeworkList() {
                 }}
               >
                 <Tab label="All Tasks" />
-                <Tab label={`Active (${stats.active})`} />
+                <Tab label={`Not Seen (${stats.unread})`} />
+                <Tab label={`Read (${stats.read})`} />
               </Tabs>
               <Box
                 sx={{
@@ -693,7 +751,11 @@ export default function HomeworkList() {
                     mb: 1,
                   }}
                 >
-                  {tabValue === 1 ? "No Active Tasks" : "No Tasks Yet"}
+                  {tabValue === 1
+                    ? "No Unseen Tasks"
+                    : tabValue === 2
+                      ? "No Read Tasks Yet"
+                      : "No Tasks Yet"}
                 </Typography>
                 <Typography
                   variant="body2"
@@ -703,8 +765,10 @@ export default function HomeworkList() {
                   }}
                 >
                   {tabValue === 1
-                    ? "Great! You have no pending homework tasks."
-                    : "No homework has been assigned yet."}
+                    ? "You're all caught up — every homework has been opened."
+                    : tabValue === 2
+                      ? "Open a homework task to mark it as read."
+                      : "No homework has been assigned yet."}
                 </Typography>
               </Box>
             ) : viewMode === "list" ? (
