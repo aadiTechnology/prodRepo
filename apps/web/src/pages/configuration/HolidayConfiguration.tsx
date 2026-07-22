@@ -339,11 +339,7 @@ export default function HolidayConfiguration() {
       <ConfirmDialog
         open={!!controller.deleteTarget}
         title="Please Confirm"
-        message={
-          controller.deleteTarget
-            ? `Are you sure you want to delete "${controller.deleteTarget.holiday_name}"?`
-            : "Are you sure you want to delete this holiday?"
-        }
+        message="Are you sure you want to delete holiday?"
         confirmText={controller.deleteMutation.isPending ? "Deleting…" : "Confirm"}
         onCancel={controller.dismissDeleteDialog}
         onConfirm={() => {
