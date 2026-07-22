@@ -115,7 +115,8 @@ export default function NoticeList() {
       }
     >
       <EntityTableSection<Notice>
-        label="Notices"
+        label=""
+        showInfoBar={false}
         totalRows={c.totalRows}
         page={c.page}
         rowsPerPage={c.rowsPerPage}
