@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-from datetime import date, timedelta
-
 from fastapi import HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -29,7 +27,6 @@ from app.schemas.homework_schema import (
 from app.utils.homework_status import (
     HOMEWORK_STATUS_ACTIVE,
     from_db_homework_status,
-    is_draft_homework_status,
     normalize_homework_status,
 )
 
@@ -129,10 +126,14 @@ def get_viewer_context(
 
 
 # ---------------------------------------------------------------------------
-# Edit/delete window
+# Edit/delete gate (no assigned-date lock)
 # ---------------------------------------------------------------------------
 
-HOMEWORK_EDIT_DELETE_WINDOW_DAYS = 7
+
+def _assert_homework_editable(hw: Homework) -> None:
+    """Edit/delete allowed for any non-deleted homework (no assigned-date window)."""
+    _ = hw
+    return
 
 
 def _integrity_hint(exc: IntegrityError) -> str:
@@ -186,20 +187,6 @@ def _raise_homework_integrity(exc: IntegrityError) -> None:
         "Could not save homework due to a database constraint."
         + (f" Detail: {hint}" if hint else "")
     ) from exc
-
-
-def _assert_homework_editable(hw: Homework) -> None:
-    if is_draft_homework_status(hw.status):
-        return
-    cutoff = hw.assigned_date + timedelta(days=HOMEWORK_EDIT_DELETE_WINDOW_DAYS)
-    if date.today() >= cutoff:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Homework cannot be edited or deleted after "
-                f"{HOMEWORK_EDIT_DELETE_WINDOW_DAYS} days from the assigned date"
-            ),
-        )
 
 
 # ---------------------------------------------------------------------------
