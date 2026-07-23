@@ -118,7 +118,16 @@ def get_unread_count(
 ):
     """
     Active homework in the caller's role/class scope that they have not opened yet.
-    Optional filters (class/division/subject/year) narrow the badge for teachers.
+
+    Scope (from viewer_context):
+      - tenant admin / admin: all homework in tenant
+      - class teacher: all subjects for assigned class/division
+      - subject teacher: only assigned subjects
+      - student / parent: their class/division only
+
+    When academic_year_id is omitted, defaults to the tenant's current academic year
+    so the sidebar badge is correct immediately on login (no need to open Homework list).
+    Optional class/division/subject filters further narrow the badge.
     """
     viewer_context = homework_service.get_viewer_context(
         db,

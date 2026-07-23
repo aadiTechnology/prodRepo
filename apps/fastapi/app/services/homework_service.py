@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 from datetime import date, timedelta
 
 from fastapi import HTTPException, status
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -256,6 +257,41 @@ def get_homework(
     return hw
 
 
+def resolve_current_academic_year_id(db: Session, tenant_id: int) -> Optional[int]:
+    """Current active year for tenant; falls back to latest active year."""
+    # Raw SQL: SQL Server BIT compares reliably with 0/1.
+    row = db.execute(
+        text(
+            """
+            SELECT TOP 1 id
+            FROM academic_years
+            WHERE tenant_id = :tenant_id
+              AND is_deleted = 0
+              AND is_active = 1
+              AND is_current = 1
+            ORDER BY start_date DESC, id DESC
+            """
+        ),
+        {"tenant_id": tenant_id},
+    ).first()
+    if row:
+        return int(row[0])
+    row = db.execute(
+        text(
+            """
+            SELECT TOP 1 id
+            FROM academic_years
+            WHERE tenant_id = :tenant_id
+              AND is_deleted = 0
+              AND is_active = 1
+            ORDER BY start_date DESC, id DESC
+            """
+        ),
+        {"tenant_id": tenant_id},
+    ).first()
+    return int(row[0]) if row else None
+
+
 def count_unread_homework(
     db: Session,
     *,
@@ -267,6 +303,10 @@ def count_unread_homework(
     subject_id: Optional[int] = None,
     academic_year_id: Optional[int] = None,
 ) -> int:
+    # Sidebar badge must match current-year list without waiting for HomeworkList filters.
+    effective_year_id = academic_year_id
+    if effective_year_id is None:
+        effective_year_id = resolve_current_academic_year_id(db, tenant_id)
     return repo.count_unread_homework(
         db,
         tenant_id=tenant_id,
@@ -274,7 +314,7 @@ def count_unread_homework(
         class_id=class_id,
         class_division_id=class_division_id,
         subject_id=subject_id,
-        academic_year_id=academic_year_id,
+        academic_year_id=effective_year_id,
         viewer_context=viewer_context,
     )
 

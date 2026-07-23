@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { homeworkService } from "../api/services/homeworkService";
-import {
-  HOMEWORK_UNREAD_CHANGED_EVENT,
-  type HomeworkUnreadFilters,
-} from "../utils/homeworkUnreadEvents";
+import { useAuth } from "../context/AuthContext";
+import { HOMEWORK_UNREAD_CHANGED_EVENT } from "../utils/homeworkUnreadEvents";
 
-function toOptionalNumber(value: string | number | null | undefined): number | undefined {
-  if (value == null || value === "") return undefined;
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-}
-
+/**
+ * Sidebar unread badge: role-scoped count for the current academic year.
+ * Backend defaults year when omitted. Refetches on user login and unread events.
+ */
 export function useHomeworkSidebarCount(enabled: boolean): number {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [count, setCount] = useState(0);
-  const [filters, setFilters] = useState<HomeworkUnreadFilters>({});
   const [refreshTick, setRefreshTick] = useState(0);
 
   const refresh = useCallback(() => {
@@ -22,21 +19,12 @@ export function useHomeworkSidebarCount(enabled: boolean): number {
 
   useEffect(() => {
     if (!enabled) return;
-
-    const onChanged = (event: Event) => {
-      const detail = (event as CustomEvent<HomeworkUnreadFilters>).detail;
-      if (detail && typeof detail === "object") {
-        setFilters(detail);
-      }
-      refresh();
-    };
-
-    window.addEventListener(HOMEWORK_UNREAD_CHANGED_EVENT, onChanged);
-    return () => window.removeEventListener(HOMEWORK_UNREAD_CHANGED_EVENT, onChanged);
+    window.addEventListener(HOMEWORK_UNREAD_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(HOMEWORK_UNREAD_CHANGED_EVENT, refresh);
   }, [enabled, refresh]);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || userId == null) {
       setCount(0);
       return;
     }
@@ -44,12 +32,7 @@ export function useHomeworkSidebarCount(enabled: boolean): number {
     let cancelled = false;
 
     homeworkService
-      .getUnreadCount({
-        class_id: toOptionalNumber(filters.classId),
-        class_division_id: toOptionalNumber(filters.divisionId),
-        subject_id: toOptionalNumber(filters.subjectId),
-        academic_year_id: toOptionalNumber(filters.academicYearId),
-      })
+      .getUnreadCount()
       .then((response) => {
         if (!cancelled) {
           setCount(response.count ?? 0);
@@ -64,7 +47,7 @@ export function useHomeworkSidebarCount(enabled: boolean): number {
     return () => {
       cancelled = true;
     };
-  }, [enabled, filters, refreshTick]);
+  }, [enabled, userId, refreshTick]);
 
   return count;
 }
