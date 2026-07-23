@@ -218,13 +218,35 @@ export function useHomeworkListController() {
     setPage(0);
   }, [search, statusFilter, classFilter, divisionFilter, subjectFilter, academicYearFilter]);
 
-  // Refresh sidebar badge after list filter load; do not push class/division
-  // into the badge (that made login count wrong until this page was opened).
+  // Keep sidebar badge aligned with list filters (class / division / status).
+  // Login / other pages still get full role-scoped count until this page opens.
   useEffect(() => {
     if (!academicYearFilterReady) return;
     if (isTeacherScoped && !teacherFiltersReady) return;
-    notifyHomeworkUnreadChanged();
-  }, [academicYearFilterReady, isTeacherScoped, teacherFiltersReady]);
+    notifyHomeworkUnreadChanged({
+      classId: classFilter || null,
+      divisionId: divisionFilter || null,
+      subjectId: subjectFilter || null,
+      academicYearId: academicYearFilter || null,
+      status: statusFilter || null,
+    });
+  }, [
+    academicYearFilterReady,
+    isTeacherScoped,
+    teacherFiltersReady,
+    classFilter,
+    divisionFilter,
+    subjectFilter,
+    academicYearFilter,
+    statusFilter,
+  ]);
+
+  // Leaving Homework list restores full role-scoped badge.
+  useEffect(() => {
+    return () => {
+      notifyHomeworkUnreadChanged({});
+    };
+  }, []);
 
   const handleDeleteClick = (row: HomeworkResponse) => {
     if (!isHomeworkEditDeleteAllowed(row)) {
