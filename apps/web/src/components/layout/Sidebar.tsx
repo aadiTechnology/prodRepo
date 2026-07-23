@@ -495,21 +495,30 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   );
   const noticeCount = useNoticeSidebarCount(hasNoticeMenu);
 
+  // Inline pill (not floating MUI Badge) so it sits left of the expand chevron.
   const renderMenuBadge = (count?: number) => {
     if (!count || count <= 0) return null;
     return (
-      <Badge
-        badgeContent={count > 99 ? "99+" : count}
-        color="error"
+      <Box
+        component="span"
         sx={{
-          "& .MuiBadge-badge": {
-            fontWeight: 800,
-            fontSize: "0.65rem",
-            minWidth: 18,
-            height: 18,
-          },
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minWidth: 20,
+          height: 18,
+          px: 0.6,
+          borderRadius: "9px",
+          bgcolor: "error.main",
+          color: "#fff",
+          fontWeight: 800,
+          fontSize: "0.65rem",
+          lineHeight: 1,
+          flexShrink: 0,
         }}
-      />
+      >
+        {count > 99 ? "99+" : count}
+      </Box>
     );
   };
 
@@ -639,18 +648,30 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                         <ListItemText
                           primary={item.label}
                           primaryTypographyProps={{ fontSize: "0.9rem", fontWeight: isActive ? 800 : 600 }}
+                          sx={{ flex: 1, minWidth: 0, pr: 0.5 }}
                         />
-                        {renderMenuBadge(itemBadgeCount)}
-                        {hasMenuChildren(item.children) && (
-                          <ExpandMoreIcon
-                            sx={{
-                              fontSize: 18,
-                              transition: "transform 0.3s ease",
-                              transform: isSectionExpanded ? "rotate(0deg)" : "rotate(-90deg)",
-                              color: alpha(colorTokens.sidebar.text.secondary, 0.4)
-                            }}
-                          />
-                        )}
+                        <Box
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 0.75,
+                            flexShrink: 0,
+                            ml: "auto",
+                          }}
+                        >
+                          {renderMenuBadge(itemBadgeCount)}
+                          {hasMenuChildren(item.children) && (
+                            <ExpandMoreIcon
+                              sx={{
+                                fontSize: 18,
+                                transition: "transform 0.3s ease",
+                                transform: isSectionExpanded ? "rotate(0deg)" : "rotate(-90deg)",
+                                color: alpha(colorTokens.sidebar.text.secondary, 0.55),
+                                flexShrink: 0,
+                              }}
+                            />
+                          )}
+                        </Box>
                       </>
                     )}
                   </NavItem>
