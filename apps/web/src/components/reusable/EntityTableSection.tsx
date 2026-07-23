@@ -63,7 +63,8 @@ export default function EntityTableSection<T extends object>({
   const rangeStart = totalRows > 0 ? Math.min(page * rowsPerPage + 1, totalRows) : 0;
   const rangeEnd = Math.min((page + 1) * rowsPerPage, totalRows);
   const shouldShowInfoBar = showInfoBar ?? totalRows > 0;
-  const shouldShowPagination = showPagination ?? totalRows > rowsPerPage;
+  // Always show when there is data so changing page size (20/25/50) does not hide controls.
+  const shouldShowPagination = showPagination ?? totalRows > 0;
 
   const resolvedRowActions: DataTableProps<T>["renderRowActions"] =
     renderRowActions ??

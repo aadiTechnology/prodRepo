@@ -275,7 +275,7 @@ export default function HomeworkList() {
     return finalHomeworkList.slice(start, start + listRowsPerPage);
   }, [finalHomeworkList, listPage, listRowsPerPage]);
 
-  const showAudiencePagination = finalHomeworkList.length > listRowsPerPage;
+  const showAudiencePagination = finalHomeworkList.length > 0;
 
   const audiencePaginationBar = showAudiencePagination ? (
     <TablePaginationBar
@@ -1136,6 +1136,7 @@ export default function HomeworkList() {
         <EntityTableSection<HomeworkRow>
           label=""
           showInfoBar={false}
+          showPagination={controller.total > 0}
           totalRows={controller.total}
           page={controller.page}
           rowsPerPage={controller.rowsPerPage}
