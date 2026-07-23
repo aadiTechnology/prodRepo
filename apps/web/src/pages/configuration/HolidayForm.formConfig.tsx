@@ -133,7 +133,7 @@ export function createHolidayFormConfig({
       },
       {
         kind: "fields",
-        grid: { xs: 12 },
+        grid: { xs: 12, sm: 6 },
         fieldNames: ["holiday_type"],
       },
       {
