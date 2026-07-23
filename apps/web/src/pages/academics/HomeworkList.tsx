@@ -1161,7 +1161,7 @@ export default function HomeworkList() {
       <ConfirmDialog
         open={controller.deleteDialogOpen}
         title="Delete Homework?"
-        message={`Are you sure you want to delete "${controller.selectedRow?.title}"? This action cannot be undone.`}
+        message="Are you sure you want to delete this Homework?"
         confirmText={controller.deleteLoading ? "Deleting..." : "Delete"}
         onConfirm={controller.handleConfirmDelete}
         onCancel={() => controller.setDeleteDialogOpen(false)}
