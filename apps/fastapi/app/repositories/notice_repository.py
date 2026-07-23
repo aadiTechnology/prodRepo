@@ -208,6 +208,8 @@ def count_unread_notices(
     tenant_id: int,
     user_id: int,
     viewer_context: NoticeViewerContext | None = None,
+    audience_type: str | None = None,
+    notice_type: str | None = None,
 ) -> int:
     """Published visible notices that this user has not opened yet."""
     where_sql = [
@@ -221,6 +223,14 @@ def count_unread_notices(
     params: dict = {"tenant_id": tenant_id, "user_id": user_id}
 
     _apply_consumer_visibility(where_sql, params, viewer_context)
+
+    if audience_type:
+        where_sql.append("n.audience_type = :audience_type")
+        params["audience_type"] = audience_type.strip().upper()
+    if notice_type:
+        where_sql.append("n.notice_type = :notice_type")
+        params["notice_type"] = notice_type.strip().upper()
+
     where_clause = " AND ".join(where_sql)
 
     sql = text(

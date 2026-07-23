@@ -79,9 +79,19 @@ async def get_notice_dropdown_options(
 
 @router.get("/unread-count", response_model=NoticeCountResponse)
 async def get_notice_unread_count(
+    audience_type: str | None = Query(None),
+    notice_type: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "view")),
 ):
+    """
+    Unread published notices in the caller's role scope:
+      - tenant admin: all notices
+      - teacher: teacher notices + student notices for class-teacher classes
+      - student/parent: notices targeted to their assigned class only
+
+    Optional audience_type / notice_type narrow the badge to match NoticeList filters.
+    """
     viewer_context = notice_service.get_viewer_context(
         db,
         tenant_id=current_user.tenant_id,
@@ -96,6 +106,8 @@ async def get_notice_unread_count(
             tenant_id=current_user.tenant_id,
             user_id=current_user.id,
             viewer_context=viewer_context,
+            audience_type=audience_type.upper() if audience_type else None,
+            notice_type=notice_type.upper() if notice_type else None,
         )
     )
 

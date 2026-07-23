@@ -163,8 +163,13 @@ def get_viewer_context(
     legacy_role: object,
     manage: bool = False,
 ) -> NoticeViewerContext:
-    if manage and is_admin_like(db, user_id, legacy_role, tenant_id):
-        return HomeworkViewerContext(kind="admin", scopes=(), published_only=False)
+    # Admins always see tenant-wide notices (even if also linked as a teacher).
+    if is_admin_like(db, user_id, legacy_role, tenant_id):
+        return HomeworkViewerContext(
+            kind="admin",
+            scopes=(),
+            published_only=not manage,
+        )
 
     ctx = resolve_notice_viewer_context(
         db,
@@ -176,6 +181,8 @@ def get_viewer_context(
     if ctx.kind != "teacher":
         return ctx
 
+    # Class teacher: TEACHER audience + STUDENT notices for assigned class/div.
+    # Subject-only teachers: TEACHER audience only (empty class-teacher scopes).
     class_teacher_targets = resolve_teacher_notice_target_pairs(
         db, tenant_id=tenant_id, user_id=user_id
     )
@@ -289,37 +296,27 @@ def count_unread_notices(
     tenant_id: int,
     user_id: int,
     viewer_context: NoticeViewerContext | None = None,
+    audience_type: str | None = None,
+    notice_type: str | None = None,
 ) -> int:
-    """Count list-visible notices that the current user has not opened."""
-    page = 0
-    size = 500
-    visible_ids: list[int] = []
+    """
+    Published notices visible to this user that they have not opened.
 
-    while True:
-        rows, total = notice_repository.list_notices(
-            db,
-            tenant_id=tenant_id,
-            search=None,
-            status=None,
-            audience_type=None,
-            notice_type=None,
-            is_published=None,
-            page=page,
-            size=size,
-            viewer_context=viewer_context,
-        )
-        visible_ids.extend(int(row["id"]) for row in rows)
-        if len(visible_ids) >= total or not rows:
-            break
-        page += 1
+    Scope (viewer_context):
+      - admin: all published notices in tenant
+      - teacher: TEACHER audience + STUDENT notices for class-teacher classes
+      - student/parent: STUDENT/ALL targeted to their class/division
 
-    viewed_ids = notice_repository.get_viewed_notice_ids(
+    Optional audience_type / notice_type match NoticeList toolbar filters.
+    """
+    return notice_repository.count_unread_notices(
         db,
         tenant_id=tenant_id,
         user_id=user_id,
-        notice_ids=visible_ids,
+        viewer_context=viewer_context,
+        audience_type=audience_type,
+        notice_type=notice_type,
     )
-    return sum(1 for notice_id in visible_ids if notice_id not in viewed_ids)
 
 
 def mark_notice_viewed(

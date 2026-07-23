@@ -119,6 +119,22 @@ export function useNoticeListController() {
     void fetchNotices();
   }, [fetchNotices]);
 
+  // Keep Communication sidebar badge aligned with list filters (instant).
+  useEffect(() => {
+    notifyNoticeCountChanged({
+      audienceType: audienceType || null,
+      noticeType: noticeType || null,
+      status: status || null,
+    });
+  }, [audienceType, noticeType, status]);
+
+  // Leaving Notice List restores full role-scoped badge.
+  useEffect(() => {
+    return () => {
+      notifyNoticeCountChanged({});
+    };
+  }, []);
+
   const statusFilterOptions = useMemo(() => {
     const raw = dropdowns?.status_types ?? [];
     const source: readonly NoticeStatus[] = raw.length > 0 ? raw : STATIC_STATUS_VALUES;
@@ -206,7 +222,11 @@ export function useNoticeListController() {
     try {
       setDeleteLoading(true);
       await noticeService.delete(noticeToDelete.id);
-      notifyNoticeCountChanged();
+      notifyNoticeCountChanged({
+        audienceType: audienceType || null,
+        noticeType: noticeType || null,
+        status: status || null,
+      });
       setSnackbar("Notice deleted successfully.");
       closeDeleteConfirm();
       await fetchNotices();
@@ -216,7 +236,7 @@ export function useNoticeListController() {
     } finally {
       setDeleteLoading(false);
     }
-  }, [closeDeleteConfirm, fetchNotices, noticeToDelete]);
+  }, [audienceType, closeDeleteConfirm, fetchNotices, noticeToDelete, noticeType, status]);
 
   const tableLoading = loading && allItems.length === 0;
 
