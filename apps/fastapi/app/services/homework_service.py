@@ -419,7 +419,7 @@ def delete_homework(
     hw = repo.get_homework(db, tenant_id=tenant_id, homework_id=homework_id)
     _assert_homework_editable(hw)
     repo.soft_delete_homework(db, hw=hw, user_id=user_id)
-    return {"message": "Homework deleted successfully"}
+    return {"message": "Homework deleted successfully."}
 
 
 # ---------------------------------------------------------------------------

@@ -262,7 +262,7 @@ export function useHomeworkListController() {
     try {
       setDeleteLoading(true);
       await homeworkService.delete(selectedRow.id);
-      setSuccess("Homework deleted successfully");
+      setSuccess("Homework deleted successfully.");
       setDeleteDialogOpen(false);
       fetchHomework();
       notifyHomeworkUnreadChanged();
