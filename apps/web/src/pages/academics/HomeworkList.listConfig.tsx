@@ -41,8 +41,19 @@ export const createHomeworkListConfig = ({
     {
       id: "title",
       label: "Title",
+      // Fix: long titles no longer stretch the homework list table wider
       render: (row: HomeworkRow) => (
-        <Box sx={{ whiteSpace: "nowrap" }}>{row.title}</Box>
+        <Box
+          sx={{
+            maxWidth: 280,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+          title={row.title}
+        >
+          {row.title}
+        </Box>
       ),
     },
     {
