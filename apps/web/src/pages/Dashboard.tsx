@@ -24,8 +24,8 @@ import {
 import {
   School as SchoolIcon,
   People as PeopleIcon,
-  MonetizationOn as MoneyIcon,
-  TrendingUp as TrendIcon,
+  // MonetizationOn as MoneyIcon, // restore with Collected Fees KPI
+  // TrendingUp as TrendIcon, // restore with Quick Administrative Actions
   AssignmentTurnedIn as AttendanceIcon,
   NotificationsActive as NoticeIcon,
   ArrowForward as ArrowIcon,
@@ -34,23 +34,23 @@ import {
   WatchLater as HalfDayIcon,
   CalendarToday as CalendarIcon,
   Class as ClassIcon,
-  LocalAtm as FeeIcon,
-  Warning as WarningIcon,
+  // LocalAtm as FeeIcon, // restore with Fee Collection / student fee KPI
+  // Warning as WarningIcon, // restore with Pending Balance KPI
   Refresh as RefreshIcon,
   AccessTime as AccessTimeIcon,
-  Star as StarIcon,
-  Call as CallIcon,
+  // Star as StarIcon, // restore with Admissions Lead Pipeline
+  // Call as CallIcon,
   AssignmentInd as AssignmentIndIcon,
-  ContactPhone as ContactPhoneIcon,
+  // ContactPhone as ContactPhoneIcon,
   Assignment as HomeworkIcon,
   MenuBook as SubjectIcon,
-  PersonAdd as PersonAddIcon,
+  // PersonAdd as PersonAddIcon, // restore with Admissions Lead Pipeline
   Person as PersonIcon,
   Email as EmailIcon,
   Edit as EditIcon,
   CheckBox as QuickMarkIcon,
   DragIndicator as DragHandleIcon,
-  HelpOutline as HelpOutlineIcon,
+  // HelpOutline as HelpOutlineIcon, // restore with Support icon
 } from "@mui/icons-material";
 import {
   DndContext,
@@ -73,7 +73,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useRBAC } from "../context/RBACContext";
-import { useSupportPermissions } from "../hooks/useSupportPermissions";
+// import { useSupportPermissions } from "../hooks/useSupportPermissions"; // restore with Support icon
 import dashboardService, {
   DashboardResponse,
   AdminDashboardData,
@@ -201,17 +201,17 @@ const kpiGridSx = (count: number) => {
   };
 };
 
-/** 2-column draggable grid — compact tiles + full-width rows. */
+/** 2-column draggable grid — square/rect tiles from sm; full-width rows via fullWidthIds. */
 const sortableGridSx = {
   display: "grid",
-  gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
-  gap: { xs: 2, md: 2.5 },
+  gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+  gap: { xs: 2, sm: 2, md: 2.5 },
   width: "100%",
   alignItems: "stretch",
 };
 
 const sortableGridFullSx = {
-  gridColumn: { xs: "1", md: "1 / -1" },
+  gridColumn: { xs: "1", sm: "1 / -1" },
 };
 
 const sortableGridTileSx = {
@@ -1167,7 +1167,7 @@ const NoticesCardContent: React.FC<{
             return (
               <Chip
                 key={tab.key}
-                label={tab.key === "holiday" ? `🏖 ${tab.label}` : tab.label}
+                label={tab.label}
                 size="small"
                 onClick={() => setActiveFilter(tab.key)}
                 sx={{
@@ -1207,7 +1207,9 @@ const WelcomeBanner: React.FC<{
   onRefresh: () => void;
   showSupport?: boolean;
   onSupportClick?: () => void;
-}> = ({ schoolName, lastLoginLabel, refreshing, onRefresh, showSupport, onSupportClick }) => {
+}> = ({ schoolName, lastLoginLabel, refreshing, onRefresh, showSupport: _showSupport, onSupportClick: _onSupportClick }) => {
+  void _showSupport;
+  void _onSupportClick;
   const today = new Date().toLocaleDateString("en-IN", {
     weekday: "long",
     year: "numeric",
@@ -1345,6 +1347,7 @@ const WelcomeBanner: React.FC<{
             </Typography>
           </Box>
         </Box>
+        {/* Support icon — temporarily hidden for tenant admin cleanup; restore when needed
         {showSupport && onSupportClick && (
           <Tooltip title="Support">
             <IconButton
@@ -1366,6 +1369,7 @@ const WelcomeBanner: React.FC<{
             </IconButton>
           </Tooltip>
         )}
+        */}
         <Tooltip title={refreshing ? "Syncing…" : "Refresh dashboard"}>
           <IconButton
             onClick={onRefresh}
@@ -1727,13 +1731,14 @@ interface AdminViewProps {
 const AdminDashboardView: React.FC<AdminViewProps> = ({
   data,
   attFilter,
-  feeFilter,
+  // feeFilter, onFeeFilterChange, feeOverride, feeCardLoading — restore with Fee Collection widget
+  feeFilter: _feeFilter,
   onAttFilterChange,
-  onFeeFilterChange,
+  onFeeFilterChange: _onFeeFilterChange,
   attOverride,
   attCardLoading = false,
-  feeOverride,
-  feeCardLoading = false,
+  feeOverride: _feeOverride,
+  feeCardLoading: _feeCardLoading = false,
   classes,
   selectedClassId,
   onClassChange,
@@ -1741,22 +1746,24 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
   attMaxDate,
 }) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  void _feeFilter;
+  void _onFeeFilterChange;
+  void _feeOverride;
+  void _feeCardLoading;
 
   // Use fast-endpoint override if available, fall back to full-load data
   const attData = attOverride ?? data.attendance_overview;
-  const { present, absent, half_day, leave } = attData;
-  const totalAtt = present + absent + half_day + leave;
+  const { present, absent, half_day } = attData;
+  const totalAtt = present + absent + half_day + (attData.leave || 0);
   const attPct = totalAtt > 0 ? ((present + half_day * 0.5) / totalAtt) * 100 : 0;
 
+  /* ── Restore with Fee Collection / Lead Pipeline / Quick Actions ──
   const feeData = feeOverride ?? data.fee_collection;
   const { total_fee, total_paid, total_balance } = feeData;
   const feePct = total_fee > 0 ? (total_paid / total_fee) * 100 : 0;
   const totalLeads = data.lead_pipeline.reduce((a, c) => a + c.count, 0);
-
   const fmtINR = (n: number) =>
     "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
   const getLeadIcon = (status: string) => {
     const s = status.toLowerCase();
     if (s.includes("new") || s.includes("lead")) return <StarIcon sx={{ fontSize: 14 }} />;
@@ -1767,53 +1774,49 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
     if (s.includes("applic") || s.includes("submit")) return <HomeworkIcon sx={{ fontSize: 14 }} />;
     return <ContactPhoneIcon sx={{ fontSize: 14 }} />;
   };
-
   const quickActions = [
-    {
-      label: "Mark Attendance",
-      desc: "Register today's student lists",
-      icon: <AttendanceIcon />,
-      color: C.blue,
-      bg: C.blueGlass,
-      path: "/attendance/mark",
-    },
-    {
-      label: "Collect Payment",
-      desc: "View and manage invoices",
-      icon: <FeeIcon />,
-      color: C.green,
-      bg: C.greenGlass,
-      path: "/fees/invoices",
-    },
-    {
-      label: "Lead Pipeline",
-      desc: "View new student admissions",
-      icon: <PeopleIcon />,
-      color: "#14B8A6",
-      bg: "rgba(20,184,166,0.08)",
-      path: "/admissions/leads",
-    },
-    {
-      label: "Issue Notice",
-      desc: "Publish system broadcasts",
-      icon: <NoticeIcon />,
-      color: C.red,
-      bg: C.redGlass,
-      path: "/communication/notices/new",
-    },
+    { label: "Mark Attendance", desc: "Register today's student lists", icon: <AttendanceIcon />, color: C.blue, bg: C.blueGlass, path: "/attendance/mark" },
+    { label: "Collect Payment", desc: "View and manage invoices", icon: <FeeIcon />, color: C.green, bg: C.greenGlass, path: "/fees/invoices" },
+    { label: "Lead Pipeline", desc: "View new student admissions", icon: <PeopleIcon />, color: "#14B8A6", bg: "rgba(20,184,166,0.08)", path: "/admissions/leads" },
+    { label: "Issue Notice", desc: "Publish system broadcasts", icon: <NoticeIcon />, color: C.red, bg: C.redGlass, path: "/communication/notices/new" },
   ];
+  ── end restore block ── */
 
-  const ADMIN_KPI_DEFAULT     = ["admin_students", "admin_classes", "admin_fees", "admin_balance"];
-  const ADMIN_SECTIONS_DEFAULT = ["admin_profile", "attendance_overview", "fee_collection", "notices", "leads", "quick_actions"];
-  const ADMIN_FULL_WIDTH_SECTIONS = new Set(["admin_profile", "notices", "leads", "quick_actions"]);
-  const ADMIN_COMPACT_SECTIONS = new Set(["attendance_overview", "fee_collection"]);
+  // Tenant admin layout: square KPI pair → square Profile + Attendance → wide Notices
+  const ADMIN_KPI_DEFAULT = ["admin_students", "admin_classes"];
+  // const ADMIN_KPI_DEFAULT = ["admin_students", "admin_classes", "admin_fees", "admin_balance"];
+  const ADMIN_SECTIONS_DEFAULT = ["admin_profile", "attendance_overview", "notices"];
+  // const ADMIN_SECTIONS_DEFAULT = ["admin_profile", "attendance_overview", "fee_collection", "notices", "leads", "quick_actions"];
+  const ADMIN_FULL_WIDTH_SECTIONS = new Set(["notices"]);
+  // const ADMIN_FULL_WIDTH_SECTIONS = new Set(["admin_profile", "notices", "leads", "quick_actions"]);
+  const ADMIN_COMPACT_SECTIONS = new Set(["admin_profile", "attendance_overview"]);
+  // const ADMIN_COMPACT_SECTIONS = new Set(["attendance_overview", "fee_collection"]);
 
-  const kpiDrag = useSortableDrag("admin_kpi_order", ADMIN_KPI_DEFAULT);
-  const sectionDrag = useSortableDrag("admin_dash_order_v6", ADMIN_SECTIONS_DEFAULT);
+  const kpiDrag = useSortableDrag("admin_kpi_order_v2", ADMIN_KPI_DEFAULT);
+  const sectionDrag = useSortableDrag("admin_dash_order_v7", ADMIN_SECTIONS_DEFAULT);
 
   const renderAdminSection = (id: string) => {
     switch (id) {
       case "admin_profile":
+        return (
+          <Box sx={{ height: "100%", minHeight: { xs: 0, sm: 280 } }}>
+            <DashboardProfileCard
+              compact
+              fillHeight
+              details={[
+                {
+                  icon: <PeopleIcon sx={{ fontSize: 14, color: C.muted, flexShrink: 0 }} />,
+                  text: `${data.student_snapshot.active_students} Active Students`,
+                },
+                {
+                  icon: <ClassIcon sx={{ fontSize: 14, color: C.muted, flexShrink: 0 }} />,
+                  text: `${data.student_snapshot.total_classes} Classes`,
+                },
+              ]}
+            />
+          </Box>
+        );
+        /* Full-width strip variant — restore if preferred:
         return (
           <DashboardProfileCard
             variant="strip"
@@ -1823,11 +1826,12 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
             ]}
           />
         );
+        */
 
       case "notices":
         return (
           <GCard>
-            <CardContent sx={{ p: 3 }}>
+            <CardContent sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
               <CardHeader
                 title="Recent Notices & Holidays"
                 icon={<NoticeIcon sx={{ color: C.red }} />}
@@ -1840,7 +1844,7 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
 
       case "attendance_overview":
         return (
-          <GCard sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+          <GCard sx={{ height: "100%", display: "flex", flexDirection: "column", minHeight: { xs: 0, sm: 280 } }}>
             <CardContent sx={dashTileCardContentSx}>
               <CardHeader
                 compact
@@ -1866,9 +1870,9 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
                   </TextField>
                 )}
               </Box>
-              <Box sx={dashTilePanelSx}>
+              <Box sx={{ ...dashTilePanelSx, flex: 1 }}>
                 {attCardLoading ? (
-                  <Box sx={{ display: "flex", justifyContent: "flex-start" }}>
+                  <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
                     <Box
                       sx={{
                         width: 24,
@@ -1881,11 +1885,21 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
                     />
                   </Box>
                 ) : (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                    <AttRing pct={attPct} size={84} hideLabel color={attPct >= 75 ? C.green : C.amber} gradId="adminAttGrad" />
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.85 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: { xs: "row", sm: "column", md: "row" },
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: { xs: 1.5, sm: 2 },
+                      py: { xs: 0.5, md: 1 },
+                    }}
+                  >
+                    <AttRing pct={attPct} size={96} hideLabel color={attPct >= 75 ? C.green : C.amber} gradId="adminAttGrad" />
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.85, minWidth: 100 }}>
                       <DashStatRow label="Present" value={present} color={C.green} />
                       <DashStatRow label="Absent" value={absent} color={C.red} />
+                      <DashStatRow label="Half Day" value={half_day} color={C.amber} />
                     </Box>
                   </Box>
                 )}
@@ -1894,6 +1908,7 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
           </GCard>
         );
 
+      /* Fee Collection — temporarily hidden for tenant admin; restore + re-add "fee_collection" to ADMIN_SECTIONS_DEFAULT
       case "fee_collection":
         return (
           <GCard sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -2045,6 +2060,7 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
             </CardContent>
           </GCard>
         );
+      */
 
       default:
         return null;
@@ -2055,19 +2071,42 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
     switch (id) {
       case "admin_students":
         return (
-          <SnapCard title="Active Students" value={data.student_snapshot.active_students}
-            icon={<PeopleIcon fontSize="small" />} accentColor={C.blue} glassBg={C.blueGlass}
+          <SnapCard
+            title="Active Students"
+            value={data.student_snapshot.active_students}
+            icon={<PeopleIcon fontSize="small" />}
+            accentColor={C.blue}
+            glassBg={C.blueGlass}
             onClick={() => navigate("/students")}
-            sub={<><Sparkline color={C.blue} delay={0} /><Typography variant="caption" sx={{ color: C.green, fontWeight: 700 }}>+2.5% since last week</Typography></>}
+            sub={
+              <>
+                <Sparkline color={C.blue} delay={0} />
+                {/* <Typography variant="caption" sx={{ color: C.green, fontWeight: 700 }}>
+                  +2.5% since last week
+                </Typography> */}
+              </>
+            }
           />
         );
       case "admin_classes":
         return (
-          <SnapCard title="Total Classes" value={data.student_snapshot.total_classes}
-            icon={<SchoolIcon fontSize="small" />} accentColor={C.purple} glassBg={C.purpleGlass}
-            sub={<><Sparkline color={C.purple} delay={0.2} /><Typography variant="caption" sx={{ color: C.green, fontWeight: 700 }}>+1.2% since last week</Typography></>}
+          <SnapCard
+            title="Total Classes"
+            value={data.student_snapshot.total_classes}
+            icon={<SchoolIcon fontSize="small" />}
+            accentColor={C.purple}
+            glassBg={C.purpleGlass}
+            sub={
+              <>
+                <Sparkline color={C.purple} delay={0.2} />
+                {/* <Typography variant="caption" sx={{ color: C.green, fontWeight: 700 }}>
+                  +1.2% since last week
+                </Typography> */}
+              </>
+            }
           />
         );
+      /* Collected Fees + Pending Balance KPIs — temporarily hidden; restore + re-add to ADMIN_KPI_DEFAULT
       case "admin_fees":
         return (
           <SnapCard title="Collected Fees" value={fmtINR(total_paid)}
@@ -2088,15 +2127,28 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
             sub={<><Sparkline color={C.red} delay={0.6} /><Typography variant="caption" sx={{ color: total_balance > 0 ? C.red : C.green, fontWeight: 700 }}>{total_balance > 0 ? "-4.8% since last week" : "All dues cleared ✓"}</Typography></>}
           />
         );
+      */
       default:
         return null;
     }
   };
 
   return (
-    <Grid container spacing={{ xs: 2, md: 2.5 }}>
-      {/* ─ Row 1: KPI snap cards — individually draggable ─ */}
-      <Grid item xs={12}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: { xs: 2, md: 2.5 },
+        width: "100%",
+      }}
+    >
+      {/* Row 1: square-ish KPI tiles (Students + Classes, 2-up from sm) */}
+      <Box
+        sx={{
+          width: "100%",
+          "& .sortable-content > *": { minHeight: { sm: 148, md: 160 } },
+        }}
+      >
         <SortableKpiRow
           items={kpiDrag.order}
           activeId={kpiDrag.activeId}
@@ -2105,21 +2157,20 @@ const AdminDashboardView: React.FC<AdminViewProps> = ({
           onDragCancel={kpiDrag.onDragCancel}
           renderItem={renderAdminKpi}
         />
-      </Grid>
+      </Box>
 
-      <Grid item xs={12}>
-        <SortableCardGrid
-          items={sectionDrag.order}
-          activeId={sectionDrag.activeId}
-          onDragStart={sectionDrag.onDragStart}
-          onDragEnd={sectionDrag.onDragEnd}
-          onDragCancel={sectionDrag.onDragCancel}
-          fullWidthIds={ADMIN_FULL_WIDTH_SECTIONS}
-          compactOverlayIds={ADMIN_COMPACT_SECTIONS}
-          renderItem={renderAdminSection}
-        />
-      </Grid>
-    </Grid>
+      {/* Row 2: Profile + Attendance as paired square tiles; Notices as wide rectangle */}
+      <SortableCardGrid
+        items={sectionDrag.order}
+        activeId={sectionDrag.activeId}
+        onDragStart={sectionDrag.onDragStart}
+        onDragEnd={sectionDrag.onDragEnd}
+        onDragCancel={sectionDrag.onDragCancel}
+        fullWidthIds={ADMIN_FULL_WIDTH_SECTIONS}
+        compactOverlayIds={ADMIN_COMPACT_SECTIONS}
+        renderItem={renderAdminSection}
+      />
+    </Box>
   );
 };
 
@@ -2921,9 +2972,9 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function Dashboard() {
   const { user } = useAuth();
-  const { roles } = useRBAC();
-  const navigate = useNavigate();
-  const supportPerms = useSupportPermissions();
+  // const { roles } = useRBAC();
+  // const navigate = useNavigate(); // restore with Support icon onClick
+  // const supportPerms = useSupportPermissions(); // restore with Support icon
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -3134,8 +3185,9 @@ export default function Dashboard() {
         lastLoginLabel={lastLoginLabel}
         refreshing={refreshing}
         onRefresh={() => fetchData(true)}
-        showSupport={supportPerms.canAccessSupport}
-        onSupportClick={() => navigate("/support/faqs")}
+        // Support icon temporarily hidden — restore these two props when re-enabling
+        // showSupport={supportPerms.canAccessSupport}
+        // onSupportClick={() => navigate("/support/faqs")}
       />
 
       {/* ── Error banner ── */}
