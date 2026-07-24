@@ -266,14 +266,16 @@ def resolve_homework_viewer_context(
     legacy_role: object,
     teacher_id: Optional[int],
 ) -> HomeworkViewerContext:
+    # Admin-like first (incl. TENANT_ADMIN), even if also linked as a teacher —
+    # otherwise draft + published tenant-wide list is narrowed to teacher scope.
+    if is_admin_like(db, user_id, legacy_role, tenant_id):
+        return HomeworkViewerContext(kind="admin", scopes=(), published_only=False)
+
     if teacher_id is not None:
         scopes = resolve_teacher_assignment_scopes(
             db, tenant_id=tenant_id, teacher_id=teacher_id
         )
         return HomeworkViewerContext(kind="teacher", scopes=scopes, published_only=False)
-
-    if is_admin_like(db, user_id, legacy_role, tenant_id):
-        return HomeworkViewerContext(kind="admin", scopes=(), published_only=False)
 
     if is_student_user(db, user_id, legacy_role):
         student = _resolve_student_record(db, tenant_id=tenant_id, user_id=user_id, email=email)

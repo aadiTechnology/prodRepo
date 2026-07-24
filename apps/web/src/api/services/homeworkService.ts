@@ -167,6 +167,8 @@ export const homeworkService = {
     class_division_id?: number;
     subject_id?: number;
     academic_year_id?: number;
+    /** Draft | Active; omit = both for admin/teacher, published for student/parent */
+    status?: "Draft" | "Active";
   }): Promise<{ count: number }> {
     const response = await apiClient.get("/api/homework/unread-count", { params });
     return response.data;

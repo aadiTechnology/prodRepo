@@ -113,11 +113,12 @@ def get_unread_count(
     class_division_id: Optional[int] = Query(None, ge=1),
     subject_id: Optional[int] = Query(None, ge=1),
     academic_year_id: Optional[int] = Query(None, ge=1),
+    status: Optional[str] = Query(None, description="Draft | Active; omit for both (admin/teacher)"),
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_user),
 ):
     """
-    Active homework in the caller's role/class scope that they have not opened yet.
+    Homework in the caller's role/class scope that they have not opened yet.
 
     Scope (from viewer_context):
       - tenant admin / admin: all homework in tenant
@@ -127,7 +128,8 @@ def get_unread_count(
 
     When academic_year_id is omitted, defaults to the tenant's current academic year
     so the sidebar badge is correct immediately on login (no need to open Homework list).
-    Optional class/division/subject filters further narrow the badge.
+    Optional class/division/subject/status filters further narrow the badge.
+    Status: Draft, Active/Published, or omit (both for admin/teacher; published for student/parent).
     """
     viewer_context = homework_service.get_viewer_context(
         db,
@@ -145,6 +147,7 @@ def get_unread_count(
         class_division_id=class_division_id,
         subject_id=subject_id,
         academic_year_id=academic_year_id,
+        hw_status=status,
     )
     return HomeworkUnreadCountResponse(count=count)
 

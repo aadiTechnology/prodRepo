@@ -289,6 +289,7 @@ def count_unread_homework(
     class_division_id: Optional[int] = None,
     subject_id: Optional[int] = None,
     academic_year_id: Optional[int] = None,
+    hw_status: Optional[str] = None,
 ) -> int:
     # Sidebar badge must match current-year list without waiting for HomeworkList filters.
     effective_year_id = academic_year_id
@@ -302,6 +303,7 @@ def count_unread_homework(
         class_division_id=class_division_id,
         subject_id=subject_id,
         academic_year_id=effective_year_id,
+        hw_status=hw_status,
         viewer_context=viewer_context,
     )
 

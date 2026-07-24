@@ -144,15 +144,37 @@ def count_unread_homework(
     class_division_id: Optional[int] = None,
     subject_id: Optional[int] = None,
     academic_year_id: Optional[int] = None,
+    hw_status: Optional[str] = None,
     viewer_context: Optional[object] = None,
 ) -> int:
     """
-    Active/published homework in the viewer's scope that this user has not opened yet.
+    Homework in the viewer's scope that this user has not opened yet.
+
+    Status filter (matches list badge behavior for admin/teacher):
+      - Draft → unread drafts only
+      - Active/Published → unread published only
+      - omitted → published only for student/parent; draft+published for admin/teacher
     """
+    published_only = bool(getattr(viewer_context, "published_only", False)) if viewer_context else False
+    if hw_status:
+        effective_status = normalize_homework_status(hw_status)
+        if effective_status == HOMEWORK_STATUS_DRAFT:
+            if published_only:
+                return 0
+            status_values = tuple(DB_DRAFT_HOMEWORK_STATUSES)
+        elif effective_status == HOMEWORK_STATUS_ACTIVE:
+            status_values = tuple(DB_LIVE_HOMEWORK_STATUSES)
+        else:
+            status_values = (to_db_homework_status(hw_status),)
+    elif published_only:
+        status_values = tuple(DB_LIVE_HOMEWORK_STATUSES)
+    else:
+        status_values = tuple(DB_DRAFT_HOMEWORK_STATUSES | DB_LIVE_HOMEWORK_STATUSES)
+
     query = db.query(Homework).filter(
         Homework.tenant_id == tenant_id,
         Homework.is_deleted == False,  # noqa: E712
-        Homework.status.in_(tuple(DB_LIVE_HOMEWORK_STATUSES)),
+        Homework.status.in_(status_values),
     )
 
     viewer_kind = getattr(viewer_context, "kind", None) if viewer_context else None

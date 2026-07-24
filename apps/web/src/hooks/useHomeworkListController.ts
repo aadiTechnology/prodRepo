@@ -12,7 +12,7 @@ import {
 } from "../utils/homeworkEditWindow";
 import { isTeacherNoticeUser } from "../utils/noticeAudience";
 import { resolveCurrentAcademicYearId } from "../utils/academicYear";
-import { HOMEWORK_STATUS_ACTIVE } from "../utils/homeworkStatus";
+import { HOMEWORK_STATUS_ACTIVE, HOMEWORK_STATUS_DRAFT } from "../utils/homeworkStatus";
 import { notifyHomeworkUnreadChanged } from "../utils/homeworkUnreadEvents";
 
 export function useHomeworkListController() {
@@ -23,7 +23,12 @@ export function useHomeworkListController() {
     [user?.role, roles],
   );
   const isTeacherScoped = useMemo(() => {
-    const isAdminLike = hasAnyRole(["ADMIN", "SUPER_ADMIN", "SYSTEM_ADMIN"]);
+    // TENANT_ADMIN must stay admin-scoped so draft + published both list correctly.
+    const isAdminLike =
+      hasAnyRole(["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "SYSTEM_ADMIN"]) ||
+      ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "SYSTEM_ADMIN"].includes(
+        (user?.role ?? "").toUpperCase(),
+      );
     return !readOnlyAudience && !isAdminLike && isTeacherNoticeUser(user?.role, roles);
   }, [hasAnyRole, readOnlyAudience, roles, user?.role]);
   const [homework, setHomework] = useState<HomeworkResponse[]>([]);
@@ -53,6 +58,18 @@ export function useHomeworkListController() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<HomeworkResponse | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const listBaseParams = useMemo(
+    () => ({
+      search: search || undefined,
+      class_id: readOnlyAudience || !classFilter ? undefined : Number(classFilter),
+      class_division_id:
+        readOnlyAudience || !divisionFilter ? undefined : Number(divisionFilter),
+      academic_year_id:
+        readOnlyAudience || !academicYearFilter ? undefined : Number(academicYearFilter),
+    }),
+    [search, readOnlyAudience, classFilter, divisionFilter, academicYearFilter],
+  );
 
   useEffect(() => {
     if (readOnlyAudience) {
@@ -172,18 +189,19 @@ export function useHomeworkListController() {
     try {
       setLoading(true);
       setError(null);
+      // Admin/teacher: no status => draft + published; Draft/Active => that status only.
+      const statusParam = readOnlyAudience
+        ? HOMEWORK_STATUS_ACTIVE
+        : statusFilter === HOMEWORK_STATUS_DRAFT
+          ? HOMEWORK_STATUS_DRAFT
+          : statusFilter === "Active"
+            ? HOMEWORK_STATUS_ACTIVE
+            : undefined;
       const response = await homeworkService.list({
+        ...listBaseParams,
         skip: readOnlyAudience ? 0 : page * rowsPerPage,
         limit: readOnlyAudience ? 200 : rowsPerPage,
-        search: search || undefined,
-        class_id: readOnlyAudience || !classFilter ? undefined : Number(classFilter),
-        class_division_id:
-          readOnlyAudience || !divisionFilter ? undefined : Number(divisionFilter),
-        academic_year_id:
-          readOnlyAudience || !academicYearFilter ? undefined : Number(academicYearFilter),
-        status: readOnlyAudience
-          ? HOMEWORK_STATUS_ACTIVE
-          : (statusFilter as "Draft" | "Active") || undefined,
+        status: statusParam,
       });
       setHomework(response.data);
       setTotal(response.total);
@@ -218,8 +236,6 @@ export function useHomeworkListController() {
     setPage(0);
   }, [search, statusFilter, classFilter, divisionFilter, subjectFilter, academicYearFilter]);
 
-  // Keep sidebar badge aligned with list filters (class / division / status).
-  // Login / other pages still get full role-scoped count until this page opens.
   useEffect(() => {
     if (!academicYearFilterReady) return;
     if (isTeacherScoped && !teacherFiltersReady) return;
@@ -241,7 +257,6 @@ export function useHomeworkListController() {
     statusFilter,
   ]);
 
-  // Leaving Homework list restores full role-scoped badge.
   useEffect(() => {
     return () => {
       notifyHomeworkUnreadChanged({});
