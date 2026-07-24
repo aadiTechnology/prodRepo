@@ -210,19 +210,43 @@ def count_unread_notices(
     viewer_context: NoticeViewerContext | None = None,
     audience_type: str | None = None,
     notice_type: str | None = None,
+    status: str | None = None,
 ) -> int:
-    """Published visible notices that this user has not opened yet."""
+    """
+    Notices visible to this user that they have not opened yet.
+
+    Status (matches NoticeList toolbar / effective status chips):
+      - omitted → live published unread (WhatsApp-style badge default)
+      - DRAFT / PUBLISHED / UNPUBLISHED / EXPIRED → that chip only
+        (non-published statuses are 0 for published-only consumers)
+    Optional audience_type / notice_type further narrow like the list filters.
+    """
     where_sql = [
         "n.tenant_id = :tenant_id",
         "n.is_deleted = 0",
-        "n.is_published = 1",
-        "n.status = 'PUBLISHED'",
-        "(n.expiry_date IS NULL OR n.expiry_date >= GETUTCDATE())",
         "nv.id IS NULL",
     ]
     params: dict = {"tenant_id": tenant_id, "user_id": user_id}
 
+    published_only = bool(
+        viewer_context
+        and is_notice_consumer(viewer_context)
+        and getattr(viewer_context, "published_only", False)
+    )
+    status_norm = status.strip().upper() if status else None
+
+    # Students/parents never see drafts; keep badge at 0 for those chips.
+    if status_norm and status_norm != "PUBLISHED" and published_only:
+        return 0
+
     _apply_consumer_visibility(where_sql, params, viewer_context)
+
+    if status_norm:
+        _append_effective_status_filter(where_sql, params, status_norm)
+    elif not published_only:
+        # Admin / manage teacher default badge: live published only.
+        _append_effective_status_filter(where_sql, params, "PUBLISHED")
+    # else: consumer published_only already clamped via visibility
 
     if audience_type:
         where_sql.append("n.audience_type = :audience_type")

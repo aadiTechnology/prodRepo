@@ -298,16 +298,17 @@ def count_unread_notices(
     viewer_context: NoticeViewerContext | None = None,
     audience_type: str | None = None,
     notice_type: str | None = None,
+    status: str | None = None,
 ) -> int:
     """
-    Published notices visible to this user that they have not opened.
+    Notices visible to this user that they have not opened.
 
     Scope (viewer_context):
-      - admin: all published notices in tenant
+      - admin: all notices in tenant (status filter optional)
       - teacher: TEACHER audience + STUDENT notices for class-teacher classes
-      - student/parent: STUDENT/ALL targeted to their class/division
+      - student/parent: published STUDENT/ALL targeted to their class/division
 
-    Optional audience_type / notice_type match NoticeList toolbar filters.
+    Optional status / audience_type / notice_type match NoticeList toolbar filters.
     """
     return notice_repository.count_unread_notices(
         db,
@@ -316,6 +317,7 @@ def count_unread_notices(
         viewer_context=viewer_context,
         audience_type=audience_type,
         notice_type=notice_type,
+        status=status,
     )
 
 

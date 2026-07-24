@@ -81,24 +81,26 @@ async def get_notice_dropdown_options(
 async def get_notice_unread_count(
     audience_type: str | None = Query(None),
     notice_type: str | None = Query(None),
+    status: str | None = Query(None, description="DRAFT|PUBLISHED|UNPUBLISHED|EXPIRED; omit for role default"),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "view")),
 ):
     """
-    Unread published notices in the caller's role scope:
-      - tenant admin: all notices
+    Unread notices in the caller's role scope (sidebar Communication badge):
+      - tenant admin: all notices in tenant
       - teacher: teacher notices + student notices for class-teacher classes
-      - student/parent: notices targeted to their assigned class only
+      - student/parent: published notices targeted to their assigned class only
 
-    Optional audience_type / notice_type narrow the badge to match NoticeList filters.
+    Optional status / audience_type / notice_type narrow the badge to match NoticeList filters.
     """
+    can_manage = notice_service.user_can_manage_notices(db, current_user)
     viewer_context = notice_service.get_viewer_context(
         db,
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         email=str(current_user.email),
         legacy_role=current_user.role,
-        manage=False,
+        manage=can_manage,
     )
     return NoticeCountResponse(
         count=notice_service.count_unread_notices(
@@ -108,6 +110,7 @@ async def get_notice_unread_count(
             viewer_context=viewer_context,
             audience_type=audience_type.upper() if audience_type else None,
             notice_type=notice_type.upper() if notice_type else None,
+            status=status.upper() if status else None,
         )
     )
 

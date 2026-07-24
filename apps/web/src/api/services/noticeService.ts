@@ -33,6 +33,7 @@ const noticeService = {
   getUnreadCount: async (params?: {
     audience_type?: string;
     notice_type?: string;
+    status?: string;
   }): Promise<NoticeCountResponse> => {
     const res = await apiClient.get(`${BASE}/unread-count`, { params });
     return res.data;

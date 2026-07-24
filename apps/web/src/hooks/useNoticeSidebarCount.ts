@@ -30,9 +30,9 @@ export function useNoticeSidebarCount(enabled: boolean): number {
     if (!enabled) return;
 
     const onChanged = (event: Event) => {
-      const detail = (event as CustomEvent<NoticeUnreadFilters>).detail;
-      if (detail && typeof detail === "object") {
-        setFilters(detail);
+      const detail = (event as CustomEvent<NoticeUnreadFilters | undefined>).detail;
+      if (detail !== undefined) {
+        setFilters(detail ?? {});
       }
       refresh();
     };
@@ -52,18 +52,12 @@ export function useNoticeSidebarCount(enabled: boolean): number {
       return;
     }
 
-    const status = toOptionalFilter(filters.status);
-    // Unread badge only tracks published notices; other status filters => 0.
-    if (status && status !== "PUBLISHED") {
-      setCount(0);
-      return;
-    }
-
     let cancelled = false;
     noticeService
       .getUnreadCount({
         audience_type: toOptionalFilter(filters.audienceType),
         notice_type: toOptionalFilter(filters.noticeType),
+        status: toOptionalFilter(filters.status),
       })
       .then((response) => {
         if (!cancelled) setCount(response.count ?? 0);
