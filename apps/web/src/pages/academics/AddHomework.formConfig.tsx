@@ -68,6 +68,10 @@ export const createHomeworkFormConfig = (options: {
       type: "text",
       placeholder: "Enter homework title",
       required: true,
+      // DB title column is NVARCHAR(255)
+      props: {
+        htmlInput: { maxLength: 255 },
+      },
     },
     instructions: {
       name: "instructions",

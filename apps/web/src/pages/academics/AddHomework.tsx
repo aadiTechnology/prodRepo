@@ -126,7 +126,10 @@ export default function AddHomework() {
     () => ({
       class_id: [{ type: "required", message: "Please select class" }],
       subject_id: [{ type: "required", message: "Please select subject" }],
-      title: [{ type: "required", message: "Please enter homework title" }],
+      title: [
+        { type: "required", message: "Please enter homework title" },
+        { type: "maxLength", value: 255, message: "Title cannot exceed 255 characters" },
+      ],
       assigned_date: [{ type: "required", message: "Please select assigned date" }],
     }),
     [],
@@ -426,6 +429,9 @@ export default function AddHomework() {
     if (!formData.class_id) draftErrors.class_id = "Please select class";
     if (!formData.subject_id) draftErrors.subject_id = "Please select subject";
     if (!formData.title.trim()) draftErrors.title = "Please enter homework title";
+    else if (formData.title.trim().length > 255) {
+      draftErrors.title = "Title cannot exceed 255 characters";
+    }
     if (!formData.assigned_date) draftErrors.assigned_date = "Please select assigned date";
     return draftErrors;
   }, [formData]);
