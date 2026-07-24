@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.utils.homework_status import HOMEWORK_STATUS_ACTIVE, HOMEWORK_STATUS_DRAFT, normalize_homework_status
 
@@ -35,7 +35,8 @@ class HomeworkCreate(BaseModel):
     class_division_id: Optional[int] = None
     subject_id: int
     academic_year_id: int
-    title: str
+    # Matches DB NVARCHAR(255) — longer titles cause SQL truncation / "Database error"
+    title: str = Field(..., min_length=1, max_length=255)
     instructions: Optional[str] = None
     assigned_date: date
     submission_date: Optional[date] = None
@@ -65,7 +66,7 @@ class HomeworkCreate(BaseModel):
 class HomeworkUpdate(BaseModel):
     class_division_id: Optional[int] = None
     subject_id: Optional[int] = None
-    title: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
     instructions: Optional[str] = None
     assigned_date: Optional[date] = None
     submission_date: Optional[date] = None
