@@ -69,6 +69,13 @@ export function createHolidayFormConfig({
         },
       },
     },
+    // Label only — rendered via associatedClassesSlot; needed for ValidationErrorDialog.
+    class_ids: {
+      name: "class_ids",
+      label: "Associated Classes",
+      type: "custom",
+      required: false,
+    },
     start_date: {
       name: "start_date",
       label: "Start Date",
