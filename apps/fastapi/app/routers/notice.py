@@ -87,9 +87,9 @@ async def get_notice_unread_count(
 ):
     """
     Unread notices in the caller's role scope (sidebar Communication badge):
-      - tenant admin: all notices in tenant
-      - teacher: teacher notices + student notices for class-teacher classes
-      - student/parent: published notices targeted to their assigned class only
+      - tenant admin / manage teacher: Draft+Published+Unpublished+Expired unread combined
+        (Status filter narrows to one chip; Audience/Type narrow further)
+      - teacher (view) / student/parent: published notices in their role scope
 
     Optional status / audience_type / notice_type narrow the badge to match NoticeList filters.
     """

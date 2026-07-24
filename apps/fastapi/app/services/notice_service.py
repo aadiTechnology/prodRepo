@@ -304,9 +304,9 @@ def count_unread_notices(
     Notices visible to this user that they have not opened.
 
     Scope (viewer_context):
-      - admin: all notices in tenant (status filter optional)
-      - teacher: TEACHER audience + STUDENT notices for class-teacher classes
-      - student/parent: published STUDENT/ALL targeted to their class/division
+      - admin / manage teacher: unread across Draft+Published+Unpublished+Expired
+        (or one status when status filter is set)
+      - teacher (view-only) / student/parent: published unread in role scope
 
     Optional status / audience_type / notice_type match NoticeList toolbar filters.
     """

@@ -88,9 +88,12 @@ def check_wiring(report: Report) -> None:
         ("Notice sidebar userId", "../web/src/hooks/useNoticeSidebarCount.ts", "userId"),
         ("Notice list pushes filters", "../web/src/hooks/useNoticeListController.ts", "notifyNoticeCountChanged"),
         ("Notice filter event type", "../web/src/utils/noticeCountEvents.ts", "NoticeUnreadFilters"),
-        ("Notice service getUnreadCount params", "../web/src/api/services/noticeService.ts", "audience_type"),
+        ("Notice service getUnreadCount params", "../web/src/api/services/noticeService.ts", "status"),
         ("Notice repo filter count", "app/repositories/notice_repository.py", "notice_type"),
+        ("Notice status filter count", "app/repositories/notice_repository.py", "status_norm"),
+        ("Notice sticky filter notify", "../web/src/utils/noticeCountEvents.ts", "detail: filters,"),
         ("Admin-first notice context", "app/services/notice_service.py", "Admins always see tenant-wide"),
+        ("Notice unread manage flag", "app/routers/notice.py", "manage=can_manage"),
     ]
     for label, path, needle in checks:
         if _file_has(path, needle):
@@ -195,6 +198,8 @@ def _notice_unread(
     user: dict[str, Any],
     audience_type: Optional[str] = None,
     notice_type: Optional[str] = None,
+    status: Optional[str] = None,
+    manage: bool = False,
 ) -> tuple[int, Any]:
     ctx = notice_service.get_viewer_context(
         db,
@@ -202,7 +207,7 @@ def _notice_unread(
         user_id=int(user["user_id"]),
         email=str(user.get("email") or ""),
         legacy_role=user["role"],
-        manage=False,
+        manage=manage,
     )
     count = notice_service.count_unread_notices(
         db,
@@ -211,6 +216,7 @@ def _notice_unread(
         viewer_context=ctx,
         audience_type=audience_type,
         notice_type=notice_type,
+        status=status,
     )
     return count, ctx
 
@@ -261,16 +267,19 @@ def check_role_counts(
             report.ok.append("HW student kind")
             _print("  OK   HW student kind")
 
-    # Notice
-    for key, user in (("admin", admin), ("teacher", teacher)):
-        n, ctx = _notice_unread(db, tenant_id=tenant_id, user=user)
+    # Notice (manage=True for admin matches unread-count when they have manage perms)
+    for key, user, manage in (
+        ("admin", admin, True),
+        ("teacher", teacher, False),
+    ):
+        n, ctx = _notice_unread(db, tenant_id=tenant_id, user=user, manage=manage)
         counts[f"notice_{key}"] = n
         label = user.get("teacher_name") or user.get("full_name")
         _print(f"  NTC {key:8} {label}: unread={n}  kind={ctx.kind}")
         report.info.append(f"notice_{key}={n} kind={ctx.kind}")
 
     if student:
-        n, ctx = _notice_unread(db, tenant_id=tenant_id, user=student)
+        n, ctx = _notice_unread(db, tenant_id=tenant_id, user=student, manage=False)
         counts["notice_student"] = n
         _print(f"  NTC student  {student.get('full_name')}: unread={n}  kind={ctx.kind}")
 
@@ -411,16 +420,18 @@ def check_notice_filters(
     teacher: dict[str, Any],
 ) -> None:
     _print("\n=== 4) NOTICE FILTER NARROWING ===")
-    base_admin, _ = _notice_unread(db, tenant_id=tenant_id, user=admin)
-    base_teacher, tctx = _notice_unread(db, tenant_id=tenant_id, user=teacher)
+    base_admin, _ = _notice_unread(db, tenant_id=tenant_id, user=admin, manage=True)
+    base_teacher, tctx = _notice_unread(
+        db, tenant_id=tenant_id, user=teacher, manage=False
+    )
     _print(f"  Admin base: {base_admin} | Teacher base: {base_teacher}")
 
     for audience in ("TEACHER", "STUDENT"):
         n_admin, _ = _notice_unread(
-            db, tenant_id=tenant_id, user=admin, audience_type=audience
+            db, tenant_id=tenant_id, user=admin, audience_type=audience, manage=True
         )
         n_teacher, _ = _notice_unread(
-            db, tenant_id=tenant_id, user=teacher, audience_type=audience
+            db, tenant_id=tenant_id, user=teacher, audience_type=audience, manage=False
         )
         _print(f"  audience={audience}: admin={n_admin} teacher={n_teacher}")
         if n_admin > base_admin:
@@ -441,10 +452,10 @@ def check_notice_filters(
 
     # Sum of TEACHER+STUDENT for teacher should be <= base (teacher has no ALL)
     t_only, _ = _notice_unread(
-        db, tenant_id=tenant_id, user=teacher, audience_type="TEACHER"
+        db, tenant_id=tenant_id, user=teacher, audience_type="TEACHER", manage=False
     )
     s_only, _ = _notice_unread(
-        db, tenant_id=tenant_id, user=teacher, audience_type="STUDENT"
+        db, tenant_id=tenant_id, user=teacher, audience_type="STUDENT", manage=False
     )
     if t_only + s_only > base_teacher + 0:
         # Equality expected if teacher only sees TEACHER+STUDENT
@@ -473,7 +484,7 @@ def check_notice_filters(
     # Notice type filter
     for ntype in ("GENERAL", "FEE", "EVENT", "HOLIDAY", "EXAM"):
         n, _ = _notice_unread(
-            db, tenant_id=tenant_id, user=admin, notice_type=ntype
+            db, tenant_id=tenant_id, user=admin, notice_type=ntype, manage=True
         )
         if n > base_admin:
             report.fail.append(f"notice_type={ntype} raised admin count")
@@ -483,9 +494,24 @@ def check_notice_filters(
         report.ok.append("Notice type filters <= base")
         _print("  OK   all notice_type filters <= base")
 
+    # Status chips (admin): draft/unpublished unread for manage viewers
+    for st in ("DRAFT", "PUBLISHED", "UNPUBLISHED", "EXPIRED"):
+        n, _ = _notice_unread(
+            db, tenant_id=tenant_id, user=admin, status=st, manage=True
+        )
+        _print(f"  status={st}: admin={n}")
+        if st == "PUBLISHED" and n > base_admin:
+            report.fail.append(f"PUBLISHED filter {n} > combined base {base_admin}")
+            _print(f"  FAIL PUBLISHED={n} > base={base_admin}")
+        elif st == "PUBLISHED" and n < base_admin:
+            report.ok.append("Combined default > PUBLISHED-only (expected)")
+            _print(f"  OK   combined base={base_admin} > PUBLISHED={n}")
+    report.ok.append("Notice status filters runnable")
+    _print("  OK   status filters runnable")
+
     # Impossible type
     zero, _ = _notice_unread(
-        db, tenant_id=tenant_id, user=admin, notice_type="NOT_A_REAL_TYPE"
+        db, tenant_id=tenant_id, user=admin, notice_type="NOT_A_REAL_TYPE", manage=True
     )
     if zero != 0:
         report.fail.append(f"bogus notice_type unread={zero}")

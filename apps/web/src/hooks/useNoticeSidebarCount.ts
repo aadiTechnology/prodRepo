@@ -13,6 +13,7 @@ function toOptionalFilter(value: string | null | undefined): string | undefined 
 
 /**
  * Sidebar unread notice badge: role-scoped, optionally narrowed by NoticeList filters.
+ * Admin/manage teacher default = Draft+Published+Unpublished+Expired unread combined.
  * Refetches on user switch and notice-count-changed (with filter detail).
  */
 export function useNoticeSidebarCount(enabled: boolean): number {

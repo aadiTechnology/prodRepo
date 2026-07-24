@@ -216,7 +216,8 @@ def count_unread_notices(
     Notices visible to this user that they have not opened yet.
 
     Status (matches NoticeList toolbar / effective status chips):
-      - omitted → live published unread (WhatsApp-style badge default)
+      - omitted (admin / manage teacher) → Draft+Published+Unpublished+Expired unread combined
+      - omitted (student/parent) → published unread only (role visibility)
       - DRAFT / PUBLISHED / UNPUBLISHED / EXPIRED → that chip only
         (non-published statuses are 0 for published-only consumers)
     Optional audience_type / notice_type further narrow like the list filters.
@@ -241,12 +242,10 @@ def count_unread_notices(
 
     _apply_consumer_visibility(where_sql, params, viewer_context)
 
+    # Admin / manage teacher: no status → all statuses together; with status → that chip.
+    # Student/parent: published_only visibility already clamps when status is omitted.
     if status_norm:
         _append_effective_status_filter(where_sql, params, status_norm)
-    elif not published_only:
-        # Admin / manage teacher default badge: live published only.
-        _append_effective_status_filter(where_sql, params, "PUBLISHED")
-    # else: consumer published_only already clamped via visibility
 
     if audience_type:
         where_sql.append("n.audience_type = :audience_type")
