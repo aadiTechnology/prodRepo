@@ -2,16 +2,14 @@ from __future__ import annotations
 
 import math
 import os
-import shutil
-from datetime import datetime
 from typing import Any, List, Optional
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.exceptions import ValidationException
 from app.schemas.homework_schema import (
     ClassOption,
     DivisionOption,
@@ -25,19 +23,17 @@ from app.schemas.homework_schema import (
     SubjectOption,
 )
 from app.services import homework_service
-
-UPLOAD_DIR = os.path.join("static", "homework-attachments")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".pdf", ".doc", ".docx", ".txt"}
-MAX_FILE_SIZE_MB = 10
+from app.services.homework_attachment_storage import (
+    ALLOWED_EXTENSIONS,
+    MAX_FILE_SIZE_MB,
+    save_homework_attachment_file,
+)
 
 router = APIRouter(
     prefix="/api/homework",
     tags=["Homework"],
     responses={404: {"description": "Not found"}},
 )
-
 
 # ---------------------------------------------------------------------------
 # Dropdown — classes available to the current user (teacher-scoped or all)
@@ -358,7 +354,6 @@ def upload_attachment(
             detail="Invalid file format. Allowed: images, PDF, Word, text files",
         )
 
-    # Read file content to check size
     content = file.file.read()
     size_mb = len(content) / (1024 * 1024)
     if size_mb > MAX_FILE_SIZE_MB:
@@ -367,27 +362,30 @@ def upload_attachment(
             detail=f"File size exceeded. Maximum allowed size is {MAX_FILE_SIZE_MB} MB",
         )
 
-    unique_suffix = datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
-    safe_name = f"{current_user.tenant_id}_{homework_id}_{unique_suffix}{extension}"
-    file_path = os.path.join(UPLOAD_DIR, safe_name)
-
     try:
-        with open(file_path, "wb") as buf:
-            buf.write(content)
-    except Exception:
-        raise HTTPException(status_code=500, detail="File upload failed")
+        stored_path = save_homework_attachment_file(
+            tenant_id=current_user.tenant_id,
+            homework_id=homework_id,
+            file_name=file.filename or f"attachment{extension}",
+            content=content,
+            content_type=file.content_type,
+        )
+    except ValidationException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=exc.message,
+        ) from exc
 
-    attachment = homework_service.add_attachment(
+    return homework_service.add_attachment(
         db,
         tenant_id=current_user.tenant_id,
         homework_id=homework_id,
-        file_name=file.filename or safe_name,
-        file_path=f"/homework-attachments/{safe_name}",
+        file_name=file.filename or stored_path.rsplit("/", 1)[-1],
+        file_path=stored_path,
         file_type=extension.lstrip("."),
         file_size_kb=int(len(content) / 1024),
         uploaded_by=current_user.id,
     )
-    return attachment
 
 
 @router.delete(
@@ -414,17 +412,10 @@ def delete_attachment(
         homework_id=homework_id,
         viewer_context=viewer_context,
     )
-    result = homework_service.delete_attachment(
+    homework_service.delete_attachment(
         db,
         tenant_id=current_user.tenant_id,
         homework_id=homework_id,
         attachment_id=attachment_id,
     )
-    # Delete file from disk (best-effort)
-    try:
-        file_path = os.path.join("static", result.get("file_path", "").lstrip("/"))
-        if os.path.exists(file_path):
-            os.remove(file_path)
-    except Exception:
-        pass
     return {"message": "Attachment deleted successfully"}

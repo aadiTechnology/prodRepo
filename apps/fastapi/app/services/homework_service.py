@@ -9,7 +9,11 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictException, ValidationException
 
-from app.models.homework import Homework, HomeworkAttachment
+from app.models.homework import Homework
+from app.services.homework_attachment_storage import (
+    delete_homework_attachment_file,
+    resolve_attachment_url,
+)
 from app.repositories import homework_repository as repo
 from app.services.homework_access import (
     HomeworkViewerContext,
@@ -87,7 +91,7 @@ def _to_response(hw: Homework, *, is_viewed: bool = False) -> HomeworkResponse:
                 "id": a.id,
                 "homework_id": a.homework_id,
                 "file_name": a.file_name,
-                "file_path": a.file_path,
+                "file_path": resolve_attachment_url(a.file_path),
                 "file_type": a.file_type,
                 "file_size_kb": a.file_size_kb,
                 "uploaded_at": a.uploaded_at,
@@ -438,10 +442,10 @@ def add_attachment(
     file_type: Optional[str],
     file_size_kb: Optional[int],
     uploaded_by: int,
-) -> HomeworkAttachment:
+) -> HomeworkAttachmentResponse:
     hw = repo.get_homework(db, tenant_id=tenant_id, homework_id=homework_id)
     _assert_homework_editable(hw)
-    return repo.add_attachment(
+    att = repo.add_attachment(
         db,
         homework_id=homework_id,
         file_name=file_name,
@@ -449,6 +453,15 @@ def add_attachment(
         file_type=file_type,
         file_size_kb=file_size_kb,
         uploaded_by=uploaded_by,
+    )
+    return HomeworkAttachmentResponse(
+        id=att.id,
+        homework_id=att.homework_id,
+        file_name=att.file_name,
+        file_path=resolve_attachment_url(att.file_path),
+        file_type=att.file_type,
+        file_size_kb=att.file_size_kb,
+        uploaded_at=att.uploaded_at,
     )
 
 
@@ -463,6 +476,8 @@ def delete_attachment(
     _assert_homework_editable(hw)
     att = repo.get_attachment(db, homework_id=homework_id, attachment_id=attachment_id)
     file_path = repo.delete_attachment(db, att=att)
+    if file_path:
+        delete_homework_attachment_file(file_path)
     return {"file_path": file_path}
 
 

@@ -15,7 +15,8 @@ from app.services.notice_access import (
     resolve_teacher_notice_target_pairs,
 )
 from app.services.notice_attachment_storage import (
-    disk_path_for_attachment,
+    delete_notice_attachment_file,
+    resolve_attachment_url,
     save_notice_attachment_file,
     validate_attachment_path,
 )
@@ -208,6 +209,14 @@ def _normalize_attachments(*, attachments: list[dict]) -> list[dict]:
     return normalized
 
 
+def _attachment_response(item: dict) -> NoticeAttachmentResponse:
+    payload = dict(item)
+    file_path = payload.get("file_path")
+    if file_path:
+        payload["file_path"] = resolve_attachment_url(str(file_path))
+    return NoticeAttachmentResponse(**payload)
+
+
 def _to_notice_response(
     db: Session, row: dict, *, is_viewed: bool = False
 ) -> NoticeResponse:
@@ -234,7 +243,7 @@ def _to_notice_response(
         updated_at=row.get("updated_at"),
         is_deleted=bool(row["is_deleted"]),
         targets=[NoticeTargetResponse(**item) for item in targets],
-        attachments=[NoticeAttachmentResponse(**item) for item in attachments],
+        attachments=[_attachment_response(item) for item in attachments],
         is_viewed=is_viewed,
     )
 
@@ -543,7 +552,7 @@ def upload_notice_attachment(
     attachments = notice_repository.get_notice_attachments(db, notice_id=notice_id)
     if not attachments:
         raise ValidationException("File upload failed")
-    return NoticeAttachmentResponse(**attachments[-1])
+    return _attachment_response(attachments[-1])
 
 
 def delete_notice_attachment(
@@ -576,6 +585,8 @@ def delete_notice_attachment(
         attachments=[],
     )
     db.commit()
+    if file_path:
+        delete_notice_attachment_file(file_path)
     return file_path or None
 
 

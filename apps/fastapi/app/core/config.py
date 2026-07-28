@@ -69,6 +69,20 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # Azure Blob Storage (attachments)
+    AZURE_STORAGE_CONNECTION_STRING: str = Field(
+        default="",
+        description="Azure Storage connection string for attachment blobs",
+    )
+    AZURE_CONTAINER_NAME: str = Field(
+        default="attachmentserp",
+        description="Azure Blob container name for attachments",
+    )
+    AZURE_BLOB_SAS_EXPIRY_MINUTES: int = Field(
+        default=60,
+        description="SAS token lifetime in minutes for secure attachment downloads",
+    )
     
     # Logging
     LOG_LEVEL: str = "INFO"
