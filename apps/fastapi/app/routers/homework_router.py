@@ -418,4 +418,5 @@ def delete_attachment(
         homework_id=homework_id,
         attachment_id=attachment_id,
     )
+    
     return {"message": "Attachment deleted successfully"}
