@@ -277,7 +277,9 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
     icon: calendarIcon,
     color: colorTokens.menuColors.academics,
     children: [
-      { id: "mark-attendance", label: "Mark Attendance", path: "/attendance/mark" }
+      { id: "mark-attendance", label: "Mark Attendance", path: "/attendance/mark" },
+      { id: "teacher-attendance-marking", label: "Teacher Attendance", path: "/attendance/teacher-marking" }
+
     ]
   },
   {
