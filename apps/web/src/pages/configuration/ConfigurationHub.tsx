@@ -94,6 +94,20 @@ const CONFIG_SECTIONS: ConfigSection[] = [
       },
     ],
   },
+
+  {
+    id: "attendance-related",
+    label: "Attendance Related",
+    features: [
+      {
+        id: "attendance-configuration",
+        label: "Attendance Configuration",
+        path: "/attendance/configuration",
+        permission: "ACADEMIC_MGMT:view",
+        menuPaths: ["/attendance/configuration"],
+      },
+    ],
+  },
   {
     id: "fees-related",
     label: "Fees Related",
