@@ -28,9 +28,12 @@ const TeacherAssignmentsPage = lazy(() => import("../pages/teacher/TeacherAssign
 const AssignTeacher = lazy(() => import("../pages/teacher/AssignTeacher"));
 const MarkAttendance = lazy(() => import("../pages/Attendance/MarkAttendance"));
 const AttendanceReport = lazy(() => import("../pages/Attendance/AttendanceReport"));
-const AttendanceConfigurationPage = lazy(
-  () => import("../pages/Attendance/configuration/AttendanceConfigurationPage")
-);
+// Disabled: pages/Attendance/configuration/ is absent from the repo, so this
+// import breaks the dev server build. Re-enable with the route below once the
+// Attendance Configuration page is committed.
+// const AttendanceConfigurationPage = lazy(
+//   () => import("../pages/Attendance/configuration/AttendanceConfigurationPage")
+// );
 const TeacherAttendanceDashboardPage = lazy(
   () => import("../pages/Attendance/teacher-marking/TeacherAttendanceDashboardPage")
 );
@@ -506,14 +509,14 @@ export default function AppRoutes() {
           <Route path="/attendance/mark" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><MarkAttendance /></ProtectedRoute>} />
           <Route path="/attendance/teacher-marking" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><TeacherAttendanceDashboardPage /></ProtectedRoute>} />
           <Route path="/attendance/report" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><AttendanceReport /></ProtectedRoute>} />
-          <Route
+          {/* <Route
             path="/attendance/configuration"
             element={
               <ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view">
                 <AttendanceConfigurationPage />
               </ProtectedRoute>
             }
-          />
+          /> */}
 
 
           {/* Admissions – Lead Management */}
