@@ -75,12 +75,15 @@ export function createNoticeFormConfig({
         type: "date",
         required: true,
       },
-      expiry_date: {
-        name: "expiry_date",
-        label: "Expiry Date",
-        type: "date",
-        required: false,
-      },
+      // Expiry Date hidden on request. New notices save expiry_date as null, so
+      // they never auto-expire; existing notices with an expiry still do.
+      // Uncomment both this and the layoutRows entry below to restore.
+      // expiry_date: {
+      //   name: "expiry_date",
+      //   label: "Expiry Date",
+      //   type: "date",
+      //   required: false,
+      // },
       // send_notification: {
       //   name: "send_notification",
       //   label: "Send Notification",
@@ -93,7 +96,7 @@ export function createNoticeFormConfig({
       { kind: "custom", grid: { xs: 12, sm: 6 }, render: () => audienceTypeRenderer },
       { kind: "custom", grid: { xs: 12, sm: 6 }, render: () => noticeTypeRenderer },
       { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["publish_date"] },
-      { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["expiry_date"] },
+      // { kind: "fields", grid: { xs: 12, sm: 6 }, fieldNames: ["expiry_date"] },
       {
         kind: "custom",
         grid: { xs: 12 },

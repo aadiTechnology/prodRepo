@@ -90,12 +90,15 @@ export const createHomeworkFormConfig = (options: {
       type: "date",
       required: true,
     },
-    submission_date: {
-      name: "submission_date",
-      label: "Submission Date",
-      type: "date",
-      required: false,
-    },
+    // Submission Date hidden on request. Field kept (optional end-to-end) so
+    // homework saves submission_date as null; uncomment both this and the
+    // layoutRows entry below to restore.
+    // submission_date: {
+    //   name: "submission_date",
+    //   label: "Submission Date",
+    //   type: "date",
+    //   required: false,
+    // },
   },
 
   layoutRows: [
@@ -108,7 +111,7 @@ export const createHomeworkFormConfig = (options: {
     { kind: "fields", grid: { xs: 12 }, fieldNames: ["instructions"] },
     { kind: "section", title: "Schedule", grid: { xs: 12 } },
     { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["assigned_date"] },
-    { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["submission_date"] },
+    // { kind: "fields", grid: { xs: 12, md: 6 }, fieldNames: ["submission_date"] },
     ...(options.attachmentSlot
       ? [
           {

@@ -79,11 +79,12 @@ export const createHomeworkListConfig = ({
       label: "Assigned",
       render: (row: HomeworkRow) => formatDate(row.assigned_date),
     },
-    {
-      id: "submission_date",
-      label: "Submission",
-      render: (row: HomeworkRow) => formatDate(row.submission_date),
-    },
+    // Submission Date hidden on request.
+    // {
+    //   id: "submission_date",
+    //   label: "Submission",
+    //   render: (row: HomeworkRow) => formatDate(row.submission_date),
+    // },
     ...(showStatusColumn
       ? [
           {
@@ -115,8 +116,8 @@ export const createHomeworkListConfig = ({
   sortOptions: [
     { id: "title-asc", label: "Title (A–Z)", sortBy: "title", sortOrder: "asc" },
     { id: "title-desc", label: "Title (Z–A)", sortBy: "title", sortOrder: "desc" },
-    { id: "submission_date-asc", label: "Submission (earliest)", sortBy: "submission_date", sortOrder: "asc" },
-    { id: "submission_date-desc", label: "Submission (latest)", sortBy: "submission_date", sortOrder: "desc" },
+    // { id: "submission_date-asc", label: "Submission (earliest)", sortBy: "submission_date", sortOrder: "asc" },
+    // { id: "submission_date-desc", label: "Submission (latest)", sortBy: "submission_date", sortOrder: "desc" },
   ],
 
   uiPolicy: {

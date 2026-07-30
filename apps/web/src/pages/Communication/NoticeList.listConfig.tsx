@@ -76,11 +76,12 @@ export function createNoticeListConfig({
         label: "Publish Date",
         render: (row) => formatShortDate(row.publish_date),
       },
-      {
-        id: "expiry_date",
-        label: "Expiry Date",
-        render: (row) => (row.expiry_date ? formatShortDate(row.expiry_date) : "—"),
-      },
+      // Expiry Date hidden on request.
+      // {
+      //   id: "expiry_date",
+      //   label: "Expiry Date",
+      //   render: (row) => (row.expiry_date ? formatShortDate(row.expiry_date) : "—"),
+      // },
       ...(hideAdminColumns
         ? []
         : [
