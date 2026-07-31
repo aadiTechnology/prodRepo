@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   Box,
   Button,
   IconButton,
-  Snackbar,
   Tab,
   Tabs,
   Tooltip,
@@ -18,6 +16,7 @@ import {
   Slideshow as SlideshowIcon,
   Videocam as VideocamIcon,
 } from "@mui/icons-material";
+import { useSnackbar } from "notistack";
 import { useLocation, useNavigate } from "react-router-dom";
 import { EntityTableSection, ListPageLayout, ListPageToolbar } from "../../components/reusable";
 import TableRowActions from "../../components/reusable/TableRowActions";
@@ -42,6 +41,7 @@ function tabIndexFromGalleryType(type?: GalleryType): number {
 export default function ActivityGalleryList() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { enqueueSnackbar } = useSnackbar();
   const perms = useActivityGalleryPermissions();
   const [tabIndex, setTabIndex] = useState(() =>
     tabIndexFromGalleryType((location.state as { galleryType?: GalleryType } | null)?.galleryType),
@@ -56,12 +56,26 @@ export default function ActivityGalleryList() {
     }
   }, [location.state]);
 
+  useEffect(() => {
+    if (!c.snackbar) return;
+    enqueueSnackbar(c.snackbar, {
+      variant: "success",
+      autoHideDuration: 3000,
+      anchorOrigin: { vertical: "top", horizontal: "center" },
+    });
+    c.setSnackbar(null);
+  }, [c.snackbar, c.setSnackbar, enqueueSnackbar]);
+
   const handleDownload = useCallback(async (row: ActivityGalleryListItem) => {
     try {
       const gallery = await activityGalleryService.getById(row.id);
       const media = gallery.media_items ?? [];
       if (media.length === 0) {
-        c.setSnackbar("No media available to download.");
+        enqueueSnackbar("No media available to download.", {
+          variant: "warning",
+          autoHideDuration: 3000,
+          anchorOrigin: { vertical: "top", horizontal: "center" },
+        });
         return;
       }
       for (const item of media) {
@@ -70,9 +84,13 @@ export default function ActivityGalleryList() {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Download failed";
-      c.setSnackbar(msg);
+      enqueueSnackbar(msg, {
+        variant: "error",
+        autoHideDuration: 4000,
+        anchorOrigin: { vertical: "top", horizontal: "center" },
+      });
     }
-  }, [c]);
+  }, [enqueueSnackbar]);
 
   const listConfig = useMemo(
     () =>
@@ -221,17 +239,6 @@ export default function ActivityGalleryList() {
         onClose={c.closeDeleteConfirm}
         loading={c.deleteLoading}
       />
-
-      <Snackbar
-        open={!!c.snackbar}
-        autoHideDuration={4000}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        onClose={() => c.setSnackbar(null)}
-      >
-        <Alert onClose={() => c.setSnackbar(null)} severity="success" sx={{ width: "100%" }}>
-          {c.snackbar}
-        </Alert>
-      </Snackbar>
     </ListPageLayout>
   );
 }
