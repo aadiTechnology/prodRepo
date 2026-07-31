@@ -524,10 +524,20 @@ export default function CreateActivityGallery() {
     ensureFormValid,
   ]);
 
+  const mediaRequiredMessage =
+    galleryType === "Photo"
+      ? "Please upload at least one photo"
+      : "Please add at least one YouTube video";
+
   const handleConfirmSave = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      setFileError(null);
+      if (savedMedia.length < 1) {
+        setFileError(mediaRequiredMessage);
+        return;
+      }
       await persistGallery();
       enqueueSnackbar("Gallery saved successfully.", { variant: "success" });
       navigate(GALLERY_PATH, { state: { galleryType } });
@@ -538,22 +548,26 @@ export default function CreateActivityGallery() {
     } finally {
       setLoading(false);
     }
-  }, [enqueueSnackbar, galleryType, navigate, persistGallery, setFieldErrors]);
+  }, [
+    enqueueSnackbar,
+    galleryType,
+    mediaRequiredMessage,
+    navigate,
+    persistGallery,
+    savedMedia.length,
+    setFieldErrors,
+  ]);
 
   const handlePublish = useCallback(async () => {
     try {
       setPublishLoading(true);
       setError(null);
       setFileError(null);
-      const targetId = await persistGallery();
       if (savedMedia.length < 1) {
-        setFileError(
-          galleryType === "Photo"
-            ? "Please upload at least one photo"
-            : "Please add at least one YouTube video",
-        );
+        setFileError(mediaRequiredMessage);
         return;
       }
+      const targetId = await persistGallery();
       await activityGalleryService.publish(targetId);
       enqueueSnackbar("Gallery published successfully.", { variant: "success" });
       navigate(GALLERY_PATH, { state: { galleryType } });
@@ -564,7 +578,15 @@ export default function CreateActivityGallery() {
     } finally {
       setPublishLoading(false);
     }
-  }, [enqueueSnackbar, galleryType, navigate, persistGallery, savedMedia.length]);
+  }, [
+    enqueueSnackbar,
+    galleryType,
+    mediaRequiredMessage,
+    navigate,
+    persistGallery,
+    savedMedia.length,
+    setFieldErrors,
+  ]);
 
   const validateFiles = useCallback(
     (files: File[]): string | null => {
