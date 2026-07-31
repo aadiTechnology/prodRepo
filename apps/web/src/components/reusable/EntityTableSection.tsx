@@ -14,6 +14,7 @@ export interface EntityTableSectionProps<T extends object> {
   rowsPerPage: number;
   onPageChange: (page: number) => void;
   onRowsPerPageChange: (rowsPerPage: number) => void;
+  rowsPerPageOptions?: number[];
   columns: DataTableProps<T>["columns"];
   data: DataTableProps<T>["data"];
   emptyMessage?: ReactNode;
@@ -42,6 +43,7 @@ export default function EntityTableSection<T extends object>({
   rowsPerPage,
   onPageChange,
   onRowsPerPageChange,
+  rowsPerPageOptions,
   columns,
   data,
   emptyMessage,
@@ -104,6 +106,7 @@ export default function EntityTableSection<T extends object>({
           totalRows={totalRows}
           onPageChange={onPageChange}
           onRowsPerPageChange={onRowsPerPageChange}
+          rowsPerPageOptions={rowsPerPageOptions}
         />
       )}
     </>

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -18,12 +18,15 @@ import {
   Slideshow as SlideshowIcon,
   Videocam as VideocamIcon,
 } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { EntityTableSection, ListPageLayout, ListPageToolbar } from "../../components/reusable";
 import TableRowActions from "../../components/reusable/TableRowActions";
 import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
-import { useActivityGalleryListController } from "../../hooks/useActivityGalleryListController";
+import {
+  GALLERY_LIST_ROWS_PER_PAGE_OPTIONS,
+  useActivityGalleryListController,
+} from "../../hooks/useActivityGalleryListController";
 import { useActivityGalleryPermissions } from "../../hooks/useActivityGalleryPermissions";
 import activityGalleryService from "../../api/services/activityGalleryService";
 import type { ActivityGalleryListItem, GalleryType } from "../../types/activityGallery";
@@ -32,12 +35,26 @@ import { colorTokens } from "../../tokens/colors";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
 
+function tabIndexFromGalleryType(type?: GalleryType): number {
+  return type === "Video" ? 1 : 0;
+}
+
 export default function ActivityGalleryList() {
   const navigate = useNavigate();
+  const location = useLocation();
   const perms = useActivityGalleryPermissions();
-  const [tabIndex, setTabIndex] = useState(0);
+  const [tabIndex, setTabIndex] = useState(() =>
+    tabIndexFromGalleryType((location.state as { galleryType?: GalleryType } | null)?.galleryType),
+  );
   const galleryType: GalleryType = tabIndex === 0 ? "Photo" : "Video";
   const c = useActivityGalleryListController(galleryType);
+
+  useEffect(() => {
+    const type = (location.state as { galleryType?: GalleryType } | null)?.galleryType;
+    if (type === "Photo" || type === "Video") {
+      setTabIndex(tabIndexFromGalleryType(type));
+    }
+  }, [location.state]);
 
   const handleDownload = useCallback(async (row: ActivityGalleryListItem) => {
     try {
@@ -145,6 +162,7 @@ export default function ActivityGalleryList() {
         rowsPerPage={c.rowsPerPage}
         onPageChange={c.setPage}
         onRowsPerPageChange={c.setRowsPerPage}
+        rowsPerPageOptions={GALLERY_LIST_ROWS_PER_PAGE_OPTIONS}
         columns={listConfig.columns}
         data={c.items}
         loading={c.tableLoading}

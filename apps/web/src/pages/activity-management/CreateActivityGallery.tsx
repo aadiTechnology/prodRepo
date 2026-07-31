@@ -530,7 +530,7 @@ export default function CreateActivityGallery() {
       setError(null);
       await persistGallery();
       enqueueSnackbar("Gallery saved successfully.", { variant: "success" });
-      navigate(GALLERY_PATH);
+      navigate(GALLERY_PATH, { state: { galleryType } });
     } catch (err: unknown) {
       const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
       setFieldErrors((prev) => ({ ...prev, ...apiFieldErrors }));
@@ -538,7 +538,7 @@ export default function CreateActivityGallery() {
     } finally {
       setLoading(false);
     }
-  }, [enqueueSnackbar, navigate, persistGallery, setFieldErrors]);
+  }, [enqueueSnackbar, galleryType, navigate, persistGallery, setFieldErrors]);
 
   const handlePublish = useCallback(async () => {
     try {
@@ -556,7 +556,7 @@ export default function CreateActivityGallery() {
       }
       await activityGalleryService.publish(targetId);
       enqueueSnackbar("Gallery published successfully.", { variant: "success" });
-      navigate(GALLERY_PATH);
+      navigate(GALLERY_PATH, { state: { galleryType } });
     } catch (err: unknown) {
       const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
       setFieldErrors((prev) => ({ ...prev, ...apiFieldErrors }));
@@ -950,12 +950,17 @@ export default function CreateActivityGallery() {
           saveTooltipCreate: "Save",
           saveTooltipEdit: "Save",
         }}
-        onCancelNavigate={() => navigate(GALLERY_PATH)}
-        confirmMessage={(ctx) =>
-          ctx.isEditMode
-            ? "Are you sure you want to update this gallery?"
-            : "Are you sure you want to save this gallery?"
-        }
+        onCancelNavigate={() => navigate(GALLERY_PATH, { state: { galleryType } })}
+        confirmMessage={(ctx) => {
+          if (galleryType === "Video") {
+            return ctx.isEditMode
+              ? "Are you sure you want to update this Video?"
+              : "Are you sure you want to save this Video?";
+          }
+          return ctx.isEditMode
+            ? "Are you sure you want to update this Photo?"
+            : "Are you sure you want to save this Photo?";
+        }}
         submitLabelCreate="Save"
         submitLabelEdit="Save"
         extraHeaderActions={
