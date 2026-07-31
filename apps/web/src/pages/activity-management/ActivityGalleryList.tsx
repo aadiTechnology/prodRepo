@@ -15,7 +15,6 @@ import {
   Add as AddIcon,
   Download as DownloadIcon,
   Photo as PhotoIcon,
-  Refresh as RefreshIcon,
   Slideshow as SlideshowIcon,
   Videocam as VideocamIcon,
 } from "@mui/icons-material";
@@ -96,21 +95,6 @@ export default function ActivityGalleryList() {
                 searchValue={c.search}
                 onSearchChange={c.setSearch}
                 searchPlaceholder="Search by gallery name or class…"
-                renderActions={
-                  <Tooltip title="Refresh">
-                    <IconButton
-                      onClick={() => void c.fetchGalleries()}
-                      disabled={c.loading}
-                      sx={{
-                        border: `1px solid ${alpha(colorTokens.primary.main, 0.2)}`,
-                        bgcolor: "background.paper",
-                      }}
-                    >
-                      <RefreshIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                }
-                actionsAfterSearch
                 {...(perms.canCreate && !perms.readOnlyAudience
                   ? {
                       onAddClick: () =>

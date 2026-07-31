@@ -951,7 +951,11 @@ export default function CreateActivityGallery() {
           saveTooltipEdit: "Save",
         }}
         onCancelNavigate={() => navigate(GALLERY_PATH)}
-        confirmMessage="Save this activity gallery?"
+        confirmMessage={(ctx) =>
+          ctx.isEditMode
+            ? "Are you sure you want to update this gallery?"
+            : "Are you sure you want to save this gallery?"
+        }
         submitLabelCreate="Save"
         submitLabelEdit="Save"
         extraHeaderActions={
