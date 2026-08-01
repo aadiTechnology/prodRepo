@@ -236,6 +236,10 @@ def resolve_download_url(file_path: str) -> str:
         return trimmed
 
     try:
+        # Legacy rows can still point to files that were never uploaded to Azure.
+        # In that case, keep the original path so existing StaticFiles mounts can serve them.
+        if not blob_exists(blob_name):
+            return trimmed
         return generate_sas_url(blob_name)
     except Exception:
         logger.exception("Failed to generate SAS URL for %s", blob_name)
