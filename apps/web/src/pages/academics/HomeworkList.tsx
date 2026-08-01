@@ -131,74 +131,51 @@ export default function HomeworkList() {
     setListPage(0);
   }, [selectedChild?.id]);
 
-  // Fetch student profile or parent's children info
+  // Parent child selection only — students trust API-scoped homework (no name/email/list match).
   useEffect(() => {
-    if (!controller.readOnlyAudience) return;
+    if (!controller.readOnlyAudience || !isParent || isStudent) return;
 
     studentService.list({ limit: 100 })
       .then((res) => {
-        if (isStudent) {
-          const matched = res.items.find(
-            (s: any) =>
-              s.email?.toLowerCase() === user?.email?.toLowerCase() ||
-              s.name?.toLowerCase() === user?.full_name?.toLowerCase()
-          );
-          if (matched) {
-            setChildren([matched]);
-            setSelectedChild(matched);
-          } else {
-            const fallbackStudent = {
-              id: "fallback-student",
-              name: user?.full_name || "Student",
-              roll_no: "N/A",
-              class_name: "Active Student",
-              class_division_name: "",
-            };
-            setChildren([fallbackStudent]);
-            setSelectedChild(fallbackStudent);
-          }
-        } else if (isParent) {
-          const matched = res.items.filter(
-            (s: any) =>
-              s.parent_name?.toLowerCase() === user?.full_name?.toLowerCase() ||
-              (user?.phone_number && s.parent_mobile === user?.phone_number)
-          );
+        const matched = res.items.filter(
+          (s: any) =>
+            s.parent_name?.toLowerCase() === user?.full_name?.toLowerCase() ||
+            (user?.phone_number && s.parent_mobile === user?.phone_number)
+        );
 
-          if (matched.length > 0) {
-            setChildren(matched);
-            setSelectedChild(matched[0]);
-          } else {
-            if (controller.homework.length > 0) {
-              const uniqueChildrenFromHomework = Array.from(
-                new Set(controller.homework.map(h => h.class_name))
-              ).map((className, idx) => ({
-                id: `hw-child-${idx}`,
-                name: `Child ${idx + 1}`,
-                roll_no: "—",
-                class_name: className,
-                class_division_name: controller.homework.find(h => h.class_name === className)?.division_name || "",
-              }));
-              setChildren(uniqueChildrenFromHomework);
-              setSelectedChild(uniqueChildrenFromHomework[0]);
-            } else {
-              const fallbackChild = {
-                id: "fallback-child",
-                name: "Your Child",
-                roll_no: "—",
-                class_name: "Assigned Class",
-                class_division_name: "",
-              };
-              setChildren([fallbackChild]);
-              setSelectedChild(fallbackChild);
-            }
-          }
+        if (matched.length > 0) {
+          setChildren(matched);
+          setSelectedChild(matched[0]);
+        } else if (controller.homework.length > 0) {
+          const uniqueChildrenFromHomework = Array.from(
+            new Set(controller.homework.map((h) => h.class_name))
+          ).map((className, idx) => ({
+            id: `hw-child-${idx}`,
+            name: `Child ${idx + 1}`,
+            roll_no: "—",
+            class_name: className,
+            class_division_name:
+              controller.homework.find((h) => h.class_name === className)?.division_name || "",
+          }));
+          setChildren(uniqueChildrenFromHomework);
+          setSelectedChild(uniqueChildrenFromHomework[0]);
+        } else {
+          const fallbackChild = {
+            id: "fallback-child",
+            name: "Your Child",
+            roll_no: "—",
+            class_name: "Assigned Class",
+            class_division_name: "",
+          };
+          setChildren([fallbackChild]);
+          setSelectedChild(fallbackChild);
         }
       })
       .catch((err) => {
         console.error("Error loading student/child info:", err);
         const fallback = {
           id: "fallback-err",
-          name: user?.full_name || "Student",
+          name: user?.full_name || "Parent",
           roll_no: "N/A",
           class_name: "Assigned Class",
           class_division_name: "",
@@ -208,19 +185,27 @@ export default function HomeworkList() {
       });
   }, [controller.readOnlyAudience, isStudent, isParent, user, controller.homework]);
 
-  // Locally filtered homework based on child selection
+  // Students: render API homework as-is. Parents: filter by selected child/class.
   const filteredHomeworkByChild = useMemo(() => {
+    if (isStudent) {
+      return controller.homework;
+    }
+
     if (!selectedChild || selectedChild.id?.toString().startsWith("fallback")) {
       return controller.homework;
     }
 
     if (selectedChild.id?.toString().startsWith("hw-child")) {
-      return controller.homework.filter(h => h.class_name === selectedChild.class_name);
+      return controller.homework.filter((h) => h.class_name === selectedChild.class_name);
     }
 
     return controller.homework.filter((h) => {
       const childClassId = Number(selectedChild.classId || selectedChild.class_id);
-      const childClassName = (selectedChild.className || selectedChild.class_name || selectedChild.class_)?.toLowerCase();
+      const childClassName = (
+        selectedChild.className ||
+        selectedChild.class_name ||
+        selectedChild.class_
+      )?.toLowerCase();
 
       if (!isNaN(childClassId) && childClassId > 0 && h.class_id === childClassId) {
         return true;
@@ -232,7 +217,7 @@ export default function HomeworkList() {
 
       return false;
     });
-  }, [controller.homework, selectedChild]);
+  }, [controller.homework, selectedChild, isStudent]);
 
   // Compute metrics and active ratio
   const stats = useMemo(() => {
