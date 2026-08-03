@@ -96,6 +96,19 @@ def _fetch_recent_notices(
         logger.warning(f"Could not fetch recent notices: {e}")
 
     # ── Holidays (recent 30 days + upcoming 60 days) ──────────────────────────
+    # Track real sort dates so we never rely on parsing formatted display strings.
+    sort_dates: dict[tuple[str, int], date] = {}
+    for item in result:
+        if item.published_at:
+            try:
+                sort_dates[("notice", item.id)] = datetime.strptime(
+                    item.published_at, "%d %b %Y"
+                ).date()
+            except Exception:
+                sort_dates[("notice", item.id)] = date.min
+        else:
+            sort_dates[("notice", item.id)] = date.min
+
     try:
         today = date.today()
         window_start = today - timedelta(days=30)
@@ -103,14 +116,23 @@ def _fetch_recent_notices(
         holidays = (
             db.query(Holiday)
             .filter(Holiday.tenant_id == tenant_id)
-            .filter(Holiday.is_active == True)
+            .filter(Holiday.is_active == True)  # noqa: E712
             .filter(Holiday.start_date >= window_start)
             .filter(Holiday.start_date <= window_end)
-            .order_by(Holiday.start_date.desc())
+            # Latest holiday first (most recently created), then nearest start date
+            .order_by(Holiday.created_at.desc(), Holiday.start_date.desc())
             .limit(limit)
             .all()
         )
         for h in holidays:
+            created = h.created_at
+            if isinstance(created, datetime):
+                holiday_sort_date = created.date()
+            elif isinstance(created, date):
+                holiday_sort_date = created
+            else:
+                holiday_sort_date = h.start_date if h.start_date is not None else date.min
+
             result.append(RecentNoticeItem(
                 id=h.id,  # type: ignore[arg-type]
                 title=h.holiday_name,  # type: ignore[arg-type]
@@ -121,19 +143,15 @@ def _fetch_recent_notices(
                 ),
                 priority="Normal",
             ))
+            sort_dates[("holiday", int(h.id))] = holiday_sort_date  # type: ignore[arg-type]
     except Exception as e:
         logger.warning(f"Could not fetch holidays for dashboard: {e}")
 
-    # ── Merge: sort by date desc, most recent first ───────────────────────────
-    def _sort_key(item: RecentNoticeItem) -> date:
-        if item.published_at:
-            try:
-                return datetime.strptime(item.published_at, "%d %b %Y").date()
-            except Exception:
-                pass
-        return date.min
-
-    result.sort(key=_sort_key, reverse=True)
+    # ── Merge: latest first (notices by publish date, holidays by created_at) ─
+    result.sort(
+        key=lambda item: sort_dates.get((item.item_type or "notice", item.id), date.min),
+        reverse=True,
+    )
     return result[:limit]
 
 

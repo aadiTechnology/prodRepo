@@ -259,17 +259,17 @@ def create_platform(
 def seed_default_platforms(db: Session) -> None:
     """Seed default platforms into the catalog if the table is empty."""
     default_platforms = [
-        {"name": "Instagram", "code": "instagram", "category": "Social Media", "sort_order": 10},
-        {"name": "Facebook", "code": "facebook", "category": "Social Media", "sort_order": 20},
-        {"name": "YouTube", "code": "youtube", "category": "Social Media", "sort_order": 30},
-        {"name": "Meta Ads", "code": "meta_ads", "category": "Advertising", "sort_order": 40},
-        {"name": "Google Ads", "code": "google_ads", "category": "Advertising", "sort_order": 50},
-        {"name": "WhatsApp", "code": "whatsapp", "category": "Communication", "sort_order": 60},
-        {"name": "Email Campaign", "code": "email_campaign", "category": "Communication", "sort_order": 70},
-        {"name": "Canva", "code": "canva", "category": "Branding", "sort_order": 80},
-        {"name": "Brochure", "code": "brochure", "category": "Branding", "sort_order": 90},
-        {"name": "School Website", "code": "school_website", "category": "Website & Reviews", "sort_order": 100},
-        {"name": "Google Review", "code": "google_review", "category": "Website & Reviews", "sort_order": 110},
+        {"name": "Instagram", "code": "instagram", "category": "Social Media", "sort_order": 1},
+        {"name": "Facebook", "code": "facebook", "category": "Social Media", "sort_order": 2},
+        {"name": "YouTube", "code": "youtube", "category": "Social Media", "sort_order": 3},
+        {"name": "Meta Ads", "code": "meta_ads", "category": "Advertising", "sort_order": 4},
+        {"name": "Google Ads", "code": "google_ads", "category": "Advertising", "sort_order": 5},
+        {"name": "WhatsApp", "code": "whatsapp", "category": "Communication", "sort_order": 6},
+        {"name": "Email Campaign", "code": "email_campaign", "category": "Communication", "sort_order": 7},
+        {"name": "Canva", "code": "canva", "category": "Branding", "sort_order": 8},
+        {"name": "Brochure", "code": "brochure", "category": "Branding", "sort_order": 9},
+        {"name": "School Website", "code": "school_website", "category": "Website & Reviews", "sort_order": 10},
+        {"name": "Google Review", "code": "google_review", "category": "Website & Reviews", "sort_order": 11},
     ]
 
     for p_def in default_platforms:

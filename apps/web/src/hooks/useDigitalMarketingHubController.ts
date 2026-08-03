@@ -59,12 +59,12 @@ export function useDigitalMarketingHubController() {
         await marketingHubService.deleteMarketingLink(platform.link_id);
       }
       await marketingHubService.deletePlatform(platform.platform_id);
-      setSuccess(`${platform.name} removed from catalog.`);
+      setSuccess("Platform deleted successfully.");
       setDeleteTarget(null);
       await fetchConfig();
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(detail || "Failed to delete");
+      setError(detail || "Failed to delete platform.");
     } finally {
       setDeleting(false);
     }
@@ -91,25 +91,33 @@ export function useDigitalMarketingHubController() {
   const filteredPlatforms = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return platformConfig.filter((platform) => {
-      const matchesCategory = !categoryFilter || platform.category === categoryFilter;
+    return platformConfig
+      .filter((platform) => {
+        const matchesCategory = !categoryFilter || platform.category === categoryFilter;
 
-      const matchesSearch =
-        !query ||
-        platform.name.toLowerCase().includes(query) ||
-        platform.code.toLowerCase().includes(query) ||
-        platform.category.toLowerCase().includes(query);
+        const matchesSearch =
+          !query ||
+          platform.name.toLowerCase().includes(query) ||
+          platform.code.toLowerCase().includes(query) ||
+          platform.category.toLowerCase().includes(query);
 
-      const isActive = platform.link_active ?? true;
-      const isConfigured = Boolean(platform.url?.trim());
-      const matchesStatus =
-        !statusFilter ||
-        (statusFilter === "active" && isActive) ||
-        (statusFilter === "inactive" && !isActive) ||
-        (statusFilter === "configured" && isConfigured);
+        const isActive = platform.link_active ?? true;
+        const isConfigured = Boolean(platform.url?.trim());
+        const matchesStatus =
+          !statusFilter ||
+          (statusFilter === "active" && isActive) ||
+          (statusFilter === "inactive" && !isActive) ||
+          (statusFilter === "configured" && isConfigured);
 
-      return matchesCategory && matchesSearch && matchesStatus;
-    });
+        return matchesCategory && matchesSearch && matchesStatus;
+      })
+      // Keep catalog order stable: sort_order ASC, then name
+      .slice()
+      .sort((a, b) => {
+        const orderDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+        if (orderDiff !== 0) return orderDiff;
+        return a.name.localeCompare(b.name);
+      });
   }, [platformConfig, categoryFilter, statusFilter, search]);
 
   const paginatedPlatforms = useMemo(() => {
@@ -124,11 +132,7 @@ export function useDigitalMarketingHubController() {
 
   const deleteDialogMessage = useMemo(() => {
     if (!deleteTarget) return "";
-    const { platform } = deleteTarget;
-    if (platform.link_id) {
-      return `Remove "${platform.name}" and its configured link from the marketing hub?`;
-    }
-    return `Remove "${platform.name}" from the marketing catalog?`;
+    return "Are you sure you want to delete this platform?";
   }, [deleteTarget]);
 
   return {

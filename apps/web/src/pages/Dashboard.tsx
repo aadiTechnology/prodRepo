@@ -1075,6 +1075,22 @@ const openRecentNoticeItem = (
   navigate(`/communication/notices/${notice.id}`);
 };
 
+/** Parse dashboard dates like "29 Jul 2026" for stable latest-first sorting. */
+const parseDashboardItemDate = (value?: string | null): number => {
+  if (!value) return 0;
+  const native = Date.parse(value);
+  if (!Number.isNaN(native)) return native;
+  const match = value.trim().match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
+  if (!match) return 0;
+  const months: Record<string, number> = {
+    Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+    Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+  };
+  const month = months[match[2]];
+  if (month == null) return 0;
+  return new Date(Number(match[3]), month, Number(match[1])).getTime();
+};
+
 // ─── Notices table ────────────────────────────────────────────────────────────
 const NoticesTable: React.FC<{ notices: RecentNoticeItem[]; navigate: ReturnType<typeof useNavigate> }> = ({
   notices,
@@ -1150,10 +1166,21 @@ const NoticesCardContent: React.FC<{
     (t) => t.key === "all" || presentTypes.has(t.key)
   );
 
-  const filtered =
-    activeFilter === "all"
-      ? notices
-      : notices.filter((n) => (n.notice_type || "general").toLowerCase() === activeFilter);
+  const filtered = React.useMemo(() => {
+    const rows =
+      activeFilter === "all"
+        ? notices
+        : notices.filter((n) => (n.notice_type || "general").toLowerCase() === activeFilter);
+
+    // Holiday tab: always show latest holiday first by date
+    if (activeFilter === "holiday") {
+      return [...rows].sort(
+        (a, b) => parseDashboardItemDate(b.published_at) - parseDashboardItemDate(a.published_at)
+      );
+    }
+
+    return rows;
+  }, [notices, activeFilter]);
 
   return (
     <>

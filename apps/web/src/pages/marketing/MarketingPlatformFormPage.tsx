@@ -19,7 +19,7 @@ const emptyForm = (): MarketingPlatformFormData => ({
   code: "",
   category: "Social Media",
   description: "",
-  sort_order: 10,
+  sort_order: 1,
   integration_url: "",
   link_active: true,
 });
@@ -139,7 +139,7 @@ export default function MarketingPlatformFormPage() {
             name: formData.name.trim(),
             category: formData.category,
             description: formData.description.trim() || undefined,
-            sort_order: Number(formData.sort_order),
+            sort_order: Number.parseInt(String(formData.sort_order), 10) || 0,
           });
         } catch (platformErr: unknown) {
           const status = (platformErr as { response?: { status?: number } })?.response?.status;
@@ -165,7 +165,7 @@ export default function MarketingPlatformFormPage() {
           code: formData.code.trim().toLowerCase(),
           category: formData.category,
           description: formData.description.trim() || undefined,
-          sort_order: Number(formData.sort_order),
+          sort_order: Number.parseInt(String(formData.sort_order), 10) || 0,
         });
 
         if (normalizedUrl) {

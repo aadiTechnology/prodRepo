@@ -65,7 +65,8 @@ export function createMarketingPlatformFormConfig({
         name: "sort_order",
         label: "Sort Order",
         type: "text",
-        props: { htmlInput: { type: "number", min: 0 } },
+        props: { htmlInput: { type: "number", min: 0, step: 1 } },
+        helperText: "Lower numbers appear first (e.g. 1, then 2, then 3).",
       },
       integration_url: {
         name: "integration_url",

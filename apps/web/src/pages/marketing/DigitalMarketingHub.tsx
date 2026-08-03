@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Snackbar } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
+import { useSnackbar } from "notistack";
 
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { PageHeader } from "../../components/layout";
@@ -18,6 +18,27 @@ const breadcrumbLinks = [
 export default function DigitalMarketingHub() {
   const navigate = useNavigate();
   const controller = useDigitalMarketingHubController();
+  const { enqueueSnackbar } = useSnackbar();
+
+  useEffect(() => {
+    if (!controller.success) return;
+    enqueueSnackbar(controller.success, {
+      variant: "success",
+      autoHideDuration: 3000,
+      anchorOrigin: { vertical: "top", horizontal: "center" },
+    });
+    controller.setSuccess(null);
+  }, [controller.success, controller.setSuccess, enqueueSnackbar]);
+
+  useEffect(() => {
+    if (!controller.error) return;
+    enqueueSnackbar(controller.error, {
+      variant: "error",
+      autoHideDuration: 4000,
+      anchorOrigin: { vertical: "top", horizontal: "center" },
+    });
+    controller.setError(null);
+  }, [controller.error, controller.setError, enqueueSnackbar]);
 
   const listConfig = useMemo(
     () =>
@@ -64,14 +85,9 @@ export default function DigitalMarketingHub() {
         />
       }
     >
-      {controller.error && (
-        <Alert severity="error" sx={{ m: 2 }} onClose={() => controller.setError(null)}>
-          {controller.error}
-        </Alert>
-      )}
-
       <EntityTableSection<MarketingHubRow>
-        label="Platform Directory"
+        label=""
+        showInfoBar={false}
         totalRows={controller.filteredPlatforms.length}
         page={controller.page}
         rowsPerPage={controller.rowsPerPage}
@@ -90,28 +106,13 @@ export default function DigitalMarketingHub() {
 
       <ConfirmDialog
         open={!!controller.deleteTarget}
-        title="Confirm Delete"
+        title="Please Confirm"
         message={controller.deleteDialogMessage}
-        confirmText={controller.deleting ? "Deleting…" : "Delete"}
+        confirmText={controller.deleting ? "Deleting…" : "Confirm"}
         onConfirm={() => void controller.handleConfirmDelete()}
         onCancel={() => controller.setDeleteTarget(null)}
         loading={controller.deleting}
       />
-
-      <Snackbar
-        open={!!controller.success}
-        autoHideDuration={3000}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        onClose={() => controller.setSuccess(null)}
-      >
-        <Alert
-          onClose={() => controller.setSuccess(null)}
-          severity="success"
-          sx={{ borderRadius: "12px", width: "100%" }}
-        >
-          {controller.success}
-        </Alert>
-      </Snackbar>
     </ListPageLayout>
   );
 }
