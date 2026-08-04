@@ -2,9 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import activityGalleryService from "../api/services/activityGalleryService";
 import type { ActivityGalleryListItem, GalleryType } from "../types/activityGallery";
 
-/** Gallery list starts at 21 (defect: page initiation should not default to ≤20). */
-export const GALLERY_LIST_ROWS_PER_PAGE = 21;
-export const GALLERY_LIST_ROWS_PER_PAGE_OPTIONS = [21, 25, 50];
+export const GALLERY_LIST_ROWS_PER_PAGE = 20;
+export const GALLERY_LIST_ROWS_PER_PAGE_OPTIONS = [20, 40, 60];
 
 export function useActivityGalleryListController(galleryType: GalleryType) {
   const [items, setItems] = useState<ActivityGalleryListItem[]>([]);

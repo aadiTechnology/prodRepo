@@ -20,6 +20,7 @@ type Args = {
   canEdit?: boolean;
   canDelete?: boolean;
   showStatus?: boolean;
+  hideGalleryName?: boolean;
 };
 
 function formatClassLabel(row: ActivityGalleryListItem): string {
@@ -41,11 +42,12 @@ export function createActivityGalleryListConfig({
   canEdit = true,
   canDelete = true,
   showStatus = true,
+  hideGalleryName = false,
 }: Args): ListConfig<ActivityGalleryListItem, GalleryListSortBy> {
   const columns: ListConfig<ActivityGalleryListItem, GalleryListSortBy>["columns"] = [
     {
       id: "gallery_name",
-      label: galleryType === "Photo" ? "Gallery Name" : "Video Gallery Name",
+      label: hideGalleryName ? "Gallery" : galleryType === "Photo" ? "Gallery Name" : "Video Gallery Name",
       render: (row) => (
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
           <Avatar
@@ -60,7 +62,7 @@ export function createActivityGalleryListConfig({
             {galleryType === "Photo" ? <PhotoIcon fontSize="small" /> : <VideoIcon fontSize="small" />}
           </Avatar>
           <Box sx={{ minWidth: 0 }}>
-            <Tooltip title={row.gallery_name}>
+            <Tooltip title={hideGalleryName ? "Gallery" : row.gallery_name}>
               <Typography
                 variant="body2"
                 sx={{
@@ -71,7 +73,7 @@ export function createActivityGalleryListConfig({
                   whiteSpace: "nowrap",
                 }}
               >
-                {row.gallery_name}
+                {hideGalleryName ? "Gallery" : row.gallery_name}
               </Typography>
             </Tooltip>
             {showStatus ? (

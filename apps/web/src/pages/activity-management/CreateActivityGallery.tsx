@@ -237,6 +237,7 @@ export default function CreateActivityGallery() {
     handleFieldValueChange,
     handleSubmit: baseHandleSubmit,
     setFormData,
+    resetForm,
   } = useFormManager<CreateActivityGalleryFormData>({
     initialValues,
     validationConfig,
@@ -1014,7 +1015,20 @@ export default function CreateActivityGallery() {
           saveTooltipCreate: "Save",
           saveTooltipEdit: "Save",
         }}
-        onCancelNavigate={() => navigate(galleryListPathByType(galleryType), { state: { galleryType } })}
+        onCancelNavigate={() => {
+          if (isEditMode) {
+            navigate(galleryListPathByType(galleryType), { state: { galleryType } });
+            return;
+          }
+          resetForm(initialValues);
+          setSavedMedia([]);
+          setAssociatedClassesError(null);
+          setFileError(null);
+          setError(null);
+          setSnackbar(null);
+          setPreviewMedia(null);
+          setYoutubeUrl("");
+        }}
         confirmMessage={(ctx) => {
           if (galleryType === "Video") {
             return ctx.isEditMode

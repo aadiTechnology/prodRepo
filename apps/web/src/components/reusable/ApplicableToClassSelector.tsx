@@ -104,12 +104,6 @@ export default function ApplicableToClassSelector({
           </Box>
         </>
       ) : null}
-      {error ? (
-        <Typography variant="caption" color="error" sx={{ mt: -0.5 }}>
-          {error}
-        </Typography>
-      ) : null}
-
       {showClassTargetSection ? (
         <Box
           sx={{
@@ -198,6 +192,11 @@ export default function ApplicableToClassSelector({
             ))}
           </Box>
         </Box>
+      ) : null}
+      {error ? (
+        <Typography variant="caption" color="error" sx={{ mt: 0.25 }}>
+          {error}
+        </Typography>
       ) : null}
     </Box>
   );

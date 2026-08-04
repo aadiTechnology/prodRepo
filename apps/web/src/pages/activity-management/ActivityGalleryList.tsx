@@ -115,6 +115,7 @@ export default function ActivityGalleryList() {
         canEdit: perms.canEdit && !perms.readOnlyAudience,
         canDelete: perms.canDelete && !perms.readOnlyAudience,
         showStatus: !perms.readOnlyAudience,
+        hideGalleryName: perms.readOnlyAudience,
       }),
     [
       c.openDeleteConfirm,
@@ -188,7 +189,7 @@ export default function ActivityGalleryList() {
       }
     >
       <EntityTableSection<ActivityGalleryListItem>
-        label="Galleries"
+        label=""
         totalRows={c.totalRows}
         page={c.page}
         rowsPerPage={c.rowsPerPage}
@@ -240,8 +241,8 @@ export default function ActivityGalleryList() {
         }}
         stickyHeader
         size="small"
-        showPagination={c.totalRows > 0}
-        showInfoBar
+        showPagination={c.totalRows > 20}
+        showInfoBar={false}
       />
 
       <ConfirmDialog
