@@ -9,12 +9,13 @@ import {
   DialogTitle,
   IconButton,
   Stack,
+  Tooltip,
   Typography,
   alpha,
 } from "@mui/material";
 import {
   Add as AddIcon,
-  DeleteOutline as DeleteOutlineIcon,
+  Delete as DeleteIcon,
   UploadFile as UploadFileIcon,
   Visibility as VisibilityIcon,
 } from "@mui/icons-material";
@@ -43,7 +44,7 @@ import {
 } from "./CreateActivityGallery.formConfig";
 import { colorTokens } from "../../tokens/colors";
 import { apiBaseUrl } from "../../config";
-import { buildYoutubeEmbedUrl, isYoutubeUrl } from "../../utils/youtube";
+import { buildVideoEmbedUrl, isDirectVideoFileUrl } from "../../utils/videoEmbed";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
 
@@ -127,23 +128,43 @@ function GalleryMediaPreviewDialog({
               <CircularProgress />
             )}
           </Box>
-        ) : isYoutubeUrl(media.file_path) ? (
-          <Box
-            component="iframe"
-            src={buildYoutubeEmbedUrl(media.file_path)}
-            title={title}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            sx={{ width: "100%", minHeight: 420, border: 0, display: "block", borderRadius: 2 }}
-          />
-        ) : (
-          <Box
-            component="video"
-            src={buildMediaUrl(media.file_path)}
-            controls
-            sx={{ width: "100%", maxHeight: "70vh", display: "block", borderRadius: 2 }}
-          />
-        )}
+        ) : (() => {
+          const embedSrc = buildVideoEmbedUrl(media.file_path);
+          if (embedSrc) {
+            return (
+              <Box
+                component="iframe"
+                src={embedSrc}
+                title={title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                sx={{ width: "100%", minHeight: 420, border: 0, display: "block", borderRadius: 2 }}
+              />
+            );
+          }
+          if (isDirectVideoFileUrl(media.file_path) || !/^https?:\/\//i.test(media.file_path)) {
+            return (
+              <Box
+                component="video"
+                src={buildMediaUrl(media.file_path)}
+                controls
+                sx={{ width: "100%", maxHeight: "70vh", display: "block", borderRadius: 2 }}
+              />
+            );
+          }
+          return (
+            <Box sx={{ py: 4, textAlign: "center" }}>
+              <Button
+                variant="contained"
+                href={media.file_path}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open video link
+              </Button>
+            </Box>
+          );
+        })()}
       </DialogContent>
     </Dialog>
   );
@@ -763,16 +784,24 @@ export default function CreateActivityGallery() {
           <VisibilityIcon sx={{ fontSize: 18 }} />
         </IconButton>
         {perms.canEdit ? (
-          <IconButton
-            size="small"
-            color="error"
-            aria-label="Delete media"
-            onClick={() => void onDeleteMedia(item.id)}
-            disabled={deletingMediaId === item.id}
-            sx={{ p: 0.5 }}
-          >
-            <DeleteOutlineIcon sx={{ fontSize: 18 }} />
-          </IconButton>
+          <Tooltip title="Delete">
+            <IconButton
+              size="small"
+              aria-label="Delete media"
+              onClick={() => void onDeleteMedia(item.id)}
+              disabled={deletingMediaId === item.id}
+              sx={{
+                color: colorTokens.preschool.coral.main,
+                "&:hover": {
+                  bgcolor: alpha(colorTokens.preschool.coral.main, 0.1),
+                  transform: "scale(1.15) rotate(5deg)",
+                },
+                transition: "all 0.2s",
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         ) : null}
       </Box>
     ),
@@ -852,7 +881,7 @@ export default function CreateActivityGallery() {
           Add video links (max {MAX_MEDIA} videos)
         </Typography>
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
-          Example: https://www.youtube.com/watch?v=VIDEO_ID or any public video URL
+          Example: YouTube, Instagram, or Facebook video URL
         </Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "flex-start" }}>
           <TextFieldInput

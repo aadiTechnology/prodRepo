@@ -89,8 +89,21 @@ def list_galleries(
             g.updated_at,
             m.class_id,
             m.division_id,
-            c.name AS class_name,
-            cd.division_name,
+            ISNULL((
+                SELECT STRING_AGG(
+                    CASE
+                        WHEN cd2.division_name IS NOT NULL AND LTRIM(RTRIM(cd2.division_name)) <> ''
+                            THEN c2.name + N' (' + cd2.division_name + N')'
+                        ELSE c2.name
+                    END,
+                    N', '
+                )
+                FROM activity_gallery_class_mapping cm2
+                INNER JOIN classes c2 ON c2.id = cm2.class_id
+                LEFT JOIN class_divisions cd2 ON cd2.id = cm2.division_id
+                WHERE cm2.gallery_id = g.id
+            ), NULL) AS class_name,
+            CAST(NULL AS NVARCHAR(100)) AS division_name,
             ISNULL((
                 SELECT COUNT(1)
                 FROM activity_gallery_media gm
@@ -112,8 +125,6 @@ def list_galleries(
             WHERE cm.gallery_id = g.id
             ORDER BY cm.id ASC
         ) m
-        LEFT JOIN classes c ON c.id = m.class_id
-        LEFT JOIN class_divisions cd ON cd.id = m.division_id
         WHERE {where_clause}
         ORDER BY g.updated_at DESC, g.id DESC
         OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY

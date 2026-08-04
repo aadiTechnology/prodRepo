@@ -24,9 +24,7 @@ type Args = {
 };
 
 function formatClassLabel(row: ActivityGalleryListItem): string {
-  if (!row.class_name) return "—";
-  if (row.division_name) return `${row.class_name} (${row.division_name})`;
-  return row.class_name;
+  return row.class_name?.trim() || "—";
 }
 
 function mediaCountLabel(row: ActivityGalleryListItem, galleryType: GalleryType): string {

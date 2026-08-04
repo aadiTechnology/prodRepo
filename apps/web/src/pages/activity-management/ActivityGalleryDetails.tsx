@@ -24,10 +24,10 @@ import { PageHeader } from "../../components/layout";
 import { FormHeaderIconAction } from "../../components/primitives";
 import activityGalleryService from "../../api/services/activityGalleryService";
 import { useActivityGalleryPermissions } from "../../hooks/useActivityGalleryPermissions";
-import type { ActivityGallery } from "../../types/activityGallery";
+import type { ActivityGallery, ActivityGalleryClassMapping } from "../../types/activityGallery";
 import { apiBaseUrl } from "../../config";
 import { formatShortDate } from "../../utils/formatters";
-import { buildYoutubeEmbedUrl, isYoutubeUrl } from "../../utils/youtube";
+import { buildVideoEmbedUrl, isDirectVideoFileUrl } from "../../utils/videoEmbed";
 import { colorTokens } from "../../tokens/colors";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
@@ -38,6 +38,24 @@ function buildMediaUrl(filePath: string): string {
     return "";
   }
   return `${apiBaseUrl}${filePath}`;
+}
+
+function formatAssignedClasses(
+  gallery: Pick<ActivityGallery, "class_name" | "division_name" | "class_mappings">,
+): string {
+  const mappings = gallery.class_mappings ?? [];
+  if (mappings.length > 0) {
+    const labels = mappings.map((m: ActivityGalleryClassMapping) => {
+      if (!m.class_name) return null;
+      return m.division_name ? `${m.class_name} (${m.division_name})` : m.class_name;
+    });
+    const unique = [...new Set(labels.filter(Boolean))];
+    return unique.length > 0 ? unique.join(", ") : "—";
+  }
+  if (!gallery.class_name) return "—";
+  return gallery.division_name
+    ? `${gallery.class_name} (${gallery.division_name})`
+    : gallery.class_name;
 }
 
 export default function ActivityGalleryDetails() {
@@ -140,9 +158,7 @@ export default function ActivityGalleryDetails() {
     );
   }
 
-  const classLabel = gallery.class_name
-    ? `${gallery.class_name}${gallery.division_name ? ` (${gallery.division_name})` : ""}`
-    : "—";
+  const classLabel = formatAssignedClasses(gallery);
 
   return (
     <ListPageLayout
@@ -281,23 +297,46 @@ export default function ActivityGalleryDetails() {
         ) : (
           <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#000" }}>
             {currentMedia ? (
-              isYoutubeUrl(currentMedia.file_path) ? (
-                <Box
-                  component="iframe"
-                  src={buildYoutubeEmbedUrl(currentMedia.file_path)}
-                  title={currentMedia.original_file_name || "YouTube video"}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  sx={{ width: "100%", minHeight: 420, border: 0, display: "block" }}
-                />
-              ) : (
-                <Box
-                  component="video"
-                  src={buildMediaUrl(currentMedia.file_path)}
-                  controls
-                  sx={{ width: "100%", maxHeight: 520, display: "block" }}
-                />
-              )
+              (() => {
+                const embedSrc = buildVideoEmbedUrl(currentMedia.file_path);
+                if (embedSrc) {
+                  return (
+                    <Box
+                      component="iframe"
+                      src={embedSrc}
+                      title={currentMedia.original_file_name || "Video"}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                      sx={{ width: "100%", minHeight: 420, border: 0, display: "block" }}
+                    />
+                  );
+                }
+                if (
+                  isDirectVideoFileUrl(currentMedia.file_path) ||
+                  !/^https?:\/\//i.test(currentMedia.file_path)
+                ) {
+                  return (
+                    <Box
+                      component="video"
+                      src={buildMediaUrl(currentMedia.file_path)}
+                      controls
+                      sx={{ width: "100%", maxHeight: 520, display: "block" }}
+                    />
+                  );
+                }
+                return (
+                  <Box sx={{ py: 6, textAlign: "center", bgcolor: "#111" }}>
+                    <Button
+                      variant="contained"
+                      href={currentMedia.file_path}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open video link
+                    </Button>
+                  </Box>
+                );
+              })()
             ) : null}
           </Box>
         )}
