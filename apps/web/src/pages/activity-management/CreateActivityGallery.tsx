@@ -977,8 +977,8 @@ export default function CreateActivityGallery() {
               : "Are you sure you want to save this Video?";
           }
           return ctx.isEditMode
-            ? "Are you sure you want to update this Photo?"
-            : "Are you sure you want to save this Photo?";
+            ? "Are you sure you want to update this gallery?"
+            : "Are you sure you want to save this gallery?";
         }}
         submitLabelCreate="Save"
         submitLabelEdit="Save"
