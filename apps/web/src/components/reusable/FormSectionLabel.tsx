@@ -11,6 +11,8 @@ export interface FormSectionLabelProps {
   title: string;
   /** Optional icon shown before the title. */
   icon?: ReactNode;
+  /** Show required asterisk in error color. */
+  required?: boolean;
   /** Typography variant for title. Default subtitle2. */
   titleVariant?: TypographyProps["variant"];
   /** Spacing below the label (theme.spacing multiplier). Default 1.5. */
@@ -21,6 +23,7 @@ export interface FormSectionLabelProps {
 export default function FormSectionLabel({
   title,
   icon,
+  required = false,
   titleVariant = "subtitle2",
   spacing = 1.5,
   sx,
@@ -53,6 +56,14 @@ export default function FormSectionLabel({
         })}
       >
         {title}
+        {required ? (
+          <Box
+            component="span"
+            sx={(theme) => ({ color: theme.palette.error.main, ml: 0.5 })}
+          >
+            *
+          </Box>
+        ) : null}
       </Typography>
     </Box>
   );

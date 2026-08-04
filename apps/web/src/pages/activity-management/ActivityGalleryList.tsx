@@ -144,7 +144,7 @@ export default function ActivityGalleryList() {
               <ListPageToolbar
                 searchValue={c.search}
                 onSearchChange={c.setSearch}
-                searchPlaceholder="Search by gallery name or class…"
+                searchPlaceholder="Search by gallery name…"
                 {...(perms.canCreate && !perms.readOnlyAudience
                   ? {
                       onAddClick: () =>

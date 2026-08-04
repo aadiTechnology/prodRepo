@@ -781,7 +781,7 @@ export default function CreateActivityGallery() {
 
   const photoUploadSlot = (
     <Box sx={{ mt: 2 }}>
-      <FormSectionLabel title="Upload Photos *" icon={<UploadFileIcon fontSize="small" />} />
+      <FormSectionLabel title="Upload Photos" required icon={<UploadFileIcon fontSize="small" />} />
       <Box
         sx={{
           border: `2px dashed ${alpha(colorTokens.primary.main, 0.3)}`,
@@ -839,7 +839,7 @@ export default function CreateActivityGallery() {
 
   const videoUploadSlot = (
     <Box sx={{ mt: 2 }}>
-      <FormSectionLabel title="Video Links *" icon={<UploadFileIcon fontSize="small" />} />
+      <FormSectionLabel title="Video Links" required icon={<UploadFileIcon fontSize="small" />} />
       <Box
         sx={{
           border: `1px solid ${alpha(colorTokens.primary.main, 0.2)}`,
