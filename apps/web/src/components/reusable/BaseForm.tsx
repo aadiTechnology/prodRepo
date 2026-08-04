@@ -55,6 +55,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
   hideFooterActions = false,
   hideHeaderCancel = false,
   footerActionOrder = "cancel-first",
+  hideFieldValidationDialog = false,
   gridSpacing = 2,
   pageTestId,
   formTestId,
@@ -73,7 +74,8 @@ export default function BaseForm<T extends Record<string, unknown>>({
       });
   }, [fieldErrors, formConfig.fields]);
 
-  const showValidationDialog = Boolean(error) || fieldValidationOpen;
+  const showValidationDialog =
+    Boolean(error) || (fieldValidationOpen && !hideFieldValidationDialog);
   const validationDialogMessage =
     error ??
     (fieldValidationOpen ? "Please fix the highlighted errors." : null);
@@ -84,6 +86,7 @@ export default function BaseForm<T extends Record<string, unknown>>({
   };
 
   const openFieldValidationDialog = () => {
+    if (hideFieldValidationDialog) return;
     setFieldValidationOpen(true);
   };
 

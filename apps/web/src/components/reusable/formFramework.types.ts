@@ -132,6 +132,8 @@ export type BaseFormProps<T extends Record<string, unknown>> = {
   footerActionOrder?: "save-first" | "cancel-first";
   /** @deprecated Errors are shown in ValidationErrorDialog by default. */
   useErrorSnackbar?: boolean;
+  /** Skip the field-validation popup; inline field errors still show. */
+  hideFieldValidationDialog?: boolean;
   /** MUI Grid spacing between form field blocks (default 2). */
   gridSpacing?: number;
   /** Stable test hook for the page root container. */

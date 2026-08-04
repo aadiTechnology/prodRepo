@@ -494,11 +494,7 @@ export default function CreateActivityGallery() {
       errors.gallery_name = "Please enter gallery name";
     }
     setFieldErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      setError("Please fix the highlighted errors.");
-    } else {
-      setError(null);
-    }
+    setError(null);
     return Object.keys(errors).length === 0 && !classSelectionError;
   }, [formData, setFieldErrors, validateAssociatedClasses, validationConfig]);
 
@@ -958,6 +954,7 @@ export default function CreateActivityGallery() {
         loading={loading}
         fetchLoading={fetchLoading}
         error={error}
+        hideFieldValidationDialog
         onErrorDismiss={() => setError(null)}
         snackbar={snackbar}
         onSnackbarClose={() => setSnackbar(null)}
