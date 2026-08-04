@@ -28,6 +28,8 @@ type Props = {
   hideApplicableRoleControls?: boolean;
   /** When true, class/division checkboxes are read-only (e.g. teacher notice scope). */
   disableSelection?: boolean;
+  /** When true, shows required marker on Associated Classes label. */
+  requiredClassSelection?: boolean;
 };
 
 export default function ApplicableToClassSelector({
@@ -45,6 +47,7 @@ export default function ApplicableToClassSelector({
   onDivisionToggle,
   hideApplicableRoleControls = false,
   disableSelection = false,
+  requiredClassSelection = false,
 }: Props) {
   const showClassTargetSection = hideApplicableRoleControls || applicableTo.student;
 
@@ -120,7 +123,12 @@ export default function ApplicableToClassSelector({
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.8 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mr: 0.25 }}>
-              Associated Classes 
+              Associated Classes{" "}
+              {requiredClassSelection ? (
+                <Box component="span" sx={{ color: "error.main" }}>
+                  *
+                </Box>
+              ) : null}
             </Typography>
             <Checkbox
               size="small"

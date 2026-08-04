@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Box,
@@ -525,6 +525,39 @@ export default function CreateActivityGallery() {
       ? "Please upload at least one photo"
       : "Please add at least one YouTube video";
 
+  const handlePreConfirmSubmit = useCallback(
+    (
+      e: FormEvent,
+      onValid?: () => void,
+      onInvalid?: (errors: Partial<Record<keyof CreateActivityGalleryFormData & string, string>>) => void,
+    ) => {
+      const classSelectionError = validateAssociatedClasses();
+      const missingMedia = savedMedia.length < 1;
+      setAssociatedClassesError(classSelectionError || null);
+      setFileError(missingMedia ? mediaRequiredMessage : null);
+      baseHandleSubmit(
+        e,
+        () => {
+          if (!ensureFormValid()) {
+            return;
+          }
+          if (missingMedia) {
+            return;
+          }
+          onValid?.();
+        },
+        onInvalid,
+      );
+    },
+    [
+      baseHandleSubmit,
+      ensureFormValid,
+      mediaRequiredMessage,
+      savedMedia.length,
+      validateAssociatedClasses,
+    ],
+  );
+
   const handleConfirmSave = useCallback(async () => {
     try {
       setLoading(true);
@@ -736,7 +769,7 @@ export default function CreateActivityGallery() {
 
   const photoUploadSlot = (
     <Box sx={{ mt: 2 }}>
-      <FormSectionLabel title="Upload Photos" icon={<UploadFileIcon fontSize="small" />} />
+      <FormSectionLabel title="Upload Photos *" icon={<UploadFileIcon fontSize="small" />} />
       <Box
         sx={{
           border: `2px dashed ${alpha(colorTokens.primary.main, 0.3)}`,
@@ -794,7 +827,7 @@ export default function CreateActivityGallery() {
 
   const videoUploadSlot = (
     <Box sx={{ mt: 2 }}>
-      <FormSectionLabel title="YouTube Videos" icon={<UploadFileIcon fontSize="small" />} />
+      <FormSectionLabel title="YouTube Videos *" icon={<UploadFileIcon fontSize="small" />} />
       <Box
         sx={{
           border: `1px solid ${alpha(colorTokens.primary.main, 0.2)}`,
@@ -876,6 +909,7 @@ export default function CreateActivityGallery() {
         onClassToggle={handleClassToggle}
         onDivisionToggle={handleDivisionToggle}
         hideApplicableRoleControls
+        requiredClassSelection
       />
     ),
     [
@@ -947,7 +981,7 @@ export default function CreateActivityGallery() {
         fieldErrors={fieldErrors}
         handleChange={handleChange}
         handleFieldValueChange={handleFieldValueChange}
-        handleSubmit={baseHandleSubmit}
+        handleSubmit={handlePreConfirmSubmit}
         setFormError={setError}
         onConfirmSubmit={handleConfirmSave}
         isEditMode={isEditMode}
