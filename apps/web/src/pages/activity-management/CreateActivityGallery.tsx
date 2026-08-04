@@ -46,6 +46,10 @@ import { apiBaseUrl } from "../../config";
 import { extractYoutubeVideoId, buildYoutubeEmbedUrl, isYoutubeUrl } from "../../utils/youtube";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
+
+function galleryListPathByType(type: GalleryType): string {
+  return `${GALLERY_PATH}?type=${type.toLowerCase()}`;
+}
 const PERSIST_VALIDATION_MESSAGE = "Please complete all required fields before saving.";
 const MAX_MEDIA = 20;
 const MAX_PHOTO_TOTAL_MB = 10;
@@ -995,7 +999,7 @@ export default function CreateActivityGallery() {
         hideFooterActions
         headerConfig={{
           links: [
-            { title: "Photo / Video Gallery", path: GALLERY_PATH },
+            { title: "Photo / Video Gallery", path: galleryListPathByType(effectiveGalleryType) },
             { title: pageBreadcrumbTitle, path: "#" },
           ],
           homePath: "/",
@@ -1003,7 +1007,7 @@ export default function CreateActivityGallery() {
           saveTooltipCreate: "Save",
           saveTooltipEdit: "Save",
         }}
-        onCancelNavigate={() => navigate(GALLERY_PATH, { state: { galleryType } })}
+        onCancelNavigate={() => navigate(galleryListPathByType(galleryType), { state: { galleryType } })}
         confirmMessage={(ctx) => {
           if (galleryType === "Video") {
             return ctx.isEditMode

@@ -34,6 +34,15 @@ import { colorTokens } from "../../tokens/colors";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
 
+function galleryTypeFromSearch(search: string): GalleryType | undefined {
+  const type = new URLSearchParams(search).get("type");
+  if (!type) return undefined;
+  const normalized = type.trim().toLowerCase();
+  if (normalized === "photo") return "Photo";
+  if (normalized === "video") return "Video";
+  return undefined;
+}
+
 function tabIndexFromGalleryType(type?: GalleryType): number {
   return type === "Video" ? 1 : 0;
 }
@@ -43,18 +52,23 @@ export default function ActivityGalleryList() {
   const location = useLocation();
   const { enqueueSnackbar } = useSnackbar();
   const perms = useActivityGalleryPermissions();
+  const initialType =
+    galleryTypeFromSearch(location.search) ??
+    (location.state as { galleryType?: GalleryType } | null)?.galleryType;
   const [tabIndex, setTabIndex] = useState(() =>
-    tabIndexFromGalleryType((location.state as { galleryType?: GalleryType } | null)?.galleryType),
+    tabIndexFromGalleryType(initialType),
   );
   const galleryType: GalleryType = tabIndex === 0 ? "Photo" : "Video";
   const c = useActivityGalleryListController(galleryType);
 
   useEffect(() => {
-    const type = (location.state as { galleryType?: GalleryType } | null)?.galleryType;
+    const type =
+      galleryTypeFromSearch(location.search) ??
+      (location.state as { galleryType?: GalleryType } | null)?.galleryType;
     if (type === "Photo" || type === "Video") {
       setTabIndex(tabIndexFromGalleryType(type));
     }
-  }, [location.state]);
+  }, [location.search, location.state]);
 
   useEffect(() => {
     if (!c.snackbar) return;
