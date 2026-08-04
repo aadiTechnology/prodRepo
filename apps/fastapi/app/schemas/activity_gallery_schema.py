@@ -137,8 +137,8 @@ class ActivityGalleryDeleteResponse(BaseModel):
     message: str
 
 
-class ActivityGalleryYoutubeCreate(BaseModel):
-    youtube_url: str = Field(..., min_length=1, max_length=500)
+class ActivityGalleryVideoLinkCreate(BaseModel):
+    video_url: str = Field(..., min_length=1, max_length=500)
 
 
 class ClassOption(BaseModel):

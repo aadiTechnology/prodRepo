@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import os
 from datetime import date
+from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
@@ -47,7 +48,7 @@ from app.services.activity_gallery_media_storage import (
     legacy_disk_path,
     mime_type_for_file_name,
 )
-from app.services.activity_gallery_youtube import normalize_youtube_url
+from app.services.activity_gallery_youtube import extract_youtube_video_id, normalize_youtube_url
 
 __all__ = ["ACTIVITY_GALLERY_MENU_PATH"]
 
@@ -521,14 +522,14 @@ def upload_media(
     return _to_media_response(media_row)
 
 
-def add_youtube_video(
+def add_video_link(
     db: Session,
     *,
     tenant_id: int,
     user_id: int,
     legacy_role: object,
     gallery_id: int,
-    youtube_url: str,
+    video_url: str,
 ) -> ActivityGalleryMediaResponse:
     row = _get_manageable_gallery(
         db,
@@ -539,22 +540,32 @@ def add_youtube_video(
     )
 
     if str(row["gallery_type"]) != "Video":
-        raise ValidationException("YouTube links are only supported for video galleries")
+        raise ValidationException("Video links are only supported for video galleries")
 
     current_count = repo.count_media_by_type(db, gallery_id=gallery_id, media_type="Video")
     if current_count >= MAX_MEDIA_PER_GALLERY:
         raise ValidationException("Maximum 20 files allowed")
 
-    watch_url, video_id = normalize_youtube_url(youtube_url)
-    trimmed_url = youtube_url.strip()
+    trimmed_url = video_url.strip()
+    if not trimmed_url:
+        raise ValidationException("Please enter a valid video URL")
+
+    video_id = extract_youtube_video_id(trimmed_url)
+    if video_id:
+        storage_url, file_name = normalize_youtube_url(trimmed_url)[0], f"youtube_{video_id}"
+    else:
+        parsed = urlparse(trimmed_url)
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+            raise ValidationException("Please enter a valid video URL")
+        storage_url, file_name = trimmed_url, f"video_link_{current_count + 1}"
 
     media_id = repo.insert_media(
         db,
         gallery_id=gallery_id,
         media_type="Video",
-        file_name=f"youtube_{video_id}",
+        file_name=file_name,
         original_file_name=trimmed_url,
-        file_path=watch_url,
+        file_path=storage_url,
         file_size=None,
         display_order=current_count + 1,
     )

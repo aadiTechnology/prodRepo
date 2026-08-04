@@ -79,9 +79,9 @@ const activityGalleryService = {
     return res.data;
   },
 
-  addYoutubeVideo: async (galleryId: number, youtubeUrl: string): Promise<ActivityGalleryMedia> => {
+  addVideoLink: async (galleryId: number, videoUrl: string): Promise<ActivityGalleryMedia> => {
     const res = await apiClient.post(`${BASE}/${galleryId}/youtube-videos`, {
-      youtube_url: youtubeUrl,
+      video_url: videoUrl,
     });
     return res.data;
   },

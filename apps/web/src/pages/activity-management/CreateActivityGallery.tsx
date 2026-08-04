@@ -43,7 +43,7 @@ import {
 } from "./CreateActivityGallery.formConfig";
 import { colorTokens } from "../../tokens/colors";
 import { apiBaseUrl } from "../../config";
-import { extractYoutubeVideoId, buildYoutubeEmbedUrl, isYoutubeUrl } from "../../utils/youtube";
+import { buildYoutubeEmbedUrl, isYoutubeUrl } from "../../utils/youtube";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
 
@@ -527,7 +527,7 @@ export default function CreateActivityGallery() {
   const mediaRequiredMessage =
     galleryType === "Photo"
       ? "Please upload at least one photo"
-      : "Please add at least one YouTube video";
+      : "Please add at least one video link";
 
   const handlePreConfirmSubmit = useCallback(
     (
@@ -640,14 +640,21 @@ export default function CreateActivityGallery() {
     [mediaCount, uploadedPhotoBytes],
   );
 
-  const onAddYoutubeVideo = useCallback(async () => {
+  const onAddVideoLink = useCallback(async () => {
     const trimmed = youtubeUrl.trim();
     if (!trimmed) {
-      setFileError("Please enter a YouTube video URL");
+      setFileError("Please enter a video link");
       return;
     }
-    if (!extractYoutubeVideoId(trimmed)) {
-      setFileError("Please enter a valid YouTube video URL");
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      setFileError("Please enter a valid video link");
+      return;
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      setFileError("Please enter a valid video link");
       return;
     }
     if (mediaCount >= MAX_MEDIA) {
@@ -659,13 +666,13 @@ export default function CreateActivityGallery() {
       setUploadLoading(true);
       setFileError(null);
       const targetId = effectiveGalleryId ?? (await persistGallery());
-      const added = await activityGalleryService.addYoutubeVideo(targetId, trimmed);
+      const added = await activityGalleryService.addVideoLink(targetId, trimmed);
       setSavedMedia((prev) => [...prev, added]);
       setYoutubeUrl("");
-      enqueueSnackbar("YouTube video added successfully.", { variant: "success" });
+      enqueueSnackbar("Video link added successfully.", { variant: "success" });
     } catch (err: unknown) {
       const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
-      const uploadError = message || "Unable to add YouTube video. Please try again.";
+      const uploadError = message || "Unable to add video link. Please try again.";
       if (uploadError === PERSIST_VALIDATION_MESSAGE) return;
       setFieldErrors((prev) => ({ ...prev, ...apiFieldErrors }));
       enqueueSnackbar(uploadError, { variant: "error" });
@@ -831,7 +838,7 @@ export default function CreateActivityGallery() {
 
   const videoUploadSlot = (
     <Box sx={{ mt: 2 }}>
-      <FormSectionLabel title="YouTube Videos *" icon={<UploadFileIcon fontSize="small" />} />
+      <FormSectionLabel title="Video Links *" icon={<UploadFileIcon fontSize="small" />} />
       <Box
         sx={{
           border: `1px solid ${alpha(colorTokens.primary.main, 0.2)}`,
@@ -841,15 +848,15 @@ export default function CreateActivityGallery() {
         }}
       >
         <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-          Add YouTube video links only (max {MAX_MEDIA} videos)
+          Add video links (max {MAX_MEDIA} videos)
         </Typography>
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
-          Example: https://www.youtube.com/watch?v=VIDEO_ID or https://youtu.be/VIDEO_ID
+          Example: https://www.youtube.com/watch?v=VIDEO_ID or any public video URL
         </Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "flex-start" }}>
           <TextFieldInput
-            label="YouTube Video URL"
-            placeholder="Paste YouTube video link"
+            label="Video Link"
+            placeholder="Paste video link"
             value={youtubeUrl}
             onChange={(e) => {
               setYoutubeUrl(e.target.value);
@@ -860,7 +867,7 @@ export default function CreateActivityGallery() {
           />
           <Box sx={{ mt: { xs: 0, sm: 1 }, flexShrink: 0 }}>
             <PrimaryActionButton
-              onClick={() => void onAddYoutubeVideo()}
+              onClick={() => void onAddVideoLink()}
               icon={
                 uploadLoading ? (
                   <CircularProgress size={22} sx={{ color: colorTokens.primary.contrast }} />

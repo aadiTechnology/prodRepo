@@ -17,7 +17,7 @@ from app.schemas.activity_gallery_schema import (
     ActivityGalleryPublishResponse,
     ActivityGalleryResponse,
     ActivityGalleryUpdate,
-    ActivityGalleryYoutubeCreate,
+    ActivityGalleryVideoLinkCreate,
     ClassOption,
     DivisionOption,
     GalleryAccessPermissionsResponse,
@@ -279,18 +279,18 @@ async def upload_gallery_media(
     status_code=status.HTTP_201_CREATED,
 )
 def add_gallery_youtube_video(
-    payload: ActivityGalleryYoutubeCreate,
+    payload: ActivityGalleryVideoLinkCreate,
     gallery_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(_require_gallery_upload_permission),
 ):
-    return activity_gallery_service.add_youtube_video(
+    return activity_gallery_service.add_video_link(
         db,
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         legacy_role=current_user.role,
         gallery_id=gallery_id,
-        youtube_url=payload.youtube_url,
+        video_url=payload.video_url,
     )
 
 
