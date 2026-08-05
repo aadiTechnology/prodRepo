@@ -21,13 +21,19 @@ export function createActivityGalleryFormConfig(options: {
         type: "text",
         placeholder: "Enter activity gallery name",
         required: true,
-        props: { inputProps: { maxLength: 255 } },
+        props: {
+          inputProps: { maxLength: 255 },
+          FormHelperTextProps: { sx: { fontSize: "0.875rem", lineHeight: 1.43, mt: 0.75 } },
+        },
       },
       activity_date: {
         name: "activity_date",
         label: "Activity Date",
         type: "date",
         required: true,
+        props: {
+          FormHelperTextProps: { sx: { fontSize: "0.875rem", lineHeight: 1.43, mt: 0.75 } },
+        },
       },
       description: {
         name: "description",

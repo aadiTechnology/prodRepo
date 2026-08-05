@@ -191,12 +191,16 @@ export default function ApplicableToClassSelector({
               </Box>
             ))}
           </Box>
+          {error ? (
+            <Typography
+              variant="body2"
+              color="error"
+              sx={{ mt: 0.75, fontSize: "0.875rem", lineHeight: 1.43 }}
+            >
+              {error}
+            </Typography>
+          ) : null}
         </Box>
-      ) : null}
-      {error ? (
-        <Typography variant="caption" color="error" sx={{ mt: 0.25 }}>
-          {error}
-        </Typography>
       ) : null}
     </Box>
   );
