@@ -364,24 +364,56 @@ def teacher_can_manage_class_division(
     return False
 
 
-def gallery_visible_to_viewer(
+def _scope_matches_class_division(
     *,
-    class_id: int | None,
-    division_id: int | None,
-    is_published: bool,
+    class_id: int,
+    division_id: int,
     ctx: GalleryViewerContext,
 ) -> bool:
-    if ctx.kind == "admin":
-        return True
-    if ctx.published_only and not is_published:
-        return False
-    if class_id is None or division_id is None:
-        return False
-    if not ctx.scopes:
-        return False
     for scope in ctx.scopes:
         if scope.class_id != class_id:
             continue
         if scope.class_division_id is None or scope.class_division_id == division_id:
+            return True
+    return False
+
+
+def gallery_visible_to_viewer(
+    *,
+    class_id: int | None = None,
+    division_id: int | None = None,
+    class_mappings: list[tuple[int, int]] | None = None,
+    is_published: bool,
+    ctx: GalleryViewerContext,
+) -> bool:
+    """Return True if the gallery is visible to the viewer.
+
+    Prefer ``class_mappings`` (all mapped class/division pairs). When only a
+    single ``class_id``/``division_id`` is provided (legacy callers), that pair
+    is checked alone — which is wrong for multi-class galleries if mappings
+    are omitted.
+    """
+    if ctx.kind == "admin":
+        return True
+    if ctx.published_only and not is_published:
+        return False
+    if not ctx.scopes:
+        return False
+
+    pairs: list[tuple[int, int]] = []
+    if class_mappings is not None:
+        pairs = list(class_mappings)
+    elif class_id is not None and division_id is not None:
+        pairs = [(class_id, division_id)]
+
+    if not pairs:
+        return False
+
+    for mapped_class_id, mapped_division_id in pairs:
+        if _scope_matches_class_division(
+            class_id=mapped_class_id,
+            division_id=mapped_division_id,
+            ctx=ctx,
+        ):
             return True
     return False
