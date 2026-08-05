@@ -27,7 +27,6 @@ type Args = {
   canEdit?: boolean;
   canDelete?: boolean;
   showStatus?: boolean;
-  hideGalleryName?: boolean;
 };
 
 function renderClassLabel(row: ActivityGalleryListItem): ReactNode {
@@ -71,16 +70,15 @@ export function createActivityGalleryListConfig({
   canEdit = true,
   canDelete = true,
   showStatus = true,
-  hideGalleryName = false,
 }: Args): ListConfig<ActivityGalleryListItem, GalleryListSortBy> {
   const columns: ListConfig<ActivityGalleryListItem, GalleryListSortBy>["columns"] = [
     {
       id: "gallery_name",
-      label: hideGalleryName ? "Gallery" : "Gallery Name",
+      label: "Gallery Name",
       width: GALLERY_LIST_COLUMN_WIDTHS.gallery_name,
       render: (row) => (
         <Box sx={{ minWidth: 0, maxWidth: GALLERY_LIST_COLUMN_WIDTHS.gallery_name }}>
-          <Tooltip title={hideGalleryName ? "Gallery" : row.gallery_name}>
+          <Tooltip title={row.gallery_name}>
             <Typography
               variant="body2"
               sx={{
@@ -90,7 +88,7 @@ export function createActivityGalleryListConfig({
                 whiteSpace: "nowrap",
               }}
             >
-              {hideGalleryName ? "Gallery" : row.gallery_name}
+              {row.gallery_name}
             </Typography>
           </Tooltip>
           {showStatus ? (

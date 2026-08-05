@@ -128,7 +128,6 @@ export default function ActivityGalleryList() {
         canEdit: perms.canEdit && !perms.readOnlyAudience,
         canDelete: perms.canDelete && !perms.readOnlyAudience,
         showStatus: !perms.readOnlyAudience,
-        hideGalleryName: perms.readOnlyAudience,
       }),
     [
       c.openDeleteConfirm,
@@ -225,7 +224,7 @@ export default function ActivityGalleryList() {
               sx={{
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "flex-start",
+                justifyContent: galleryType === "Video" ? "center" : "flex-start",
                 gap: 0,
                 width: "100%",
               }}
