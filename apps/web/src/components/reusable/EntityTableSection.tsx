@@ -33,6 +33,8 @@ export interface EntityTableSectionProps<T extends object> {
   rowTestId?: DataTableProps<T>["rowTestId"];
   emptyTestId?: string;
   loadingTestId?: string;
+  fixedLayout?: DataTableProps<T>["fixedLayout"];
+  actionsColumnWidth?: DataTableProps<T>["actionsColumnWidth"];
 }
 
 export default function EntityTableSection<T extends object>({
@@ -61,6 +63,8 @@ export default function EntityTableSection<T extends object>({
   rowTestId,
   emptyTestId,
   loadingTestId,
+  fixedLayout,
+  actionsColumnWidth,
 }: EntityTableSectionProps<T>) {
   const rangeStart = totalRows > 0 ? Math.min(page * rowsPerPage + 1, totalRows) : 0;
   const rangeEnd = Math.min((page + 1) * rowsPerPage, totalRows);
@@ -98,6 +102,8 @@ export default function EntityTableSection<T extends object>({
         onRowClick={onRowClick}
         getRowKey={getRowKey}
         getRowSx={getRowSx}
+        fixedLayout={fixedLayout}
+        actionsColumnWidth={actionsColumnWidth}
       />
       {shouldShowPagination && (
         <TablePaginationBar

@@ -58,6 +58,10 @@ export interface DataTableProps<T> {
   emptyTestId?: string;
   /** Test hook for the loading state container. */
   loadingTestId?: string;
+  /** Use fixed table layout so explicit column widths stay consistent. */
+  fixedLayout?: boolean;
+  /** Optional width for the actions column when using fixed layout. */
+  actionsColumnWidth?: string | number;
 }
 
 function getCellValue<T>(row: T, field: keyof T | string): ReactNode {
@@ -82,6 +86,8 @@ export default function DataTable<T extends object>({
   rowTestId,
   emptyTestId,
   loadingTestId,
+  fixedLayout = false,
+  actionsColumnWidth,
 }: DataTableProps<T>) {
   const hasActions = renderRowActions != null;
   // Defensive: always use an array
@@ -105,7 +111,16 @@ export default function DataTable<T extends object>({
           <CircularProgress sx={(t) => ({ color: t.palette.primary.main })} />
         </Box>
       ) : (
-        <Table size={size} stickyHeader={stickyHeader} sx={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: { xs: 'max-content', sm: 'auto' } }}>
+        <Table
+          size={size}
+          stickyHeader={stickyHeader}
+          sx={{
+            borderCollapse: "separate",
+            borderSpacing: 0,
+            minWidth: fixedLayout ? "100%" : { xs: "max-content", sm: "auto" },
+            ...(fixedLayout ? { tableLayout: "fixed", width: "100%" } : {}),
+          }}
+        >
           <TableHead>
             <TableRow>
               {columns.map((col) => (
@@ -133,6 +148,7 @@ export default function DataTable<T extends object>({
                 <TableCell
                   align="center"
                   sx={(theme) => ({
+                    width: actionsColumnWidth,
                     fontWeight: 800,
                     color: "#ffffff",
                     fontSize: "0.85rem",
