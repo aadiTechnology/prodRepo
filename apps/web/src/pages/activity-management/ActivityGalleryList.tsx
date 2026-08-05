@@ -34,8 +34,13 @@ import { colorTokens } from "../../tokens/colors";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
 const SNACKBAR_ANCHOR = { vertical: "top", horizontal: "center" } as const;
+const GALLERY_ACTIONS_COLUMN_WIDTH = 148;
 const NO_MEDIA_DOWNLOAD_MESSAGE = "No media available to download.";
 const PHOTOS_DOWNLOAD_SUCCESS_MESSAGE = "Photos download successfully.";
+
+function galleryListPathByType(type: GalleryType): string {
+  return `${GALLERY_PATH}?type=${type.toLowerCase()}`;
+}
 
 function galleryTypeFromSearch(search: string): GalleryType | undefined {
   const type = new URLSearchParams(search).get("type");
@@ -137,6 +142,8 @@ export default function ActivityGalleryList() {
 
   const handleTabChange = (_: React.SyntheticEvent, value: number) => {
     setTabIndex(value);
+    const type: GalleryType = value === 0 ? "Photo" : "Video";
+    navigate(`${GALLERY_PATH}?type=${type.toLowerCase()}`, { replace: true });
   };
 
   return (
@@ -208,11 +215,21 @@ export default function ActivityGalleryList() {
         data={c.items}
         loading={c.tableLoading}
         emptyMessage={listConfig.uiPolicy.emptyMessage}
+        fixedLayout
+        actionsColumnWidth={GALLERY_ACTIONS_COLUMN_WIDTH}
         getRowKey={(row) => row.id}
         renderRowActions={(row) => {
           const actions = listConfig.actions.rowActions(row);
           return (
-            <Box sx={{ display: "flex", alignItems: "center" }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-start",
+                gap: 0,
+                width: "100%",
+              }}
+            >
               <Tooltip title={galleryType === "Photo" ? "View Slideshow" : "View Video"}>
                 <IconButton
                   size="small"

@@ -19,13 +19,13 @@ import {
   Download as DownloadIcon,
 } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ListPageLayout } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
 import { FormHeaderIconAction } from "../../components/primitives";
 import activityGalleryService from "../../api/services/activityGalleryService";
 import { useActivityGalleryPermissions } from "../../hooks/useActivityGalleryPermissions";
-import type { ActivityGallery, ActivityGalleryClassMapping } from "../../types/activityGallery";
+import type { ActivityGallery, ActivityGalleryClassMapping, GalleryType } from "../../types/activityGallery";
 import { apiBaseUrl } from "../../config";
 import { formatShortDate } from "../../utils/formatters";
 import { buildVideoEmbedUrl, isDirectVideoFileUrl } from "../../utils/videoEmbed";
@@ -36,6 +36,10 @@ const SNACKBAR_ANCHOR = { vertical: "top", horizontal: "center" } as const;
 const NO_MEDIA_DOWNLOAD_MESSAGE = "No media available to download.";
 const PHOTOS_DOWNLOAD_SUCCESS_MESSAGE = "Photos download successfully.";
 const DOWNLOAD_FAILED_MESSAGE = "Download failed";
+
+function galleryListPathByType(type: GalleryType): string {
+  return `${GALLERY_PATH}?type=${type.toLowerCase()}`;
+}
 
 function buildMediaUrl(filePath: string): string {
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
@@ -65,6 +69,7 @@ function formatAssignedClasses(
 
 export default function ActivityGalleryDetails() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const galleryId = id ? Number(id) : NaN;
   const perms = useActivityGalleryPermissions();
@@ -145,9 +150,16 @@ export default function ActivityGalleryDetails() {
     }
   };
 
+  const galleryListPath =
+    gallery != null
+      ? galleryListPathByType(gallery.gallery_type)
+      : galleryListPathByType(
+          (location.state as { galleryType?: GalleryType } | null)?.galleryType ?? "Photo",
+        );
+
   if (!perms.canView && !perms.readOnlyAudience) {
     return (
-      <ListPageLayout header={<PageHeader links={[{ title: "Photo / Video Gallery", path: GALLERY_PATH }]} homePath="/" />}>
+      <ListPageLayout header={<PageHeader links={[{ title: "Photo / Video Gallery", path: galleryListPath }]} homePath="/" />}>
         <Typography color="error" sx={{ p: 3 }}>
           You are not authorized for this activity
         </Typography>
@@ -165,7 +177,7 @@ export default function ActivityGalleryDetails() {
 
   if (error || !gallery) {
     return (
-      <ListPageLayout header={<PageHeader links={[{ title: "Photo / Video Gallery", path: GALLERY_PATH }]} homePath="/" />}>
+      <ListPageLayout header={<PageHeader links={[{ title: "Photo / Video Gallery", path: galleryListPath }]} homePath="/" />}>
         <Alert severity="error" sx={{ m: 2 }}>
           {error ?? "Gallery not found"}
         </Alert>
@@ -183,7 +195,7 @@ export default function ActivityGalleryDetails() {
       header={
         <PageHeader
           links={[
-            { title: "Photo / Video Gallery", path: GALLERY_PATH },
+            { title: "Photo / Video Gallery", path: galleryListPath },
             { title: gallery.gallery_name, path: "#" },
           ]}
           homePath="/"
