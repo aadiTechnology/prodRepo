@@ -33,6 +33,9 @@ import { createActivityGalleryListConfig } from "./ActivityGalleryList.listConfi
 import { colorTokens } from "../../tokens/colors";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
+const SNACKBAR_ANCHOR = { vertical: "top", horizontal: "center" } as const;
+const NO_MEDIA_DOWNLOAD_MESSAGE = "No media available to download.";
+const PHOTOS_DOWNLOAD_SUCCESS_MESSAGE = "Photos download successfully.";
 
 function galleryTypeFromSearch(search: string): GalleryType | undefined {
   const type = new URLSearchParams(search).get("type");
@@ -85,10 +88,10 @@ export default function ActivityGalleryList() {
       const gallery = await activityGalleryService.getById(row.id);
       const media = gallery.media_items ?? [];
       if (media.length === 0) {
-        enqueueSnackbar("No media available to download.", {
+        enqueueSnackbar(NO_MEDIA_DOWNLOAD_MESSAGE, {
           variant: "warning",
           autoHideDuration: 3000,
-          anchorOrigin: { vertical: "top", horizontal: "center" },
+          anchorOrigin: SNACKBAR_ANCHOR,
         });
         return;
       }
@@ -96,12 +99,17 @@ export default function ActivityGalleryList() {
         const name = item.original_file_name || item.file_name;
         await activityGalleryService.downloadMedia(row.id, item.id, name);
       }
+      enqueueSnackbar(PHOTOS_DOWNLOAD_SUCCESS_MESSAGE, {
+        variant: "success",
+        autoHideDuration: 3000,
+        anchorOrigin: SNACKBAR_ANCHOR,
+      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Download failed";
       enqueueSnackbar(msg, {
         variant: "error",
         autoHideDuration: 4000,
-        anchorOrigin: { vertical: "top", horizontal: "center" },
+        anchorOrigin: SNACKBAR_ANCHOR,
       });
     }
   }, [enqueueSnackbar]);

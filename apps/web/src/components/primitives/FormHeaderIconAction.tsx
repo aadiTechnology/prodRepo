@@ -7,6 +7,7 @@ import { Tooltip, alpha } from "@mui/material";
 import {
   ArrowBack as ArrowBackGlyph,
   Cancel as CancelGlyph,
+  Download as DownloadGlyph,
   Edit as EditGlyph,
   Publish as PublishGlyph,
   Save as SaveGlyph,
@@ -41,6 +42,10 @@ export type FormHeaderIconActionProps =
     })
   | (Base & {
       variant: "edit";
+      tooltipTitle?: string;
+    })
+  | (Base & {
+      variant: "download";
       tooltipTitle?: string;
     })
   | (Base & {
@@ -156,6 +161,32 @@ export default function FormHeaderIconAction(props: FormHeaderIconActionProps) {
         >
           <EditGlyph sx={{ fontSize: 20 }} />
         </IconButton>
+      </Tooltip>
+    );
+  }
+
+  if (props.variant === "download") {
+    const {
+      variant: _v,
+      tooltipTitle = "Download",
+      disabled,
+      sx,
+      "aria-label": ariaLabel,
+      ...rest
+    } = props;
+    const button = (
+      <IconButton
+        {...rest}
+        aria-label={ariaLabel ?? "Download"}
+        disabled={disabled}
+        sx={[publishButtonSx, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
+      >
+        <DownloadGlyph sx={{ fontSize: 22 }} />
+      </IconButton>
+    );
+    return (
+      <Tooltip title={tooltipTitle}>
+        {disabled ? <span style={{ display: "inline-flex" }}>{button}</span> : button}
       </Tooltip>
     );
   }

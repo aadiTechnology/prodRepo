@@ -7,8 +7,8 @@ import {
   CircularProgress,
   IconButton,
   MobileStepper,
-  Snackbar,
   Stack,
+  Tooltip,
   Typography,
   alpha,
 } from "@mui/material";
@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Download as DownloadIcon,
 } from "@mui/icons-material";
+import { useSnackbar } from "notistack";
 import { useNavigate, useParams } from "react-router-dom";
 import { ListPageLayout } from "../../components/reusable";
 import { PageHeader } from "../../components/layout";
@@ -31,6 +32,10 @@ import { buildVideoEmbedUrl, isDirectVideoFileUrl } from "../../utils/videoEmbed
 import { colorTokens } from "../../tokens/colors";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
+const SNACKBAR_ANCHOR = { vertical: "top", horizontal: "center" } as const;
+const NO_MEDIA_DOWNLOAD_MESSAGE = "No media available to download.";
+const PHOTOS_DOWNLOAD_SUCCESS_MESSAGE = "Photos download successfully.";
+const DOWNLOAD_FAILED_MESSAGE = "Download failed";
 
 function buildMediaUrl(filePath: string): string {
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
@@ -63,12 +68,12 @@ export default function ActivityGalleryDetails() {
   const { id } = useParams<{ id: string }>();
   const galleryId = id ? Number(id) : NaN;
   const perms = useActivityGalleryPermissions();
+  const { enqueueSnackbar } = useSnackbar();
 
   const [gallery, setGallery] = useState<ActivityGallery | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(0);
-  const [snackbar, setSnackbar] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(galleryId)) {
@@ -111,7 +116,11 @@ export default function ActivityGalleryDetails() {
       ? mediaItems.filter((m) => m.id === mediaId)
       : mediaItems;
     if (targets.length === 0) {
-      setSnackbar("No media available to download.");
+      enqueueSnackbar(NO_MEDIA_DOWNLOAD_MESSAGE, {
+        variant: "warning",
+        autoHideDuration: 3000,
+        anchorOrigin: SNACKBAR_ANCHOR,
+      });
       return;
     }
     try {
@@ -122,8 +131,17 @@ export default function ActivityGalleryDetails() {
           item.original_file_name || item.file_name,
         );
       }
+      enqueueSnackbar(PHOTOS_DOWNLOAD_SUCCESS_MESSAGE, {
+        variant: "success",
+        autoHideDuration: 3000,
+        anchorOrigin: SNACKBAR_ANCHOR,
+      });
     } catch {
-      setSnackbar("Download failed");
+      enqueueSnackbar(DOWNLOAD_FAILED_MESSAGE, {
+        variant: "error",
+        autoHideDuration: 4000,
+        anchorOrigin: SNACKBAR_ANCHOR,
+      });
     }
   };
 
@@ -172,14 +190,12 @@ export default function ActivityGalleryDetails() {
           actions={
             <Stack direction="row" spacing={1}>
               {gallery.gallery_type === "Photo" && perms.canDownload ? (
-                <Button
-                  variant="outlined"
-                  startIcon={<DownloadIcon />}
+                <FormHeaderIconAction
+                  variant="download"
+                  tooltipTitle="Download"
                   onClick={() => void handleDownload()}
                   disabled={mediaItems.length === 0}
-                >
-                  Download
-                </Button>
+                />
               ) : null}
               {perms.canEdit && !perms.readOnlyAudience ? (
                 <FormHeaderIconAction
@@ -356,28 +372,27 @@ export default function ActivityGalleryDetails() {
           </Stack>
         ) : null}
 
-        {gallery.gallery_type === "Photo" && currentMedia ? (
-          <Box sx={{ mt: 2 }}>
-            <IconButton onClick={() => void handleDownload(currentMedia.id)} color="primary">
-              <DownloadIcon />
-            </IconButton>
+        {gallery.gallery_type === "Photo" && currentMedia && perms.canDownload ? (
+          <Box sx={{ mt: 2, display: "flex", alignItems: "center", gap: 1 }}>
+            <Tooltip title="Download current photo">
+              <IconButton
+                size="small"
+                aria-label="Download current photo"
+                onClick={() => void handleDownload(currentMedia.id)}
+                sx={{
+                  color: colorTokens.primary.main,
+                  "&:hover": { bgcolor: alpha(colorTokens.primary.main, 0.1) },
+                }}
+              >
+                <DownloadIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
             <Typography component="span" variant="body2">
               Download current photo
             </Typography>
           </Box>
         ) : null}
       </Box>
-
-      <Snackbar
-        open={!!snackbar}
-        autoHideDuration={4000}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        onClose={() => setSnackbar(null)}
-      >
-        <Alert onClose={() => setSnackbar(null)} severity="info" sx={{ width: "100%" }}>
-          {snackbar}
-        </Alert>
-      </Snackbar>
     </ListPageLayout>
   );
 }
