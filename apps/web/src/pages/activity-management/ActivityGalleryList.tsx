@@ -224,7 +224,7 @@ export default function ActivityGalleryList() {
               sx={{
                 display: "flex",
                 alignItems: "center",
-                justifyContent: galleryType === "Video" ? "center" : "flex-start",
+                justifyContent: "center",
                 gap: 0,
                 width: "100%",
               }}
