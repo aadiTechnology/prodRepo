@@ -1,12 +1,42 @@
 from __future__ import annotations
 
 from datetime import datetime
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ConflictException
 from app.models.marketing_hub import MarketingPlatform, MarketingSocialMediaLink
 from app.schemas.marketing_hub import MarketingPlatformCreate, MarketingPlatformUpdate
 from app.utils.integration_url import normalize_integration_url
+
+
+def _swap_sort_order_if_taken(
+    db: Session,
+    *,
+    desired_sort_order: int,
+    exclude_platform_id: int | None = None,
+    previous_sort_order: int | None = None,
+) -> None:
+    """If another platform already has desired_sort_order, swap/displace it.
+
+    Edit: occupant takes previous_sort_order (true swap).
+    Create: occupant moves to max(sort_order)+1 (new platform takes the slot).
+    """
+    query = db.query(MarketingPlatform).filter(
+        MarketingPlatform.sort_order == desired_sort_order
+    )
+    if exclude_platform_id is not None:
+        query = query.filter(MarketingPlatform.id != exclude_platform_id)
+    occupant = query.first()
+    if not occupant:
+        return
+
+    if previous_sort_order is not None:
+        occupant.sort_order = previous_sort_order
+        return
+
+    max_order = db.query(func.max(MarketingPlatform.sort_order)).scalar()
+    occupant.sort_order = int(max_order or 0) + 1
 
 
 def list_platforms(db: Session, active_only: bool = False) -> list[MarketingPlatform]:
@@ -173,7 +203,14 @@ def update_platform(
         platform.description = data.description.strip() if data.description else None
     if data.icon_url is not None:
         platform.icon_url = data.icon_url.strip() if data.icon_url else None
-    if data.sort_order is not None:
+    if data.sort_order is not None and data.sort_order != platform.sort_order:
+        previous_sort_order = int(platform.sort_order or 0)
+        _swap_sort_order_if_taken(
+            db,
+            desired_sort_order=data.sort_order,
+            exclude_platform_id=platform.id,
+            previous_sort_order=previous_sort_order,
+        )
         platform.sort_order = data.sort_order
     if data.is_active is not None:
         platform.is_active = data.is_active
@@ -238,6 +275,8 @@ def create_platform(
     )
     if existing:
         raise ConflictException(f"Platform with code '{data.code}' already exists.")
+
+    _swap_sort_order_if_taken(db, desired_sort_order=data.sort_order)
 
     platform = MarketingPlatform(
         name=data.name.strip(),

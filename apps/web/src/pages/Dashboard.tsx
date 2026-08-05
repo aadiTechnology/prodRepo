@@ -1075,7 +1075,7 @@ const openRecentNoticeItem = (
   navigate(`/communication/notices/${notice.id}`);
 };
 
-/** Parse dashboard dates like "29 Jul 2026" for stable latest-first sorting. */
+/** Parse dashboard dates like "29 Jul 2026" for stable date sorting. */
 const parseDashboardItemDate = (value?: string | null): number => {
   if (!value) return 0;
   const native = Date.parse(value);
@@ -1172,10 +1172,10 @@ const NoticesCardContent: React.FC<{
         ? notices
         : notices.filter((n) => (n.notice_type || "general").toLowerCase() === activeFilter);
 
-    // Holiday tab: always show latest holiday first by date
+    // Holiday tab: upcoming first (earliest date on top)
     if (activeFilter === "holiday") {
       return [...rows].sort(
-        (a, b) => parseDashboardItemDate(b.published_at) - parseDashboardItemDate(a.published_at)
+        (a, b) => parseDashboardItemDate(a.published_at) - parseDashboardItemDate(b.published_at)
       );
     }
 

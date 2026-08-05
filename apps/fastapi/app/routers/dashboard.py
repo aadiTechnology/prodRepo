@@ -58,7 +58,7 @@ def _fetch_recent_notices(
     limit: int = 10,
     viewer_context: NoticeViewerContext | None = None,
 ) -> List[RecentNoticeItem]:
-    """Fetch the most recent published notices AND upcoming/recent holidays for a tenant."""
+    """Fetch recent published notices and upcoming holidays in the current month."""
 
     def _priority(notice_type: str) -> str:
         nt = (notice_type or "").upper()
@@ -95,7 +95,7 @@ def _fetch_recent_notices(
     except Exception as e:
         logger.warning(f"Could not fetch recent notices: {e}")
 
-    # ── Holidays (recent 30 days + upcoming 60 days) ──────────────────────────
+    # ── Holidays (upcoming in the current calendar month only) ───────────────
     # Track real sort dates so we never rely on parsing formatted display strings.
     sort_dates: dict[tuple[str, int], date] = {}
     for item in result:
@@ -111,27 +111,24 @@ def _fetch_recent_notices(
 
     try:
         today = date.today()
-        window_start = today - timedelta(days=30)
-        window_end = today + timedelta(days=60)
+        if today.month == 12:
+            month_end = date(today.year, 12, 31)
+        else:
+            month_end = date(today.year, today.month + 1, 1) - timedelta(days=1)
+
         holidays = (
             db.query(Holiday)
             .filter(Holiday.tenant_id == tenant_id)
             .filter(Holiday.is_active == True)  # noqa: E712
-            .filter(Holiday.start_date >= window_start)
-            .filter(Holiday.start_date <= window_end)
-            # Latest holiday first (most recently created), then nearest start date
-            .order_by(Holiday.created_at.desc(), Holiday.start_date.desc())
+            .filter(Holiday.start_date >= today)
+            .filter(Holiday.start_date <= month_end)
+            # Upcoming first: 15 Aug, then 28 Aug, then 30 Aug, …
+            .order_by(Holiday.start_date.asc())
             .limit(limit)
             .all()
         )
         for h in holidays:
-            created = h.created_at
-            if isinstance(created, datetime):
-                holiday_sort_date = created.date()
-            elif isinstance(created, date):
-                holiday_sort_date = created
-            else:
-                holiday_sort_date = h.start_date if h.start_date is not None else date.min
+            holiday_sort_date = h.start_date if h.start_date is not None else date.max
 
             result.append(RecentNoticeItem(
                 id=h.id,  # type: ignore[arg-type]
@@ -147,12 +144,17 @@ def _fetch_recent_notices(
     except Exception as e:
         logger.warning(f"Could not fetch holidays for dashboard: {e}")
 
-    # ── Merge: latest first (notices by publish date, holidays by created_at) ─
-    result.sort(
-        key=lambda item: sort_dates.get((item.item_type or "notice", item.id), date.min),
+    # ── Merge: upcoming holidays first (asc), then recent notices (desc) ─────
+    notice_items = [item for item in result if (item.item_type or "notice") != "holiday"]
+    holiday_items = [item for item in result if item.item_type == "holiday"]
+    notice_items.sort(
+        key=lambda item: sort_dates.get(("notice", item.id), date.min),
         reverse=True,
     )
-    return result[:limit]
+    holiday_items.sort(
+        key=lambda item: sort_dates.get(("holiday", item.id), date.max),
+    )
+    return (holiday_items + notice_items)[:limit]
 
 
 # ─── Per-class gender + new-enrollment counts ─────────────────────────────────

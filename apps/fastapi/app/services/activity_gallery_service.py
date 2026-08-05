@@ -23,6 +23,10 @@ from app.schemas.activity_gallery_schema import (
     ActivityGalleryUpdate,
     ClassOption,
     DivisionOption,
+    GalleryAccessPermissionsResponse,
+    TeacherGalleryClassDivision,
+    TeacherGalleryClassOption,
+    TeacherGalleryScopeResponse,
 )
 from app.services.activity_gallery_access import (
     ACTIVITY_GALLERY_MENU_PATH,
@@ -188,13 +192,21 @@ def _assert_gallery_visible(
     if not row:
         raise NotFoundException("Activity gallery", gallery_id)
 
-    if viewer_context and not gallery_visible_to_viewer(
-        class_id=int(row["class_id"]) if row.get("class_id") is not None else None,
-        division_id=int(row["division_id"]) if row.get("division_id") is not None else None,
-        is_published=bool(row.get("is_published")),
-        ctx=viewer_context,
-    ):
-        raise ForbiddenException("You are not authorized for this activity")
+    if viewer_context:
+        # Check ALL class mappings — get_gallery_by_id only returns TOP 1 pair,
+        # which incorrectly 403s other mapped classes on detail/download.
+        mappings = repo.get_class_mappings(db, gallery_id=gallery_id)
+        class_mappings = [
+            (int(m["class_id"]), int(m["division_id"]))
+            for m in mappings
+            if m.get("class_id") is not None and m.get("division_id") is not None
+        ]
+        if not gallery_visible_to_viewer(
+            class_mappings=class_mappings,
+            is_published=bool(row.get("is_published")),
+            ctx=viewer_context,
+        ):
+            raise ForbiddenException("You are not authorized for this activity")
     return row
 
 
@@ -760,9 +772,7 @@ def user_can_manage(db: Session, current_user: object) -> bool:
     return user_can_manage_galleries(db, current_user)
 
 
-def get_my_gallery_permissions(db: Session, current_user: object) -> "GalleryAccessPermissionsResponse":
-    from app.schemas.activity_gallery_schema import GalleryAccessPermissionsResponse
-
+def get_my_gallery_permissions(db: Session, current_user: object) -> GalleryAccessPermissionsResponse:
     return GalleryAccessPermissionsResponse(
         can_view=user_can_view_gallery(db, current_user),
         can_create=user_can_create_gallery(db, current_user),
@@ -777,15 +787,10 @@ def get_teacher_gallery_scope(
     *,
     tenant_id: int,
     user_id: int,
-) -> "TeacherGalleryScopeResponse":
+) -> TeacherGalleryScopeResponse:
     from sqlalchemy import text
 
     from app.models.academic import SchoolClass
-    from app.schemas.activity_gallery_schema import (
-        TeacherGalleryClassDivision,
-        TeacherGalleryClassOption,
-        TeacherGalleryScopeResponse,
-    )
     from app.services.homework_access import ClassDivisionScope, resolve_teacher_assignment_scopes
 
     teacher_id = homework_repository._resolve_teacher_id(db, tenant_id, user_id)
