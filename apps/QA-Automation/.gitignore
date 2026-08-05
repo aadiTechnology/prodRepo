@@ -1,0 +1,14 @@
+node_modules/
+.env
+test-results/
+playwright-report/
+reports/
+blob-report/
+playwright/.cache/
+screenshots/*
+!screenshots/.gitkeep
+videos/*
+!videos/.gitkeep
+traces/*
+!traces/.gitkeep
+.gitkeep
