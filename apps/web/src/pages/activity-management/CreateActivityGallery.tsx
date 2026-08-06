@@ -729,7 +729,6 @@ export default function CreateActivityGallery() {
             ? await activityGalleryService.uploadMediaBulk(targetId, selected)
             : [await activityGalleryService.uploadMedia(targetId, selected[0])];
         setSavedMedia((prev) => [...prev, ...uploaded]);
-        enqueueSnackbar("Media uploaded successfully.", { variant: "success" });
       } catch (err: unknown) {
         const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
         const uploadError = message || "Unable to upload file. Please try again.";
