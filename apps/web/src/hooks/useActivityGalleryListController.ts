@@ -5,6 +5,23 @@ import type { ActivityGalleryListItem, GalleryType } from "../types/activityGall
 export const GALLERY_LIST_ROWS_PER_PAGE = 20;
 export const GALLERY_LIST_ROWS_PER_PAGE_OPTIONS = [20, 40, 60];
 
+const UNAUTHORIZED_GALLERY_MESSAGE = "You are not authorized for this activity.";
+
+function galleryActionErrorMessage(err: unknown, fallback: string): string {
+  const obj = err && typeof err === "object" ? (err as {
+    message?: unknown;
+    response?: { status?: number; data?: { detail?: unknown } };
+  }) : null;
+  const detail = obj?.response?.data?.detail;
+  const fromDetail = typeof detail === "string" ? detail.trim() : "";
+  const fromMessage = typeof obj?.message === "string" ? obj.message.trim() : "";
+  const raw = fromDetail || fromMessage;
+  if (obj?.response?.status === 403 || /^not authorized$/i.test(raw)) {
+    return UNAUTHORIZED_GALLERY_MESSAGE;
+  }
+  return raw || fallback;
+}
+
 export function useActivityGalleryListController(galleryType: GalleryType) {
   const [items, setItems] = useState<ActivityGalleryListItem[]>([]);
   const [totalRows, setTotalRows] = useState(0);
@@ -17,7 +34,10 @@ export function useActivityGalleryListController(galleryType: GalleryType) {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [galleryToDelete, setGalleryToDelete] = useState<ActivityGalleryListItem | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{
+    message: string;
+    variant: "success" | "error";
+  } | null>(null);
 
   const hasLoadedOnceRef = useRef(false);
   const fetchGenerationRef = useRef(0);
@@ -96,12 +116,15 @@ export function useActivityGalleryListController(galleryType: GalleryType) {
     try {
       setDeleteLoading(true);
       await activityGalleryService.delete(galleryToDelete.id);
-      setSnackbar("Gallery deleted successfully.");
+      setSnackbar({ message: "Gallery deleted successfully.", variant: "success" });
       closeDeleteConfirm();
       await fetchGalleries();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to delete gallery";
-      setError(msg);
+      setSnackbar({
+        message: galleryActionErrorMessage(err, "Failed to delete gallery"),
+        variant: "error",
+      });
+      closeDeleteConfirm();
     } finally {
       setDeleteLoading(false);
     }

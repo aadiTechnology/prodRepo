@@ -209,7 +209,7 @@ def _assert_gallery_visible(
             is_published=bool(row.get("is_published")),
             ctx=viewer_context,
         ):
-            raise ForbiddenException("You are not authorized for this activity")
+            raise ForbiddenException("You are not authorized for this activity.")
     return row
 
 

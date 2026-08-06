@@ -46,7 +46,7 @@ export default function ActivityGalleryAccess({
           Access Denied
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          You are not authorized for this activity
+          You are not authorized for this activity.
         </Typography>
         <Button variant="contained" onClick={() => navigate(GALLERY_PATH)}>
           Back to Gallery

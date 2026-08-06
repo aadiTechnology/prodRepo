@@ -148,7 +148,7 @@ export default function ActivityGalleryDetails() {
     } catch (err: unknown) {
       const apiErr = err as { message?: string; response?: { status?: number } };
       if (apiErr.response?.status === 403) {
-        setError("You are not authorized for this activity");
+        setError("You are not authorized for this activity.");
       } else {
         setError(apiErr.message ?? "Unable to load gallery details");
       }
@@ -211,8 +211,7 @@ export default function ActivityGalleryDetails() {
     return (
       <ListPageLayout header={<PageHeader links={[{ title: "Photo / Video Gallery", path: galleryListPath }]} homePath="/" />}>
         <Typography color="error" sx={{ p: 3 }}>
-          You are not authorized for this activity
-        </Typography>
+          You are not authorized for this activity.        </Typography>
       </ListPageLayout>
     );
   }

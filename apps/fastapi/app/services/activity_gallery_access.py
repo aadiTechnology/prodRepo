@@ -299,7 +299,7 @@ def assert_gallery_manage_access(
 ) -> None:
     """Raise ForbiddenException unless user may manage this class/division gallery."""
     if is_parent_user(db, user_id, legacy_role) or is_student_user(db, user_id, legacy_role):
-        raise ForbiddenException("You are not authorized for this activity")
+        raise ForbiddenException("You are not authorized for this activity.")
 
     if is_admin_like(db, user_id, legacy_role, tenant_id):
         return
@@ -320,7 +320,7 @@ def assert_gallery_manage_access(
             division_id=division_id,
         ):
             return
-        raise ForbiddenException("You are not authorized for this activity")
+        raise ForbiddenException("You are not authorized for this activity.")
 
     if class_teacher_can_manage_class_division(
         db,
@@ -330,7 +330,7 @@ def assert_gallery_manage_access(
         division_id=division_id,
     ):
         return
-    raise ForbiddenException("You are not authorized for this activity")
+    raise ForbiddenException("You are not authorized for this activity.")
 
 
 def is_gallery_consumer(ctx: GalleryViewerContext) -> bool:

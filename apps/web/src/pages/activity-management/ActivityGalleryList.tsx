@@ -80,9 +80,9 @@ export default function ActivityGalleryList() {
 
   useEffect(() => {
     if (!c.snackbar) return;
-    enqueueSnackbar(c.snackbar, {
-      variant: "success",
-      autoHideDuration: 3000,
+    enqueueSnackbar(c.snackbar.message, {
+      variant: c.snackbar.variant,
+      autoHideDuration: c.snackbar.variant === "error" ? 4000 : 3000,
       anchorOrigin: { vertical: "top", horizontal: "center" },
     });
     c.setSnackbar(null);
