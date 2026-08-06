@@ -1,22 +1,29 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useGalleryMediaSrc } from "../../hooks/useGalleryMediaSrc";
 import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
-  IconButton,
+  Divider,
+  Link,
   MobileStepper,
+  Paper,
   Stack,
   Tooltip,
   Typography,
-  alpha,
 } from "@mui/material";
 import Grid from "@mui/material/Grid2";
+import { alpha } from "@mui/material/styles";
 import {
+  CalendarMonth as CalendarIcon,
   ChevronLeft,
   ChevronRight,
-  Download as DownloadIcon,
+  Class as ClassIcon,
+  OpenInNew as OpenInNewIcon,
+  PhotoLibrary as PhotoIcon,
+  Videocam as VideocamIcon,
 } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -26,9 +33,7 @@ import { FormHeaderIconAction } from "../../components/primitives";
 import activityGalleryService from "../../api/services/activityGalleryService";
 import { useActivityGalleryPermissions } from "../../hooks/useActivityGalleryPermissions";
 import type { ActivityGallery, ActivityGalleryClassMapping, GalleryType } from "../../types/activityGallery";
-import { apiBaseUrl } from "../../config";
 import { formatShortDate } from "../../utils/formatters";
-import { buildVideoEmbedUrl, isDirectVideoFileUrl } from "../../utils/videoEmbed";
 import { colorTokens } from "../../tokens/colors";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
@@ -37,16 +42,10 @@ const NO_MEDIA_DOWNLOAD_MESSAGE = "No media available to download.";
 const PHOTOS_DOWNLOAD_SUCCESS_MESSAGE = "Photos download successfully.";
 const DOWNLOAD_FAILED_MESSAGE = "Download failed";
 
+const accent = colorTokens.preschool.turquoise.main;
+
 function galleryListPathByType(type: GalleryType): string {
   return `${GALLERY_PATH}?type=${type.toLowerCase()}`;
-}
-
-function buildMediaUrl(filePath: string): string {
-  if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
-  if (filePath.includes("/media/") && filePath.endsWith("/content")) {
-    return "";
-  }
-  return `${apiBaseUrl}${filePath}`;
 }
 
 function formatAssignedClasses(
@@ -65,6 +64,60 @@ function formatAssignedClasses(
   return gallery.division_name
     ? `${gallery.class_name} (${gallery.division_name})`
     : gallery.class_name;
+}
+
+function videoPlatformLabel(url: string): string {
+  const trimmed = url.trim();
+  if (/instagram\.com/i.test(trimmed)) return "Instagram";
+  if (/youtube\.com|youtu\.be/i.test(trimmed)) return "YouTube";
+  if (/facebook\.com|fb\.watch/i.test(trimmed)) return "Facebook";
+  return "Video";
+}
+
+function MetaItem({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <Box
+      sx={(theme) => ({
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 1.25,
+        minWidth: 0,
+        p: 1.25,
+        borderRadius: 1.5,
+        bgcolor: alpha(theme.palette.primary.main, 0.04),
+        border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+        height: "100%",
+      })}
+    >
+      <Box
+        sx={{
+          width: 36,
+          height: 36,
+          borderRadius: 1.25,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          bgcolor: alpha(accent, 0.12),
+          color: "primary.main",
+          "& .MuiSvgIcon-root": { fontSize: 20 },
+        }}
+      >
+        {icon}
+      </Box>
+      <Box sx={{ minWidth: 0, pt: 0.15 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, lineHeight: 1.2 }}>
+          {label}
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{ fontWeight: 700, lineHeight: 1.35, color: "text.primary", wordBreak: "break-word" }}
+        >
+          {value}
+        </Typography>
+      </Box>
+    </Box>
+  );
 }
 
 export default function ActivityGalleryDetails() {
@@ -115,12 +168,9 @@ export default function ActivityGalleryDetails() {
     gallery?.gallery_type === "Photo" ? currentMedia?.file_path : undefined,
   );
 
-  const handleDownload = async (mediaId?: number) => {
+  const handleDownload = async () => {
     if (!gallery) return;
-    const targets = mediaId
-      ? mediaItems.filter((m) => m.id === mediaId)
-      : mediaItems;
-    if (targets.length === 0) {
+    if (mediaItems.length === 0) {
       enqueueSnackbar(NO_MEDIA_DOWNLOAD_MESSAGE, {
         variant: "warning",
         autoHideDuration: 3000,
@@ -129,7 +179,7 @@ export default function ActivityGalleryDetails() {
       return;
     }
     try {
-      for (const item of targets) {
+      for (const item of mediaItems) {
         await activityGalleryService.downloadMedia(
           gallery.id,
           item.id,
@@ -189,6 +239,8 @@ export default function ActivityGalleryDetails() {
   }
 
   const classLabel = formatAssignedClasses(gallery);
+  const isPhoto = gallery.gallery_type === "Photo";
+  const TypeIcon = isPhoto ? PhotoIcon : VideocamIcon;
 
   return (
     <ListPageLayout
@@ -201,7 +253,7 @@ export default function ActivityGalleryDetails() {
           homePath="/"
           actions={
             <Stack direction="row" spacing={1}>
-              {gallery.gallery_type === "Photo" && perms.canDownload ? (
+              {isPhoto && perms.canDownload ? (
                 <FormHeaderIconAction
                   variant="download"
                   tooltipTitle="Download"
@@ -221,189 +273,252 @@ export default function ActivityGalleryDetails() {
         />
       }
     >
-      <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Typography variant="caption" color="text.secondary">
-              Activity Date
-            </Typography>
-            <Typography variant="body2" fontWeight={700}>
-              {formatShortDate(gallery.activity_date)}
-            </Typography>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Typography variant="caption" color="text.secondary">
-              Class
-            </Typography>
-            <Typography variant="body2" fontWeight={700}>
-              {classLabel}
-            </Typography>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Typography variant="caption" color="text.secondary">
-              Media
-            </Typography>
-            <Typography variant="body2" fontWeight={700}>
-              {gallery.media_count}
-            </Typography>
-          </Grid>
-          {!perms.readOnlyAudience ? (
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <Typography variant="caption" color="text.secondary">
-                Status
-              </Typography>
-              <Typography variant="body2" fontWeight={700}>
-                {gallery.is_published ? "Published" : "Draft"}
-              </Typography>
-            </Grid>
-          ) : null}
-        </Grid>
-
-        {gallery.description ? (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            {gallery.description}
-          </Typography>
-        ) : null}
-
-        {mediaItems.length === 0 ? (
-          <Alert severity="info">No media uploaded for this gallery yet.</Alert>
-        ) : gallery.gallery_type === "Photo" ? (
-          <Box>
-            <Box
-              sx={{
-                position: "relative",
-                borderRadius: 2,
-                overflow: "hidden",
-                bgcolor: alpha(colorTokens.text.primary, 0.04),
-                minHeight: 360,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {currentMedia ? (
-                photoSrc ? (
-                  <Box
-                    component="img"
-                    src={photoSrc}
-                    alt={currentMedia.original_file_name || currentMedia.file_name}
-                    sx={{ maxWidth: "100%", maxHeight: 480, objectFit: "contain" }}
+      <Box sx={{ width: "100%", maxWidth: 1200, mx: "auto", px: { xs: 1.5, sm: 2.5 }, py: 2 }}>
+        <Paper
+          elevation={0}
+          sx={(theme) => ({
+            borderRadius: 2.5,
+            border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+            bgcolor: "background.paper",
+            overflow: "hidden",
+            boxShadow: `0 8px 28px ${alpha(theme.palette.common.black, 0.06)}`,
+          })}
+        >
+          <Box
+            sx={(theme) => ({
+              px: { xs: 2, sm: 2.5 },
+              py: 1.75,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 1.5,
+              flexWrap: "wrap",
+              background: `linear-gradient(120deg, ${alpha(accent, 0.14)} 0%, ${alpha(theme.palette.primary.main, 0.06)} 45%, ${theme.palette.background.paper} 100%)`,
+              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.85)}`,
+            })}
+          >
+            <Stack direction="row" alignItems="center" gap={1.25} flexWrap="wrap" useFlexGap sx={{ minWidth: 0 }}>
+              <TypeIcon sx={{ fontSize: 26, color: "primary.main", flexShrink: 0 }} />
+              <Box sx={{ minWidth: 0 }}>
+                <Typography
+                  variant="h5"
+                  component="h1"
+                  sx={{ fontWeight: 800, lineHeight: 1.2, wordBreak: "break-word", letterSpacing: -0.2 }}
+                >
+                  {gallery.gallery_name}
+                </Typography>
+                <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                  <Chip
+                    label={isPhoto ? "Photo" : "Video"}
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    sx={{ height: 24, fontWeight: 600, fontSize: "0.72rem" }}
                   />
-                ) : (
-                  <CircularProgress />
-                )
+                  {!perms.readOnlyAudience ? (
+                    <Chip
+                      label={gallery.is_published ? "Published" : "Draft"}
+                      color={gallery.is_published ? "success" : "default"}
+                      size="small"
+                      sx={{ height: 24, fontWeight: 700, fontSize: "0.72rem" }}
+                    />
+                  ) : null}
+                </Stack>
+              </Box>
+            </Stack>
+          </Box>
+
+          <Box sx={{ px: { xs: 2, sm: 2.5 }, py: 1.5, bgcolor: alpha("#f8fafc", 0.65) }}>
+            <Grid container spacing={1.5}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <MetaItem
+                  icon={<CalendarIcon />}
+                  label="Activity Date"
+                  value={formatShortDate(gallery.activity_date)}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 5 }}>
+                <MetaItem icon={<ClassIcon />} label="Class" value={classLabel} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                <MetaItem
+                  icon={isPhoto ? <PhotoIcon /> : <VideocamIcon />}
+                  label="Media"
+                  value={String(gallery.media_count)}
+                />
+              </Grid>
+              {!perms.readOnlyAudience ? (
+                <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                  <MetaItem
+                    icon={<TypeIcon />}
+                    label="Status"
+                    value={gallery.is_published ? "Published" : "Draft"}
+                  />
+                </Grid>
               ) : null}
-            </Box>
-            <MobileStepper
-              variant="dots"
-              steps={mediaItems.length}
-              position="static"
-              activeStep={activeStep}
-              sx={{ mt: 2, bgcolor: "transparent" }}
-              nextButton={
-                <Button
-                  size="small"
-                  onClick={() => setActiveStep((s) => Math.min(s + 1, mediaItems.length - 1))}
-                  disabled={activeStep >= mediaItems.length - 1}
-                >
-                  Next
-                  <ChevronRight />
-                </Button>
-              }
-              backButton={
-                <Button
-                  size="small"
-                  onClick={() => setActiveStep((s) => Math.max(s - 1, 0))}
-                  disabled={activeStep <= 0}
-                >
-                  <ChevronLeft />
-                  Back
-                </Button>
-              }
-            />
+            </Grid>
           </Box>
-        ) : (
-          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#000" }}>
-            {currentMedia ? (
-              (() => {
-                const embedSrc = buildVideoEmbedUrl(currentMedia.file_path);
-                if (embedSrc) {
-                  return (
-                    <Box
-                      component="iframe"
-                      src={embedSrc}
-                      title={currentMedia.original_file_name || "Video"}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowFullScreen
-                      sx={{ width: "100%", minHeight: 420, border: 0, display: "block" }}
-                    />
-                  );
-                }
-                if (
-                  isDirectVideoFileUrl(currentMedia.file_path) ||
-                  !/^https?:\/\//i.test(currentMedia.file_path)
-                ) {
-                  return (
-                    <Box
-                      component="video"
-                      src={buildMediaUrl(currentMedia.file_path)}
-                      controls
-                      sx={{ width: "100%", maxHeight: 520, display: "block" }}
-                    />
-                  );
-                }
-                return (
-                  <Box sx={{ py: 6, textAlign: "center", bgcolor: "#111" }}>
-                    <Button
-                      variant="contained"
-                      href={currentMedia.file_path}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open video link
-                    </Button>
-                  </Box>
-                );
-              })()
+
+          <Box sx={{ px: { xs: 2, sm: 2.5 }, py: 2 }}>
+            {gallery.description ? (
+              <>
+                <Typography
+                  variant="overline"
+                  sx={{ fontWeight: 700, letterSpacing: 0.6, color: "text.secondary", display: "block", mb: 1 }}
+                >
+                  Description
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{
+                    mb: 2,
+                    p: 1.5,
+                    borderRadius: 1.5,
+                    border: (theme) => `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                    bgcolor: alpha("#f8fafc", 0.8),
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {gallery.description}
+                </Typography>
+                <Divider sx={{ mb: 2, opacity: 0.7 }} />
+              </>
             ) : null}
-          </Box>
-        )}
 
-        {mediaItems.length > 1 && gallery.gallery_type === "Video" ? (
-          <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: "wrap" }}>
-            {mediaItems.map((item, index) => (
-              <Button
-                key={item.id}
-                size="small"
-                variant={index === activeStep ? "contained" : "outlined"}
-                onClick={() => setActiveStep(index)}
-              >
-                Video {index + 1}
-              </Button>
-            ))}
-          </Stack>
-        ) : null}
-
-        {gallery.gallery_type === "Photo" && currentMedia && perms.canDownload ? (
-          <Box sx={{ mt: 2, display: "flex", alignItems: "center", gap: 1 }}>
-            <Tooltip title="Download current photo">
-              <IconButton
-                size="small"
-                aria-label="Download current photo"
-                onClick={() => void handleDownload(currentMedia.id)}
-                sx={{
-                  color: colorTokens.primary.main,
-                  "&:hover": { bgcolor: alpha(colorTokens.primary.main, 0.1) },
-                }}
-              >
-                <DownloadIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Typography component="span" variant="body2">
-              Download current photo
-            </Typography>
+            {mediaItems.length === 0 ? (
+              <Alert severity="info">No media uploaded for this gallery yet.</Alert>
+            ) : isPhoto ? (
+              <Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: 280,
+                  }}
+                >
+                  {currentMedia ? (
+                    photoSrc ? (
+                      <Box
+                        component="img"
+                        src={photoSrc}
+                        alt={currentMedia.original_file_name || currentMedia.file_name}
+                        sx={{ maxWidth: "100%", maxHeight: 480, objectFit: "contain", display: "block" }}
+                      />
+                    ) : (
+                      <CircularProgress />
+                    )
+                  ) : null}
+                </Box>
+                <MobileStepper
+                  variant="dots"
+                  steps={mediaItems.length}
+                  position="static"
+                  activeStep={activeStep}
+                  sx={{ mt: 2, bgcolor: "transparent" }}
+                  nextButton={
+                    <Button
+                      size="small"
+                      onClick={() => setActiveStep((s) => Math.min(s + 1, mediaItems.length - 1))}
+                      disabled={activeStep >= mediaItems.length - 1}
+                    >
+                      Next
+                      <ChevronRight />
+                    </Button>
+                  }
+                  backButton={
+                    <Button
+                      size="small"
+                      onClick={() => setActiveStep((s) => Math.max(s - 1, 0))}
+                      disabled={activeStep <= 0}
+                    >
+                      <ChevronLeft />
+                      Back
+                    </Button>
+                  }
+                />
+              </Box>
+            ) : (
+              <Box>
+                <Typography
+                  variant="overline"
+                  sx={{ fontWeight: 700, letterSpacing: 0.6, color: "text.secondary", display: "block", mb: 1.25 }}
+                >
+                  Video Links
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  Click a link to open the video in a new tab.
+                </Typography>
+                <Stack spacing={1}>
+                  {mediaItems.map((item, index) => {
+                    const href = item.file_path?.trim();
+                    if (!href) return null;
+                    const platform = videoPlatformLabel(href);
+                    return (
+                      <Box
+                        key={item.id}
+                        sx={(theme) => ({
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1.25,
+                          px: 1.5,
+                          py: 1.1,
+                          borderRadius: 1.5,
+                          border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+                          bgcolor: alpha(theme.palette.primary.main, 0.04),
+                          transition: "background-color 0.15s ease",
+                          "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.08) },
+                        })}
+                      >
+                        <Box
+                          sx={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 1.25,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            bgcolor: alpha(accent, 0.12),
+                            color: "primary.main",
+                          }}
+                        >
+                          <VideocamIcon sx={{ fontSize: 20 }} />
+                        </Box>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                            Video {index + 1} · {platform}
+                          </Typography>
+                          <Tooltip title={href} placement="top-start">
+                            <Link
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              underline="hover"
+                              variant="body2"
+                              sx={{
+                                display: "block",
+                                fontWeight: 700,
+                                color: "primary.main",
+                                cursor: "pointer",
+                                width: "fit-content",
+                                maxWidth: "100%",
+                              }}
+                            >
+                              Open {platform} video
+                            </Link>
+                          </Tooltip>
+                        </Box>
+                        <OpenInNewIcon sx={{ fontSize: 18, color: "primary.main", flexShrink: 0, opacity: 0.75 }} />
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Box>
+            )}
           </Box>
-        ) : null}
+        </Paper>
       </Box>
     </ListPageLayout>
   );
