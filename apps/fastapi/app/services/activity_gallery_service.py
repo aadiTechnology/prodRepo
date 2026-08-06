@@ -46,11 +46,14 @@ from app.services.activity_gallery_access import (
     user_can_manage_galleries,
 )
 from app.services.activity_gallery_media_storage import (
-    build_gallery_photo_file_name,
-    gallery_media_content_path,
+    delete_gallery_media_file,
+    download_gallery_media_bytes,
+    is_azure_gallery_media_path,
     is_db_stored_media_path,
     legacy_disk_path,
     mime_type_for_file_name,
+    resolve_media_url,
+    save_gallery_photo_file,
 )
 from app.services.activity_gallery_youtube import extract_youtube_video_id, normalize_youtube_url
 
@@ -107,7 +110,7 @@ def _to_media_response(row: dict) -> ActivityGalleryMediaResponse:
         media_type=row["media_type"],
         file_name=str(row["file_name"]),
         original_file_name=row.get("original_file_name"),
-        file_path=str(row["file_path"]),
+        file_path=resolve_media_url(str(row["file_path"])),
         file_size=int(row["file_size"]) if row.get("file_size") is not None else None,
         display_order=int(row.get("display_order") or 1),
         uploaded_at=row["uploaded_at"],
@@ -502,7 +505,7 @@ def upload_media(
     if media_type == "Photo":
         _assert_photo_gallery_total_size(db, gallery_id=gallery_id, incoming_bytes=len(content))
 
-    safe_name = build_gallery_photo_file_name(
+    blob_name, safe_name = save_gallery_photo_file(
         tenant_id=tenant_id,
         gallery_id=gallery_id,
         original_filename=filename,
@@ -515,17 +518,10 @@ def upload_media(
         media_type=media_type,
         file_name=safe_name,
         original_file_name=filename,
-        file_path="/pending",
-        file_content=content,
+        file_path=blob_name,
+        file_content=None,
         file_size=len(content),
         display_order=current_count + 1,
-    )
-    public_path = gallery_media_content_path(gallery_id=gallery_id, media_id=media_id)
-    repo.update_media_file_path(
-        db,
-        gallery_id=gallery_id,
-        media_id=media_id,
-        file_path=public_path,
     )
     media_row = repo.get_media_by_id(db, gallery_id=gallery_id, media_id=media_id)
     if not media_row:
@@ -653,9 +649,10 @@ def delete_media(
 
     try:
         stored_path = str(media_row["file_path"])
+        delete_gallery_media_file(stored_path)
         if not stored_path.startswith(("http://", "https://")) and not is_db_stored_media_path(
             stored_path
-        ):
+        ) and not is_azure_gallery_media_path(stored_path):
             file_path = legacy_disk_path(stored_path)
             if os.path.exists(file_path):
                 os.remove(file_path)
@@ -677,6 +674,11 @@ def _resolve_media_bytes(
     if file_content is not None:
         mime = mime_type_for_file_name(str(media_row.get("file_name") or download_name))
         return bytes(file_content), mime, download_name
+
+    azure_bytes = download_gallery_media_bytes(stored_path)
+    if azure_bytes is not None:
+        mime = mime_type_for_file_name(str(media_row.get("file_name") or download_name))
+        return azure_bytes, mime, download_name
 
     if is_db_stored_media_path(stored_path):
         raise NotFoundException("Gallery media content", media_row.get("id"))
@@ -738,6 +740,10 @@ def get_media_for_download(
     file_content = media_row.get("file_content")
     if file_content is not None:
         return bytes(file_content), None, mime, download_name
+
+    azure_bytes = download_gallery_media_bytes(stored_path)
+    if azure_bytes is not None:
+        return azure_bytes, None, mime, download_name
 
     if is_db_stored_media_path(stored_path):
         raise NotFoundException("Gallery media content", media_id)

@@ -229,7 +229,11 @@ def resolve_download_url(file_path: str) -> str:
     if not blob_name:
         return trimmed
 
-    azure_prefixes = ("notice-attachments/", "homework-attachments/")
+    azure_prefixes = (
+        "notice-attachments/",
+        "homework-attachments/",
+        "activity-gallery-media/",
+    )
     if not blob_name.startswith(azure_prefixes) and not (
         trimmed.startswith("http://") or trimmed.startswith("https://")
     ):
