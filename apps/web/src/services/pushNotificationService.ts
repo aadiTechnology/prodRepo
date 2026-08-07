@@ -28,10 +28,24 @@ type RegistrationError = import("@capacitor/push-notifications").RegistrationErr
 type PushNotificationSchema = import("@capacitor/push-notifications").PushNotificationSchema;
 type ActionPerformed = import("@capacitor/push-notifications").ActionPerformed;
 
-async function loadPushPlugin(): Promise<PushNotificationsPlugin | null> {
+/**
+ * Dynamically import the native Push Notifications plugin.
+ *
+ * Important: Capacitor plugins are Proxies that intercept *any* property access,
+ * including `then`. Returning the plugin object from an `async` function (or
+ * otherwise as a Promise resolution value) makes the JS Promise engine treat it
+ * as a thenable and call `PushNotifications.then()`, which fails with:
+ *   "PushNotifications.then() is not implemented on android"
+ *
+ * Always return a plain non-thenable container and unwrap the plugin only after
+ * `await` has completed.
+ */
+async function loadPushPlugin(): Promise<{
+  PushNotifications: PushNotificationsPlugin;
+} | null> {
   try {
-    const mod = await import("@capacitor/push-notifications");
-    return mod.PushNotifications;
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+    return { PushNotifications };
   } catch (error) {
     console.error("[PushNotifications] Plugin unavailable:", error);
     return null;
@@ -65,10 +79,11 @@ async function runInitialization(): Promise<string | null> {
       return null;
     }
 
-    const PushNotifications = await loadPushPlugin();
-    if (!PushNotifications) {
+    const loaded = await loadPushPlugin();
+    if (!loaded) {
       return null;
     }
+    const { PushNotifications } = loaded;
 
     // Attach listeners before register() so no events are missed (Capacitor best practice).
     await attachPushListeners(PushNotifications);
