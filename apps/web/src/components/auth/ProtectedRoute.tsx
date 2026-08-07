@@ -132,7 +132,7 @@ export default function ProtectedRoute({
   const location = useLocation();
   const userRole = normalizeRole(user?.role);
 
-  // Show loading spinner while checking authentication
+  // Show loading spinner while checking authentication (avoids blank shell on refresh)
   if (isLoading) {
     return (
       <Box
@@ -140,8 +140,10 @@ export default function ProtectedRoute({
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          minHeight: "400px",
+          minHeight: "100vh",
+          width: "100%",
         }}
+        data-testid="auth-loading"
       >
         <CircularProgress />
       </Box>

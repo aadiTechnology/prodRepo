@@ -5,17 +5,11 @@
  * Safe to call multiple times — only the first call performs registration.
  *
  * Supported only on native Capacitor shells (Android / iOS). On web this is a no-op.
+ * The Capacitor plugin is loaded via dynamic import so missing/web installs cannot
+ * crash the whole SPA at module-eval time (blank page / ErrorBoundary reload).
  *
  * @see https://capacitorjs.com/docs/apis/push-notifications
  */
-import { PushNotifications } from "@capacitor/push-notifications";
-import type {
-  ActionPerformed,
-  PermissionStatus,
-  PushNotificationSchema,
-  RegistrationError,
-  Token,
-} from "@capacitor/push-notifications";
 import { isNativePlatform } from "../utils/capacitor";
 
 /** Time to wait for FCM/APNs registration before giving up. */
@@ -26,6 +20,23 @@ let initializationPromise: Promise<string | null> | null = null;
 
 /** Ensures plugin event listeners are registered only once. */
 let listenersAttached = false;
+
+type PushNotificationsPlugin = typeof import("@capacitor/push-notifications").PushNotifications;
+type Token = import("@capacitor/push-notifications").Token;
+type PermissionStatus = import("@capacitor/push-notifications").PermissionStatus;
+type RegistrationError = import("@capacitor/push-notifications").RegistrationError;
+type PushNotificationSchema = import("@capacitor/push-notifications").PushNotificationSchema;
+type ActionPerformed = import("@capacitor/push-notifications").ActionPerformed;
+
+async function loadPushPlugin(): Promise<PushNotificationsPlugin | null> {
+  try {
+    const mod = await import("@capacitor/push-notifications");
+    return mod.PushNotifications;
+  } catch (error) {
+    console.error("[PushNotifications] Plugin unavailable:", error);
+    return null;
+  }
+}
 
 /**
  * Request notification permission, register with FCM/APNs, and attach event listeners.
@@ -54,8 +65,13 @@ async function runInitialization(): Promise<string | null> {
       return null;
     }
 
+    const PushNotifications = await loadPushPlugin();
+    if (!PushNotifications) {
+      return null;
+    }
+
     // Attach listeners before register() so no events are missed (Capacitor best practice).
-    await attachPushListeners();
+    await attachPushListeners(PushNotifications);
 
     const permission: PermissionStatus = await PushNotifications.requestPermissions();
 
@@ -69,7 +85,7 @@ async function runInitialization(): Promise<string | null> {
 
     console.log("[PushNotifications] Permission granted — registering with FCM/APNs…");
 
-    const token = await registerAndWaitForToken();
+    const token = await registerAndWaitForToken(PushNotifications);
     console.log("[PushNotifications] Device registered. FCM token:", token);
     return token;
   } catch (error) {
@@ -83,7 +99,7 @@ async function runInitialization(): Promise<string | null> {
 /**
  * Subscribe to plugin events. Listeners stay active for the app lifetime.
  */
-async function attachPushListeners(): Promise<void> {
+async function attachPushListeners(PushNotifications: PushNotificationsPlugin): Promise<void> {
   if (listenersAttached) {
     return;
   }
@@ -138,7 +154,9 @@ async function attachPushListeners(): Promise<void> {
 /**
  * Call plugin register() and resolve when the `registration` event delivers a token.
  */
-async function registerAndWaitForToken(): Promise<string> {
+async function registerAndWaitForToken(
+  PushNotifications: PushNotificationsPlugin,
+): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     let settled = false;
 

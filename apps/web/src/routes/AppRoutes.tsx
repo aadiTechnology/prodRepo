@@ -140,8 +140,14 @@ export default function AppRoutes() {
         <Route path="/register" element={<Register />} />
         <Route path="/session-expired" element={<SessionExpired />} />
 
-        {/* Protected routes with layout */}
-        <Route element={<MainLayout />}>
+        {/* Auth gate BEFORE MainLayout so logged-out deep links / refresh never blank the shell */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/students" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:view"><StudentList /></ProtectedRoute>} />
           <Route

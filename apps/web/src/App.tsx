@@ -4,16 +4,22 @@ import AppRoutes from "./routes/AppRoutes";
 import { AuthProvider, RBACProvider } from "./context";
 import ThemeFromTenantProvider from "./theme/ThemeFromTenantProvider";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { initializePushNotifications } from "./services/pushNotificationService";
+import { isNativePlatform } from "./utils/capacitor";
 
 export default function App() {
-  // Register for FCM/APNs once at app startup (no-op on web).
+  // Register for FCM/APNs once at app startup (native only; dynamic import avoids web crash).
   useEffect(() => {
-    void initializePushNotifications().then((token) => {
-      if (token) {
-        console.log("[App] Push notifications ready. Token:", token);
-      }
-    });
+    if (!isNativePlatform()) return;
+    void import("./services/pushNotificationService")
+      .then(({ initializePushNotifications }) => initializePushNotifications())
+      .then((token) => {
+        if (token) {
+          console.log("[App] Push notifications ready. Token:", token);
+        }
+      })
+      .catch((error) => {
+        console.error("[App] Push notification bootstrap failed:", error);
+      });
   }, []);
 
   return (

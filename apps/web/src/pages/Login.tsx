@@ -18,7 +18,6 @@ import { Button, CircularProgress } from "../components/primitives";
 import { EmailInput, PasswordInput } from "../components/semantic";
 import { Info as InfoIcon } from "@mui/icons-material";
 import { useAuth } from "../context/AuthContext";
-import { useRBAC } from "../context/RBACContext";
 import { LoginRequest } from "../types/auth";
 import type { ApiError } from "../api/client";
 import type { TenantSchoolPickerItem } from "../types/tenant";
@@ -114,7 +113,6 @@ export default function Login() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { loginWithContext, isAuthenticated } = useAuth();
-  const { setRBACData } = useRBAC();
 
   const [formData, setFormData] = useState<LoginRequest>({ email: "", password: "" });
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
@@ -270,11 +268,11 @@ export default function Login() {
     if (!validate()) return;
     setIsSubmitting(true);
     try {
-      const response = await loginWithContext({
+      await loginWithContext({
         ...formData,
         ...(tenantIdFromQuery !== undefined ? { tenant_id: tenantIdFromQuery } : {}),
       });
-      setRBACData({ roles: response.roles, menus: response.menus, permissions: response.permissions });
+      // loginWithContext already hydrated auth + RBAC — navigate once ready.
       const statePath = (location.state as { from?: Location })?.from?.pathname;
       const from =
         statePath && statePath.startsWith("/") && !statePath.includes("http") ? statePath : "/";
