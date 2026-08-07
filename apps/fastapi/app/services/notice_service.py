@@ -5,6 +5,8 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ValidationException
+from app.core.logging_config import get_logger
+from app.models.user import User
 from app.repositories import notice_repository
 from app.services.homework_access import ClassDivisionScope, HomeworkViewerContext, is_admin_like
 from app.services.notice_access import (
@@ -20,6 +22,7 @@ from app.services.notice_attachment_storage import (
     save_notice_attachment_file,
     validate_attachment_path,
 )
+from app.services import notification_service
 from app.schemas.notice import (
     NoticeAttachmentResponse,
     NoticeCreateRequest,
@@ -31,6 +34,7 @@ from app.schemas.notice import (
     NoticeUpdateRequest,
 )
 
+logger = get_logger(__name__)
 
 ALLOWED_ATTACHMENT_TYPES = {"application/pdf", "image/jpeg", "image/jpg", "image/png"}
 ALLOWED_AUDIENCE_TYPES = {"ALL", "STUDENT", "TEACHER", "ADMIN"}
@@ -38,6 +42,46 @@ NOTICE_MENU_PATH = "/communication/notices"
 ALLOWED_NOTICE_TYPES = {"GENERAL", "FEE", "EVENT", "HOLIDAY", "EXAM"}
 AUDIENCE_WITH_CLASS_TARGETS = frozenset({"STUDENT", "ALL"})
 
+
+def _actor_display_name(db: Session, user_id: int | None) -> str:
+    if not user_id:
+        return "System"
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return "System"
+    name = (user.full_name or "").strip()
+    if name:
+        return name
+    email = (user.email or "").strip()
+    return email or "System"
+
+
+def _emit_notice_notification(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    audience_type: str,
+    title: str,
+    body: str,
+    notice_id: int | None = None,
+) -> None:
+    """Call shared Notification Create API after notice save/publish (non-blocking)."""
+    try:
+        notification_service.create_notification(
+            db,
+            tenant_id=tenant_id,
+            from_=_actor_display_name(db, user_id),
+            to=(audience_type or "ALL").strip().upper() or "ALL",
+            subject="Notice Notification",
+            body=body,
+            created_by=user_id,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to create notification after notice save (notice_id=%s)",
+            notice_id,
+        )
 
 def _coerce_naive_utc(value: datetime | None) -> datetime | None:
     if value is None:
@@ -511,6 +555,18 @@ def create_notice(
         attachments=stored_attachments,
     )
     db.commit()
+
+    title = payload.title.strip()
+    _emit_notice_notification(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        audience_type=audience_type,
+        title=title,
+        body=f"{title} notice has been created.",
+        notice_id=notice_id,
+    )
+
     return get_notice(db, tenant_id=tenant_id, notice_id=notice_id)
 
 
@@ -740,6 +796,19 @@ def publish_notice(
         },
     )
     db.commit()
+
+    title = str(existing.get("title") or "Notice").strip() or "Notice"
+    audience_type = str(existing.get("audience_type") or "ALL").strip().upper() or "ALL"
+    _emit_notice_notification(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        audience_type=audience_type,
+        title=title,
+        body=f"{title} notice has been published.",
+        notice_id=notice_id,
+    )
+
     return NoticeStatusUpdateResponse(
         message="Notice published successfully",
         notice=get_notice(db, tenant_id=tenant_id, notice_id=notice_id),

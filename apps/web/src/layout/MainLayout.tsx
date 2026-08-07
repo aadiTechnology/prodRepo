@@ -19,6 +19,8 @@ import { colorTokens } from "../tokens/colors";
 import { toRoleLabel } from "../utils/formatters";
 import { getTimeGreeting, getFirstName } from "../utils/greeting";
 import { hasAiAssistantAccess } from "../utils/menuNavigation";
+import { NotificationProvider } from "../pages/notifications/NotificationContext";
+import NotificationBell from "../pages/notifications/components/NotificationBell";
 
 function MainLayout() {
   const theme = useTheme();
@@ -161,6 +163,7 @@ function MainLayout() {
   const headerFirstName = getFirstName(user?.full_name || "User");
 
   return (
+    <NotificationProvider>
     <Box
       sx={{
         display: "flex",
@@ -353,6 +356,8 @@ function MainLayout() {
                   </Box>
                 </Typography>
               )}
+
+              {isAuthenticated && <NotificationBell />}
 
               {/* User menu */}
               {isAuthenticated && user && (
@@ -566,6 +571,7 @@ function MainLayout() {
         }
       `}</style>
     </Box>
+    </NotificationProvider>
   );
 }
 

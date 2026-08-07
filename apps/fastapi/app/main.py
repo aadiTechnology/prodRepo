@@ -42,6 +42,10 @@ from app.models import (  # noqa: F401
     SupportFaqAttachment,
     SupportFaqFeedback,
     SupportProductUpdate,
+    Syllabus,
+    UserNotification,
+    UserNotificationSettings,
+    Notification,
 )
 # Import FeePayment + FeePaymentAllocation so create_all creates fee_payment_allocations
 from app.models.fee_payment import FeePayment, FeePaymentAllocation  # noqa: F401
@@ -159,6 +163,8 @@ app.include_router(support_router.faq_router)
 app.include_router(support_router.product_update_router)
 from app.routers import syllabus_router
 app.include_router(syllabus_router.router)
+from app.routers import notification_router
+app.include_router(notification_router.router)
 
 
 

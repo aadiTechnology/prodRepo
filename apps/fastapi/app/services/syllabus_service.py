@@ -7,6 +7,8 @@ from typing import cast
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ForbiddenException, NotFoundException, ValidationException
+from app.core.logging_config import get_logger
+from app.models.user import User
 from app.repositories import homework_repository, syllabus_repository
 from app.schemas.syllabus_schema import (
     SYLLABUS_MONTHS,
@@ -24,6 +26,7 @@ from app.services.homework_access import (
     HomeworkViewerContext,
     resolve_homework_viewer_context,
 )
+from app.services import notification_service
 from app.services.school_class_service import require_active_class
 from app.services.syllabus_attachment_storage import (
     ALLOWED_EXTENSIONS,
@@ -33,8 +36,54 @@ from app.services.syllabus_attachment_storage import (
     save_syllabus_attachment_file,
 )
 
+logger = get_logger(__name__)
+
 SYLLABUS_MENU_PATH = "/academics/syllabus"
 
+
+def _actor_display_name(db: Session, user_id: int | None) -> str:
+    if not user_id:
+        return "System"
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return "System"
+    name = (user.full_name or "").strip()
+    if name:
+        return name
+    email = (user.email or "").strip()
+    return email or "System"
+
+
+def _emit_syllabus_notification(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    month: str,
+    class_label: str | None,
+    syllabus_id: int | None = None,
+) -> None:
+    """Call shared Notification Create API after syllabus save (non-blocking)."""
+    month_label = (month or "").strip() or "the selected month"
+    if class_label:
+        body = f"Syllabus for {class_label} ({month_label}) has been created."
+    else:
+        body = f"Syllabus for {month_label} has been created."
+    try:
+        notification_service.create_notification(
+            db,
+            tenant_id=tenant_id,
+            from_=_actor_display_name(db, user_id),
+            to="STUDENT",
+            subject="Syllabus Notification",
+            body=body,
+            created_by=user_id,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to create notification after syllabus save (syllabus_id=%s)",
+            syllabus_id,
+        )
 
 def get_viewer_context(
     db: Session,
@@ -254,6 +303,23 @@ def create_syllabus(
     )
     db.commit()
     db.refresh(row)
+
+    class_label = None
+    try:
+        if row.class_model and getattr(row.class_model, "name", None):
+            class_label = str(row.class_model.name).strip() or None
+    except Exception:
+        class_label = None
+
+    _emit_syllabus_notification(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        month=str(payload.month or row.month or ""),
+        class_label=class_label,
+        syllabus_id=int(row.id) if row.id is not None else None,
+    )
+
     return _to_response(db, row)
 
 

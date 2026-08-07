@@ -92,6 +92,10 @@ const ActivityGalleryList = lazy(() => import("../pages/activity-management/Acti
 const ActivityGalleryDetails = lazy(() => import("../pages/activity-management/ActivityGalleryDetails"));
 const CreateActivityGallery = lazy(() => import("../pages/activity-management/CreateActivityGallery"));
 const AcademicCalendar = lazy(() => import("../pages/calendar/AcademicCalendar"));
+const NotificationListPage = lazy(() => import("../pages/notifications/NotificationListPage"));
+const NotificationSettingsPage = lazy(
+  () => import("../pages/notifications/NotificationSettingsPage")
+);
 const ConfigurationHub = lazy(() =>
   import("../pages/configuration").then((module) => ({ default: module.ConfigurationHub }))
 );
@@ -203,7 +207,22 @@ export default function AppRoutes() {
           <Route path="/user/create" element={<ProtectedRoute requiredPermissions="ADMIN_MGMT:create"><CreateUser /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
-
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notifications/settings"
+            element={
+              <ProtectedRoute>
+                <NotificationSettingsPage />
+              </ProtectedRoute>
+            }
+          />
           {/* Fee Category Management */}
           <Route path="/fees/categories" element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeCategoryManagement /></ProtectedRoute>} />
           <Route path="/fees/categories/add" element={<ProtectedRoute requiredPermissions="FEE_MGMT:create"><AddEditFeeCategory /></ProtectedRoute>} />

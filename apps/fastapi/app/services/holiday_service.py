@@ -18,6 +18,7 @@ from app.schemas.holiday import (
     HolidaySummary,
     HolidayUpdateRequest,
 )
+from app.services import notification_service
 from app.utils.holiday_storage import (
     coerce_holiday_type_for_db,
     pack_holiday_description,
@@ -404,6 +405,8 @@ def create_holiday(
     *,
     tenant_id: int,
     payload: HolidayCreateRequest,
+    actor_user_id: int | None = None,
+    actor_name: str | None = None,
 ) -> HolidayResponse:
     ay = _get_academic_year_for_tenant(db, tenant_id, payload.academic_year_id)
 
@@ -445,6 +448,27 @@ def create_holiday(
     )
     db.add(row)
     _commit_holiday(db, row)
+
+    # Reusable Notification Create API — no holiday-specific DB/insert logic here
+    try:
+        notification_service.create_notification(
+            db,
+            tenant_id=tenant_id,
+            from_=(actor_name or "System").strip() or "System",
+            to=aud,
+            subject="Holiday Notification",
+            body=f"{hname} holiday has been created.",
+            created_by=actor_user_id,
+        )
+    except Exception:
+        # Holiday save already committed; notification failure must not fail the Save response
+        from app.core.logging_config import get_logger
+
+        get_logger(__name__).exception(
+            "Failed to create notification after holiday save (holiday_id=%s)",
+            getattr(row, "id", None),
+        )
+
     return _to_response(row)
 
 

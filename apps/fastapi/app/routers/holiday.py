@@ -100,7 +100,13 @@ def create_holiday(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    return holiday_service.create_holiday(db, tenant_id=current_user.tenant_id, payload=payload)
+    return holiday_service.create_holiday(
+        db,
+        tenant_id=current_user.tenant_id,
+        payload=payload,
+        actor_user_id=current_user.id,
+        actor_name=getattr(current_user, "full_name", None) or current_user.email,
+    )
 
 
 @router.put("/{holiday_id}", response_model=HolidayResponse)
