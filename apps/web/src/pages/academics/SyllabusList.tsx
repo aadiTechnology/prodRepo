@@ -304,7 +304,7 @@ export default function SyllabusList() {
         }
         stickyHeader
         size="small"
-        showPagination={total > 0}
+        showPagination={total > rowsPerPage}
       />
 
       <ConfirmDialog

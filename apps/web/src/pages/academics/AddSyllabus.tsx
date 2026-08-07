@@ -29,7 +29,9 @@ type FormData = {
   month: SyllabusMonth | "";
 };
 
-const UPLOAD_HINT = "Accepted: pdf, doc, docx, xls, xlsx, ppt, pptx, jpg, jpeg, png";
+const UPLOAD_HINT =
+  "Accepted: pdf, doc, docx, xls, xlsx, ppt, pptx, jpg, jpeg, png. Limit 10 MB";
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 export default function AddSyllabus() {
   const navigate = useNavigate();
@@ -198,6 +200,11 @@ export default function AddSyllabus() {
     if (!isAllowedSyllabusFile(file)) {
       setPendingFile(null);
       setFileError(`Invalid file type. ${UPLOAD_HINT}`);
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setPendingFile(null);
+      setFileError("File size exceeded. Maximum allowed size is 10 MB");
       return;
     }
     setPendingFile(file);
