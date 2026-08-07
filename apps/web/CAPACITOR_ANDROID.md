@@ -1,6 +1,6 @@
 # Android deployment (Capacitor)
 
-This guide covers building and running **Preschool ERP** (`com.aaditech.preschoolerp`) as a native Android app from the React web project in `apps/web`.
+This guide covers building and running **Preschool ERP** (`com.aaditech.preschool`) as a native Android app from the React web project in `apps/web`.
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ This guide covers building and running **Preschool ERP** (`com.aaditech.preschoo
 | Setting | Value |
 |---------|-------|
 | App name | Preschool ERP |
-| Package ID | `com.aaditech.preschoolerp` |
+| Package ID | `com.aaditech.preschool` |
 | Web output | `dist/` |
 | Production API | `https://preschoolapi.aaditechnology.com` |
 | Emulator dev API | `http://10.0.2.2:8022` |

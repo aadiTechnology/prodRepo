@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.aaditech.preschoolerp",
-  appName: "Preschool ERP",
+  appId: "com.aaditech.preschool",
+  appName: "Preschool",
   webDir: "dist",
   server: {
     // Allow live reload during development (optional — set CAPACITOR_DEV_SERVER_URL)
