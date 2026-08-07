@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Alert, Box, Button, Typography } from "@mui/material";
+import { Alert, Box, Button, IconButton, Tooltip, Typography } from "@mui/material";
+import { Delete as DeleteIcon } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
 import BaseForm from "../../components/reusable/BaseForm";
 import { ListPageLayout } from "../../components/reusable";
@@ -245,14 +246,17 @@ export default function AddSyllabus() {
                 {displayFileName}
               </Typography>
               {pendingFile ? (
-                <Button
-                  variant="text"
-                  color="error"
-                  onClick={() => onFileSelect(undefined)}
-                  data-testid="btn-remove-syllabus-attachment"
-                >
-                  Remove
-                </Button>
+                <Tooltip title="Delete">
+                  <IconButton
+                    size="small"
+                    color="error"
+                    aria-label="Delete attachment"
+                    onClick={() => onFileSelect(undefined)}
+                    data-testid="btn-remove-syllabus-attachment"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               ) : null}
             </>
           ) : null}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Box, Button, Link, Snackbar, Typography } from "@mui/material";
+import { Box, Button, Link, Typography } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
+import { useSnackbar } from "notistack";
 import { useNavigate } from "react-router-dom";
 import {
   EntityTableSection,
@@ -20,11 +21,16 @@ import { isTeacherNoticeUser } from "../../utils/noticeAudience";
 import syllabusService, {
   buildSyllabusAttachmentUrl,
   formatSyllabusMonthLabel,
+  SYLLABUS_MONTHS,
   type Syllabus,
 } from "../../api/services/syllabusService";
 
+/** Align with Activity Gallery list pagination (page 2 starts at record 21). */
+const SYLLABUS_ROWS_PER_PAGE_OPTIONS = [20, 40, 60];
+
 export default function SyllabusList() {
   const navigate = useNavigate();
+  const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuth();
   const { hasPermission, hasAnyRole, roles } = useRBAC();
   const teacherScope = useTeacherStudentListScope();
@@ -48,13 +54,12 @@ export default function SyllabusList() {
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [academicYearId, setAcademicYearId] = useState("");
   const [classId, setClassId] = useState("");
-  const [month, setMonth] = useState("");
+  const [month, setMonth] = useState(SYLLABUS_MONTHS[new Date().getMonth()]);
   const [yearOptions, setYearOptions] = useState<{ label: string; value: string }[]>([]);
   const [classOptions, setClassOptions] = useState<{ label: string; value: string }[]>([]);
   const [monthOptions, setMonthOptions] = useState<{ label: string; value: string }[]>([]);
   const [toDelete, setToDelete] = useState<Syllabus | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 400);
@@ -70,7 +75,8 @@ export default function SyllabusList() {
         setYearOptions(opts.academic_years.map((y) => ({ label: y.name, value: String(y.id) })));
         setClassOptions(opts.classes.map((c) => ({ label: c.name, value: String(c.id) })));
         setMonthOptions(opts.months.map((m) => ({ label: formatSyllabusMonthLabel(m), value: m })));
-        const current = opts.academic_years.find((y) => y.is_current);
+        // Prefer current academic year; fall back to first so Admin filter is never blank.
+        const current = opts.academic_years.find((y) => y.is_current) ?? opts.academic_years[0];
         if (current) {
           setAcademicYearId((prev) => prev || String(current.id));
         }
@@ -137,7 +143,11 @@ export default function SyllabusList() {
     try {
       setDeleteLoading(true);
       await syllabusService.delete(toDelete.id);
-      setSnackbar("Syllabus deleted successfully.");
+      enqueueSnackbar("Syllabus deleted successfully.", {
+        variant: "success",
+        autoHideDuration: 3000,
+        anchorOrigin: { vertical: "top", horizontal: "center" },
+      });
       setToDelete(null);
       await fetchList();
     } catch (err) {
@@ -272,10 +282,11 @@ export default function SyllabusList() {
           setRowsPerPage(n);
           setPage(0);
         }}
+        rowsPerPageOptions={SYLLABUS_ROWS_PER_PAGE_OPTIONS}
         columns={columns}
         data={items}
         loading={loading}
-        emptyMessage="No syllabus records found"
+        emptyMessage="No syllabus records found."
         getRowKey={(row) => row.id}
         data-testid="table-syllabus-list"
         rowTestId={(row) => `row-syllabus-${row.id}`}
@@ -305,17 +316,6 @@ export default function SyllabusList() {
         onClose={() => setToDelete(null)}
         loading={deleteLoading}
       />
-
-      <Snackbar
-        open={!!snackbar}
-        autoHideDuration={3000}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        onClose={() => setSnackbar(null)}
-      >
-        <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: "100%" }}>
-          {snackbar}
-        </Alert>
-      </Snackbar>
     </ListPageLayout>
   );
 }
