@@ -233,6 +233,7 @@ def resolve_download_url(file_path: str) -> str:
         "notice-attachments/",
         "homework-attachments/",
         "activity-gallery-media/",
+        "syllabus-attachments/",
     )
     if not blob_name.startswith(azure_prefixes) and not (
         trimmed.startswith("http://") or trimmed.startswith("https://")

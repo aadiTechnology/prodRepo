@@ -161,7 +161,14 @@ function MainLayout() {
   const headerFirstName = getFirstName(user?.full_name || "User");
 
   return (
-    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+    <Box
+      sx={{
+        display: "flex",
+        height: "100vh",
+        "@supports (height: 100dvh)": { height: "100dvh" },
+        overflow: "hidden",
+      }}
+    >
       {/* Sidebar */}
       <Sidebar
         mobileOpen={mobileMenuOpen}
@@ -192,6 +199,8 @@ function MainLayout() {
           position="sticky"
           elevation={0}
           sx={{
+            flexShrink: 0,
+            pt: "env(safe-area-inset-top, 0px)",
             zIndex: (theme) => theme.zIndex.drawer + 1,
             backgroundColor: alpha(colorTokens.background.paper, 0.7),
             backdropFilter: 'blur(16px) saturate(180%)',
@@ -208,11 +217,13 @@ function MainLayout() {
           <Toolbar
             sx={{
               minHeight: { xs: 56, sm: 60, md: 68 },
+              height: { xs: 56, sm: 60, md: 68 },
               px: { xs: 1.5, sm: 2, md: 3 },
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: 1,
+              boxSizing: 'border-box',
             }}
           >
             {/* Column 1: Left - Logo & Branding */}
@@ -251,7 +262,13 @@ function MainLayout() {
                   component="img"
                   src={user?.tenant?.logo_url && !logoError ? user.tenant.logo_url : "/aaadi.webp"}
                   alt="Logo"
-                  sx={{ height: "45px", objectFit: "contain", borderRadius: "8px" }}
+                  sx={{
+                    height: { xs: 36, sm: 45 },
+                    maxWidth: { xs: 120, sm: 160 },
+                    objectFit: "contain",
+                    borderRadius: "8px",
+                    flexShrink: 0,
+                  }}
                   onError={() => setLogoError(true)}
                 />
                 {!user?.tenant && (
@@ -312,9 +329,11 @@ function MainLayout() {
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
-                    maxWidth: { xs: 140, sm: 260, md: 320, lg: 420 },
-                    fontSize: { xs: "0.82rem", sm: "0.92rem", md: "1rem", lg: "1.05rem" },
+                    maxWidth: { xs: 110, sm: 260, md: 320, lg: 420 },
+                    fontSize: { xs: "0.78rem", sm: "0.92rem", md: "1rem", lg: "1.05rem" },
                     lineHeight: 1.25,
+                    flexShrink: 1,
+                    minWidth: 0,
                   }}
                 >
                   {headerGreeting.text},{" "}
@@ -499,9 +518,11 @@ function MainLayout() {
         <Box
           component="footer"
           sx={{
-            py: 1, // Reduced padding for a more compact footer
+            py: 1,
             px: 2,
+            pb: "max(8px, env(safe-area-inset-bottom, 0px))",
             mt: "auto",
+            flexShrink: 0,
             backgroundColor: colorTokens.background.paper,
             borderTop: "1px solid",
             borderColor: colorTokens.border.subtle,
@@ -511,7 +532,8 @@ function MainLayout() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            height: "50px"
+            minHeight: 50,
+            boxSizing: "border-box",
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>

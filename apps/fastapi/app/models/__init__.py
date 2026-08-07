@@ -50,6 +50,7 @@ from app.models.support import (
     SupportFaqFeedback,
     SupportProductUpdate,
 )
+from app.models.syllabus import Syllabus, SyllabusAttachment
 from app.models.ai_assistant_chat import AiAssistantSession, AiAssistantMessage
 from app.models.ai_assistant_tenant_config import AiAssistantTenantConfig
 
@@ -116,6 +117,8 @@ __all__ = [
     "SupportFaqAttachment",
     "SupportFaqFeedback",
     "SupportProductUpdate",
+    "Syllabus",
+    "SyllabusAttachment",
     "AiAssistantSession",
     "AiAssistantMessage",
     "AiAssistantTenantConfig",

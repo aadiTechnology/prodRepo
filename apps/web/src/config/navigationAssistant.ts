@@ -21,6 +21,7 @@ export const NAV_ACTION_PAGES: NavActionPage[] = [
   { name: "Add Role", path: "/roles/create", hint: "Create a new role here", permission: "ADMIN_MGMT:create" },
   { name: "Add Fee Structure", path: "/fees/setup/add", hint: "Create a new fee structure here", permission: "FEE_MGMT:create" },
   { name: "Create Notice", path: "/communication/notices/new", hint: "Create a new notice here", permission: "COMMUNICATION_MGMT:create" },
+  { name: "Add Syllabus", path: "/academics/syllabus/new", hint: "Upload a class syllabus attachment here", permission: "ACADEMIC_MGMT:create" },
   { name: "Assign Class Teacher", path: "/teacher-assignments/assign", hint: "Assign a teacher to a class here", permission: "ADMIN_MGMT:create" },
 ];
 
@@ -36,6 +37,7 @@ export const NAV_PAGE_HINTS: Record<string, string> = {
   "/subjects": "View and manage subjects",
   "/academic-years": "View and manage academic years",
   "/homework": "View and manage homework",
+  "/academics/syllabus": "View and manage class syllabus",
   "/attendance/mark": "Mark student attendance",
   "/attendance/report": "View attendance reports",
   "/fees/collect-payment": "Collect fee payments",

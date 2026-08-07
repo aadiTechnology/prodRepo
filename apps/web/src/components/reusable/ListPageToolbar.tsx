@@ -17,6 +17,8 @@ export interface ToolbarFilter {
   label: string;
   options: { label: string; value: string }[];
   disabled?: boolean;
+  /** Stable test hook for Playwright (e.g. filter-syllabus-month). */
+  testId?: string;
 }
 
 export interface ListPageToolbarProps {
@@ -81,6 +83,8 @@ export default function ListPageToolbar({
               displayEmpty
               disabled={filter.disabled}
               size="small"
+              data-testid={filter.testId}
+              inputProps={filter.testId ? { "data-testid": `${filter.testId}-input` } : undefined}
               sx={{
                 minWidth: { xs: "100%", sm: 160 },
                 "& .MuiOutlinedInput-root": {

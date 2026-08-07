@@ -157,6 +157,8 @@ app.include_router(activity_gallery_router.router)
 from app.routers import support_router
 app.include_router(support_router.faq_router)
 app.include_router(support_router.product_update_router)
+from app.routers import syllabus_router
+app.include_router(syllabus_router.router)
 
 
 
@@ -177,6 +179,8 @@ os.makedirs("static/support-faq-attachments", exist_ok=True)
 app.mount("/support-faq-attachments", StaticFiles(directory="static/support-faq-attachments"), name="support-faq-attachments")
 os.makedirs("static/support-release-notes", exist_ok=True)
 app.mount("/support-release-notes", StaticFiles(directory="static/support-release-notes"), name="support-release-notes")
+os.makedirs("static/syllabus-attachments", exist_ok=True)
+app.mount("/syllabus-attachments", StaticFiles(directory="static/syllabus-attachments"), name="syllabus-attachments")
 
 @app.on_event("startup")
 async def startup_event():

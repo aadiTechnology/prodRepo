@@ -15,8 +15,10 @@ async function bootstrap() {
     ]);
 
     try {
+      // Keep app content below the system status bar (prevents header collapse on Android).
+      await StatusBar.setOverlaysWebView({ overlay: false });
       await StatusBar.setStyle({ style: Style.Light });
-      await StatusBar.setBackgroundColor({ color: "#1976d2" });
+      await StatusBar.setBackgroundColor({ color: "#ffffff" });
     } catch {
       // Status bar plugin is unavailable on some WebView versions
     }

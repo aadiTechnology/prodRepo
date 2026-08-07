@@ -86,6 +86,8 @@ const HolidayForm = lazy(() => import("../pages/configuration/HolidayForm"));
 const HomeworkList = lazy(() => import("../pages/academics/HomeworkList"));
 const AddHomework = lazy(() => import("../pages/academics/AddHomework"));
 const HomeworkDetails = lazy(() => import("../pages/academics/HomeworkDetails"));
+const SyllabusList = lazy(() => import("../pages/academics/SyllabusList"));
+const AddSyllabus = lazy(() => import("../pages/academics/AddSyllabus"));
 const ActivityGalleryList = lazy(() => import("../pages/activity-management/ActivityGalleryList"));
 const ActivityGalleryDetails = lazy(() => import("../pages/activity-management/ActivityGalleryDetails"));
 const CreateActivityGallery = lazy(() => import("../pages/activity-management/CreateActivityGallery"));
@@ -503,6 +505,11 @@ export default function AppRoutes() {
           <Route path="/homework/new" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:create"><AddHomework /></ProtectedRoute>} />
           <Route path="/homework/:id/edit" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:edit"><AddHomework /></ProtectedRoute>} />
           <Route path="/homework/:id" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:view"><HomeworkDetails /></ProtectedRoute>} />
+
+          {/* Syllabus Management */}
+          <Route path="/academics/syllabus/new" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:create"><AddSyllabus /></ProtectedRoute>} />
+          <Route path="/academics/syllabus/:id/edit" element={<ProtectedRoute requiredPermissions={["ACADEMIC_MGMT:edit", "ACADEMIC_MGMT:create"]}><AddSyllabus /></ProtectedRoute>} />
+          <Route path="/academics/syllabus" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><SyllabusList /></ProtectedRoute>} />
 
           {/* Attendance Management */}
           {/* Attendance Management */}
