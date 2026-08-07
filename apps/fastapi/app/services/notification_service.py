@@ -37,11 +37,57 @@ VALID_PLATFORMS = ("android", "ios", "web")
 _MATERIALIZE_LOOKBACK_DAYS = 14
 _MAX_SOURCE_ITEMS = 25
 
+# Lifecycle / materialization events that share one source_key scheme
+_ENTITY_EVENTS = frozenset({"created", "updated", "deleted", "published", "day", "reminder"})
+
 
 def _require_tenant(tenant_id: Optional[int]) -> int:
     if tenant_id is None:
         raise ValidationException("Notifications require a school (tenant) context")
     return int(tenant_id)
+
+
+def entity_source_key(
+    module: str,
+    entity_id: int,
+    event: str = "created",
+    *,
+    day: Optional[date] = None,
+    notification_id: Optional[int] = None,
+) -> str:
+    """
+    Shared source_key for eager create and lazy materialization.
+
+    Stable once-only events (created / published): module:entity_id[:event]
+      - created → module:entity_id  (aligns materialize of new notice/syllabus)
+      - published → module:entity_id:published
+    Repeatable events (updated / deleted): append notification id for uniqueness
+    under UQ(tenant, user, source_key).
+    Calendar reminders: module:entity_id:day|reminder:YYYY-MM-DD
+    """
+    mod = (module or "general").strip().lower()
+    if mod not in VALID_MODULES:
+        mod = "general"
+    eid = int(entity_id)
+    ev = (event or "created").strip().lower()
+    if ev not in _ENTITY_EVENTS:
+        ev = "created"
+
+    if ev in ("day", "reminder"):
+        d = day.isoformat() if day is not None else date.today().isoformat()
+        return f"{mod}:{eid}:{ev}:{d}"
+
+    if ev == "created":
+        # Primary key shared with notice/syllabus materialization
+        return f"{mod}:{eid}"
+
+    if ev == "published":
+        return f"{mod}:{eid}:published"
+
+    # updated / deleted — unique per notification master row so repeats are allowed
+    if notification_id is not None:
+        return f"{mod}:{eid}:{ev}:{int(notification_id)}"
+    return f"{mod}:{eid}:{ev}"
 
 
 def _infer_module(subject: str, from_: str) -> str:
@@ -84,17 +130,21 @@ def create_notification(
     subject: str,
     body: str,
     created_by: Optional[int] = None,
+    module: Optional[str] = None,
+    entity_id: Optional[int] = None,
+    source_key: Optional[str] = None,
+    event: Optional[str] = None,
 ) -> NotificationCreateResponse:
     """
     Reusable Notification Create API for any module.
 
-    Only From / To / Subject / Body are accepted as content fields.
+    Only From / To / Subject / Body are required content fields.
+    Optional module/entity_id/event (or explicit source_key) align inbox
+    source_keys with materialization so create does not duplicate on list.
+
     Persists to `notifications`, fans out to `user_notifications` for the in-app
     inbox, then best-effort FCM push to registered device tokens.
     FCM failures never fail this create.
-
-    Extension (Notices, Syllabus, etc.): after a successful Save, call this function
-    with the same four fields. Do not re-implement insert logic in feature services.
     """
     tid = _require_tenant(tenant_id)
 
@@ -125,24 +175,41 @@ def create_notification(
 
     # 2) Resolve audience → users and fan-out inbox rows
     user_ids = repo.resolve_recipient_user_ids(db, tenant_id=tid, to=recipient)
-    module = _infer_module(subj, sender)
+    module_key = (module or "").strip().lower() if module else _infer_module(subj, sender)
+    if module_key not in VALID_MODULES:
+        module_key = _infer_module(subj, sender)
+
+    inbox_source_key = (source_key or "").strip() or None
+    inbox_entity_id = int(entity_id) if entity_id is not None else None
+    if not inbox_source_key and inbox_entity_id is not None:
+        # Build key after master insert so updated/deleted can embed notification id
+        inbox_source_key = entity_source_key(
+            module_key,
+            inbox_entity_id,
+            event or "created",
+            notification_id=int(master.id),
+        )
+
     delivered = repo.create_user_inbox_rows(
         db,
         tenant_id=tid,
         user_ids=user_ids,
         subject=subj,
         body=msg,
-        module=module,
+        module=module_key,
         notification_id=int(master.id),
         created_by=created_by,
+        source_key=inbox_source_key,
+        entity_id=inbox_entity_id,
     )
     logger.info(
-        "Notification created id=%s tenant=%s recipients=%s delivered=%s module=%s",
+        "Notification created id=%s tenant=%s recipients=%s delivered=%s module=%s source_key=%s",
         master.id,
         tid,
         len(user_ids),
         delivered,
-        module,
+        module_key,
+        inbox_source_key,
     )
 
     # 3) FCM push — best-effort; never fail notification creation
@@ -153,7 +220,7 @@ def create_notification(
         subject=subj,
         body=msg,
         notification_id=int(master.id),
-        module=module,
+        module=module_key,
     )
 
     return NotificationCreateResponse(
@@ -345,7 +412,7 @@ def _materialize_holiday_exam_events(
         name = (h.holiday_name or "Event").strip() or "Event"
 
         if _holiday_covers_day(h, today):
-            key = f"{module}:{h.id}:day:{today.isoformat()}"
+            key = entity_source_key(module, int(h.id), "day", day=today)
             source_keys.append(key)
             if is_exam:
                 title = f"{name} — today"
@@ -376,7 +443,7 @@ def _materialize_holiday_exam_events(
             )
 
         if _holiday_covers_day(h, tomorrow):
-            key = f"{module}:{h.id}:reminder:{tomorrow.isoformat()}"
+            key = entity_source_key(module, int(h.id), "reminder", day=tomorrow)
             source_keys.append(key)
             if is_exam:
                 title = f"Reminder: {name} tomorrow"
@@ -437,6 +504,7 @@ def _materialize_notice_events(
             Notice.tenant_id == tenant_id,
             Notice.is_deleted == False,  # noqa: E712
             Notice.is_published == True,  # noqa: E712
+            Notice.send_notification == True,  # noqa: E712
             Notice.created_at >= since,
         )
         .order_by(Notice.created_at.desc())
@@ -446,14 +514,20 @@ def _materialize_notice_events(
     if not notices:
         return
 
-    source_keys = [f"notice:{n.id}" for n in notices]
+    # created key (module:id) + published key so eager create/publish and materialize share keys
+    source_keys: List[str] = []
+    for n in notices:
+        source_keys.append(entity_source_key("notice", int(n.id), "created"))
+        source_keys.append(entity_source_key("notice", int(n.id), "published"))
     existing = repo.existing_source_keys(
         db, tenant_id=tenant_id, user_id=user_id, source_keys=source_keys
     )
     candidates: List[UserNotification] = []
     for n in notices:
-        key = f"notice:{n.id}"
-        if key in existing:
+        created_key = entity_source_key("notice", int(n.id), "created")
+        published_key = entity_source_key("notice", int(n.id), "published")
+        # Skip if any lifecycle key already delivered via eager create/publish
+        if created_key in existing or published_key in existing:
             continue
         title = (n.title or "New notice").strip() or "New notice"
         desc = (n.description or "").strip()
@@ -467,7 +541,7 @@ def _materialize_notice_events(
                 message=message,
                 kind="general",
                 is_read=False,
-                source_key=key,
+                source_key=created_key,
                 entity_id=n.id,
                 created_at=n.published_at or n.created_at or datetime.utcnow(),
                 created_by=user_id,
@@ -505,13 +579,13 @@ def _materialize_syllabus_events(
     if not rows:
         return
 
-    source_keys = [f"syllabus:{s.id}" for s in rows]
+    source_keys = [entity_source_key("syllabus", int(s.id), "created") for s in rows]
     existing = repo.existing_source_keys(
         db, tenant_id=tenant_id, user_id=user_id, source_keys=source_keys
     )
     candidates: List[UserNotification] = []
     for s in rows:
-        key = f"syllabus:{s.id}"
+        key = entity_source_key("syllabus", int(s.id), "created")
         if key in existing:
             continue
         month = (s.month or "").strip()

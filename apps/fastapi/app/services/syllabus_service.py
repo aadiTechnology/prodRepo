@@ -62,13 +62,26 @@ def _emit_syllabus_notification(
     month: str,
     class_label: str | None,
     syllabus_id: int | None = None,
+    event: str = "created",
 ) -> None:
-    """Call shared Notification Create API after syllabus save (non-blocking)."""
+    """Call shared Notification Create API after syllabus lifecycle events (non-blocking)."""
     month_label = (month or "").strip() or "the selected month"
-    if class_label:
-        body = f"Syllabus for {class_label} ({month_label}) has been created."
+    if event == "updated":
+        if class_label:
+            body = f"Syllabus for {class_label} ({month_label}) has been updated."
+        else:
+            body = f"Syllabus for {month_label} has been updated."
+    elif event == "deleted":
+        if class_label:
+            body = f"Syllabus for {class_label} ({month_label}) has been deleted."
+        else:
+            body = f"Syllabus for {month_label} has been deleted."
     else:
-        body = f"Syllabus for {month_label} has been created."
+        event = "created"
+        if class_label:
+            body = f"Syllabus for {class_label} ({month_label}) has been created."
+        else:
+            body = f"Syllabus for {month_label} has been created."
     try:
         notification_service.create_notification(
             db,
@@ -78,10 +91,14 @@ def _emit_syllabus_notification(
             subject="Syllabus Notification",
             body=body,
             created_by=user_id,
+            module="syllabus",
+            entity_id=syllabus_id,
+            event=event,
         )
     except Exception:
         logger.exception(
-            "Failed to create notification after syllabus save (syllabus_id=%s)",
+            "Failed to create notification after syllabus %s (syllabus_id=%s)",
+            event,
             syllabus_id,
         )
 
@@ -318,6 +335,7 @@ def create_syllabus(
         month=str(payload.month or row.month or ""),
         class_label=class_label,
         syllabus_id=int(row.id) if row.id is not None else None,
+        event="created",
     )
 
     return _to_response(db, row)
@@ -360,6 +378,24 @@ def update_syllabus(
     )
     db.commit()
     db.refresh(row)
+
+    class_label = None
+    try:
+        if row.class_model and getattr(row.class_model, "name", None):
+            class_label = str(row.class_model.name).strip() or None
+    except Exception:
+        class_label = None
+
+    _emit_syllabus_notification(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        month=str(payload.month or row.month or ""),
+        class_label=class_label,
+        syllabus_id=syllabus_id,
+        event="updated",
+    )
+
     return _to_response(db, row)
 
 
@@ -378,6 +414,14 @@ def delete_syllabus(
         raise NotFoundException("Syllabus not found")
     _assert_class_in_scope(class_id=int(row.class_id), viewer_context=viewer_context)
 
+    class_label = None
+    try:
+        if row.class_model and getattr(row.class_model, "name", None):
+            class_label = str(row.class_model.name).strip() or None
+    except Exception:
+        class_label = None
+    month = str(row.month or "")
+
     attachment = syllabus_repository.get_active_attachment(db, syllabus_id=row.id)
     if attachment:
         syllabus_repository.soft_delete_attachment(db, attachment, user_id=user_id)
@@ -389,6 +433,15 @@ def delete_syllabus(
     syllabus_repository.soft_delete_syllabus(db, row, user_id=user_id)
     db.commit()
 
+    _emit_syllabus_notification(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        month=month,
+        class_label=class_label,
+        syllabus_id=syllabus_id,
+        event="deleted",
+    )
 
 def upload_attachment(
     db: Session,

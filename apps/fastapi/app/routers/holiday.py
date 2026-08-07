@@ -121,6 +121,8 @@ def update_holiday(
         tenant_id=current_user.tenant_id,
         holiday_id=holiday_id,
         payload=payload,
+        actor_user_id=current_user.id,
+        actor_name=getattr(current_user, "full_name", None) or current_user.email,
     )
 
 
@@ -130,5 +132,11 @@ def delete_holiday(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    holiday_service.delete_holiday(db, tenant_id=current_user.tenant_id, holiday_id=holiday_id)
+    holiday_service.delete_holiday(
+        db,
+        tenant_id=current_user.tenant_id,
+        holiday_id=holiday_id,
+        actor_user_id=current_user.id,
+        actor_name=getattr(current_user, "full_name", None) or current_user.email,
+    )
     return None

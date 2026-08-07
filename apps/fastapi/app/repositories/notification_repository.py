@@ -365,14 +365,25 @@ def create_user_inbox_rows(
     module: str,
     notification_id: int,
     created_by: Optional[int],
+    source_key: Optional[str] = None,
+    entity_id: Optional[int] = None,
 ) -> int:
-    """Fan-out canonical notification to per-user inbox rows."""
+    """
+    Fan-out canonical notification to per-user inbox rows.
+
+    When `source_key` is provided (entity lifecycle keys shared with materialization),
+    the same key is used for every recipient so unique (tenant, user, source_key)
+    dedupes eager create against lazy materialize. Without it, falls back to
+    notif:{notification_id}:user:{uid} for generic API creates.
+    """
     if not user_ids:
         return 0
     module_key = module if module in VALID_MODULES else "general"
     rows: List[UserNotification] = []
     now = datetime.utcnow()
+    entity = int(entity_id) if entity_id is not None else int(notification_id)
     for uid in user_ids:
+        key = (source_key or "").strip() or f"notif:{notification_id}:user:{uid}"
         rows.append(
             UserNotification(
                 tenant_id=tenant_id,
@@ -382,8 +393,8 @@ def create_user_inbox_rows(
                 message=body,
                 kind="general",
                 is_read=False,
-                source_key=f"notif:{notification_id}:user:{uid}",
-                entity_id=notification_id,
+                source_key=key[:120],
+                entity_id=entity,
                 created_at=now,
                 created_by=created_by,
                 is_deleted=False,

@@ -65,8 +65,12 @@ def _emit_notice_notification(
     title: str,
     body: str,
     notice_id: int | None = None,
+    send_notification: bool = True,
+    event: str = "created",
 ) -> None:
-    """Call shared Notification Create API after notice save/publish (non-blocking)."""
+    """Call shared Notification Create API after notice lifecycle events (non-blocking)."""
+    if not send_notification:
+        return
     try:
         notification_service.create_notification(
             db,
@@ -76,10 +80,14 @@ def _emit_notice_notification(
             subject="Notice Notification",
             body=body,
             created_by=user_id,
+            module="notice",
+            entity_id=notice_id,
+            event=event,
         )
     except Exception:
         logger.exception(
-            "Failed to create notification after notice save (notice_id=%s)",
+            "Failed to create notification after notice %s (notice_id=%s)",
+            event,
             notice_id,
         )
 
@@ -565,6 +573,8 @@ def create_notice(
         title=title,
         body=f"{title} notice has been created.",
         notice_id=notice_id,
+        send_notification=bool(payload.send_notification),
+        event="created",
     )
 
     return get_notice(db, tenant_id=tenant_id, notice_id=notice_id)
@@ -764,7 +774,22 @@ def update_notice(
             attachments=stored_attachments,
         )
     db.commit()
-    return get_notice(db, tenant_id=tenant_id, notice_id=notice_id)
+
+    updated = get_notice(db, tenant_id=tenant_id, notice_id=notice_id)
+    title = str(updated.title or "Notice").strip() or "Notice"
+    audience_type = str(updated.audience_type or "ALL").strip().upper() or "ALL"
+    _emit_notice_notification(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        audience_type=audience_type,
+        title=title,
+        body=f"{title} notice has been updated.",
+        notice_id=notice_id,
+        send_notification=bool(updated.send_notification),
+        event="updated",
+    )
+    return updated
 
 
 def publish_notice(
@@ -807,6 +832,8 @@ def publish_notice(
         title=title,
         body=f"{title} notice has been published.",
         notice_id=notice_id,
+        send_notification=bool(existing.get("send_notification")),
+        event="published",
     )
 
     return NoticeStatusUpdateResponse(
@@ -841,6 +868,21 @@ def unpublish_notice(
         },
     )
     db.commit()
+
+    title = str(existing.get("title") or "Notice").strip() or "Notice"
+    audience_type = str(existing.get("audience_type") or "ALL").strip().upper() or "ALL"
+    _emit_notice_notification(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        audience_type=audience_type,
+        title=title,
+        body=f"{title} notice has been unpublished.",
+        notice_id=notice_id,
+        send_notification=bool(existing.get("send_notification")),
+        event="deleted",
+    )
+
     return NoticeStatusUpdateResponse(
         message="Notice unpublished successfully.",
         notice=get_notice(db, tenant_id=tenant_id, notice_id=notice_id),
@@ -851,6 +893,11 @@ def delete_notice(db: Session, *, tenant_id: int, notice_id: int, user_id: int) 
     existing = notice_repository.get_notice_by_id(db, tenant_id=tenant_id, notice_id=notice_id)
     if not existing:
         raise NotFoundException("Notice", notice_id)
+
+    title = str(existing.get("title") or "Notice").strip() or "Notice"
+    audience_type = str(existing.get("audience_type") or "ALL").strip().upper() or "ALL"
+    should_notify = bool(existing.get("send_notification"))
+
     notice_repository.update_notice(
         db,
         tenant_id=tenant_id,
@@ -865,6 +912,17 @@ def delete_notice(db: Session, *, tenant_id: int, notice_id: int, user_id: int) 
     )
     db.commit()
 
+    _emit_notice_notification(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        audience_type=audience_type,
+        title=title,
+        body=f"{title} notice has been deleted.",
+        notice_id=notice_id,
+        send_notification=should_notify,
+        event="deleted",
+    )
 
 def get_dropdown_options() -> NoticeDropdownOptionsResponse:
     return NoticeDropdownOptionsResponse(

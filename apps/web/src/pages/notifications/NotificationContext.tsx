@@ -1,6 +1,7 @@
 /**
  * In-app notification state — loads from /api/notifications (tenant + user scoped).
  * Shared by header bell, notification list, and module settings.
+ * Unread badge always uses GET /api/notifications/unread-count (server truth).
  */
 
 import {
@@ -42,6 +43,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<NotificationModuleSettings>(
     DEFAULT_NOTIFICATION_SETTINGS
   );
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,24 +51,28 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!isAuthenticated || !user?.tenant_id) {
       setNotifications([]);
       setSettings(DEFAULT_NOTIFICATION_SETTINGS);
+      setUnreadCount(0);
       setError(null);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const [listResult, settingsResult] = await Promise.all([
+      const [listResult, settingsResult, count] = await Promise.all([
         notificationService.list({ page: 0, size: 100 }),
         notificationService.getSettings(),
+        notificationService.getUnreadCount(),
       ]);
       setNotifications(listResult.items);
       setSettings(settingsResult);
+      setUnreadCount(Number(count) || 0);
     } catch (err: unknown) {
       const detail =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
         "Failed to load notifications";
       setError(String(detail));
       setNotifications([]);
+      setUnreadCount(0);
     } finally {
       setLoading(false);
     }
@@ -79,22 +85,21 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // Server already filters by module settings for list endpoints
   const visibleNotifications = notifications;
 
-  const unreadCount = useMemo(
-    () => visibleNotifications.filter((n) => !n.isRead).length,
-    [visibleNotifications]
+  const markAsRead = useCallback(
+    async (id: string) => {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id && !n.isRead ? { ...n, isRead: true } : n))
+      );
+      try {
+        await notificationService.markRead(id);
+        const count = await notificationService.getUnreadCount();
+        setUnreadCount(Number(count) || 0);
+      } catch {
+        void refresh();
+      }
+    },
+    [refresh]
   );
-
-  const markAsRead = useCallback(async (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id && !n.isRead ? { ...n, isRead: true } : n))
-    );
-    try {
-      await notificationService.markRead(id);
-    } catch {
-      // Re-sync on failure so UI matches server
-      void refresh();
-    }
-  }, [refresh]);
 
   const setModuleEnabled = useCallback(
     async (module: NotificationModule, enabled: boolean) => {
@@ -104,9 +109,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       try {
         const updated = await notificationService.updateSettings({ [module]: enabled });
         setSettings(updated);
-        // Re-fetch list so hidden modules drop out / reappear immediately
-        const listResult = await notificationService.list({ page: 0, size: 100 });
+        // Re-fetch list + server unread count so hidden modules drop / reappear
+        const [listResult, count] = await Promise.all([
+          notificationService.list({ page: 0, size: 100 }),
+          notificationService.getUnreadCount(),
+        ]);
         setNotifications(listResult.items);
+        setUnreadCount(Number(count) || 0);
       } catch {
         setSettings(previous);
       }

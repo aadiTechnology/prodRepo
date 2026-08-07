@@ -400,6 +400,49 @@ def list_holidays(
     )
 
 
+def _emit_holiday_notification(
+    db: Session,
+    *,
+    tenant_id: int,
+    audience: str,
+    holiday_name: str,
+    event: str,
+    holiday_id: int | None,
+    actor_user_id: int | None = None,
+    actor_name: str | None = None,
+) -> None:
+    """Call shared Notification Create API after holiday lifecycle events (non-blocking)."""
+    hname = (holiday_name or "Holiday").strip() or "Holiday"
+    if event == "updated":
+        body = f"{hname} holiday has been updated."
+    elif event == "deleted":
+        body = f"{hname} holiday has been deleted."
+    else:
+        body = f"{hname} holiday has been created."
+        event = "created"
+    try:
+        notification_service.create_notification(
+            db,
+            tenant_id=tenant_id,
+            from_=(actor_name or "System").strip() or "System",
+            to=(audience or "TEACHER").strip().upper() or "TEACHER",
+            subject="Holiday Notification",
+            body=body,
+            created_by=actor_user_id,
+            module="holiday",
+            entity_id=holiday_id,
+            event=event,
+        )
+    except Exception:
+        from app.core.logging_config import get_logger
+
+        get_logger(__name__).exception(
+            "Failed to create notification after holiday %s (holiday_id=%s)",
+            event,
+            holiday_id,
+        )
+
+
 def create_holiday(
     db: Session,
     *,
@@ -449,25 +492,16 @@ def create_holiday(
     db.add(row)
     _commit_holiday(db, row)
 
-    # Reusable Notification Create API — no holiday-specific DB/insert logic here
-    try:
-        notification_service.create_notification(
-            db,
-            tenant_id=tenant_id,
-            from_=(actor_name or "System").strip() or "System",
-            to=aud,
-            subject="Holiday Notification",
-            body=f"{hname} holiday has been created.",
-            created_by=actor_user_id,
-        )
-    except Exception:
-        # Holiday save already committed; notification failure must not fail the Save response
-        from app.core.logging_config import get_logger
-
-        get_logger(__name__).exception(
-            "Failed to create notification after holiday save (holiday_id=%s)",
-            getattr(row, "id", None),
-        )
+    _emit_holiday_notification(
+        db,
+        tenant_id=tenant_id,
+        audience=aud,
+        holiday_name=hname,
+        event="created",
+        holiday_id=int(row.id) if row.id is not None else None,
+        actor_user_id=actor_user_id,
+        actor_name=actor_name,
+    )
 
     return _to_response(row)
 
@@ -478,6 +512,8 @@ def update_holiday(
     tenant_id: int,
     holiday_id: int,
     payload: HolidayUpdateRequest,
+    actor_user_id: int | None = None,
+    actor_name: str | None = None,
 ) -> HolidayResponse:
     row = (
         db.query(Holiday)
@@ -557,10 +593,29 @@ def update_holiday(
     )
 
     _commit_holiday(db, row)
+
+    _emit_holiday_notification(
+        db,
+        tenant_id=tenant_id,
+        audience=aud,
+        holiday_name=str(row.holiday_name or "Holiday"),
+        event="updated",
+        holiday_id=holiday_id,
+        actor_user_id=actor_user_id,
+        actor_name=actor_name,
+    )
+
     return _to_response(row)
 
 
-def delete_holiday(db: Session, *, tenant_id: int, holiday_id: int) -> None:
+def delete_holiday(
+    db: Session,
+    *,
+    tenant_id: int,
+    holiday_id: int,
+    actor_user_id: int | None = None,
+    actor_name: str | None = None,
+) -> None:
     row = (
         db.query(Holiday)
         .filter(Holiday.id == holiday_id, Holiday.tenant_id == tenant_id, Holiday.is_active == True)  # noqa: E712
@@ -569,6 +624,21 @@ def delete_holiday(db: Session, *, tenant_id: int, holiday_id: int) -> None:
     if not row:
         return
 
+    hname = str(row.holiday_name or "Holiday")
+    stored_aud, _, _, _, _ = unpack_holiday_description(row.description)
+    aud = (stored_aud or "TEACHER").strip().upper() or "TEACHER"
+
     row.is_active = False
     row.updated_at = datetime.utcnow()
     db.commit()
+
+    _emit_holiday_notification(
+        db,
+        tenant_id=tenant_id,
+        audience=aud,
+        holiday_name=hname,
+        event="deleted",
+        holiday_id=holiday_id,
+        actor_user_id=actor_user_id,
+        actor_name=actor_name,
+    )
