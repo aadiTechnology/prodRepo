@@ -13,7 +13,6 @@ import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
-import { useTeacherStudentListScope } from "../../hooks/useTeacherStudentListScope";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
 import { formatShortDate } from "../../utils/formatters";
 import { isStudentHomeworkUser } from "../../utils/homeworkAudience";
@@ -33,7 +32,6 @@ export default function SyllabusList() {
   const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuth();
   const { hasPermission, hasAnyRole, roles } = useRBAC();
-  const teacherScope = useTeacherStudentListScope();
 
   const isAdmin = hasAnyRole(["ADMIN", "SUPER_ADMIN", "SYSTEM_ADMIN", "TENANT_ADMIN"]);
   const isTeacher = !isAdmin && isTeacherNoticeUser(user?.role, roles);
@@ -54,7 +52,7 @@ export default function SyllabusList() {
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [academicYearId, setAcademicYearId] = useState("");
   const [classId, setClassId] = useState("");
-  const [month, setMonth] = useState(SYLLABUS_MONTHS[new Date().getMonth()]);
+  const [month, setMonth] = useState<string>(SYLLABUS_MONTHS[new Date().getMonth()]);
   const [yearOptions, setYearOptions] = useState<{ label: string; value: string }[]>([]);
   const [classOptions, setClassOptions] = useState<{ label: string; value: string }[]>([]);
   const [monthOptions, setMonthOptions] = useState<{ label: string; value: string }[]>([]);
@@ -91,11 +89,9 @@ export default function SyllabusList() {
     };
   }, []);
 
-  const scopedClassId =
-    isTeacher && teacherScope.defaultClassId ? Number(teacherScope.defaultClassId) : undefined;
-
+  // Teacher/student class scope comes from the backend viewer context — do not pass
+  // attendance-derived scoped_class_id (mismatch caused false "Unable to load syllabus").
   const fetchList = useCallback(async () => {
-    if (isTeacher && !teacherScope.scopeReady) return;
     try {
       setLoading(true);
       setError(null);
@@ -106,7 +102,6 @@ export default function SyllabusList() {
         academic_year_id: isAdmin && academicYearId ? Number(academicYearId) : undefined,
         class_id: isAdmin && classId ? Number(classId) : undefined,
         month: month || undefined,
-        scoped_class_id: scopedClassId,
       });
       setItems(res.items);
       setTotal(res.total);
@@ -122,12 +117,9 @@ export default function SyllabusList() {
     classId,
     debouncedSearch,
     isAdmin,
-    isTeacher,
     month,
     page,
     rowsPerPage,
-    scopedClassId,
-    teacherScope.scopeReady,
   ]);
 
   useEffect(() => {
@@ -136,7 +128,7 @@ export default function SyllabusList() {
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, academicYearId, classId, month, scopedClassId]);
+  }, [debouncedSearch, academicYearId, classId, month]);
 
   const confirmDelete = async () => {
     if (!toDelete) return;
