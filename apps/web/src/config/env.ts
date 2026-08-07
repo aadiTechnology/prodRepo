@@ -17,7 +17,7 @@ interface EnvConfig {
 }
 
 const PRODUCTION_API_FALLBACK = "https://preschoolapi.aaditechnology.com";
-const DEV_API_FALLBACK = "http://127.0.0.1:8000";
+const DEV_API_FALLBACK = "http://127.0.0.1:8022";
 
 function normalizeBaseUrl(url: string): string {
   return url.replace(/\/+$/, "");

@@ -90,3 +90,21 @@ class NotificationSettingsUpdateRequest(BaseModel):
     holiday: Optional[bool] = None
     notice: Optional[bool] = None
     exam: Optional[bool] = None
+
+
+DevicePlatform = Literal["android", "ios", "web"]
+
+
+class DeviceRegisterRequest(BaseModel):
+    """Register or refresh the current user's FCM device token."""
+
+    fcm_token: str = Field(..., min_length=10, max_length=512)
+    platform: DevicePlatform
+
+
+class DeviceRegisterResponse(BaseModel):
+    id: int
+    fcm_token: str
+    platform: str
+    is_active: bool
+    message: str = "Device registered"

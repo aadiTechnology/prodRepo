@@ -101,6 +101,24 @@ const notificationService = {
       exam: d.exam !== false,
     };
   },
+
+  /**
+   * Register or refresh the current user's FCM device token (native apps).
+   * Idempotent on the backend when the same fcm_token is posted again.
+   */
+  registerDevice: async (payload: {
+    fcm_token: string;
+    platform: "android" | "ios" | "web";
+  }): Promise<{
+    id: number;
+    fcm_token: string;
+    platform: string;
+    is_active: boolean;
+    message: string;
+  }> => {
+    const res = await apiClient.post(`${BASE}/devices`, payload);
+    return res.data;
+  },
 };
 
 export default notificationService;

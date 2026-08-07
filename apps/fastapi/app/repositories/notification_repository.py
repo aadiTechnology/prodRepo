@@ -8,7 +8,12 @@ from typing import List, Optional, Sequence, Tuple
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.notification import Notification, UserNotification, UserNotificationSettings
+from app.models.notification import (
+    Notification,
+    UserDeviceToken,
+    UserNotification,
+    UserNotificationSettings,
+)
 from app.models.role import Role, user_roles
 from app.models.user import User, UserRole
 
@@ -385,3 +390,114 @@ def create_user_inbox_rows(
             )
         )
     return bulk_insert_notifications(db, rows=rows)
+
+
+def get_device_token_by_fcm(
+    db: Session,
+    *,
+    fcm_token: str,
+) -> Optional[UserDeviceToken]:
+    return (
+        db.query(UserDeviceToken)
+        .filter(UserDeviceToken.fcm_token == fcm_token)
+        .first()
+    )
+
+
+def upsert_device_token(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    fcm_token: str,
+    platform: str,
+    created_by: Optional[int],
+) -> UserDeviceToken:
+    """
+    Register or refresh an FCM token.
+
+    Unique on fcm_token: re-registration updates owner/platform and reactivates.
+    """
+    now = datetime.utcnow()
+    existing = get_device_token_by_fcm(db, fcm_token=fcm_token)
+    if existing:
+        existing.tenant_id = tenant_id
+        existing.user_id = user_id
+        existing.platform = platform
+        existing.is_active = True
+        existing.updated_at = now
+        existing.updated_by = created_by
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    row = UserDeviceToken(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        fcm_token=fcm_token,
+        platform=platform,
+        is_active=True,
+        created_at=now,
+        created_by=created_by,
+    )
+    db.add(row)
+    try:
+        db.commit()
+        db.refresh(row)
+        return row
+    except IntegrityError:
+        db.rollback()
+        existing = get_device_token_by_fcm(db, fcm_token=fcm_token)
+        if existing:
+            existing.tenant_id = tenant_id
+            existing.user_id = user_id
+            existing.platform = platform
+            existing.is_active = True
+            existing.updated_at = now
+            existing.updated_by = created_by
+            db.commit()
+            db.refresh(existing)
+            return existing
+        raise
+
+
+def list_active_tokens_for_users(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_ids: Sequence[int],
+) -> List[UserDeviceToken]:
+    if not user_ids:
+        return []
+    return (
+        db.query(UserDeviceToken)
+        .filter(
+            UserDeviceToken.tenant_id == tenant_id,
+            UserDeviceToken.user_id.in_(list(user_ids)),
+            UserDeviceToken.is_active == True,  # noqa: E712
+        )
+        .all()
+    )
+
+
+def deactivate_device_tokens(
+    db: Session,
+    *,
+    fcm_tokens: Sequence[str],
+) -> int:
+    """Mark invalid / unregistered FCM tokens inactive."""
+    tokens = [t for t in fcm_tokens if t]
+    if not tokens:
+        return 0
+    now = datetime.utcnow()
+    rows = (
+        db.query(UserDeviceToken)
+        .filter(UserDeviceToken.fcm_token.in_(tokens))
+        .all()
+    )
+    for row in rows:
+        row.is_active = False
+        row.updated_at = now
+    if rows:
+        db.commit()
+    return len(rows)

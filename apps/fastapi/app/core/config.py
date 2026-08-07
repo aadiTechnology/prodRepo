@@ -83,6 +83,16 @@ class Settings(BaseSettings):
         default=60,
         description="SAS token lifetime in minutes for secure attachment downloads",
     )
+
+    # Firebase Cloud Messaging (optional; push is a no-op when unset)
+    FIREBASE_CREDENTIALS_PATH: str = Field(
+        default="",
+        description="Path to Firebase service-account JSON for FCM admin SDK",
+    )
+    FIREBASE_CREDENTIALS_JSON: str = Field(
+        default="",
+        description="Inline Firebase service-account JSON (alternative to path)",
+    )
     
     # Logging
     LOG_LEVEL: str = "INFO"

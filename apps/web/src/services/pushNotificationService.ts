@@ -1,8 +1,9 @@
 /**
  * Capacitor Push Notifications (FCM) bootstrap service.
  *
- * Registers the device for remote notifications and attaches lifecycle listeners.
- * Safe to call multiple times — only the first call performs registration.
+ * Registers the device for remote notifications, attaches lifecycle listeners,
+ * and posts the FCM token to the backend when an authenticated session is present.
+ * Safe to call multiple times — only the first call performs native registration.
  *
  * Supported only on native Capacitor shells (Android / iOS). On web this is a no-op.
  * The Capacitor plugin is loaded via dynamic import so missing/web installs cannot
@@ -10,7 +11,7 @@
  *
  * @see https://capacitorjs.com/docs/apis/push-notifications
  */
-import { isNativePlatform } from "../utils/capacitor";
+import { isNativePlatform, getCapacitorPlatform } from "../utils/capacitor";
 
 /** Time to wait for FCM/APNs registration before giving up. */
 const REGISTRATION_TIMEOUT_MS = 30_000;
@@ -20,6 +21,15 @@ let initializationPromise: Promise<string | null> | null = null;
 
 /** Ensures plugin event listeners are registered only once. */
 let listenersAttached = false;
+
+/** Last FCM token obtained from the native shell. */
+let cachedFcmToken: string | null = null;
+
+/** Last token successfully stored on the backend (avoid duplicate POSTs). */
+let lastSyncedToken: string | null = null;
+
+/** In-flight backend sync so concurrent auth + registration share one request. */
+let backendSyncPromise: Promise<void> | null = null;
 
 type PushNotificationsPlugin = typeof import("@capacitor/push-notifications").PushNotifications;
 type Token = import("@capacitor/push-notifications").Token;
@@ -50,6 +60,61 @@ async function loadPushPlugin(): Promise<{
     console.error("[PushNotifications] Plugin unavailable:", error);
     return null;
   }
+}
+
+function mapPlatform(): "android" | "ios" | "web" {
+  const p = getCapacitorPlatform().toLowerCase();
+  if (p === "android" || p === "ios") return p;
+  return "web";
+}
+
+function hasAuthSession(): boolean {
+  try {
+    return Boolean(localStorage.getItem("auth_token"));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * POST the cached FCM token to the backend if the user is authenticated.
+ * No-ops when: not native, no token, no auth, or token already synced (unless force).
+ * Safe to call after login / session restore.
+ */
+export async function syncDeviceTokenWithBackend(options?: {
+  force?: boolean;
+}): Promise<void> {
+  if (!isNativePlatform()) return;
+  if (!cachedFcmToken) return;
+  if (!hasAuthSession()) return;
+  if (!options?.force && cachedFcmToken === lastSyncedToken) return;
+
+  if (backendSyncPromise) {
+    return backendSyncPromise;
+  }
+
+  const tokenToSync = cachedFcmToken;
+  backendSyncPromise = (async () => {
+    try {
+      const { default: notificationService } = await import(
+        "../api/services/notificationService"
+      );
+      await notificationService.registerDevice({
+        fcm_token: tokenToSync,
+        platform: mapPlatform(),
+      });
+      lastSyncedToken = tokenToSync;
+      console.log("[PushNotifications] FCM token registered with backend.");
+    } catch (error) {
+      console.error("[PushNotifications] Backend device registration failed:", error);
+      // Allow retry on next login / token event.
+      lastSyncedToken = null;
+    } finally {
+      backendSyncPromise = null;
+    }
+  })();
+
+  return backendSyncPromise;
 }
 
 /**
@@ -101,7 +166,12 @@ async function runInitialization(): Promise<string | null> {
     console.log("[PushNotifications] Permission granted — registering with FCM/APNs…");
 
     const token = await registerAndWaitForToken(PushNotifications);
+    cachedFcmToken = token;
     console.log("[PushNotifications] Device registered. FCM token:", token);
+
+    // If session already exists (cold start while logged in), store token now.
+    await syncDeviceTokenWithBackend();
+
     return token;
   } catch (error) {
     console.error("[PushNotifications] Initialization failed:", error);
@@ -120,8 +190,12 @@ async function attachPushListeners(PushNotifications: PushNotificationsPlugin): 
   }
 
   await PushNotifications.addListener("registration", (token: Token) => {
-    // Token is primarily resolved via registerAndWaitForToken(); keep a log for visibility.
     console.log("[PushNotifications] registration event — token received:", token.value);
+    cachedFcmToken = token.value;
+    // Token rotation: re-sync only when value changed or not yet stored.
+    if (token.value !== lastSyncedToken) {
+      void syncDeviceTokenWithBackend();
+    }
   });
 
   await PushNotifications.addListener(

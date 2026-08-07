@@ -51,7 +51,12 @@ from app.models.support import (
     SupportProductUpdate,
 )
 from app.models.syllabus import Syllabus, SyllabusAttachment
-from app.models.notification import Notification, UserNotification, UserNotificationSettings
+from app.models.notification import (
+    Notification,
+    UserDeviceToken,
+    UserNotification,
+    UserNotificationSettings,
+)
 from app.models.ai_assistant_chat import AiAssistantSession, AiAssistantMessage
 from app.models.ai_assistant_tenant_config import AiAssistantTenantConfig
 
@@ -122,6 +127,7 @@ __all__ = [
     "SyllabusAttachment",
     "UserNotification",
     "UserNotificationSettings",
+    "UserDeviceToken",
     "Notification",
     "AiAssistantSession",
     "AiAssistantMessage",

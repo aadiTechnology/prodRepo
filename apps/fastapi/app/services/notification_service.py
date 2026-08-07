@@ -16,6 +16,8 @@ from app.models.notification import UserNotification
 from app.models.syllabus import Syllabus
 from app.repositories import notification_repository as repo
 from app.schemas.notification_schema import (
+    DeviceRegisterRequest,
+    DeviceRegisterResponse,
     NotificationCountResponse,
     NotificationCreateRequest,
     NotificationCreateResponse,
@@ -25,10 +27,12 @@ from app.schemas.notification_schema import (
     NotificationSettingsResponse,
     NotificationSettingsUpdateRequest,
 )
+from app.services import fcm_service
 
 logger = get_logger(__name__)
 
 VALID_MODULES = ("syllabus", "holiday", "notice", "exam", "general")
+VALID_PLATFORMS = ("android", "ios", "web")
 # Lookback window when materializing recent notice / syllabus events
 _MATERIALIZE_LOOKBACK_DAYS = 14
 _MAX_SOURCE_ITEMS = 25
@@ -85,8 +89,9 @@ def create_notification(
     Reusable Notification Create API for any module.
 
     Only From / To / Subject / Body are accepted as content fields.
-    Persists to `notifications` (canonical store for Firebase later), then fans out
-    to `user_notifications` for the in-app inbox.
+    Persists to `notifications`, fans out to `user_notifications` for the in-app
+    inbox, then best-effort FCM push to registered device tokens.
+    FCM failures never fail this create.
 
     Extension (Notices, Syllabus, etc.): after a successful Save, call this function
     with the same four fields. Do not re-implement insert logic in feature services.
@@ -140,7 +145,17 @@ def create_notification(
         module,
     )
 
-    # Push/Firebase should consume `notifications` (id=master.id); intentional no-op here.
+    # 3) FCM push — best-effort; never fail notification creation
+    _dispatch_fcm_push(
+        db,
+        tenant_id=tid,
+        user_ids=user_ids,
+        subject=subj,
+        body=msg,
+        notification_id=int(master.id),
+        module=module,
+    )
+
     return NotificationCreateResponse(
         id=int(master.id),
         from_=master.sender,
@@ -148,6 +163,101 @@ def create_notification(
         subject=master.subject,
         body=master.body,
     )
+
+
+def register_device_token(
+    db: Session,
+    *,
+    tenant_id: Optional[int],
+    user_id: int,
+    payload: DeviceRegisterRequest,
+) -> DeviceRegisterResponse:
+    """Upsert the caller's FCM device token (idempotent on fcm_token)."""
+    tid = _require_tenant(tenant_id)
+    token = (payload.fcm_token or "").strip()
+    platform = (payload.platform or "").strip().lower()
+    if not token:
+        raise ValidationException("fcm_token is required")
+    if platform not in VALID_PLATFORMS:
+        raise ValidationException("platform must be android, ios, or web")
+
+    row = repo.upsert_device_token(
+        db,
+        tenant_id=tid,
+        user_id=user_id,
+        fcm_token=token,
+        platform=platform,
+        created_by=user_id,
+    )
+    logger.info(
+        "Device token registered id=%s user=%s tenant=%s platform=%s",
+        row.id,
+        user_id,
+        tid,
+        platform,
+    )
+    return DeviceRegisterResponse(
+        id=int(row.id),
+        fcm_token=row.fcm_token,
+        platform=row.platform,
+        is_active=bool(row.is_active),
+    )
+
+
+def _dispatch_fcm_push(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_ids: Sequence[int],
+    subject: str,
+    body: str,
+    notification_id: int,
+    module: str,
+) -> None:
+    """Send FCM to active tokens for resolved recipients. Errors are logged only."""
+    try:
+        if not user_ids:
+            return
+        token_rows = repo.list_active_tokens_for_users(
+            db, tenant_id=tenant_id, user_ids=user_ids
+        )
+        tokens = [r.fcm_token for r in token_rows if r.fcm_token]
+        if not tokens:
+            logger.debug(
+                "FCM skipped for notification_id=%s: no active device tokens",
+                notification_id,
+            )
+            return
+
+        success, failure, invalid = fcm_service.send_to_tokens(
+            tokens=tokens,
+            title=subject[:255],
+            body=body[:1000] if body else subject,
+            data={
+                "notification_id": str(notification_id),
+                "module": module or "general",
+                "type": "app_notification",
+            },
+        )
+        logger.info(
+            "FCM dispatch notification_id=%s tokens=%s success=%s failure=%s",
+            notification_id,
+            len(tokens),
+            success,
+            failure,
+        )
+        if invalid:
+            deactivated = repo.deactivate_device_tokens(db, fcm_tokens=invalid)
+            logger.info(
+                "Deactivated %s invalid FCM token(s) after notification_id=%s",
+                deactivated,
+                notification_id,
+            )
+    except Exception:
+        logger.exception(
+            "FCM push failed for notification_id=%s (inbox create succeeded)",
+            notification_id,
+        )
 
 
 def create_notification_from_request(

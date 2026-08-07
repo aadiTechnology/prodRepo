@@ -1,4 +1,4 @@
-"""In-app notification models: canonical notifications + per-user inbox/settings."""
+"""In-app notification models: canonical notifications + per-user inbox/settings + device tokens."""
 
 from datetime import datetime
 
@@ -90,6 +90,26 @@ class UserNotificationSettings(Base):
     holiday_enabled = Column(Boolean, nullable=False, default=True)
     notice_enabled = Column(Boolean, nullable=False, default=True)
     exam_enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_by = Column(Integer, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+    updated_by = Column(Integer, nullable=True)
+
+
+class UserDeviceToken(Base):
+    """FCM device token registration for push delivery."""
+
+    __tablename__ = "user_device_tokens"
+    __table_args__ = (
+        UniqueConstraint("fcm_token", name="UQ_user_device_tokens_fcm_token"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    fcm_token = Column(NVARCHAR(512), nullable=False)
+    platform = Column(String(20), nullable=False)  # android | ios | web
+    is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_by = Column(Integer, nullable=True)
     updated_at = Column(DateTime, nullable=True)

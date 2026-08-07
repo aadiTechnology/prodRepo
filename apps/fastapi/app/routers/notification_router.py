@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.schemas.notification_schema import (
+    DeviceRegisterRequest,
+    DeviceRegisterResponse,
     NotificationCountResponse,
     NotificationCreateRequest,
     NotificationCreateResponse,
@@ -56,6 +58,25 @@ def create_notification(
         tenant_id=current_user.tenant_id,
         payload=payload,
         created_by=current_user.id,
+    )
+
+
+@router.post(
+    "/devices",
+    response_model=DeviceRegisterResponse,
+    status_code=status.HTTP_200_OK,
+)
+def register_device(
+    payload: DeviceRegisterRequest,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_user),
+):
+    """Register or refresh the authenticated user's FCM device token."""
+    return notification_service.register_device_token(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        payload=payload,
     )
 
 

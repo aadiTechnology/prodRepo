@@ -16,6 +16,8 @@ export default function App() {
         if (token) {
           console.log("[App] Push notifications ready. Token:", token);
         }
+        // Token sync with backend is handled inside initializePushNotifications /
+        // syncDeviceTokenWithBackend when an auth session is present.
       })
       .catch((error) => {
         console.error("[App] Push notification bootstrap failed:", error);

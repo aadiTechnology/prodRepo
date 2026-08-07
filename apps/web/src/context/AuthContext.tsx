@@ -16,6 +16,7 @@ import { enqueueSnackbar } from "notistack";
 import { getJwtExpiryMs } from "../utils/jwt";
 import { recordUserLogin } from "../utils/lastLoginStorage";
 import { clearAiChatSession } from "../api/services/aiChatService";
+import { isNativePlatform } from "../utils/capacitor";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Type Definitions
@@ -36,6 +37,18 @@ const USER_STORAGE_KEY = "auth_user";
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 /** Refresh JWT this many ms before `exp` so the session does not hit 401 mid-work. */
 const TOKEN_REFRESH_BEFORE_EXPIRY_MS = 2 * 60 * 1000;
+
+/** After auth, post cached FCM token if native push already registered. */
+function syncPushDeviceTokenAfterAuth(): void {
+  if (!isNativePlatform()) return;
+  void import("../services/pushNotificationService")
+    .then(({ syncDeviceTokenWithBackend }) =>
+      syncDeviceTokenWithBackend({ force: true }),
+    )
+    .catch((error) => {
+      console.error("[Auth] Push device token sync failed:", error);
+    });
+}
 
 /**
  * Get token from localStorage
@@ -147,6 +160,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       recordUserLogin(userData.id);
       setUser(userData);
       saveUser(userData);
+      syncPushDeviceTokenAfterAuth();
     } catch (error) {
       clearAuthData();
       setToken(null);
@@ -194,6 +208,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
       await clearAiChatSession();
+      syncPushDeviceTokenAfterAuth();
 
       return response;
     } catch (error) {
@@ -227,6 +242,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       rbac_version: response.rbac_version ?? null,
     });
     void clearAiChatSession();
+    syncPushDeviceTokenAfterAuth();
   }, [setRBACData]);
 
   /**
