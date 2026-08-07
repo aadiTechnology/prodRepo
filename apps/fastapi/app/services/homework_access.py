@@ -88,6 +88,33 @@ def resolve_teacher_assignment_scopes(
         sql, {"tenant_id": tenant_id, "teacher_id": teacher_id}
     ).mappings().all()
 
+    # Legacy teachers.class_id / class_division_id when assignments table has no rows.
+    if not rows:
+        legacy = db.execute(
+            text(
+                """
+                SELECT class_id, class_division_id
+                FROM teachers
+                WHERE id = :teacher_id
+                  AND tenant_id = :tenant_id
+                  AND is_deleted = 0
+                  AND is_active = 1
+                  AND class_id IS NOT NULL
+                """
+            ),
+            {"tenant_id": tenant_id, "teacher_id": teacher_id},
+        ).mappings().first()
+        if legacy:
+            div_raw = legacy["class_division_id"]
+            return (
+                ClassDivisionScope(
+                    class_id=int(legacy["class_id"]),
+                    class_division_id=int(div_raw) if div_raw is not None else None,
+                    allowed_subject_ids=None,
+                ),
+            )
+        return ()
+
     # Group by class + division. Class teacher row (subject_id NULL) => see all subjects.
     grouped: dict[tuple[int, int | None], set[int]] = {}
     class_teacher_keys: set[tuple[int, int | None]] = set()

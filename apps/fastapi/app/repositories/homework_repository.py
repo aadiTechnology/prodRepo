@@ -482,7 +482,31 @@ def get_classes_for_teacher(
     )
     rows = db.execute(sql, {"tenant_id": tenant_id, "teacher_id": teacher_id}).mappings().all()
     from app.schemas.homework_schema import ClassOption
-    return [ClassOption(id=r["id"], name=r["name"]) for r in rows]
+
+    if rows:
+        return [ClassOption(id=r["id"], name=r["name"]) for r in rows]
+
+    # Legacy fallback: teachers.class_id when no teacher_assignments rows.
+    legacy = db.execute(
+        text(
+            """
+            SELECT c.id, c.name
+            FROM teachers t
+            INNER JOIN classes c ON c.id = t.class_id
+            WHERE t.id = :teacher_id
+              AND t.tenant_id = :tenant_id
+              AND t.is_deleted = 0
+              AND t.is_active = 1
+              AND t.class_id IS NOT NULL
+              AND c.is_active = 1
+              AND c.is_deleted = 0
+            """
+        ),
+        {"tenant_id": tenant_id, "teacher_id": teacher_id},
+    ).mappings().first()
+    if legacy:
+        return [ClassOption(id=int(legacy["id"]), name=str(legacy["name"]))]
+    return []
 
 
 def get_divisions_for_teacher_class(

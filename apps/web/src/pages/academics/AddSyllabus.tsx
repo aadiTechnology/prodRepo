@@ -9,7 +9,6 @@ import { PageHeader } from "../../components/layout";
 import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
 import { useFormManager } from "../../hooks/useFormManager";
-import { useTeacherStudentListScope } from "../../hooks/useTeacherStudentListScope";
 import type { FormConfig } from "../../components/reusable/formFramework.types";
 import type { FormValidationConfig } from "../../utils/formValidation";
 import { mapApiErrorsToFields } from "../../utils/formValidation";
@@ -42,7 +41,6 @@ export default function AddSyllabus() {
   const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuth();
   const { hasPermission, hasAnyRole, roles } = useRBAC();
-  const teacherScope = useTeacherStudentListScope();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = hasAnyRole(["ADMIN", "SUPER_ADMIN", "SYSTEM_ADMIN", "TENANT_ADMIN"]);
@@ -114,10 +112,19 @@ export default function AddSyllabus() {
           );
         }
         // Backend already scopes classes by role (admin = all, teacher/student = assigned).
+        // Do not overwrite with attendance scope — mismatch caused blank class / Not authorized.
         if (!isEditMode || !isTeacher) {
-          setClassOptions(
-            opts.classes.map((c) => ({ id: String(c.id), label: c.name, value: String(c.id) })),
-          );
+          const mapped = opts.classes.map((c) => ({
+            id: String(c.id),
+            label: c.name,
+            value: String(c.id),
+          }));
+          setClassOptions(mapped);
+          if (isTeacher && mapped.length > 0) {
+            setFormData((prev) =>
+              prev.class_id ? prev : { ...prev, class_id: mapped[0].value },
+            );
+          }
         }
       })
       .catch(() => {
@@ -128,36 +135,6 @@ export default function AddSyllabus() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot load
   }, []);
-
-  useEffect(() => {
-    if (!isTeacher || !teacherScope.scopeReady || isEditMode) return;
-    if (teacherScope.teacherClassOptions.length > 0) {
-      setClassOptions(
-        teacherScope.teacherClassOptions.map((o) => ({
-          id: o.value,
-          label: o.label,
-          value: o.value,
-        })),
-      );
-      const nextClassId =
-        teacherScope.defaultClassId || teacherScope.teacherClassOptions[0].value;
-      setFormData((prev) =>
-        prev.class_id === nextClassId ? prev : { ...prev, class_id: nextClassId },
-      );
-    } else if (teacherScope.defaultClassId) {
-      const nextClassId = teacherScope.defaultClassId;
-      setFormData((prev) =>
-        prev.class_id === nextClassId ? prev : { ...prev, class_id: nextClassId },
-      );
-    }
-  }, [
-    isEditMode,
-    isTeacher,
-    setFormData,
-    teacherScope.defaultClassId,
-    teacherScope.scopeReady,
-    teacherScope.teacherClassOptions,
-  ]);
 
   useEffect(() => {
     if (!isEditMode || !Number.isFinite(editId)) return;
