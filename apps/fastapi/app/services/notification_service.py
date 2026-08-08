@@ -32,6 +32,7 @@ from app.schemas.notification_schema import (
 from app.services import fcm_service
 from app.services.homework_access import HomeworkViewerContext, resolve_homework_viewer_context
 from app.repositories import notice_repository
+from app.utils.holiday_storage import unpack_holiday_description
 
 logger = get_logger(__name__)
 
@@ -88,6 +89,30 @@ def _scoped_class_ids(viewer_context: HomeworkViewerContext | None) -> set[int] 
     if viewer_context is None or viewer_context.kind == "admin":
         return None
     return {scope.class_id for scope in viewer_context.scopes}
+
+
+def _holiday_authored_by_user(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    holiday: Holiday,
+) -> bool:
+    _, _, _, _, _, creator_id = unpack_holiday_description(holiday.description)
+    if creator_id is not None and int(creator_id) == int(user_id):
+        return True
+    actor = (
+        db.query(UserNotification.created_by)
+        .filter(
+            UserNotification.tenant_id == tenant_id,
+            UserNotification.module == "holiday",
+            UserNotification.entity_id == holiday.id,
+            UserNotification.kind == "general",
+        )
+        .limit(1)
+        .scalar()
+    )
+    return actor is not None and int(actor) == int(user_id)
 
 
 def _notice_visible_to_viewer(
@@ -236,8 +261,11 @@ def create_notification(
         created_by=created_by,
     )
 
-    # 2) Resolve audience → users and fan-out inbox rows
+    # 2) Resolve audience → users and fan-out inbox rows (never notify the author)
     user_ids = repo.resolve_recipient_user_ids(db, tenant_id=tid, to=recipient)
+    if created_by is not None:
+        actor_id = int(created_by)
+        user_ids = [uid for uid in user_ids if int(uid) != actor_id]
     module_key = (module or "").strip().lower() if module else _infer_module(subj, sender)
     if module_key not in VALID_MODULES:
         module_key = _infer_module(subj, sender)
@@ -470,6 +498,8 @@ def _materialize_holiday_exam_events(
     source_keys: List[str] = []
 
     for h in holidays:
+        if _holiday_authored_by_user(db, tenant_id=tenant_id, user_id=user_id, holiday=h):
+            continue
         is_exam = _is_exam_holiday(h)
         module = "exam" if is_exam else "holiday"
         name = (h.holiday_name or "Event").strip() or "Event"
@@ -582,6 +612,8 @@ def _materialize_notice_events(
     source_keys: List[str] = []
     visible_notices: List[Notice] = []
     for n in notices:
+        if int(n.created_by or 0) == int(user_id):
+            continue
         if not _notice_visible_to_viewer(
             db,
             tenant_id=tenant_id,
@@ -667,6 +699,8 @@ def _materialize_syllabus_events(
     )
     candidates: List[UserNotification] = []
     for s in rows:
+        if int(s.created_by or 0) == int(user_id):
+            continue
         key = entity_source_key("syllabus", int(s.id), "created")
         if key in existing:
             continue

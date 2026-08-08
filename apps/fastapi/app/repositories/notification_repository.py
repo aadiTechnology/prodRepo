@@ -7,8 +7,9 @@ from typing import List, Optional, Sequence, Tuple
 
 from sqlalchemy import and_, exists, false, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Query, Session
+from sqlalchemy.orm import Query, Session, aliased
 
+from app.models.holiday import Holiday
 from app.models.notice import Notice, NoticeTarget
 from app.models.notification import (
     Notification,
@@ -163,6 +164,84 @@ def apply_inbox_entity_visibility(
     return query.filter(or_(passthrough, scoped))
 
 
+def apply_exclude_self_created(
+    query: Query,
+    *,
+    tenant_id: int,
+    user_id: int,
+) -> Query:
+    """
+    Hide inbox rows for notice/syllabus/holiday entities authored by the viewer.
+
+    Creators still receive other users' notifications; only their own items are suppressed.
+    """
+    lifecycle = aliased(UserNotification)
+
+    notice_self = and_(
+        UserNotification.module == "notice",
+        UserNotification.entity_id.isnot(None),
+        exists(
+            select(Notice.id).where(
+                Notice.id == UserNotification.entity_id,
+                Notice.tenant_id == tenant_id,
+                Notice.is_deleted == False,  # noqa: E712
+                Notice.created_by == user_id,
+            )
+        ),
+    )
+    syllabus_self = and_(
+        UserNotification.module == "syllabus",
+        UserNotification.entity_id.isnot(None),
+        exists(
+            select(Syllabus.id).where(
+                Syllabus.id == UserNotification.entity_id,
+                Syllabus.tenant_id == tenant_id,
+                Syllabus.is_deleted == False,  # noqa: E712
+                Syllabus.created_by == user_id,
+            )
+        ),
+    )
+    holiday_meta_self = and_(
+        UserNotification.module.in_(("holiday", "exam")),
+        UserNotification.entity_id.isnot(None),
+        exists(
+            select(Holiday.id).where(
+                Holiday.id == UserNotification.entity_id,
+                Holiday.tenant_id == tenant_id,
+                Holiday.description.like(f'%"created_by_user_id":{int(user_id)}%'),
+            )
+        ),
+    )
+    holiday_lifecycle_self = and_(
+        UserNotification.module.in_(("holiday", "exam")),
+        UserNotification.entity_id.isnot(None),
+        exists(
+            select(lifecycle.id).where(
+                lifecycle.tenant_id == tenant_id,
+                lifecycle.entity_id == UserNotification.entity_id,
+                lifecycle.module == "holiday",
+                lifecycle.kind == "general",
+                lifecycle.created_by == user_id,
+            )
+        ),
+    )
+    holiday_inbox_self = and_(
+        UserNotification.module == "holiday",
+        UserNotification.kind == "general",
+        UserNotification.user_id == user_id,
+        UserNotification.created_by == user_id,
+    )
+
+    authored = or_(
+        notice_self,
+        syllabus_self,
+        holiday_meta_self,
+        holiday_lifecycle_self,
+        holiday_inbox_self,
+    )
+    return query.filter(~authored)
+
+
 # Audience token → role code/name fragments used when resolving `to`
 _AUDIENCE_ROLE_CODES: dict[str, set[str]] = {
     "ALL": set(),
@@ -274,6 +353,7 @@ def list_notifications(
     query = apply_inbox_entity_visibility(
         query, tenant_id=tenant_id, viewer_context=viewer_context
     )
+    query = apply_exclude_self_created(query, tenant_id=tenant_id, user_id=user_id)
     total = query.count()
     rows = (
         query.order_by(UserNotification.created_at.desc(), UserNotification.id.desc())
@@ -304,6 +384,7 @@ def count_unread(
     query = apply_inbox_entity_visibility(
         query, tenant_id=tenant_id, viewer_context=viewer_context
     )
+    query = apply_exclude_self_created(query, tenant_id=tenant_id, user_id=user_id)
     return query.count()
 
 
