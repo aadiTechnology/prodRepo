@@ -5,9 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional, Sequence, Tuple
 
+from sqlalchemy import and_, exists, false, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query, Session
 
+from app.models.notice import Notice, NoticeTarget
 from app.models.notification import (
     Notification,
     UserDeviceToken,
@@ -15,9 +17,151 @@ from app.models.notification import (
     UserNotificationSettings,
 )
 from app.models.role import Role, user_roles
+from app.models.syllabus import Syllabus
 from app.models.user import User, UserRole
+from app.services.homework_access import HomeworkViewerContext
+from app.services.notice_access import is_notice_consumer
 
 VALID_MODULES = ("syllabus", "holiday", "notice", "exam", "general")
+
+_TENANT_WIDE_MODULES = ("general", "holiday", "exam")
+
+
+def _notice_target_matches_scope(scope) -> object:
+    """EXISTS clause: notice target row matches one class/division scope."""
+    base = and_(
+        NoticeTarget.notice_id == Notice.id,
+        NoticeTarget.is_deleted == False,  # noqa: E712
+    )
+    if scope.class_division_id is not None:
+        return exists(
+            select(NoticeTarget.id).where(
+                base,
+                or_(
+                    NoticeTarget.division_id == scope.class_division_id,
+                    and_(
+                        NoticeTarget.class_id == scope.class_id,
+                        NoticeTarget.division_id.is_(None),
+                    ),
+                ),
+            )
+        )
+    return exists(
+        select(NoticeTarget.id).where(
+            base,
+            NoticeTarget.class_id == scope.class_id,
+        )
+    )
+
+
+def _notice_entity_visible_clause(
+    *,
+    tenant_id: int,
+    viewer_context: HomeworkViewerContext,
+) -> object:
+    """Inbox row visible when its linked notice is in the viewer's role/class scope."""
+    now = datetime.utcnow()
+    published_filters = []
+    if viewer_context.published_only:
+        published_filters = [
+            Notice.status == "PUBLISHED",
+            Notice.is_published == True,  # noqa: E712
+            or_(Notice.expiry_date.is_(None), Notice.expiry_date >= now),
+        ]
+
+    base_notice = and_(
+        Notice.id == UserNotification.entity_id,
+        Notice.tenant_id == tenant_id,
+        Notice.is_deleted == False,  # noqa: E712
+        *published_filters,
+    )
+
+    if viewer_context.kind == "teacher":
+        teacher_audience = exists(
+            select(Notice.id).where(base_notice, Notice.audience_type == "TEACHER")
+        )
+        scope_parts = [_notice_target_matches_scope(scope) for scope in viewer_context.scopes]
+        if scope_parts:
+            student_audience = exists(
+                select(Notice.id).where(
+                    base_notice,
+                    Notice.audience_type == "STUDENT",
+                    or_(*scope_parts),
+                )
+            )
+            return and_(
+                UserNotification.module == "notice",
+                or_(teacher_audience, student_audience),
+            )
+        return and_(UserNotification.module == "notice", teacher_audience)
+
+    if viewer_context.kind in ("student", "parent"):
+        if not viewer_context.scopes:
+            return false()
+        scope_parts = [_notice_target_matches_scope(scope) for scope in viewer_context.scopes]
+        return and_(
+            UserNotification.module == "notice",
+            exists(
+                select(Notice.id).where(
+                    base_notice,
+                    Notice.audience_type.in_(("STUDENT", "ALL")),
+                    or_(*scope_parts),
+                )
+            ),
+        )
+
+    return false()
+
+
+def _syllabus_entity_visible_clause(
+    *,
+    tenant_id: int,
+    viewer_context: HomeworkViewerContext,
+) -> object:
+    scoped_class_ids = sorted({scope.class_id for scope in viewer_context.scopes})
+    if not scoped_class_ids:
+        return false()
+    return and_(
+        UserNotification.module == "syllabus",
+        exists(
+            select(Syllabus.id).where(
+                Syllabus.id == UserNotification.entity_id,
+                Syllabus.tenant_id == tenant_id,
+                Syllabus.is_deleted == False,  # noqa: E712
+                Syllabus.class_id.in_(scoped_class_ids),
+            )
+        ),
+    )
+
+
+def apply_inbox_entity_visibility(
+    query: Query,
+    *,
+    tenant_id: int,
+    viewer_context: HomeworkViewerContext | None,
+) -> Query:
+    """
+    Restrict notice/syllabus inbox rows to the viewer's class scope.
+
+    Admin-like viewers see all rows. Tenant-wide modules (holiday/exam/general)
+    are never filtered here.
+    """
+    if viewer_context is None or viewer_context.kind == "admin":
+        return query
+    if not is_notice_consumer(viewer_context):
+        return query
+
+    passthrough = or_(
+        UserNotification.module.in_(_TENANT_WIDE_MODULES),
+        UserNotification.entity_id.is_(None),
+        ~UserNotification.module.in_(("notice", "syllabus")),
+    )
+    scoped = or_(
+        _notice_entity_visible_clause(tenant_id=tenant_id, viewer_context=viewer_context),
+        _syllabus_entity_visible_clause(tenant_id=tenant_id, viewer_context=viewer_context),
+    )
+    return query.filter(or_(passthrough, scoped))
+
 
 # Audience token → role code/name fragments used when resolving `to`
 _AUDIENCE_ROLE_CODES: dict[str, set[str]] = {
@@ -116,6 +260,7 @@ def list_notifications(
     enabled_modules: Sequence[str],
     page: int = 0,
     size: int = 50,
+    viewer_context: HomeworkViewerContext | None = None,
 ) -> Tuple[List[UserNotification], int]:
     if not enabled_modules:
         return [], 0
@@ -125,6 +270,9 @@ def list_notifications(
         UserNotification.user_id == user_id,
         UserNotification.is_deleted == False,  # noqa: E712
         UserNotification.module.in_(list(enabled_modules)),
+    )
+    query = apply_inbox_entity_visibility(
+        query, tenant_id=tenant_id, viewer_context=viewer_context
     )
     total = query.count()
     rows = (
@@ -142,20 +290,21 @@ def count_unread(
     tenant_id: int,
     user_id: int,
     enabled_modules: Sequence[str],
+    viewer_context: HomeworkViewerContext | None = None,
 ) -> int:
     if not enabled_modules:
         return 0
-    return (
-        db.query(UserNotification)
-        .filter(
-            UserNotification.tenant_id == tenant_id,
-            UserNotification.user_id == user_id,
-            UserNotification.is_deleted == False,  # noqa: E712
-            UserNotification.is_read == False,  # noqa: E712
-            UserNotification.module.in_(list(enabled_modules)),
-        )
-        .count()
+    query = db.query(UserNotification).filter(
+        UserNotification.tenant_id == tenant_id,
+        UserNotification.user_id == user_id,
+        UserNotification.is_deleted == False,  # noqa: E712
+        UserNotification.is_read == False,  # noqa: E712
+        UserNotification.module.in_(list(enabled_modules)),
     )
+    query = apply_inbox_entity_visibility(
+        query, tenant_id=tenant_id, viewer_context=viewer_context
+    )
+    return query.count()
 
 
 def get_notification(

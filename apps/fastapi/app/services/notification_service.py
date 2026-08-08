@@ -15,6 +15,7 @@ from app.models.notice import Notice
 from app.models.notification import UserNotification
 from app.models.syllabus import Syllabus
 from app.repositories import notification_repository as repo
+from app.repositories import homework_repository
 from app.schemas.notification_schema import (
     DeviceRegisterRequest,
     DeviceRegisterResponse,
@@ -28,6 +29,8 @@ from app.schemas.notification_schema import (
     NotificationSettingsUpdateRequest,
 )
 from app.services import fcm_service
+from app.services.homework_access import HomeworkViewerContext, resolve_homework_viewer_context
+from app.repositories import notice_repository
 
 logger = get_logger(__name__)
 
@@ -45,6 +48,65 @@ def _require_tenant(tenant_id: Optional[int]) -> int:
     if tenant_id is None:
         raise ValidationException("Notifications require a school (tenant) context")
     return int(tenant_id)
+
+
+def _resolve_viewer_context(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    email: str,
+    legacy_role: object,
+) -> HomeworkViewerContext:
+    """Class/role scope for filtering notice and syllabus inbox rows."""
+    teacher_id = homework_repository._resolve_teacher_id(db, tenant_id, user_id)
+    ctx = resolve_homework_viewer_context(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        email=email,
+        legacy_role=legacy_role,
+        teacher_id=teacher_id,
+    )
+    if ctx.kind in ("student", "parent"):
+        return HomeworkViewerContext(
+            kind=ctx.kind,
+            scopes=ctx.scopes,
+            published_only=True,
+        )
+    if ctx.kind == "teacher":
+        return HomeworkViewerContext(
+            kind=ctx.kind,
+            scopes=ctx.scopes,
+            published_only=True,
+        )
+    return ctx
+
+
+def _scoped_class_ids(viewer_context: HomeworkViewerContext | None) -> set[int] | None:
+    if viewer_context is None or viewer_context.kind == "admin":
+        return None
+    return {scope.class_id for scope in viewer_context.scopes}
+
+
+def _notice_visible_to_viewer(
+    db: Session,
+    *,
+    tenant_id: int,
+    notice_id: int,
+    viewer_context: HomeworkViewerContext | None,
+) -> bool:
+    if viewer_context is None or viewer_context.kind == "admin":
+        return True
+    from app.services.notice_service import _consumer_can_view_notice
+
+    row = notice_repository.get_notice_by_id(
+        db, tenant_id=tenant_id, notice_id=notice_id
+    )
+    if not row:
+        return False
+    targets = notice_repository.get_notice_targets(db, notice_id=notice_id)
+    return _consumer_can_view_notice(row, targets, viewer_context)
 
 
 def entity_source_key(
@@ -496,6 +558,7 @@ def _materialize_notice_events(
     tenant_id: int,
     user_id: int,
     today: date,
+    viewer_context: HomeworkViewerContext | None = None,
 ) -> None:
     since = datetime.combine(today - timedelta(days=_MATERIALIZE_LOOKBACK_DAYS), datetime.min.time())
     notices = (
@@ -516,14 +579,26 @@ def _materialize_notice_events(
 
     # created key (module:id) + published key so eager create/publish and materialize share keys
     source_keys: List[str] = []
+    visible_notices: List[Notice] = []
     for n in notices:
+        if not _notice_visible_to_viewer(
+            db,
+            tenant_id=tenant_id,
+            notice_id=int(n.id),
+            viewer_context=viewer_context,
+        ):
+            continue
+        visible_notices.append(n)
         source_keys.append(entity_source_key("notice", int(n.id), "created"))
         source_keys.append(entity_source_key("notice", int(n.id), "published"))
+    if not visible_notices:
+        return
+
     existing = repo.existing_source_keys(
         db, tenant_id=tenant_id, user_id=user_id, source_keys=source_keys
     )
     candidates: List[UserNotification] = []
-    for n in notices:
+    for n in visible_notices:
         created_key = entity_source_key("notice", int(n.id), "created")
         published_key = entity_source_key("notice", int(n.id), "published")
         # Skip if any lifecycle key already delivered via eager create/publish
@@ -563,9 +638,10 @@ def _materialize_syllabus_events(
     tenant_id: int,
     user_id: int,
     today: date,
+    viewer_context: HomeworkViewerContext | None = None,
 ) -> None:
     since = datetime.combine(today - timedelta(days=_MATERIALIZE_LOOKBACK_DAYS), datetime.min.time())
-    rows = (
+    query = (
         db.query(Syllabus)
         .filter(
             Syllabus.tenant_id == tenant_id,
@@ -574,8 +650,13 @@ def _materialize_syllabus_events(
         )
         .order_by(Syllabus.created_at.desc())
         .limit(_MAX_SOURCE_ITEMS)
-        .all()
     )
+    scoped_class_ids = _scoped_class_ids(viewer_context)
+    if scoped_class_ids is not None:
+        if not scoped_class_ids:
+            return
+        query = query.filter(Syllabus.class_id.in_(sorted(scoped_class_ids)))
+    rows = query.all()
     if not rows:
         return
 
@@ -632,16 +713,29 @@ def materialize_notifications(
     *,
     tenant_id: int,
     user_id: int,
+    viewer_context: HomeworkViewerContext | None = None,
 ) -> None:
     """
-    Idempotently create inbox rows from real module data (frontend filtering is not used).
+    Idempotently create inbox rows from real module data, scoped to the viewer's class.
     Holiday/Exam: day + 1-day-before reminder. Notice/Syllabus: recent published/created rows.
     """
     today = date.today()
     try:
         _materialize_holiday_exam_events(db, tenant_id=tenant_id, user_id=user_id, today=today)
-        _materialize_notice_events(db, tenant_id=tenant_id, user_id=user_id, today=today)
-        _materialize_syllabus_events(db, tenant_id=tenant_id, user_id=user_id, today=today)
+        _materialize_notice_events(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            today=today,
+            viewer_context=viewer_context,
+        )
+        _materialize_syllabus_events(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            today=today,
+            viewer_context=viewer_context,
+        )
     except Exception:
         logger.exception(
             "Notification materialization failed for tenant=%s user=%s",
@@ -697,10 +791,21 @@ def list_notifications(
     user_id: int,
     page: int = 0,
     size: int = 50,
+    email: str = "",
+    legacy_role: object = None,
 ) -> NotificationListResponse:
     tid = _require_tenant(tenant_id)
     settings_row = repo.get_or_create_settings(db, tenant_id=tid, user_id=user_id)
-    materialize_notifications(db, tenant_id=tid, user_id=user_id)
+    viewer_context = _resolve_viewer_context(
+        db,
+        tenant_id=tid,
+        user_id=user_id,
+        email=email,
+        legacy_role=legacy_role,
+    )
+    materialize_notifications(
+        db, tenant_id=tid, user_id=user_id, viewer_context=viewer_context
+    )
     enabled = _enabled_modules_from_settings(settings_row)
     rows, total = repo.list_notifications(
         db,
@@ -709,6 +814,7 @@ def list_notifications(
         enabled_modules=enabled,
         page=page,
         size=size,
+        viewer_context=viewer_context,
     )
     return NotificationListResponse(
         items=[_to_response(r) for r in rows],
@@ -723,16 +829,28 @@ def get_unread_count(
     *,
     tenant_id: Optional[int],
     user_id: int,
+    email: str = "",
+    legacy_role: object = None,
 ) -> NotificationCountResponse:
     tid = _require_tenant(tenant_id)
     settings_row = repo.get_or_create_settings(db, tenant_id=tid, user_id=user_id)
-    materialize_notifications(db, tenant_id=tid, user_id=user_id)
+    viewer_context = _resolve_viewer_context(
+        db,
+        tenant_id=tid,
+        user_id=user_id,
+        email=email,
+        legacy_role=legacy_role,
+    )
+    materialize_notifications(
+        db, tenant_id=tid, user_id=user_id, viewer_context=viewer_context
+    )
     enabled = _enabled_modules_from_settings(settings_row)
     count = repo.count_unread(
         db,
         tenant_id=tid,
         user_id=user_id,
         enabled_modules=enabled,
+        viewer_context=viewer_context,
     )
     return NotificationCountResponse(count=count)
 
