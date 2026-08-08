@@ -8,6 +8,7 @@ from typing import List, Optional, Sequence
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+
 from app.core.exceptions import NotFoundException, ValidationException
 from app.core.logging_config import get_logger
 from app.models.holiday import Holiday
