@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Box, Stack, Tooltip, Typography } from "@mui/material";
 import { SettingsOutlined as SettingsIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -62,7 +62,13 @@ function NotificationSection({
 
 export default function NotificationListPage() {
   const navigate = useNavigate();
-  const { visibleNotifications, unreadCount, markAsRead, loading, error } = useNotifications();
+  const { visibleNotifications, unreadCount, markAsRead, loading, error, refresh } =
+    useNotifications();
+
+  // Re-fetch list + server unread count whenever the Notification List is opened.
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   const { unreadItems, readItems } = useMemo(() => {
     const unread: AppNotification[] = [];

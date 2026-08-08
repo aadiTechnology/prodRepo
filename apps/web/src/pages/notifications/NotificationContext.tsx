@@ -82,19 +82,60 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
+  /** Lightweight badge-only refresh (focus / tab visible). */
+  const refreshUnreadCount = useCallback(async () => {
+    if (!isAuthenticated || !user?.tenant_id) {
+      setUnreadCount(0);
+      return;
+    }
+    try {
+      const count = await notificationService.getUnreadCount();
+      setUnreadCount(Number(count) || 0);
+    } catch {
+      // Keep last known badge; next full refresh() will reconcile.
+    }
+  }, [isAuthenticated, user?.tenant_id, user?.id]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const onWindowFocus = () => {
+      void refreshUnreadCount();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshUnreadCount();
+      }
+    };
+
+    window.addEventListener("focus", onWindowFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", onWindowFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [isAuthenticated, refreshUnreadCount]);
+
   // Server already filters by module settings for list endpoints
   const visibleNotifications = notifications;
 
   const markAsRead = useCallback(
     async (id: string) => {
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id && !n.isRead ? { ...n, isRead: true } : n))
-      );
+      let wasUnread = false;
+      setNotifications((prev) => {
+        wasUnread = prev.some((n) => n.id === id && !n.isRead);
+        return prev.map((n) => (n.id === id && !n.isRead ? { ...n, isRead: true } : n));
+      });
+      if (wasUnread) {
+        setUnreadCount((c) => Math.max(0, c - 1));
+      }
       try {
         await notificationService.markRead(id);
+        // Reconcile badge with server after mark-read
         const count = await notificationService.getUnreadCount();
-        setUnreadCount(Number(count) || 0);
+        setUnreadCount(Math.max(0, Number(count) || 0));
       } catch {
+        // Restore list + server count on failure
         void refresh();
       }
     },
