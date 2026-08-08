@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional, Sequence
 
 from sqlalchemy import or_
@@ -223,6 +223,9 @@ def create_notification(
     source_key: Optional[str] = None,
     event: Optional[str] = None,
     notice_targets: Optional[Sequence[dict]] = None,
+    syllabus_class_id: Optional[int] = None,
+    holiday_class_ids: Optional[Sequence[int]] = None,
+    holiday_division_ids: Optional[Sequence[int]] = None,
 ) -> NotificationCreateResponse:
     """
     Reusable Notification Create API for any module.
@@ -273,6 +276,20 @@ def create_notification(
             tenant_id=tid,
             audience=recipient,
             targets=list(notice_targets or []),
+        )
+    elif module_key == "syllabus":
+        user_ids = repo.resolve_syllabus_recipient_user_ids(
+            db,
+            tenant_id=tid,
+            class_id=int(syllabus_class_id) if syllabus_class_id is not None else None,
+        )
+    elif module_key == "holiday":
+        user_ids = repo.resolve_holiday_recipient_user_ids(
+            db,
+            tenant_id=tid,
+            audience=recipient,
+            class_ids=list(holiday_class_ids or []),
+            division_ids=list(holiday_division_ids or []),
         )
     else:
         user_ids = repo.resolve_recipient_user_ids(db, tenant_id=tid, to=recipient)
@@ -447,6 +464,14 @@ def create_notification_from_request(
     )
 
 
+def _as_utc_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _to_response(row: UserNotification) -> NotificationResponse:
     kind = (row.kind or "general").lower()
     if kind not in ("reminder", "day", "general"):
@@ -459,7 +484,7 @@ def _to_response(row: UserNotification) -> NotificationResponse:
         module=module,  # type: ignore[arg-type]
         title=row.title,
         message=row.message,
-        created_at=row.created_at,
+        created_at=_as_utc_datetime(row.created_at) or datetime.now(timezone.utc),
         is_read=bool(row.is_read),
         kind=kind,  # type: ignore[arg-type]
         entity_id=row.entity_id,
@@ -695,8 +720,10 @@ def _materialize_syllabus_events(
     scoped_class_ids = _scoped_class_ids(viewer_context)
     if scoped_class_ids is not None:
         if not scoped_class_ids:
-            return
-        query = query.filter(Syllabus.class_id.in_(sorted(scoped_class_ids)))
+            if not (viewer_context and viewer_context.kind == "teacher"):
+                return
+        else:
+            query = query.filter(Syllabus.class_id.in_(sorted(scoped_class_ids)))
     rows = query.limit(_MAX_SOURCE_ITEMS).all()
     if not rows:
         return

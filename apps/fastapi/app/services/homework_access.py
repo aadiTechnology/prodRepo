@@ -15,6 +15,7 @@ from app.utils.homework_status import is_live_homework_status
 
 STUDENT_ROLE_TOKENS = frozenset({"student", "students"})
 PARENT_ROLE_TOKENS = frozenset({"parent", "parents", "guardian"})
+TEACHER_ROLE_TOKENS = frozenset({"teacher", "teachers"})
 ADMIN_ROLE_TOKENS = frozenset({
     "admin",
     "tenant_admin",
@@ -54,6 +55,10 @@ def _role_tokens(db: Session, user_id: int, legacy_role: object) -> Set[str]:
 
 def is_student_user(db: Session, user_id: int, legacy_role: object) -> bool:
     return bool(_role_tokens(db, user_id, legacy_role) & STUDENT_ROLE_TOKENS)
+
+
+def is_teacher_user(db: Session, user_id: int, legacy_role: object) -> bool:
+    return bool(_role_tokens(db, user_id, legacy_role) & TEACHER_ROLE_TOKENS)
 
 
 def is_parent_user(db: Session, user_id: int, legacy_role: object) -> bool:
@@ -241,6 +246,83 @@ def resolve_student_user_ids_for_notice_targets(
     return sorted(user_ids)
 
 
+def resolve_teacher_user_ids_for_class_scope(
+    db: Session,
+    *,
+    tenant_id: int,
+    class_ids: list[int] | None = None,
+    division_ids: list[int] | None = None,
+    targets: list[dict] | None = None,
+) -> list[int]:
+    """Resolve teacher login user ids assigned to the given class/division scope."""
+    from app.models.teacher import Teacher
+
+    class_set: set[int] = set()
+    div_set: set[int] = set()
+    for raw_id in class_ids or []:
+        if raw_id is not None:
+            class_set.add(int(raw_id))
+    for raw_id in division_ids or []:
+        if raw_id is not None:
+            div_set.add(int(raw_id))
+    for target in targets or []:
+        class_id = target.get("class_id")
+        division_id = target.get("division_id")
+        if class_id is not None:
+            class_set.add(int(class_id))
+        if division_id is not None:
+            div_set.add(int(division_id))
+
+    teachers = (
+        db.query(Teacher)
+        .filter(
+            Teacher.tenant_id == tenant_id,
+            Teacher.is_deleted == False,  # noqa: E712
+            Teacher.is_active == True,  # noqa: E712
+            Teacher.user_id.isnot(None),
+        )
+        .all()
+    )
+    if not teachers:
+        return []
+
+    user_ids: set[int] = set()
+    for teacher in teachers:
+        uid = getattr(teacher, "user_id", None)
+        if uid is None:
+            continue
+        scopes = resolve_teacher_assignment_scopes(
+            db, tenant_id=tenant_id, teacher_id=int(teacher.id)
+        )
+        if scopes:
+            for scope in scopes:
+                if class_set and scope.class_id not in class_set:
+                    continue
+                if div_set:
+                    if scope.class_division_id is not None:
+                        if int(scope.class_division_id) not in div_set:
+                            continue
+                    elif scope.class_id not in class_set:
+                        continue
+                user_ids.add(int(uid))
+                break
+            continue
+
+        legacy_class = getattr(teacher, "class_id", None)
+        legacy_div = getattr(teacher, "class_division_id", None)
+        if legacy_class is None:
+            if not class_set and not div_set:
+                user_ids.add(int(uid))
+            continue
+        if class_set and int(legacy_class) not in class_set:
+            continue
+        if div_set and legacy_div is not None and int(legacy_div) not in div_set:
+            continue
+        user_ids.add(int(uid))
+
+    return sorted(user_ids)
+
+
 def _resolve_student_record(db: Session, *, tenant_id: int, user_id: int, email: str) -> Student | None:
     from sqlalchemy import or_
 
@@ -404,6 +486,9 @@ def resolve_homework_viewer_context(
             db, tenant_id=tenant_id, teacher_id=teacher_id
         )
         return HomeworkViewerContext(kind="teacher", scopes=scopes, published_only=False)
+
+    if is_teacher_user(db, user_id, legacy_role):
+        return HomeworkViewerContext(kind="teacher", scopes=(), published_only=False)
 
     if is_student_user(db, user_id, legacy_role):
         student = _resolve_student_record(db, tenant_id=tenant_id, user_id=user_id, email=email)

@@ -410,6 +410,8 @@ def _emit_holiday_notification(
     holiday_id: int | None,
     actor_user_id: int | None = None,
     actor_name: str | None = None,
+    class_ids: list[int] | None = None,
+    division_ids: list[int] | None = None,
 ) -> None:
     """Call shared Notification Create API after holiday lifecycle events (non-blocking)."""
     hname = (holiday_name or "Holiday").strip() or "Holiday"
@@ -432,6 +434,8 @@ def _emit_holiday_notification(
             module="holiday",
             entity_id=holiday_id,
             event=event,
+            holiday_class_ids=class_ids or [],
+            holiday_division_ids=division_ids or [],
         )
     except Exception:
         from app.core.logging_config import get_logger
@@ -506,6 +510,8 @@ def create_holiday(
         holiday_id=int(row.id) if row.id is not None else None,
         actor_user_id=actor_user_id,
         actor_name=actor_name,
+        class_ids=c_ids,
+        division_ids=d_ids,
     )
 
     return _to_response(row)
@@ -615,6 +621,8 @@ def update_holiday(
         holiday_id=holiday_id,
         actor_user_id=actor_user_id,
         actor_name=actor_name,
+        class_ids=c_ids,
+        division_ids=d_ids,
     )
 
     return _to_response(row)
@@ -637,7 +645,7 @@ def delete_holiday(
         return
 
     hname = str(row.holiday_name or "Holiday")
-    stored_aud, _, _, _, _, _ = unpack_holiday_description(row.description)
+    stored_aud, stored_c, stored_d, _, _, _ = unpack_holiday_description(row.description)
     aud = (stored_aud or "TEACHER").strip().upper() or "TEACHER"
 
     row.is_active = False
@@ -653,4 +661,6 @@ def delete_holiday(
         holiday_id=holiday_id,
         actor_user_id=actor_user_id,
         actor_name=actor_name,
+        class_ids=stored_c,
+        division_ids=stored_d,
     )

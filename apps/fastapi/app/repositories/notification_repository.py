@@ -20,7 +20,11 @@ from app.models.notification import (
 from app.models.role import Role, user_roles
 from app.models.syllabus import Syllabus
 from app.models.user import User, UserRole
-from app.services.homework_access import HomeworkViewerContext, resolve_student_user_ids_for_notice_targets
+from app.services.homework_access import (
+    HomeworkViewerContext,
+    resolve_student_user_ids_for_notice_targets,
+    resolve_teacher_user_ids_for_class_scope,
+)
 from app.services.notice_access import is_notice_consumer
 
 VALID_MODULES = ("syllabus", "holiday", "notice", "exam", "general")
@@ -147,6 +151,10 @@ def _syllabus_entity_visible_clause(
     tenant_id: int,
     viewer_context: HomeworkViewerContext,
 ) -> object:
+    if viewer_context.kind == "teacher" and not viewer_context.scopes:
+        # Delivered syllabus rows for teachers without assignment scope (RBAC-only teachers).
+        return UserNotification.module == "syllabus"
+
     scoped_class_ids = sorted({scope.class_id for scope in viewer_context.scopes})
     if not scoped_class_ids:
         return false()
@@ -650,22 +658,132 @@ def resolve_notice_recipient_user_ids(
     targets: Sequence[dict] | None = None,
 ) -> List[int]:
     """
-    Resolve notice recipients.
-
-    When class/division targets exist for STUDENT/ALL audience, fan-out only to
-    student login accounts linked to matching student rows. Falls back to role
-    audience tokens when no scoped users are found.
+    Resolve notice recipients including class-scoped students and assigned teachers.
     """
     aud = (audience or "ALL").strip().upper()
     scoped_targets = [t for t in (targets or []) if t.get("class_id") is not None]
+    user_ids: set[int] = set()
+
     if aud in ("STUDENT", "ALL") and scoped_targets:
-        scoped_user_ids = resolve_student_user_ids_for_notice_targets(
-            db,
-            tenant_id=tenant_id,
-            targets=list(scoped_targets),
+        user_ids.update(
+            resolve_student_user_ids_for_notice_targets(
+                db,
+                tenant_id=tenant_id,
+                targets=list(scoped_targets),
+            )
         )
-        if scoped_user_ids:
-            return scoped_user_ids
+        user_ids.update(
+            resolve_teacher_user_ids_for_class_scope(
+                db,
+                tenant_id=tenant_id,
+                targets=list(scoped_targets),
+            )
+        )
+
+    if aud in ("TEACHER", "ALL"):
+        user_ids.update(resolve_recipient_user_ids(db, tenant_id=tenant_id, to="TEACHER"))
+        if not scoped_targets:
+            user_ids.update(
+                resolve_teacher_user_ids_for_class_scope(db, tenant_id=tenant_id)
+            )
+
+    if aud == "ALL" and not scoped_targets:
+        user_ids.update(resolve_recipient_user_ids(db, tenant_id=tenant_id, to="ALL"))
+
+    if user_ids:
+        return sorted(user_ids)
+
+    if aud in ("STUDENT", "ALL") and scoped_targets:
+        return resolve_recipient_user_ids(db, tenant_id=tenant_id, to=aud)
+
+    return resolve_recipient_user_ids(db, tenant_id=tenant_id, to=aud)
+
+
+def resolve_syllabus_recipient_user_ids(
+    db: Session,
+    *,
+    tenant_id: int,
+    class_id: int | None,
+) -> List[int]:
+    """Notify teachers and students linked to the syllabus class."""
+    user_ids: set[int] = set()
+    if class_id is not None:
+        targets = [{"class_id": int(class_id)}]
+        user_ids.update(
+            resolve_student_user_ids_for_notice_targets(
+                db, tenant_id=tenant_id, targets=targets
+            )
+        )
+        user_ids.update(
+            resolve_teacher_user_ids_for_class_scope(
+                db, tenant_id=tenant_id, class_ids=[int(class_id)]
+            )
+        )
+    user_ids.update(resolve_recipient_user_ids(db, tenant_id=tenant_id, to="TEACHER"))
+    return sorted(user_ids)
+
+
+def resolve_holiday_recipient_user_ids(
+    db: Session,
+    *,
+    tenant_id: int,
+    audience: str,
+    class_ids: Sequence[int] | None = None,
+    division_ids: Sequence[int] | None = None,
+) -> List[int]:
+    """Resolve holiday recipients for audience + optional class/division scope."""
+    aud = (audience or "TEACHER").strip().upper()
+    c_ids = [int(x) for x in (class_ids or []) if x is not None]
+    d_ids = [int(x) for x in (division_ids or []) if x is not None]
+    user_ids: set[int] = set()
+
+    if aud in ("STUDENT", "ALL") and (c_ids or d_ids):
+        targets = []
+        if c_ids and d_ids:
+            for class_id in c_ids:
+                for division_id in d_ids:
+                    targets.append({"class_id": class_id, "division_id": division_id})
+        elif c_ids:
+            targets = [{"class_id": class_id} for class_id in c_ids]
+        else:
+            targets = [{"division_id": division_id} for division_id in d_ids]
+        user_ids.update(
+            resolve_student_user_ids_for_notice_targets(
+                db, tenant_id=tenant_id, targets=targets
+            )
+        )
+        user_ids.update(
+            resolve_teacher_user_ids_for_class_scope(
+                db,
+                tenant_id=tenant_id,
+                class_ids=c_ids,
+                division_ids=d_ids,
+                targets=targets,
+            )
+        )
+
+    if aud in ("TEACHER", "ALL"):
+        user_ids.update(resolve_recipient_user_ids(db, tenant_id=tenant_id, to="TEACHER"))
+        if c_ids or d_ids:
+            user_ids.update(
+                resolve_teacher_user_ids_for_class_scope(
+                    db,
+                    tenant_id=tenant_id,
+                    class_ids=c_ids,
+                    division_ids=d_ids,
+                )
+            )
+        elif aud == "TEACHER":
+            user_ids.update(
+                resolve_teacher_user_ids_for_class_scope(db, tenant_id=tenant_id)
+            )
+
+    if aud == "ALL" and not c_ids and not d_ids:
+        user_ids.update(resolve_recipient_user_ids(db, tenant_id=tenant_id, to="ALL"))
+
+    if user_ids:
+        return sorted(user_ids)
+
     return resolve_recipient_user_ids(db, tenant_id=tenant_id, to=aud)
 
 

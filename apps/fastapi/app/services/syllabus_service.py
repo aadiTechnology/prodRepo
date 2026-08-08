@@ -62,6 +62,7 @@ def _emit_syllabus_notification(
     month: str,
     class_label: str | None,
     syllabus_id: int | None = None,
+    class_id: int | None = None,
     event: str = "created",
 ) -> None:
     """Call shared Notification Create API after syllabus lifecycle events (non-blocking)."""
@@ -87,13 +88,14 @@ def _emit_syllabus_notification(
             db,
             tenant_id=tenant_id,
             from_=_actor_display_name(db, user_id),
-            to="STUDENT",
+            to="TEACHER",
             subject="Syllabus Notification",
             body=body,
             created_by=user_id,
             module="syllabus",
             entity_id=syllabus_id,
             event=event,
+            syllabus_class_id=class_id,
         )
     except Exception:
         logger.exception(
@@ -335,6 +337,7 @@ def create_syllabus(
         month=str(payload.month or row.month or ""),
         class_label=class_label,
         syllabus_id=int(row.id) if row.id is not None else None,
+        class_id=int(row.class_id) if row.class_id is not None else None,
         event="created",
     )
 
@@ -393,6 +396,7 @@ def update_syllabus(
         month=str(payload.month or row.month or ""),
         class_label=class_label,
         syllabus_id=syllabus_id,
+        class_id=int(row.class_id) if row.class_id is not None else None,
         event="updated",
     )
 
@@ -440,6 +444,7 @@ def delete_syllabus(
         month=month,
         class_label=class_label,
         syllabus_id=syllabus_id,
+        class_id=int(row.class_id) if row.class_id is not None else None,
         event="deleted",
     )
 

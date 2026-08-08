@@ -2,20 +2,9 @@ import { Box, Chip, Stack, Typography } from "@mui/material";
 import { Circle as UnreadDotIcon } from "@mui/icons-material";
 
 import { colorTokens } from "../../../tokens/colors";
+import { formatDateTime } from "../../../utils/formatters";
 import { NOTIFICATION_MODULE_LABELS } from "../notifications.mock";
 import type { AppNotification } from "../notification.types";
-
-function formatNotificationDateTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("en-US", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 type Props = {
   notification: AppNotification;
@@ -80,7 +69,7 @@ export default function NotificationItem({ notification, onOpen }: Props) {
             data-testid={`notification-time-${notification.id}`}
             sx={{ fontWeight: 500 }}
           >
-            {formatNotificationDateTime(notification.createdAt)}
+            {formatDateTime(notification.createdAt)}
           </Typography>
           <Chip
             size="small"
