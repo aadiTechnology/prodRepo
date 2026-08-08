@@ -40,6 +40,7 @@ import { toRoleLabel } from "../../utils/formatters";
 import { toMediaUrl } from "../../utils/mediaUrl";
 import { useHomeworkSidebarCount } from "../../hooks/useHomeworkSidebarCount";
 import { useNoticeSidebarCount } from "../../hooks/useNoticeSidebarCount";
+import { isNativePlatform } from "../../utils/capacitor";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Asset Icons - Menu item icons
@@ -328,6 +329,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const isNativeApp = isNativePlatform();
   const { menus, roles: rbacRoles } = useRBAC();
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
@@ -713,7 +715,10 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         </List>
       </Box>
 
-      <ProfileCard collapsed={collapsed}>
+      <ProfileCard
+        collapsed={collapsed}
+        sx={isNativeApp && !collapsed ? { justifyContent: "center" } : undefined}
+      >
         <Avatar
           src={toMediaUrl(user?.profile_image_path)}
           sx={{
@@ -729,7 +734,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         >
           {(user?.full_name || 'U').charAt(0).toUpperCase()}
         </Avatar>
-        {!collapsed && (
+        {!collapsed && !isNativeApp && (
           <Box sx={{ flex: 1, overflow: "hidden" }}>
             <Typography
               variant="body2"
