@@ -56,6 +56,17 @@ def _actor_display_name(db: Session, user_id: int | None) -> str:
     return email or "System"
 
 
+def _should_emit_notice_notification(
+    *,
+    is_published: bool,
+    status: str,
+) -> bool:
+    """Published notices always notify; recipients filter via notification settings."""
+    if str(status or "").upper() == "DRAFT" or not is_published:
+        return False
+    return True
+
+
 def _emit_notice_notification(
     db: Session,
     *,
@@ -71,18 +82,22 @@ def _emit_notice_notification(
     """Call shared Notification Create API after notice lifecycle events (non-blocking)."""
     if not send_notification:
         return
+    notice_targets: list[dict] = []
+    if notice_id is not None:
+        notice_targets = notice_repository.get_notice_targets(db, notice_id=notice_id)
     try:
         notification_service.create_notification(
             db,
             tenant_id=tenant_id,
             from_=_actor_display_name(db, user_id),
             to=(audience_type or "ALL").strip().upper() or "ALL",
-            subject="Notice Notification",
+            subject=(title or "Notice Notification").strip() or "Notice Notification",
             body=body,
             created_by=user_id,
             module="notice",
             entity_id=notice_id,
             event=event,
+            notice_targets=notice_targets,
         )
     except Exception:
         logger.exception(
@@ -408,6 +423,8 @@ def mark_notice_viewed(
 
 
 def _targets_match_scopes(targets: list[dict], scopes: tuple[ClassDivisionScope, ...]) -> bool:
+    if not targets:
+        return True
     for scope in scopes:
         for target in targets:
             div_id = target.get("division_id")
@@ -433,8 +450,12 @@ def _consumer_can_view_notice(
 
     audience = str(row.get("audience_type") or "")
     if viewer_context.kind == "teacher":
-        if audience == "TEACHER":
-            return True
+        if audience in {"TEACHER", "ALL"}:
+            if not targets:
+                return True
+            if audience == "TEACHER":
+                return True
+            return _targets_match_scopes(targets, viewer_context.scopes)
         if audience != "STUDENT":
             return False
         if not viewer_context.scopes:
@@ -443,6 +464,8 @@ def _consumer_can_view_notice(
     if viewer_context.kind in ("student", "parent"):
         if audience not in {"STUDENT", "ALL"}:
             return False
+        if not targets:
+            return True
         if not viewer_context.scopes:
             return False
         return _targets_match_scopes(targets, viewer_context.scopes)
@@ -542,7 +565,7 @@ def create_notice(
             "is_published": is_published,
             "published_at": published_at,
             "unpublished_at": unpublished_at,
-            "send_notification": payload.send_notification,
+            "send_notification": True,
             "created_by": user_id,
             "is_deleted": False,
         },
@@ -573,7 +596,10 @@ def create_notice(
         title=title,
         body=f"{title} notice has been created.",
         notice_id=notice_id,
-        send_notification=bool(payload.send_notification),
+        send_notification=_should_emit_notice_notification(
+            is_published=is_published,
+            status=status,
+        ),
         event="created",
     )
 
@@ -778,17 +804,19 @@ def update_notice(
     updated = get_notice(db, tenant_id=tenant_id, notice_id=notice_id)
     title = str(updated.title or "Notice").strip() or "Notice"
     audience_type = str(updated.audience_type or "ALL").strip().upper() or "ALL"
-    _emit_notice_notification(
-        db,
-        tenant_id=tenant_id,
-        user_id=user_id,
-        audience_type=audience_type,
-        title=title,
-        body=f"{title} notice has been updated.",
-        notice_id=notice_id,
-        send_notification=bool(updated.send_notification),
-        event="updated",
-    )
+    became_published = next_status == "PUBLISHED" and existing_status != "PUBLISHED"
+    if became_published:
+        _emit_notice_notification(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            audience_type=audience_type,
+            title=title,
+            body=f"{title} notice has been published.",
+            notice_id=notice_id,
+            send_notification=True,
+            event="published",
+        )
     return updated
 
 
@@ -832,7 +860,7 @@ def publish_notice(
         title=title,
         body=f"{title} notice has been published.",
         notice_id=notice_id,
-        send_notification=bool(existing.get("send_notification")),
+        send_notification=True,
         event="published",
     )
 
@@ -879,7 +907,7 @@ def unpublish_notice(
         title=title,
         body=f"{title} notice has been unpublished.",
         notice_id=notice_id,
-        send_notification=bool(existing.get("send_notification")),
+        send_notification=True,
         event="deleted",
     )
 
@@ -896,7 +924,6 @@ def delete_notice(db: Session, *, tenant_id: int, notice_id: int, user_id: int) 
 
     title = str(existing.get("title") or "Notice").strip() or "Notice"
     audience_type = str(existing.get("audience_type") or "ALL").strip().upper() or "ALL"
-    should_notify = bool(existing.get("send_notification"))
 
     notice_repository.update_notice(
         db,
@@ -920,7 +947,7 @@ def delete_notice(db: Session, *, tenant_id: int, notice_id: int, user_id: int) 
         title=title,
         body=f"{title} notice has been deleted.",
         notice_id=notice_id,
-        send_notification=should_notify,
+        send_notification=True,
         event="deleted",
     )
 

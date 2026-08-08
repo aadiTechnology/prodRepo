@@ -20,7 +20,7 @@ from app.models.notification import (
 from app.models.role import Role, user_roles
 from app.models.syllabus import Syllabus
 from app.models.user import User, UserRole
-from app.services.homework_access import HomeworkViewerContext
+from app.services.homework_access import HomeworkViewerContext, resolve_student_user_ids_for_notice_targets
 from app.services.notice_access import is_notice_consumer
 
 VALID_MODULES = ("syllabus", "holiday", "notice", "exam", "general")
@@ -55,6 +55,16 @@ def _notice_target_matches_scope(scope) -> object:
     )
 
 
+def _notice_has_no_class_targets() -> object:
+    """True when the notice has no class/division target rows (tenant-wide for its audience)."""
+    return ~exists(
+        select(NoticeTarget.id).where(
+            NoticeTarget.notice_id == Notice.id,
+            NoticeTarget.is_deleted == False,  # noqa: E712
+        )
+    )
+
+
 def _notice_entity_visible_clause(
     *,
     tenant_id: int,
@@ -81,34 +91,52 @@ def _notice_entity_visible_clause(
         teacher_audience = exists(
             select(Notice.id).where(base_notice, Notice.audience_type == "TEACHER")
         )
+        all_audience = exists(
+            select(Notice.id).where(base_notice, Notice.audience_type == "ALL")
+        )
+        tenant_wide = exists(
+            select(Notice.id).where(
+                base_notice,
+                Notice.audience_type.in_(("TEACHER", "ALL")),
+                _notice_has_no_class_targets(),
+            )
+        )
         scope_parts = [_notice_target_matches_scope(scope) for scope in viewer_context.scopes]
+        scoped_audience = false()
         if scope_parts:
-            student_audience = exists(
+            scoped_audience = exists(
                 select(Notice.id).where(
                     base_notice,
-                    Notice.audience_type == "STUDENT",
-                    or_(*scope_parts),
+                    Notice.audience_type.in_(("STUDENT", "ALL")),
+                    or_(_notice_has_no_class_targets(), or_(*scope_parts)),
                 )
             )
-            return and_(
-                UserNotification.module == "notice",
-                or_(teacher_audience, student_audience),
-            )
-        return and_(UserNotification.module == "notice", teacher_audience)
-
-    if viewer_context.kind in ("student", "parent"):
-        if not viewer_context.scopes:
-            return false()
-        scope_parts = [_notice_target_matches_scope(scope) for scope in viewer_context.scopes]
         return and_(
             UserNotification.module == "notice",
-            exists(
+            or_(teacher_audience, all_audience, tenant_wide, scoped_audience),
+        )
+
+    if viewer_context.kind in ("student", "parent"):
+        scope_parts = [_notice_target_matches_scope(scope) for scope in viewer_context.scopes]
+        tenant_wide = exists(
+            select(Notice.id).where(
+                base_notice,
+                Notice.audience_type.in_(("STUDENT", "ALL")),
+                _notice_has_no_class_targets(),
+            )
+        )
+        scoped = false()
+        if scope_parts:
+            scoped = exists(
                 select(Notice.id).where(
                     base_notice,
                     Notice.audience_type.in_(("STUDENT", "ALL")),
                     or_(*scope_parts),
                 )
-            ),
+            )
+        return and_(
+            UserNotification.module == "notice",
+            or_(tenant_wide, scoped),
         )
 
     return false()
@@ -612,6 +640,33 @@ def resolve_recipient_user_ids(
     tenant_uids = {int(u.id) for u in base_q.all()}
     result = (role_uid_set | admin_users) & tenant_uids
     return sorted(result)
+
+
+def resolve_notice_recipient_user_ids(
+    db: Session,
+    *,
+    tenant_id: int,
+    audience: str,
+    targets: Sequence[dict] | None = None,
+) -> List[int]:
+    """
+    Resolve notice recipients.
+
+    When class/division targets exist for STUDENT/ALL audience, fan-out only to
+    student login accounts linked to matching student rows. Falls back to role
+    audience tokens when no scoped users are found.
+    """
+    aud = (audience or "ALL").strip().upper()
+    scoped_targets = [t for t in (targets or []) if t.get("class_id") is not None]
+    if aud in ("STUDENT", "ALL") and scoped_targets:
+        scoped_user_ids = resolve_student_user_ids_for_notice_targets(
+            db,
+            tenant_id=tenant_id,
+            targets=list(scoped_targets),
+        )
+        if scoped_user_ids:
+            return scoped_user_ids
+    return resolve_recipient_user_ids(db, tenant_id=tenant_id, to=aud)
 
 
 def create_user_inbox_rows(

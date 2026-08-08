@@ -54,7 +54,6 @@ const emptyForm = (): CreateNoticeFormData => ({
   notice_type: "GENERAL",
   publish_date: toTodayDateInput(),
   expiry_date: "",
-  send_notification: false,
 });
 
 function noticeToForm(notice: Notice): CreateNoticeFormData {
@@ -73,7 +72,6 @@ function noticeToForm(notice: Notice): CreateNoticeFormData {
     notice_type: notice.notice_type,
     publish_date: fromApiDate(notice.publish_date) || toTodayDateInput(),
     expiry_date: fromApiDate(notice.expiry_date),
-    send_notification: notice.send_notification,
   };
 }
 
@@ -514,7 +512,6 @@ export default function CreateNotice() {
           notice_type: formData.notice_type,
           publish_date: toApiDateTime(formData.publish_date),
           expiry_date: toApiDateTime(formData.expiry_date),
-          send_notification: formData.send_notification,
           targets,
         };
 

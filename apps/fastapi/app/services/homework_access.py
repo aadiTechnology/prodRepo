@@ -156,6 +156,91 @@ def resolve_teacher_assignment_scopes(
     return tuple(scopes)
 
 
+def resolve_user_for_student(db: Session, student: Student) -> User | None:
+    """Resolve the login user linked to a student row (email / admission alias / name)."""
+    if not student.tenant_id:
+        return None
+
+    tenant_id = student.tenant_id
+    admission_key = (student.admission_no or student.student_code or str(student.id)).strip()
+    candidates: list[str] = []
+
+    if student.email:
+        candidates.append(student.email.strip().lower())
+
+    candidates.append(f"{admission_key.lower()}@student.local")
+
+    if student.email and "@" in student.email:
+        local, domain = student.email.rsplit("@", 1)
+        tag = admission_key.lower().replace("+", "").replace("@", "")
+        candidates.append(f"{local}+{tag}@{domain}".lower())
+
+    for email in candidates:
+        user = (
+            db.query(User)
+            .filter(
+                User.tenant_id == tenant_id,
+                User.is_deleted == False,  # noqa: E712
+                User.is_active == True,  # noqa: E712
+                User.email.ilike(email),
+            )
+            .first()
+        )
+        if user:
+            return user
+
+    if student.student_name:
+        matches = (
+            db.query(User)
+            .filter(
+                User.tenant_id == tenant_id,
+                User.is_deleted == False,  # noqa: E712
+                User.is_active == True,  # noqa: E712
+                User.full_name.ilike(student.student_name.strip()),
+            )
+            .all()
+        )
+        if len(matches) == 1:
+            return matches[0]
+
+    return None
+
+
+def resolve_user_id_for_student(db: Session, student: Student) -> int | None:
+    user = resolve_user_for_student(db, student)
+    return int(user.id) if user else None
+
+
+def resolve_student_user_ids_for_notice_targets(
+    db: Session,
+    *,
+    tenant_id: int,
+    targets: list[dict],
+) -> list[int]:
+    """Map notice class/division targets to linked student login user ids."""
+    if not targets:
+        return []
+
+    user_ids: set[int] = set()
+    for target in targets:
+        class_id = target.get("class_id")
+        if class_id is None:
+            continue
+        query = db.query(Student).filter(
+            Student.tenant_id == tenant_id,
+            Student.is_active == True,  # noqa: E712
+            Student.class_id == int(class_id),
+        )
+        division_id = target.get("division_id")
+        if division_id is not None:
+            query = query.filter(Student.class_division_id == int(division_id))
+        for student in query.all():
+            uid = resolve_user_id_for_student(db, student)
+            if uid is not None:
+                user_ids.add(uid)
+    return sorted(user_ids)
+
+
 def _resolve_student_record(db: Session, *, tenant_id: int, user_id: int, email: str) -> Student | None:
     from sqlalchemy import or_
 
@@ -172,6 +257,22 @@ def _resolve_student_record(db: Session, *, tenant_id: int, user_id: int, email:
     )
     if student:
         return student
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if user and user.phone_number:
+        phone = str(user.phone_number).strip()
+        if phone:
+            by_phone = (
+                db.query(Student)
+                .filter(
+                    Student.tenant_id == tenant_id,
+                    Student.is_active == True,  # noqa: E712
+                    Student.mobile_number == phone,
+                )
+                .first()
+            )
+            if by_phone:
+                return by_phone
 
     if "@" in email_norm and "+" in email_norm.split("@", 1)[0]:
         local_part, _domain = email_norm.rsplit("@", 1)

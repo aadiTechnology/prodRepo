@@ -222,6 +222,7 @@ def create_notification(
     entity_id: Optional[int] = None,
     source_key: Optional[str] = None,
     event: Optional[str] = None,
+    notice_targets: Optional[Sequence[dict]] = None,
 ) -> NotificationCreateResponse:
     """
     Reusable Notification Create API for any module.
@@ -262,13 +263,22 @@ def create_notification(
     )
 
     # 2) Resolve audience → users and fan-out inbox rows (never notify the author)
-    user_ids = repo.resolve_recipient_user_ids(db, tenant_id=tid, to=recipient)
-    if created_by is not None:
-        actor_id = int(created_by)
-        user_ids = [uid for uid in user_ids if int(uid) != actor_id]
     module_key = (module or "").strip().lower() if module else _infer_module(subj, sender)
     if module_key not in VALID_MODULES:
         module_key = _infer_module(subj, sender)
+
+    if module_key == "notice":
+        user_ids = repo.resolve_notice_recipient_user_ids(
+            db,
+            tenant_id=tid,
+            audience=recipient,
+            targets=list(notice_targets or []),
+        )
+    else:
+        user_ids = repo.resolve_recipient_user_ids(db, tenant_id=tid, to=recipient)
+    if created_by is not None:
+        actor_id = int(created_by)
+        user_ids = [uid for uid in user_ids if int(uid) != actor_id]
 
     inbox_source_key = (source_key or "").strip() or None
     inbox_entity_id = int(entity_id) if entity_id is not None else None
@@ -598,7 +608,6 @@ def _materialize_notice_events(
             Notice.tenant_id == tenant_id,
             Notice.is_deleted == False,  # noqa: E712
             Notice.is_published == True,  # noqa: E712
-            Notice.send_notification == True,  # noqa: E712
             Notice.created_at >= since,
         )
         .order_by(Notice.created_at.desc())
@@ -682,14 +691,13 @@ def _materialize_syllabus_events(
             Syllabus.created_at >= since,
         )
         .order_by(Syllabus.created_at.desc())
-        .limit(_MAX_SOURCE_ITEMS)
     )
     scoped_class_ids = _scoped_class_ids(viewer_context)
     if scoped_class_ids is not None:
         if not scoped_class_ids:
             return
         query = query.filter(Syllabus.class_id.in_(sorted(scoped_class_ids)))
-    rows = query.all()
+    rows = query.limit(_MAX_SOURCE_ITEMS).all()
     if not rows:
         return
 
@@ -757,6 +765,13 @@ def materialize_notifications(
     today = date.today()
     try:
         _materialize_holiday_exam_events(db, tenant_id=tenant_id, user_id=user_id, today=today)
+    except Exception:
+        logger.exception(
+            "Holiday/exam notification materialization failed for tenant=%s user=%s",
+            tenant_id,
+            user_id,
+        )
+    try:
         _materialize_notice_events(
             db,
             tenant_id=tenant_id,
@@ -764,6 +779,13 @@ def materialize_notifications(
             today=today,
             viewer_context=viewer_context,
         )
+    except Exception:
+        logger.exception(
+            "Notice notification materialization failed for tenant=%s user=%s",
+            tenant_id,
+            user_id,
+        )
+    try:
         _materialize_syllabus_events(
             db,
             tenant_id=tenant_id,
@@ -773,7 +795,7 @@ def materialize_notifications(
         )
     except Exception:
         logger.exception(
-            "Notification materialization failed for tenant=%s user=%s",
+            "Syllabus notification materialization failed for tenant=%s user=%s",
             tenant_id,
             user_id,
         )

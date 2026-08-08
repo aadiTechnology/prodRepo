@@ -17,7 +17,6 @@ import {
   AttachFile as AttachFileIcon,
   CalendarMonth as CalendarIcon,
   Campaign as CampaignIcon,
-  NotificationsNone as NotifyIcon,
   Schedule as ScheduleIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
@@ -51,11 +50,6 @@ function statusChipColor(status: NoticeStatus): "default" | "success" | "error" 
     default:
       return "default";
   }
-}
-
-function notificationLabel(notice: Notice): string {
-  if (!notice.send_notification) return "Off";
-  return "Pending";
 }
 
 const accent = colorTokens.preschool.turquoise.main;
@@ -436,30 +430,6 @@ export default function NoticeDetails() {
                 </Stack>
               )}
             </ViewSection>
-
-            {!isConsumerView ? (
-              <>
-                <Divider sx={{ opacity: 0.7 }} />
-
-                <ViewSection title="Notification">
-                  <Chip
-                    icon={
-                      <NotifyIcon
-                        sx={{
-                          fontSize: "18px !important",
-                          color: notice.send_notification ? "warning.main !important" : undefined,
-                        }}
-                      />
-                    }
-                    label={notificationLabel(notice)}
-                    size="small"
-                    variant={notice.send_notification ? "filled" : "outlined"}
-                    color={notice.send_notification ? "warning" : "default"}
-                    sx={{ fontWeight: 700, height: 28 }}
-                  />
-                </ViewSection>
-              </>
-            ) : null}
           </Box>
         </Paper>
       </Box>

@@ -34,7 +34,8 @@ export default function NotificationSettingsPage() {
             Notification Settings
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Choose which modules can appear in your notification list. Changes apply immediately.
+            Choose which modules appear in your notification list. Published notices, holidays, and
+            syllabus updates are delivered automatically; turn a module off here to hide those alerts.
           </Typography>
         </Box>
 
