@@ -2,26 +2,11 @@
 
 cd /d C:\Users\lenovo\AadiTech\Product\AIContentStudio\code\Web
 
-echo Pull latest
-call git pull
-
-echo Install packages
-call npm install
-
-echo Build React
+echo npm run build
 call npm run build
 
-echo Sync Capacitor
-call npx cap sync
+echo npx cap sync android
+call npx cap sync android
 
-echo create build from android studio and 
-pause
-
-echo Build APK
-cd android
-call gradlew.bat assembleDebug
-
-echo Install APK
-adb install -r app\build\outputs\apk\debug\app-debug.apk
-
-pause
+echo npx cap run android
+call npx cap run android
