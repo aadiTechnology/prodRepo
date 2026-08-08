@@ -340,6 +340,35 @@ def mark_as_read(
     return row, False
 
 
+def mark_module_as_read(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    module: str,
+) -> int:
+    """Mark all unread inbox rows for one module as read. Returns rows updated."""
+    now = datetime.utcnow()
+    rows = (
+        db.query(UserNotification)
+        .filter(
+            UserNotification.tenant_id == tenant_id,
+            UserNotification.user_id == user_id,
+            UserNotification.module == module,
+            UserNotification.is_deleted == False,  # noqa: E712
+            UserNotification.is_read == False,  # noqa: E712
+        )
+        .all()
+    )
+    if not rows:
+        return 0
+    for row in rows:
+        row.is_read = True
+        row.read_at = now
+    db.commit()
+    return len(rows)
+
+
 def existing_source_keys(
     db: Session,
     *,

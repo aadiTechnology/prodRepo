@@ -18,6 +18,7 @@ from app.schemas.notification_schema import (
     NotificationCreateResponse,
     NotificationListResponse,
     NotificationMarkReadResponse,
+    NotificationModuleMarkReadResponse,
     NotificationSettingsResponse,
     NotificationSettingsUpdateRequest,
 )
@@ -141,6 +142,24 @@ def update_settings(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         payload=payload,
+    )
+
+
+@router.post(
+    "/modules/{module}/mark-read",
+    response_model=NotificationModuleMarkReadResponse,
+)
+def mark_module_notifications_read(
+    module: str = Path(..., min_length=1, max_length=30),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Mark all unread inbox notifications for one module (e.g. holiday) as read."""
+    return notification_service.mark_module_as_read(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        module=module,
     )
 
 

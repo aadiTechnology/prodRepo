@@ -78,6 +78,12 @@ class NotificationMarkReadResponse(BaseModel):
     already_read: bool
 
 
+class NotificationModuleMarkReadResponse(BaseModel):
+    message: str
+    module: NotificationModule
+    marked_count: int
+
+
 class NotificationSettingsResponse(BaseModel):
     syllabus: bool = True
     holiday: bool = True

@@ -24,6 +24,7 @@ from app.schemas.notification_schema import (
     NotificationCreateResponse,
     NotificationListResponse,
     NotificationMarkReadResponse,
+    NotificationModuleMarkReadResponse,
     NotificationResponse,
     NotificationSettingsResponse,
     NotificationSettingsUpdateRequest,
@@ -876,4 +877,34 @@ def mark_as_read(
         message="Notification marked as read" if not already else "Notification already read",
         notification_id=str(notification_id),
         already_read=already,
+    )
+
+
+def mark_module_as_read(
+    db: Session,
+    *,
+    tenant_id: Optional[int],
+    user_id: int,
+    module: str,
+) -> NotificationModuleMarkReadResponse:
+    """Mark every unread inbox notification for one module (e.g. all holiday alerts)."""
+    tid = _require_tenant(tenant_id)
+    module_key = (module or "").strip().lower()
+    if module_key not in VALID_MODULES:
+        raise ValidationException(f"Invalid notification module: {module}")
+
+    marked = repo.mark_module_as_read(
+        db,
+        tenant_id=tid,
+        user_id=user_id,
+        module=module_key,
+    )
+    return NotificationModuleMarkReadResponse(
+        message=(
+            f"Marked {marked} notification(s) as read"
+            if marked
+            else "No unread notifications for this module"
+        ),
+        module=module_key,  # type: ignore[arg-type]
+        marked_count=marked,
     )

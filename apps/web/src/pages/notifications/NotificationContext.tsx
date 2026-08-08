@@ -32,6 +32,7 @@ export type NotificationContextValue = {
   error: string | null;
   refresh: () => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
+  markModuleAsRead: (module: NotificationModule) => Promise<void>;
   setModuleEnabled: (module: NotificationModule, enabled: boolean) => Promise<void>;
 };
 
@@ -142,6 +143,23 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     [refresh]
   );
 
+  const markModuleAsRead = useCallback(
+    async (module: NotificationModule) => {
+      try {
+        const result = await notificationService.markModuleRead(module);
+        if (result.marked_count <= 0) return;
+        setNotifications((prev) =>
+          prev.map((n) => (n.module === module ? { ...n, isRead: true } : n))
+        );
+        const count = await notificationService.getUnreadCount();
+        setUnreadCount(Math.max(0, Number(count) || 0));
+      } catch {
+        void refresh();
+      }
+    },
+    [refresh]
+  );
+
   const setModuleEnabled = useCallback(
     async (module: NotificationModule, enabled: boolean) => {
       const previous = settings;
@@ -174,6 +192,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       error,
       refresh,
       markAsRead,
+      markModuleAsRead,
       setModuleEnabled,
     }),
     [
@@ -185,6 +204,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       error,
       refresh,
       markAsRead,
+      markModuleAsRead,
       setModuleEnabled,
     ]
   );

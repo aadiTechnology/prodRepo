@@ -62,7 +62,7 @@ function NotificationSection({
 
 export default function NotificationListPage() {
   const navigate = useNavigate();
-  const { visibleNotifications, unreadCount, markAsRead, loading, error, refresh } =
+  const { visibleNotifications, unreadCount, markAsRead, markModuleAsRead, loading, error, refresh } =
     useNotifications();
 
   // Re-fetch list + server unread count whenever the Notification List is opened.
@@ -81,7 +81,11 @@ export default function NotificationListPage() {
   }, [visibleNotifications]);
 
   const handleOpen = async (notification: AppNotification) => {
-    await markAsRead(notification.id);
+    if (notification.module === "holiday") {
+      await markModuleAsRead("holiday");
+    } else {
+      await markAsRead(notification.id);
+    }
     navigate(NOTIFICATION_MODULE_PATHS[notification.module]);
   };
 
