@@ -60,11 +60,12 @@ def _should_emit_notice_notification(
     *,
     is_published: bool,
     status: str,
+    send_notification: bool = True,
 ) -> bool:
-    """Published notices always notify; recipients filter via notification settings."""
+    """Emit only for published notices when the notice allows notifications."""
     if str(status or "").upper() == "DRAFT" or not is_published:
         return False
-    return True
+    return bool(send_notification)
 
 
 def _emit_notice_notification(
@@ -565,7 +566,7 @@ def create_notice(
             "is_published": is_published,
             "published_at": published_at,
             "unpublished_at": unpublished_at,
-            "send_notification": True,
+            "send_notification": bool(payload.send_notification),
             "created_by": user_id,
             "is_deleted": False,
         },
@@ -599,6 +600,7 @@ def create_notice(
         send_notification=_should_emit_notice_notification(
             is_published=is_published,
             status=status,
+            send_notification=bool(payload.send_notification),
         ),
         event="created",
     )
@@ -814,7 +816,11 @@ def update_notice(
             title=title,
             body=f"{title} notice has been published.",
             notice_id=notice_id,
-            send_notification=True,
+            send_notification=_should_emit_notice_notification(
+                is_published=True,
+                status=next_status,
+                send_notification=bool(updated.send_notification),
+            ),
             event="published",
         )
     return updated
@@ -852,6 +858,8 @@ def publish_notice(
 
     title = str(existing.get("title") or "Notice").strip() or "Notice"
     audience_type = str(existing.get("audience_type") or "ALL").strip().upper() or "ALL"
+    stored_send = existing.get("send_notification")
+    send_notification = True if stored_send is None else bool(stored_send)
     _emit_notice_notification(
         db,
         tenant_id=tenant_id,
@@ -860,7 +868,11 @@ def publish_notice(
         title=title,
         body=f"{title} notice has been published.",
         notice_id=notice_id,
-        send_notification=True,
+        send_notification=_should_emit_notice_notification(
+            is_published=True,
+            status="PUBLISHED",
+            send_notification=send_notification,
+        ),
         event="published",
     )
 
@@ -899,6 +911,8 @@ def unpublish_notice(
 
     title = str(existing.get("title") or "Notice").strip() or "Notice"
     audience_type = str(existing.get("audience_type") or "ALL").strip().upper() or "ALL"
+    stored_send = existing.get("send_notification")
+    send_notification = True if stored_send is None else bool(stored_send)
     _emit_notice_notification(
         db,
         tenant_id=tenant_id,
@@ -907,7 +921,7 @@ def unpublish_notice(
         title=title,
         body=f"{title} notice has been unpublished.",
         notice_id=notice_id,
-        send_notification=True,
+        send_notification=send_notification,
         event="deleted",
     )
 
@@ -924,6 +938,8 @@ def delete_notice(db: Session, *, tenant_id: int, notice_id: int, user_id: int) 
 
     title = str(existing.get("title") or "Notice").strip() or "Notice"
     audience_type = str(existing.get("audience_type") or "ALL").strip().upper() or "ALL"
+    stored_send = existing.get("send_notification")
+    send_notification = True if stored_send is None else bool(stored_send)
 
     notice_repository.update_notice(
         db,
@@ -947,7 +963,7 @@ def delete_notice(db: Session, *, tenant_id: int, notice_id: int, user_id: int) 
         title=title,
         body=f"{title} notice has been deleted.",
         notice_id=notice_id,
-        send_notification=True,
+        send_notification=send_notification,
         event="deleted",
     )
 

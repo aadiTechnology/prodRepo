@@ -548,6 +548,8 @@ export default function CreateNotice() {
         } else {
           const created = await noticeService.create({
             ...sharedPayload,
+            // No UI toggle; product default is notify (backend also defaults true).
+            send_notification: true,
             is_draft: isDraft,
             attachments: [],
           });
