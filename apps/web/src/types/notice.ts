@@ -69,7 +69,8 @@ export interface NoticeCreateRequest {
   notice_type: NoticeType;
   publish_date?: string;
   expiry_date?: string;
-  send_notification: boolean;
+  /** Deprecated on create UI; backend always notifies on publish. */
+  send_notification?: boolean;
   is_draft: boolean;
   targets: NoticeCreateTarget[];
   attachments: NoticeCreateAttachment[];
@@ -84,7 +85,6 @@ export type NoticeUpdateRequest = Partial<
     | "notice_type"
     | "publish_date"
     | "expiry_date"
-    | "send_notification"
     | "is_draft"
     | "targets"
     | "attachments"

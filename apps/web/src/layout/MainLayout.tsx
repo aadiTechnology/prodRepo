@@ -18,6 +18,7 @@ import { apiBaseUrl } from "../config";
 import { colorTokens } from "../tokens/colors";
 import { toRoleLabel } from "../utils/formatters";
 import { getTimeGreeting, getFirstName } from "../utils/greeting";
+import { isNativePlatform } from "../utils/capacitor";
 import { hasAiAssistantAccess } from "../utils/menuNavigation";
 import { NotificationProvider } from "../pages/notifications/NotificationContext";
 import NotificationBell from "../pages/notifications/components/NotificationBell";
@@ -29,6 +30,7 @@ function MainLayout() {
   const { user, logout, isAuthenticated, exitImpersonation, refreshUser } = useAuth();
   const { roles: rbacRoles, clearRBACData, grantedMenuPaths, menus, isInitialized } = useRBAC();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isNativeApp = isNativePlatform();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
@@ -321,7 +323,7 @@ function MainLayout() {
                 minWidth: 0,
               }}
             >
-              {isAuthenticated && user && (
+              {isAuthenticated && user && !isNativeApp && (
                 <Typography
                   component="div"
                   sx={{
@@ -535,13 +537,22 @@ function MainLayout() {
             bottom: 0,
             zIndex: (theme) => theme.zIndex.drawer + 2,
             display: "flex",
+            flexDirection: isNativeApp ? "column" : "row",
             alignItems: "center",
-            justifyContent: "space-between",
+            justifyContent: isNativeApp ? "center" : "space-between",
             minHeight: 50,
             boxSizing: "border-box",
+            gap: isNativeApp ? 0.5 : 0,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              ...(isNativeApp ? { justifyContent: "center" } : {}),
+            }}
+          >
             <Box
               component="img"
               src="/campus-axis-logo.png"
@@ -549,10 +560,20 @@ function MainLayout() {
               sx={{ height: "45px", objectFit: "contain" }}
             />
           </Box>
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              fontWeight: 500,
+              textAlign: isNativeApp ? "center" : "left",
+              width: isNativeApp ? "100%" : "auto",
+            }}
+          >
             © {new Date().getFullYear()} Campus Axis App. All rights reserved to Aadi Technology
           </Typography>
-          <Box sx={{ width: "100px", display: { xs: "none", sm: "block" } }} />
+          {!isNativeApp && (
+            <Box sx={{ width: "100px", display: { xs: "none", sm: "block" } }} />
+          )}
         </Box>
       </Box>
       {isAuthenticated && isInitialized && hasAiAssistantAccess(grantedMenuPaths) && (

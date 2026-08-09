@@ -26,7 +26,7 @@ export const NOTIFICATION_MODULE_LABELS: Record<NotificationModule, string> = {
 /** Deep-link destination for each notification module (existing app routes). */
 export const NOTIFICATION_MODULE_PATHS: Record<NotificationModule, string> = {
   syllabus: "/academics/syllabus",
-  holiday: "/academics/configuration/holidays",
+  holiday: "/calendar/academic",
   notice: "/communication/notices",
   exam: "/calendar/academic",
   general: "/notifications",

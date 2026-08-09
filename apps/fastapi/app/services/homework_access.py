@@ -15,6 +15,7 @@ from app.utils.homework_status import is_live_homework_status
 
 STUDENT_ROLE_TOKENS = frozenset({"student", "students"})
 PARENT_ROLE_TOKENS = frozenset({"parent", "parents", "guardian"})
+TEACHER_ROLE_TOKENS = frozenset({"teacher", "teachers"})
 ADMIN_ROLE_TOKENS = frozenset({
     "admin",
     "tenant_admin",
@@ -54,6 +55,10 @@ def _role_tokens(db: Session, user_id: int, legacy_role: object) -> Set[str]:
 
 def is_student_user(db: Session, user_id: int, legacy_role: object) -> bool:
     return bool(_role_tokens(db, user_id, legacy_role) & STUDENT_ROLE_TOKENS)
+
+
+def is_teacher_user(db: Session, user_id: int, legacy_role: object) -> bool:
+    return bool(_role_tokens(db, user_id, legacy_role) & TEACHER_ROLE_TOKENS)
 
 
 def is_parent_user(db: Session, user_id: int, legacy_role: object) -> bool:
@@ -156,6 +161,168 @@ def resolve_teacher_assignment_scopes(
     return tuple(scopes)
 
 
+def resolve_user_for_student(db: Session, student: Student) -> User | None:
+    """Resolve the login user linked to a student row (email / admission alias / name)."""
+    if not student.tenant_id:
+        return None
+
+    tenant_id = student.tenant_id
+    admission_key = (student.admission_no or student.student_code or str(student.id)).strip()
+    candidates: list[str] = []
+
+    if student.email:
+        candidates.append(student.email.strip().lower())
+
+    candidates.append(f"{admission_key.lower()}@student.local")
+
+    if student.email and "@" in student.email:
+        local, domain = student.email.rsplit("@", 1)
+        tag = admission_key.lower().replace("+", "").replace("@", "")
+        candidates.append(f"{local}+{tag}@{domain}".lower())
+
+    for email in candidates:
+        user = (
+            db.query(User)
+            .filter(
+                User.tenant_id == tenant_id,
+                User.is_deleted == False,  # noqa: E712
+                User.is_active == True,  # noqa: E712
+                User.email.ilike(email),
+            )
+            .first()
+        )
+        if user:
+            return user
+
+    if student.student_name:
+        matches = (
+            db.query(User)
+            .filter(
+                User.tenant_id == tenant_id,
+                User.is_deleted == False,  # noqa: E712
+                User.is_active == True,  # noqa: E712
+                User.full_name.ilike(student.student_name.strip()),
+            )
+            .all()
+        )
+        if len(matches) == 1:
+            return matches[0]
+
+    return None
+
+
+def resolve_user_id_for_student(db: Session, student: Student) -> int | None:
+    user = resolve_user_for_student(db, student)
+    return int(user.id) if user else None
+
+
+def resolve_student_user_ids_for_notice_targets(
+    db: Session,
+    *,
+    tenant_id: int,
+    targets: list[dict],
+) -> list[int]:
+    """Map notice class/division targets to linked student login user ids."""
+    if not targets:
+        return []
+
+    user_ids: set[int] = set()
+    for target in targets:
+        class_id = target.get("class_id")
+        if class_id is None:
+            continue
+        query = db.query(Student).filter(
+            Student.tenant_id == tenant_id,
+            Student.is_active == True,  # noqa: E712
+            Student.class_id == int(class_id),
+        )
+        division_id = target.get("division_id")
+        if division_id is not None:
+            query = query.filter(Student.class_division_id == int(division_id))
+        for student in query.all():
+            uid = resolve_user_id_for_student(db, student)
+            if uid is not None:
+                user_ids.add(uid)
+    return sorted(user_ids)
+
+
+def resolve_teacher_user_ids_for_class_scope(
+    db: Session,
+    *,
+    tenant_id: int,
+    class_ids: list[int] | None = None,
+    division_ids: list[int] | None = None,
+    targets: list[dict] | None = None,
+) -> list[int]:
+    """Resolve teacher login user ids assigned to the given class/division scope."""
+    from app.models.teacher import Teacher
+
+    class_set: set[int] = set()
+    div_set: set[int] = set()
+    for raw_id in class_ids or []:
+        if raw_id is not None:
+            class_set.add(int(raw_id))
+    for raw_id in division_ids or []:
+        if raw_id is not None:
+            div_set.add(int(raw_id))
+    for target in targets or []:
+        class_id = target.get("class_id")
+        division_id = target.get("division_id")
+        if class_id is not None:
+            class_set.add(int(class_id))
+        if division_id is not None:
+            div_set.add(int(division_id))
+
+    teachers = (
+        db.query(Teacher)
+        .filter(
+            Teacher.tenant_id == tenant_id,
+            Teacher.is_deleted == False,  # noqa: E712
+            Teacher.is_active == True,  # noqa: E712
+            Teacher.user_id.isnot(None),
+        )
+        .all()
+    )
+    if not teachers:
+        return []
+
+    user_ids: set[int] = set()
+    for teacher in teachers:
+        uid = getattr(teacher, "user_id", None)
+        if uid is None:
+            continue
+        scopes = resolve_teacher_assignment_scopes(
+            db, tenant_id=tenant_id, teacher_id=int(teacher.id)
+        )
+        if scopes:
+            for scope in scopes:
+                if class_set and scope.class_id not in class_set:
+                    continue
+                if div_set:
+                    if scope.class_division_id is not None:
+                        if int(scope.class_division_id) not in div_set:
+                            continue
+                    elif scope.class_id not in class_set:
+                        continue
+                user_ids.add(int(uid))
+                break
+            continue
+
+        legacy_class = getattr(teacher, "class_id", None)
+        legacy_div = getattr(teacher, "class_division_id", None)
+        if legacy_class is None:
+            if not class_set and not div_set:
+                user_ids.add(int(uid))
+            continue
+        if class_set and int(legacy_class) not in class_set:
+            continue
+        if div_set and legacy_div is not None and int(legacy_div) not in div_set:
+            continue
+        user_ids.add(int(uid))
+
+    return sorted(user_ids)
+
+
 def _resolve_student_record(db: Session, *, tenant_id: int, user_id: int, email: str) -> Student | None:
     from sqlalchemy import or_
 
@@ -172,6 +339,22 @@ def _resolve_student_record(db: Session, *, tenant_id: int, user_id: int, email:
     )
     if student:
         return student
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if user and user.phone_number:
+        phone = str(user.phone_number).strip()
+        if phone:
+            by_phone = (
+                db.query(Student)
+                .filter(
+                    Student.tenant_id == tenant_id,
+                    Student.is_active == True,  # noqa: E712
+                    Student.mobile_number == phone,
+                )
+                .first()
+            )
+            if by_phone:
+                return by_phone
 
     if "@" in email_norm and "+" in email_norm.split("@", 1)[0]:
         local_part, _domain = email_norm.rsplit("@", 1)
@@ -303,6 +486,9 @@ def resolve_homework_viewer_context(
             db, tenant_id=tenant_id, teacher_id=teacher_id
         )
         return HomeworkViewerContext(kind="teacher", scopes=scopes, published_only=False)
+
+    if is_teacher_user(db, user_id, legacy_role):
+        return HomeworkViewerContext(kind="teacher", scopes=(), published_only=False)
 
     if is_student_user(db, user_id, legacy_role):
         student = _resolve_student_record(db, tenant_id=tenant_id, user_id=user_id, email=email)

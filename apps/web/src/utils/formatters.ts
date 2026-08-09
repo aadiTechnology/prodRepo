@@ -3,6 +3,40 @@
  */
 
 const DEFAULT_LOCALE = "en-US";
+const INDIA_LOCALE = "en-IN";
+
+/**
+ * Parse API datetimes stored as naive UTC (SQL Server / FastAPI default).
+ * Strings without a timezone are treated as UTC, not local time.
+ */
+export function parseApiUtcDateTime(value: string | Date | null | undefined): Date {
+  if (value == null || value === "") return new Date(NaN);
+  if (value instanceof Date) return value;
+  const trimmed = value.trim();
+  if (!trimmed) return new Date(NaN);
+  if (/[zZ]$/.test(trimmed) || /[+-]\d{2}:\d{2}$/.test(trimmed)) {
+    return new Date(trimmed);
+  }
+  const normalized = trimmed.includes("T") ? trimmed : `${trimmed}T00:00:00`;
+  return new Date(`${normalized}Z`);
+}
+
+/** Date + time in the user's locale (defaults to en-IN for school apps). */
+export function formatDateTime(
+  value: string | Date | null | undefined,
+  options?: { locale?: string; emptyPlaceholder?: string }
+): string {
+  const empty = options?.emptyPlaceholder ?? "—";
+  const d = parseApiUtcDateTime(value);
+  if (Number.isNaN(d.getTime())) return empty;
+  return d.toLocaleString(options?.locale ?? INDIA_LOCALE, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 /** Human-readable label from a role code (e.g. `school_admin` → `School Admin`). */
 export function toRoleLabel(role: string | null | undefined): string {

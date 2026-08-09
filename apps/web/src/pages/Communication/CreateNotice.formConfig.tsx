@@ -11,7 +11,6 @@ export type CreateNoticeFormData = {
   notice_type: NoticeType;
   publish_date: string;
   expiry_date: string;
-  send_notification: boolean;
 };
 
 export type SelectOption = { id: string; label: string; value: string };
@@ -84,11 +83,6 @@ export function createNoticeFormConfig({
       //   type: "date",
       //   required: false,
       // },
-      // send_notification: {
-      //   name: "send_notification",
-      //   label: "Send Notification",
-      //   type: "switch",
-      // },
     },
     layoutRows: [
       { kind: "fields", grid: { xs: 12 }, fieldNames: ["title"] },
@@ -102,7 +96,6 @@ export function createNoticeFormConfig({
         grid: { xs: 12 },
         render: () => applicableSelectionRenderer,
       },
-      { kind: "fields", grid: { xs: 12 }, fieldNames: ["send_notification"] },
     ],
   };
 }

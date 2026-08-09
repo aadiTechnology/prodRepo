@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.schemas.auth import CurrentUser
 from app.schemas.notification_schema import (
     DeviceRegisterRequest,
     DeviceRegisterResponse,
@@ -17,6 +18,7 @@ from app.schemas.notification_schema import (
     NotificationCreateResponse,
     NotificationListResponse,
     NotificationMarkReadResponse,
+    NotificationModuleMarkReadResponse,
     NotificationSettingsResponse,
     NotificationSettingsUpdateRequest,
 )
@@ -86,7 +88,7 @@ def list_notifications(
     page: int = Query(0, ge=0),
     size: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: Any = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     """List inbox notifications for the current user (settings modules applied)."""
     return notification_service.list_notifications(
@@ -95,19 +97,23 @@ def list_notifications(
         user_id=current_user.id,
         page=page,
         size=size,
+        email=str(current_user.email or ""),
+        legacy_role=current_user.role,
     )
 
 
 @router.get("/unread-count", response_model=NotificationCountResponse)
 def get_unread_count(
     db: Session = Depends(get_db),
-    current_user: Any = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Unread badge count respecting module settings."""
+    """Unread badge count respecting module settings and class scope."""
     return notification_service.get_unread_count(
         db,
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
+        email=str(current_user.email or ""),
+        legacy_role=current_user.role,
     )
 
 
@@ -136,6 +142,24 @@ def update_settings(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         payload=payload,
+    )
+
+
+@router.post(
+    "/modules/{module}/mark-read",
+    response_model=NotificationModuleMarkReadResponse,
+)
+def mark_module_notifications_read(
+    module: str = Path(..., min_length=1, max_length=30),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Mark all unread inbox notifications for one module (e.g. holiday) as read."""
+    return notification_service.mark_module_as_read(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        module=module,
     )
 
 

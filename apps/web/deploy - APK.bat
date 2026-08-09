@@ -1,6 +1,6 @@
 @echo off
 
-cd /d C:\Users\lenovo\AadiTech\Product\AIContentStudio\code\Web
+cd /d C:\Users\lenovo\AadiTech\Product\code\apps\web
 
 echo npm run build
 call npm run build

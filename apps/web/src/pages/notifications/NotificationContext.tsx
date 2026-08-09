@@ -16,6 +16,8 @@ import {
 
 import notificationService from "../../api/services/notificationService";
 import { useAuth } from "../../context/AuthContext";
+import { isNativePlatform } from "../../utils/capacitor";
+import { setPushNotificationRefreshHandler } from "../../services/pushNotificationService";
 import { DEFAULT_NOTIFICATION_SETTINGS } from "./notifications.mock";
 import type {
   AppNotification,
@@ -32,6 +34,7 @@ export type NotificationContextValue = {
   error: string | null;
   refresh: () => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
+  markModuleAsRead: (module: NotificationModule) => Promise<void>;
   setModuleEnabled: (module: NotificationModule, enabled: boolean) => Promise<void>;
 };
 
@@ -81,6 +84,22 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  /**
+   * On Android notification tap, refresh list + unread badge once the provider
+   * is mounted. Does not mark-read (FCM carries master notification_id only).
+   */
+  useEffect(() => {
+    if (!isNativePlatform() || !isAuthenticated) return;
+
+    setPushNotificationRefreshHandler(() => {
+      void refresh();
+    });
+
+    return () => {
+      setPushNotificationRefreshHandler(null);
+    };
+  }, [isAuthenticated, refresh]);
 
   /** Lightweight badge-only refresh (focus / tab visible). */
   const refreshUnreadCount = useCallback(async () => {
@@ -142,6 +161,23 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     [refresh]
   );
 
+  const markModuleAsRead = useCallback(
+    async (module: NotificationModule) => {
+      try {
+        const result = await notificationService.markModuleRead(module);
+        if (result.marked_count <= 0) return;
+        setNotifications((prev) =>
+          prev.map((n) => (n.module === module ? { ...n, isRead: true } : n))
+        );
+        const count = await notificationService.getUnreadCount();
+        setUnreadCount(Math.max(0, Number(count) || 0));
+      } catch {
+        void refresh();
+      }
+    },
+    [refresh]
+  );
+
   const setModuleEnabled = useCallback(
     async (module: NotificationModule, enabled: boolean) => {
       const previous = settings;
@@ -174,6 +210,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       error,
       refresh,
       markAsRead,
+      markModuleAsRead,
       setModuleEnabled,
     }),
     [
@@ -185,6 +222,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       error,
       refresh,
       markAsRead,
+      markModuleAsRead,
       setModuleEnabled,
     ]
   );

@@ -39,7 +39,7 @@ def _daterange_inclusive(start: date, end: date) -> list[date]:
 
 
 def _display_holiday_type(row: Holiday) -> str:
-    _, _, _, _, htype_label = unpack_holiday_description(getattr(row, "description", None))
+    _, _, _, _, htype_label, _ = unpack_holiday_description(getattr(row, "description", None))
     return (htype_label or row.holiday_type or "").strip() or "UNKNOWN"
 
 
@@ -171,7 +171,7 @@ def get_academic_calendar(
     )
 
     for h in rows:
-        aud, class_ids, division_ids, _, _ = unpack_holiday_description(getattr(h, "description", None))
+        aud, class_ids, division_ids, _, _, _ = unpack_holiday_description(getattr(h, "description", None))
         audience_type = (aud or "STUDENT").strip().upper()
         if not _holiday_visible_for_viewer(
             audience_type=audience_type,

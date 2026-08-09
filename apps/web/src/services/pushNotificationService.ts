@@ -9,9 +9,16 @@
  * The Capacitor plugin is loaded via dynamic import so missing/web installs cannot
  * crash the whole SPA at module-eval time (blank page / ErrorBoundary reload).
  *
+ * Android notification tap navigation uses the same module→route map as the web
+ * Notification List (`NOTIFICATION_MODULE_PATHS`). Navigation is delivered through
+ * a React Router client registered by `PushNotificationNavigationBridge`; if the
+ * Router/auth shell is not ready yet, the target path is retained until it is.
+ *
  * @see https://capacitorjs.com/docs/apis/push-notifications
  */
 import { isNativePlatform, getCapacitorPlatform } from "../utils/capacitor";
+import type { NotificationModule } from "../pages/notifications/notification.types";
+import { NOTIFICATION_MODULE_PATHS } from "../pages/notifications/notifications.mock";
 
 /** Time to wait for FCM/APNs registration before giving up. */
 const REGISTRATION_TIMEOUT_MS = 30_000;
@@ -31,12 +38,297 @@ let lastSyncedToken: string | null = null;
 /** In-flight backend sync so concurrent auth + registration share one request. */
 let backendSyncPromise: Promise<void> | null = null;
 
+/**
+ * Pending deep-link path from a notification tap that occurred before Router/auth
+ * readiness (typical cold start). Latest tap wins.
+ * Mirrored to sessionStorage on native so a soft WebView remount does not lose it.
+ *
+ * Path stays until an *authenticated* navigate succeeds so unauthenticated cold
+ * starts can still resume the module after login (even if Login `location.state`
+ * was lost).
+ */
+const PENDING_NAV_STORAGE_KEY = "aadi.push.pendingNavPath";
+let pendingNavigationPath: string | null = null;
+
+/**
+ * Last module path staged while logged out (drives ProtectedRoute → login `from`).
+ * Prevents resume/retry loops from re-navigating every appStateChange.
+ */
+let lastStagedUnauthenticatedPath: string | null = null;
+
+/** React Router navigation client (registered by PushNotificationNavigationBridge). */
+let navigationClient: PushNavigationClient | null = null;
+
+/**
+ * Optional inbox refresh callback (NotificationProvider). When a tap happens before
+ * the provider mounts, `refreshOnNextHandler` defers one refresh.
+ */
+let notificationRefreshHandler: (() => void) | null = null;
+let refreshOnNextHandler = false;
+
+/** Handles for deferred flush retries (cold start / resume; cleared after delivery). */
+let pendingFlushTimers: number[] = [];
+let appStateListenerAttached = false;
+
+function clearPendingFlushTimers(): void {
+  for (const id of pendingFlushTimers) {
+    window.clearTimeout(id);
+  }
+  pendingFlushTimers = [];
+}
+
+function readPersistedPendingPath(): string | null {
+  try {
+    if (typeof sessionStorage === "undefined") return null;
+    const value = sessionStorage.getItem(PENDING_NAV_STORAGE_KEY);
+    if (typeof value === "string" && value.startsWith("/")) return value;
+  } catch {
+    // Ignore storage failures (private mode / quota).
+  }
+  return null;
+}
+
+function writePersistedPendingPath(path: string | null): void {
+  try {
+    if (typeof sessionStorage === "undefined") return;
+    if (path) {
+      sessionStorage.setItem(PENDING_NAV_STORAGE_KEY, path);
+    } else {
+      sessionStorage.removeItem(PENDING_NAV_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function setPendingNavigationPath(path: string | null): void {
+  if (path !== pendingNavigationPath) {
+    // New target (or clear) — allow one unauthenticated stage for the new path.
+    lastStagedUnauthenticatedPath = null;
+  }
+  pendingNavigationPath = path;
+  // Persist only on native; never affect web SPA behaviour.
+  if (isNativePlatform()) {
+    writePersistedPendingPath(path);
+  }
+}
+
+function getPendingNavigationPath(): string | null {
+  if (pendingNavigationPath) return pendingNavigationPath;
+  if (!isNativePlatform()) return null;
+  const restored = readPersistedPendingPath();
+  if (restored) {
+    pendingNavigationPath = restored;
+  }
+  return pendingNavigationPath;
+}
+
 type PushNotificationsPlugin = typeof import("@capacitor/push-notifications").PushNotifications;
 type Token = import("@capacitor/push-notifications").Token;
 type PermissionStatus = import("@capacitor/push-notifications").PermissionStatus;
 type RegistrationError = import("@capacitor/push-notifications").RegistrationError;
 type PushNotificationSchema = import("@capacitor/push-notifications").PushNotificationSchema;
 type ActionPerformed = import("@capacitor/push-notifications").ActionPerformed;
+
+/** Client that delivers notification-tap routes through the existing React Router. */
+export type PushNavigationClient = {
+  /** True once auth bootstrap finished (`!isLoading`) so ProtectedRoute can resolve. */
+  isReady: boolean;
+  /**
+   * When false, navigate still stages the route for ProtectedRoute → login `from`,
+   * but the pending path is retained until an authenticated delivery succeeds.
+   */
+  isAuthenticated: boolean;
+  navigate: (path: string) => void;
+};
+
+/**
+ * Map FCM `data.module` to an in-app route using existing NOTIFICATION_MODULE_PATHS.
+ * Unknown / missing module → `/notifications` (general).
+ */
+export function resolveNotificationModulePath(module: unknown): string {
+  const raw =
+    typeof module === "string"
+      ? module.trim().toLowerCase()
+      : module != null
+        ? String(module).trim().toLowerCase()
+        : "";
+  if (raw && Object.prototype.hasOwnProperty.call(NOTIFICATION_MODULE_PATHS, raw)) {
+    return NOTIFICATION_MODULE_PATHS[raw as NotificationModule];
+  }
+  return NOTIFICATION_MODULE_PATHS.general;
+}
+
+/**
+ * Normalize Capacitor/FCM notification data into a plain object.
+ * Android may deliver a JSON string or nested `data` maps depending on payload shape.
+ */
+export function normalizeNotificationData(
+  raw: unknown,
+): Record<string, unknown> {
+  if (raw == null) return {};
+
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return {};
+    try {
+      return normalizeNotificationData(JSON.parse(trimmed));
+    } catch {
+      return {};
+    }
+  }
+
+  if (typeof raw !== "object" || Array.isArray(raw)) return {};
+
+  const record = raw as Record<string, unknown>;
+  // Some payload shapes nest custom keys under `data` again.
+  if (record.data != null && typeof record.data === "object" && !Array.isArray(record.data)) {
+    return {
+      ...record,
+      ...(record.data as Record<string, unknown>),
+    };
+  }
+  if (typeof record.data === "string") {
+    const nested = normalizeNotificationData(record.data);
+    if (Object.keys(nested).length > 0) {
+      return { ...record, ...nested };
+    }
+  }
+  return record;
+}
+
+function extractModuleFromNotificationData(
+  data: Record<string, unknown> | undefined | null,
+): unknown {
+  if (!data || typeof data !== "object") return undefined;
+  // FCM data keys are strings; tolerate common casing variants.
+  return data.module ?? data.Module ?? data.MODULE;
+}
+
+/**
+ * Register (or clear) the React Router navigation client used for notification taps.
+ * When `isReady` becomes true, any retained cold-start path is flushed once.
+ */
+export function setPushNavigationClient(client: PushNavigationClient | null): void {
+  navigationClient = client;
+  flushPendingNavigation();
+  if (client?.isReady) {
+    schedulePendingNavigationRetries();
+  }
+}
+
+/**
+ * Register a callback to refresh in-app notification state after a notification tap.
+ * Does not mark notifications read (FCM payload has master notification_id only).
+ */
+export function setPushNotificationRefreshHandler(handler: (() => void) | null): void {
+  notificationRefreshHandler = handler;
+  if (handler && refreshOnNextHandler) {
+    refreshOnNextHandler = false;
+    try {
+      handler();
+    } catch (error) {
+      console.error("[PushNotifications] Deferred notification refresh failed:", error);
+    }
+  }
+}
+
+function requestNotificationRefresh(): void {
+  if (notificationRefreshHandler) {
+    try {
+      notificationRefreshHandler();
+    } catch (error) {
+      console.error("[PushNotifications] Notification refresh failed:", error);
+    }
+    return;
+  }
+  refreshOnNextHandler = true;
+}
+
+/**
+ * Deliver a retained path once Router/auth client is ready.
+ *
+ * - Authenticated: navigate and clear (delivery complete).
+ * - Unauthenticated: navigate once so ProtectedRoute can capture `from` for login;
+ *   keep pending until login so resume still works if `location.state` is lost.
+ */
+function flushPendingNavigation(): void {
+  const path = getPendingNavigationPath();
+  if (!path || !navigationClient?.isReady) {
+    return;
+  }
+  try {
+    if (!navigationClient.isAuthenticated) {
+      if (lastStagedUnauthenticatedPath === path) {
+        return;
+      }
+      navigationClient.navigate(path);
+      lastStagedUnauthenticatedPath = path;
+      return;
+    }
+
+    navigationClient.navigate(path);
+    setPendingNavigationPath(null);
+    lastStagedUnauthenticatedPath = null;
+    clearPendingFlushTimers();
+  } catch (error) {
+    // Keep pending so a later ready client / retry can still deliver the path.
+    console.error("[PushNotifications] Navigation failed:", error);
+  }
+}
+
+/**
+ * Retry delivery shortly after ready — covers first paint / ProtectedRoute settle
+ * on cold start and short post-login shell settle without a second user tap.
+ */
+function schedulePendingNavigationRetries(): void {
+  if (!getPendingNavigationPath() || !navigationClient?.isReady) {
+    return;
+  }
+  clearPendingFlushTimers();
+  // Immediate + delayed passes; later retries no-op once path is fully delivered.
+  for (const delayMs of [0, 50, 200, 500, 1000, 2000]) {
+    const id = window.setTimeout(() => {
+      flushPendingNavigation();
+    }, delayMs);
+    pendingFlushTimers.push(id);
+  }
+}
+
+/**
+ * Queue or immediately navigate to the module route for a notification tap.
+ * Safe before Router/auth ready — path is retained until the client reports ready.
+ */
+export function requestNotificationNavigation(path: string): void {
+  const target =
+    typeof path === "string" && path.startsWith("/") ? path : NOTIFICATION_MODULE_PATHS.general;
+  setPendingNavigationPath(target);
+  flushPendingNavigation();
+  schedulePendingNavigationRetries();
+}
+
+function handleNotificationActionPerformed(action: ActionPerformed): void {
+  const data = normalizeNotificationData(action.notification?.data);
+  const module = extractModuleFromNotificationData(data);
+  const path = resolveNotificationModulePath(module);
+
+  console.log("[PushNotifications] Notification action performed:", {
+    actionId: action.actionId,
+    inputValue: action.inputValue,
+    module,
+    path,
+    notification: {
+      id: action.notification.id,
+      title: action.notification.title,
+      body: action.notification.body,
+      data: action.notification.data,
+    },
+  });
+
+  // Refresh list/unread badge when NotificationProvider is available (or on next mount).
+  requestNotificationRefresh();
+  requestNotificationNavigation(path);
+}
 
 /**
  * Dynamically import the native Push Notifications plugin.
@@ -223,18 +515,27 @@ async function attachPushListeners(PushNotifications: PushNotificationsPlugin): 
   await PushNotifications.addListener(
     "pushNotificationActionPerformed",
     (action: ActionPerformed) => {
-      console.log("[PushNotifications] Notification action performed:", {
-        actionId: action.actionId,
-        inputValue: action.inputValue,
-        notification: {
-          id: action.notification.id,
-          title: action.notification.title,
-          body: action.notification.body,
-          data: action.notification.data,
-        },
-      });
+      handleNotificationActionPerformed(action);
     },
   );
+
+  // Resume may complete after JS was paused; re-attempt any retained cold-start path.
+  if (!appStateListenerAttached) {
+    appStateListenerAttached = true;
+    try {
+      const { App } = await import("@capacitor/app");
+      await App.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) {
+          flushPendingNavigation();
+          schedulePendingNavigationRetries();
+        }
+      });
+    } catch (error) {
+      // App plugin optional for navigation; push action listener remains primary path.
+      console.warn("[PushNotifications] App resume listener unavailable:", error);
+      appStateListenerAttached = false;
+    }
+  }
 
   listenersAttached = true;
   console.log("[PushNotifications] Event listeners attached.");

@@ -35,6 +35,7 @@ import {
   WEEKEND_LABEL,
 } from "./academicCalendar.utils";
 import { useAcademicCalendarController } from "./useAcademicCalendarController";
+import { useMarkModuleNotificationsRead } from "../../hooks/useMarkModuleNotificationsRead";
 
 const weekendCellBg = alpha(colorTokens.preschool.coral.light, 0.4);
 const weekendLabelColor = colorTokens.error.main;
@@ -89,6 +90,8 @@ const outsideAcademicYearTooltipSlotProps = {
 } as const;
 
 export default function AcademicCalendar() {
+  useMarkModuleNotificationsRead("holiday");
+
   const c = useAcademicCalendarController();
 
   return (

@@ -45,6 +45,7 @@ import {
 import { colorTokens } from "../../tokens/colors";
 import { apiBaseUrl } from "../../config";
 import { buildVideoEmbedUrl, isDirectVideoFileUrl } from "../../utils/videoEmbed";
+import { isNativePlatform } from "../../utils/capacitor";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
 
@@ -760,6 +761,8 @@ export default function CreateActivityGallery() {
     [effectiveGalleryId, enqueueSnackbar],
   );
 
+  const isNativeApp = isNativePlatform();
+
   const renderUploadedMediaRow = useCallback(
     (item: ActivityGalleryMedia, label: string) => (
       <Box
@@ -768,43 +771,65 @@ export default function CreateActivityGallery() {
       >
         <Typography
           variant="caption"
-          color="text.secondary"
-          sx={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+          color={isNativeApp ? "primary" : "text.secondary"}
+          component={isNativeApp ? "button" : "p"}
+          type={isNativeApp ? "button" : undefined}
+          onClick={isNativeApp ? () => setPreviewMedia(item) : undefined}
+          sx={{
+            flex: 1,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            ...(isNativeApp
+              ? {
+                  cursor: "pointer",
+                  textAlign: "left",
+                  border: "none",
+                  bgcolor: "transparent",
+                  font: "inherit",
+                  p: 0,
+                }
+              : {}),
+          }}
         >
           {label}
         </Typography>
-        <IconButton
-          size="small"
-          color="primary"
-          aria-label="View media"
-          onClick={() => setPreviewMedia(item)}
-          sx={{ p: 0.5 }}
-        >
-          <VisibilityIcon sx={{ fontSize: 18 }} />
-        </IconButton>
-        {perms.canEdit ? (
-          <Tooltip title="Delete">
+        {!isNativeApp ? (
+          <>
             <IconButton
               size="small"
-              aria-label="Delete media"
-              onClick={() => void onDeleteMedia(item.id)}
-              disabled={deletingMediaId === item.id}
-              sx={{
-                color: colorTokens.preschool.coral.main,
-                "&:hover": {
-                  bgcolor: alpha(colorTokens.preschool.coral.main, 0.1),
-                  transform: "scale(1.15) rotate(5deg)",
-                },
-                transition: "all 0.2s",
-              }}
+              color="primary"
+              aria-label="View media"
+              onClick={() => setPreviewMedia(item)}
+              sx={{ p: 0.5 }}
             >
-              <DeleteIcon fontSize="small" />
+              <VisibilityIcon sx={{ fontSize: 18 }} />
             </IconButton>
-          </Tooltip>
+            {perms.canEdit ? (
+              <Tooltip title="Delete">
+                <IconButton
+                  size="small"
+                  aria-label="Delete media"
+                  onClick={() => void onDeleteMedia(item.id)}
+                  disabled={deletingMediaId === item.id}
+                  sx={{
+                    color: colorTokens.preschool.coral.main,
+                    "&:hover": {
+                      bgcolor: alpha(colorTokens.preschool.coral.main, 0.1),
+                      transform: "scale(1.15) rotate(5deg)",
+                    },
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            ) : null}
+          </>
         ) : null}
       </Box>
     ),
-    [deletingMediaId, onDeleteMedia, perms.canEdit],
+    [deletingMediaId, isNativeApp, onDeleteMedia, perms.canEdit],
   );
 
   const photoUploadSlot = (
@@ -851,7 +876,7 @@ export default function CreateActivityGallery() {
         </Typography>
       ) : null}
       {savedMedia.length > 0 ? (
-        <Box sx={{ mt: 1 }}>
+        <Box sx={{ mt: 1, ...(isNativeApp ? { pb: 12, pr: 1 } : {}) }}>
           {savedMedia.map((item) =>
             renderUploadedMediaRow(
               item,
@@ -919,7 +944,7 @@ export default function CreateActivityGallery() {
         </Typography>
       ) : null}
       {savedMedia.length > 0 ? (
-        <Box sx={{ mt: 1 }}>
+        <Box sx={{ mt: 1, ...(isNativeApp ? { pb: 12, pr: 1 } : {}) }}>
           {savedMedia.map((item, index) =>
             renderUploadedMediaRow(
               item,

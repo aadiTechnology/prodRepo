@@ -78,6 +78,13 @@ const notificationService = {
     return res.data;
   },
 
+  markModuleRead: async (
+    module: NotificationModule
+  ): Promise<{ message: string; module: NotificationModule; marked_count: number }> => {
+    const res = await apiClient.post(`${BASE}/modules/${module}/mark-read`);
+    return res.data;
+  },
+
   getSettings: async (): Promise<NotificationModuleSettings> => {
     const res = await apiClient.get<NotificationSettingsApiResponse>(`${BASE}/settings`);
     const d = res.data;
@@ -86,6 +93,7 @@ const notificationService = {
       holiday: d.holiday !== false,
       notice: d.notice !== false,
       exam: d.exam !== false,
+      general: true,
     };
   },
 
@@ -99,6 +107,7 @@ const notificationService = {
       holiday: d.holiday !== false,
       notice: d.notice !== false,
       exam: d.exam !== false,
+      general: true,
     };
   },
 

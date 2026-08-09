@@ -77,7 +77,7 @@ class HolidayResponse(BaseModel):
 
     @classmethod
     def from_holiday_row(cls, row: Any) -> HolidayResponse:
-        aud, cids, dids, public_desc, htype_label = unpack_holiday_description(
+        aud, cids, dids, public_desc, htype_label, _ = unpack_holiday_description(
             getattr(row, "description", None)
         )
         display_type = htype_label if htype_label else row.holiday_type

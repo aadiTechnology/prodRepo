@@ -21,7 +21,7 @@ class Notice(Base):
     is_published = Column(Boolean, nullable=False, default=False)
     published_at = Column(DateTime, nullable=True)
     unpublished_at = Column(DateTime, nullable=True)
-    send_notification = Column(Boolean, nullable=False, default=False)
+    send_notification = Column(Boolean, nullable=False, default=True)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="NO ACTION"), nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_by = Column(Integer, ForeignKey("users.id", ondelete="NO ACTION"), nullable=True)

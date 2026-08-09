@@ -374,7 +374,7 @@ def list_holidays(
     for row in rows:
         end_d = row.end_date or row.start_date
         span = _inclusive_day_span(row.start_date, end_d)
-        _, _, _, _, list_htype_label = unpack_holiday_description(row.description)
+        _, _, _, _, list_htype_label, _ = unpack_holiday_description(row.description)
         display_htype = list_htype_label or row.holiday_type
         data.append(
             HolidayListItem(
@@ -410,6 +410,8 @@ def _emit_holiday_notification(
     holiday_id: int | None,
     actor_user_id: int | None = None,
     actor_name: str | None = None,
+    class_ids: list[int] | None = None,
+    division_ids: list[int] | None = None,
 ) -> None:
     """Call shared Notification Create API after holiday lifecycle events (non-blocking)."""
     hname = (holiday_name or "Holiday").strip() or "Holiday"
@@ -432,6 +434,8 @@ def _emit_holiday_notification(
             module="holiday",
             entity_id=holiday_id,
             event=event,
+            holiday_class_ids=class_ids or [],
+            holiday_division_ids=division_ids or [],
         )
     except Exception:
         from app.core.logging_config import get_logger
@@ -464,7 +468,12 @@ def create_holiday(
     applicable_for = _build_applicable_for_label(db, tenant_id, aud, c_ids, d_ids)
     db_htype, htype_label = coerce_holiday_type_for_db(payload.holiday_type)
     desc_stored = pack_holiday_description(
-        aud, c_ids, d_ids, payload.description, holiday_type_label=htype_label
+        aud,
+        c_ids,
+        d_ids,
+        payload.description,
+        holiday_type_label=htype_label,
+        created_by_user_id=actor_user_id,
     )
 
     hname = payload.holiday_name.strip()
@@ -501,6 +510,8 @@ def create_holiday(
         holiday_id=int(row.id) if row.id is not None else None,
         actor_user_id=actor_user_id,
         actor_name=actor_name,
+        class_ids=c_ids,
+        division_ids=d_ids,
     )
 
     return _to_response(row)
@@ -541,7 +552,9 @@ def update_holiday(
         if "holiday_name" in update_data and update_data["holiday_name"] is not None
         else row.holiday_name
     )
-    stored_aud, prev_c, prev_d, user_notes, prev_htype_label = unpack_holiday_description(row.description)
+    stored_aud, prev_c, prev_d, user_notes, prev_htype_label, prev_creator_id = unpack_holiday_description(
+        row.description
+    )
 
     if "holiday_type" in update_data and update_data["holiday_type"] is not None:
         db_htype, new_htype_label = coerce_holiday_type_for_db(update_data["holiday_type"])
@@ -577,7 +590,12 @@ def update_holiday(
     _validate_audience_scope(aud, c_ids, d_ids)
     row.applicable_for = _build_applicable_for_label(db, tenant_id, aud, c_ids, d_ids)
     row.description = pack_holiday_description(
-        aud, c_ids, d_ids, user_notes if user_notes else None, holiday_type_label=pack_htype_label
+        aud,
+        c_ids,
+        d_ids,
+        user_notes if user_notes else None,
+        holiday_type_label=pack_htype_label,
+        created_by_user_id=prev_creator_id,
     )
     if "is_active" in update_data and update_data["is_active"] is not None:
         row.is_active = update_data["is_active"]
@@ -603,6 +621,8 @@ def update_holiday(
         holiday_id=holiday_id,
         actor_user_id=actor_user_id,
         actor_name=actor_name,
+        class_ids=c_ids,
+        division_ids=d_ids,
     )
 
     return _to_response(row)
@@ -625,7 +645,7 @@ def delete_holiday(
         return
 
     hname = str(row.holiday_name or "Holiday")
-    stored_aud, _, _, _, _ = unpack_holiday_description(row.description)
+    stored_aud, stored_c, stored_d, _, _, _ = unpack_holiday_description(row.description)
     aud = (stored_aud or "TEACHER").strip().upper() or "TEACHER"
 
     row.is_active = False
@@ -641,4 +661,6 @@ def delete_holiday(
         holiday_id=holiday_id,
         actor_user_id=actor_user_id,
         actor_name=actor_name,
+        class_ids=stored_c,
+        division_ids=stored_d,
     )

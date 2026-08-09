@@ -5,9 +5,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional, Sequence, Tuple
 
+from sqlalchemy import and_, exists, false, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query, Session, aliased
 
+from app.models.holiday import Holiday
+from app.models.notice import Notice, NoticeTarget
 from app.models.notification import (
     Notification,
     UserDeviceToken,
@@ -15,9 +18,265 @@ from app.models.notification import (
     UserNotificationSettings,
 )
 from app.models.role import Role, user_roles
+from app.models.syllabus import Syllabus
 from app.models.user import User, UserRole
+from app.services.homework_access import (
+    HomeworkViewerContext,
+    resolve_student_user_ids_for_notice_targets,
+    resolve_teacher_user_ids_for_class_scope,
+)
+from app.services.notice_access import is_notice_consumer
 
 VALID_MODULES = ("syllabus", "holiday", "notice", "exam", "general")
+
+_TENANT_WIDE_MODULES = ("general", "holiday", "exam")
+
+
+def _notice_target_matches_scope(scope) -> object:
+    """EXISTS clause: notice target row matches one class/division scope."""
+    base = and_(
+        NoticeTarget.notice_id == Notice.id,
+        NoticeTarget.is_deleted == False,  # noqa: E712
+    )
+    if scope.class_division_id is not None:
+        return exists(
+            select(NoticeTarget.id).where(
+                base,
+                or_(
+                    NoticeTarget.division_id == scope.class_division_id,
+                    and_(
+                        NoticeTarget.class_id == scope.class_id,
+                        NoticeTarget.division_id.is_(None),
+                    ),
+                ),
+            )
+        )
+    return exists(
+        select(NoticeTarget.id).where(
+            base,
+            NoticeTarget.class_id == scope.class_id,
+        )
+    )
+
+
+def _notice_has_no_class_targets() -> object:
+    """True when the notice has no class/division target rows (tenant-wide for its audience)."""
+    return ~exists(
+        select(NoticeTarget.id).where(
+            NoticeTarget.notice_id == Notice.id,
+            NoticeTarget.is_deleted == False,  # noqa: E712
+        )
+    )
+
+
+def _notice_entity_visible_clause(
+    *,
+    tenant_id: int,
+    viewer_context: HomeworkViewerContext,
+) -> object:
+    """Inbox row visible when its linked notice is in the viewer's role/class scope."""
+    now = datetime.utcnow()
+    published_filters = []
+    if viewer_context.published_only:
+        published_filters = [
+            Notice.status == "PUBLISHED",
+            Notice.is_published == True,  # noqa: E712
+            or_(Notice.expiry_date.is_(None), Notice.expiry_date >= now),
+        ]
+
+    base_notice = and_(
+        Notice.id == UserNotification.entity_id,
+        Notice.tenant_id == tenant_id,
+        Notice.is_deleted == False,  # noqa: E712
+        *published_filters,
+    )
+
+    if viewer_context.kind == "teacher":
+        teacher_audience = exists(
+            select(Notice.id).where(base_notice, Notice.audience_type == "TEACHER")
+        )
+        all_audience = exists(
+            select(Notice.id).where(base_notice, Notice.audience_type == "ALL")
+        )
+        tenant_wide = exists(
+            select(Notice.id).where(
+                base_notice,
+                Notice.audience_type.in_(("TEACHER", "ALL")),
+                _notice_has_no_class_targets(),
+            )
+        )
+        scope_parts = [_notice_target_matches_scope(scope) for scope in viewer_context.scopes]
+        scoped_audience = false()
+        if scope_parts:
+            scoped_audience = exists(
+                select(Notice.id).where(
+                    base_notice,
+                    Notice.audience_type.in_(("STUDENT", "ALL")),
+                    or_(_notice_has_no_class_targets(), or_(*scope_parts)),
+                )
+            )
+        return and_(
+            UserNotification.module == "notice",
+            or_(teacher_audience, all_audience, tenant_wide, scoped_audience),
+        )
+
+    if viewer_context.kind in ("student", "parent"):
+        scope_parts = [_notice_target_matches_scope(scope) for scope in viewer_context.scopes]
+        tenant_wide = exists(
+            select(Notice.id).where(
+                base_notice,
+                Notice.audience_type.in_(("STUDENT", "ALL")),
+                _notice_has_no_class_targets(),
+            )
+        )
+        scoped = false()
+        if scope_parts:
+            scoped = exists(
+                select(Notice.id).where(
+                    base_notice,
+                    Notice.audience_type.in_(("STUDENT", "ALL")),
+                    or_(*scope_parts),
+                )
+            )
+        return and_(
+            UserNotification.module == "notice",
+            or_(tenant_wide, scoped),
+        )
+
+    return false()
+
+
+def _syllabus_entity_visible_clause(
+    *,
+    tenant_id: int,
+    viewer_context: HomeworkViewerContext,
+) -> object:
+    if viewer_context.kind == "teacher" and not viewer_context.scopes:
+        # Delivered syllabus rows for teachers without assignment scope (RBAC-only teachers).
+        return UserNotification.module == "syllabus"
+
+    scoped_class_ids = sorted({scope.class_id for scope in viewer_context.scopes})
+    if not scoped_class_ids:
+        return false()
+    return and_(
+        UserNotification.module == "syllabus",
+        exists(
+            select(Syllabus.id).where(
+                Syllabus.id == UserNotification.entity_id,
+                Syllabus.tenant_id == tenant_id,
+                Syllabus.is_deleted == False,  # noqa: E712
+                Syllabus.class_id.in_(scoped_class_ids),
+            )
+        ),
+    )
+
+
+def apply_inbox_entity_visibility(
+    query: Query,
+    *,
+    tenant_id: int,
+    viewer_context: HomeworkViewerContext | None,
+) -> Query:
+    """
+    Restrict notice/syllabus inbox rows to the viewer's class scope.
+
+    Admin-like viewers see all rows. Tenant-wide modules (holiday/exam/general)
+    are never filtered here.
+    """
+    if viewer_context is None or viewer_context.kind == "admin":
+        return query
+    if not is_notice_consumer(viewer_context):
+        return query
+
+    passthrough = or_(
+        UserNotification.module.in_(_TENANT_WIDE_MODULES),
+        UserNotification.entity_id.is_(None),
+        ~UserNotification.module.in_(("notice", "syllabus")),
+    )
+    scoped = or_(
+        _notice_entity_visible_clause(tenant_id=tenant_id, viewer_context=viewer_context),
+        _syllabus_entity_visible_clause(tenant_id=tenant_id, viewer_context=viewer_context),
+    )
+    return query.filter(or_(passthrough, scoped))
+
+
+def apply_exclude_self_created(
+    query: Query,
+    *,
+    tenant_id: int,
+    user_id: int,
+) -> Query:
+    """
+    Hide inbox rows for notice/syllabus/holiday entities authored by the viewer.
+
+    Creators still receive other users' notifications; only their own items are suppressed.
+    """
+    lifecycle = aliased(UserNotification)
+
+    notice_self = and_(
+        UserNotification.module == "notice",
+        UserNotification.entity_id.isnot(None),
+        exists(
+            select(Notice.id).where(
+                Notice.id == UserNotification.entity_id,
+                Notice.tenant_id == tenant_id,
+                Notice.is_deleted == False,  # noqa: E712
+                Notice.created_by == user_id,
+            )
+        ),
+    )
+    syllabus_self = and_(
+        UserNotification.module == "syllabus",
+        UserNotification.entity_id.isnot(None),
+        exists(
+            select(Syllabus.id).where(
+                Syllabus.id == UserNotification.entity_id,
+                Syllabus.tenant_id == tenant_id,
+                Syllabus.is_deleted == False,  # noqa: E712
+                Syllabus.created_by == user_id,
+            )
+        ),
+    )
+    holiday_meta_self = and_(
+        UserNotification.module.in_(("holiday", "exam")),
+        UserNotification.entity_id.isnot(None),
+        exists(
+            select(Holiday.id).where(
+                Holiday.id == UserNotification.entity_id,
+                Holiday.tenant_id == tenant_id,
+                Holiday.description.like(f'%"created_by_user_id":{int(user_id)}%'),
+            )
+        ),
+    )
+    holiday_lifecycle_self = and_(
+        UserNotification.module.in_(("holiday", "exam")),
+        UserNotification.entity_id.isnot(None),
+        exists(
+            select(lifecycle.id).where(
+                lifecycle.tenant_id == tenant_id,
+                lifecycle.entity_id == UserNotification.entity_id,
+                lifecycle.module == "holiday",
+                lifecycle.kind == "general",
+                lifecycle.created_by == user_id,
+            )
+        ),
+    )
+    holiday_inbox_self = and_(
+        UserNotification.module == "holiday",
+        UserNotification.kind == "general",
+        UserNotification.user_id == user_id,
+        UserNotification.created_by == user_id,
+    )
+
+    authored = or_(
+        notice_self,
+        syllabus_self,
+        holiday_meta_self,
+        holiday_lifecycle_self,
+        holiday_inbox_self,
+    )
+    return query.filter(~authored)
+
 
 # Audience token → role code/name fragments used when resolving `to`
 _AUDIENCE_ROLE_CODES: dict[str, set[str]] = {
@@ -116,6 +375,7 @@ def list_notifications(
     enabled_modules: Sequence[str],
     page: int = 0,
     size: int = 50,
+    viewer_context: HomeworkViewerContext | None = None,
 ) -> Tuple[List[UserNotification], int]:
     if not enabled_modules:
         return [], 0
@@ -126,6 +386,10 @@ def list_notifications(
         UserNotification.is_deleted == False,  # noqa: E712
         UserNotification.module.in_(list(enabled_modules)),
     )
+    query = apply_inbox_entity_visibility(
+        query, tenant_id=tenant_id, viewer_context=viewer_context
+    )
+    query = apply_exclude_self_created(query, tenant_id=tenant_id, user_id=user_id)
     total = query.count()
     rows = (
         query.order_by(UserNotification.created_at.desc(), UserNotification.id.desc())
@@ -142,20 +406,22 @@ def count_unread(
     tenant_id: int,
     user_id: int,
     enabled_modules: Sequence[str],
+    viewer_context: HomeworkViewerContext | None = None,
 ) -> int:
     if not enabled_modules:
         return 0
-    return (
-        db.query(UserNotification)
-        .filter(
-            UserNotification.tenant_id == tenant_id,
-            UserNotification.user_id == user_id,
-            UserNotification.is_deleted == False,  # noqa: E712
-            UserNotification.is_read == False,  # noqa: E712
-            UserNotification.module.in_(list(enabled_modules)),
-        )
-        .count()
+    query = db.query(UserNotification).filter(
+        UserNotification.tenant_id == tenant_id,
+        UserNotification.user_id == user_id,
+        UserNotification.is_deleted == False,  # noqa: E712
+        UserNotification.is_read == False,  # noqa: E712
+        UserNotification.module.in_(list(enabled_modules)),
     )
+    query = apply_inbox_entity_visibility(
+        query, tenant_id=tenant_id, viewer_context=viewer_context
+    )
+    query = apply_exclude_self_created(query, tenant_id=tenant_id, user_id=user_id)
+    return query.count()
 
 
 def get_notification(
@@ -189,6 +455,35 @@ def mark_as_read(
     db.commit()
     db.refresh(row)
     return row, False
+
+
+def mark_module_as_read(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    module: str,
+) -> int:
+    """Mark all unread inbox rows for one module as read. Returns rows updated."""
+    now = datetime.utcnow()
+    rows = (
+        db.query(UserNotification)
+        .filter(
+            UserNotification.tenant_id == tenant_id,
+            UserNotification.user_id == user_id,
+            UserNotification.module == module,
+            UserNotification.is_deleted == False,  # noqa: E712
+            UserNotification.is_read == False,  # noqa: E712
+        )
+        .all()
+    )
+    if not rows:
+        return 0
+    for row in rows:
+        row.is_read = True
+        row.read_at = now
+    db.commit()
+    return len(rows)
 
 
 def existing_source_keys(
@@ -353,6 +648,143 @@ def resolve_recipient_user_ids(
     tenant_uids = {int(u.id) for u in base_q.all()}
     result = (role_uid_set | admin_users) & tenant_uids
     return sorted(result)
+
+
+def resolve_notice_recipient_user_ids(
+    db: Session,
+    *,
+    tenant_id: int,
+    audience: str,
+    targets: Sequence[dict] | None = None,
+) -> List[int]:
+    """
+    Resolve notice recipients including class-scoped students and assigned teachers.
+    """
+    aud = (audience or "ALL").strip().upper()
+    scoped_targets = [t for t in (targets or []) if t.get("class_id") is not None]
+    user_ids: set[int] = set()
+
+    if aud in ("STUDENT", "ALL") and scoped_targets:
+        user_ids.update(
+            resolve_student_user_ids_for_notice_targets(
+                db,
+                tenant_id=tenant_id,
+                targets=list(scoped_targets),
+            )
+        )
+        user_ids.update(
+            resolve_teacher_user_ids_for_class_scope(
+                db,
+                tenant_id=tenant_id,
+                targets=list(scoped_targets),
+            )
+        )
+
+    if aud in ("TEACHER", "ALL"):
+        user_ids.update(resolve_recipient_user_ids(db, tenant_id=tenant_id, to="TEACHER"))
+        if not scoped_targets:
+            user_ids.update(
+                resolve_teacher_user_ids_for_class_scope(db, tenant_id=tenant_id)
+            )
+
+    if aud == "ALL" and not scoped_targets:
+        user_ids.update(resolve_recipient_user_ids(db, tenant_id=tenant_id, to="ALL"))
+
+    if user_ids:
+        return sorted(user_ids)
+
+    if aud in ("STUDENT", "ALL") and scoped_targets:
+        return resolve_recipient_user_ids(db, tenant_id=tenant_id, to=aud)
+
+    return resolve_recipient_user_ids(db, tenant_id=tenant_id, to=aud)
+
+
+def resolve_syllabus_recipient_user_ids(
+    db: Session,
+    *,
+    tenant_id: int,
+    class_id: int | None,
+) -> List[int]:
+    """Notify teachers and students linked to the syllabus class."""
+    user_ids: set[int] = set()
+    if class_id is not None:
+        targets = [{"class_id": int(class_id)}]
+        user_ids.update(
+            resolve_student_user_ids_for_notice_targets(
+                db, tenant_id=tenant_id, targets=targets
+            )
+        )
+        user_ids.update(
+            resolve_teacher_user_ids_for_class_scope(
+                db, tenant_id=tenant_id, class_ids=[int(class_id)]
+            )
+        )
+    user_ids.update(resolve_recipient_user_ids(db, tenant_id=tenant_id, to="TEACHER"))
+    return sorted(user_ids)
+
+
+def resolve_holiday_recipient_user_ids(
+    db: Session,
+    *,
+    tenant_id: int,
+    audience: str,
+    class_ids: Sequence[int] | None = None,
+    division_ids: Sequence[int] | None = None,
+) -> List[int]:
+    """Resolve holiday recipients for audience + optional class/division scope."""
+    aud = (audience or "TEACHER").strip().upper()
+    c_ids = [int(x) for x in (class_ids or []) if x is not None]
+    d_ids = [int(x) for x in (division_ids or []) if x is not None]
+    user_ids: set[int] = set()
+
+    if aud in ("STUDENT", "ALL") and (c_ids or d_ids):
+        targets = []
+        if c_ids and d_ids:
+            for class_id in c_ids:
+                for division_id in d_ids:
+                    targets.append({"class_id": class_id, "division_id": division_id})
+        elif c_ids:
+            targets = [{"class_id": class_id} for class_id in c_ids]
+        else:
+            targets = [{"division_id": division_id} for division_id in d_ids]
+        user_ids.update(
+            resolve_student_user_ids_for_notice_targets(
+                db, tenant_id=tenant_id, targets=targets
+            )
+        )
+        user_ids.update(
+            resolve_teacher_user_ids_for_class_scope(
+                db,
+                tenant_id=tenant_id,
+                class_ids=c_ids,
+                division_ids=d_ids,
+                targets=targets,
+            )
+        )
+
+    if aud in ("TEACHER", "ALL"):
+        user_ids.update(resolve_recipient_user_ids(db, tenant_id=tenant_id, to="TEACHER"))
+        if c_ids or d_ids:
+            user_ids.update(
+                resolve_teacher_user_ids_for_class_scope(
+                    db,
+                    tenant_id=tenant_id,
+                    class_ids=c_ids,
+                    division_ids=d_ids,
+                )
+            )
+        elif aud == "TEACHER":
+            user_ids.update(
+                resolve_teacher_user_ids_for_class_scope(db, tenant_id=tenant_id)
+            )
+
+    if aud == "ALL" and not c_ids and not d_ids:
+        user_ids.update(resolve_recipient_user_ids(db, tenant_id=tenant_id, to="ALL"))
+
+    if user_ids:
+        return sorted(user_ids)
+
+    return resolve_recipient_user_ids(db, tenant_id=tenant_id, to=aud)
 
 
 def create_user_inbox_rows(

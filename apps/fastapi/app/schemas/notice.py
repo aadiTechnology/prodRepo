@@ -39,7 +39,7 @@ class NoticeCreateRequest(BaseModel):
     notice_type: NoticeType
     publish_date: datetime | None = None
     expiry_date: datetime | None = None
-    send_notification: bool = False
+    send_notification: bool = True
     status: NoticeStatus | None = None
     is_draft: bool | None = None
     targets: list[NoticeTargetItem] = Field(default_factory=list)

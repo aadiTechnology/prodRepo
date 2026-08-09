@@ -67,7 +67,7 @@ def get_attendance_block_reason(
     for row in holidays:
         if not _holiday_overlaps_date(row, check_date):
             continue
-        aud, class_ids, division_ids, _, _ = unpack_holiday_description(
+        aud, class_ids, division_ids, _, _, _ = unpack_holiday_description(
             getattr(row, "description", None)
         )
         if _holiday_blocks_attendance(

@@ -15,6 +15,7 @@ import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
 import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { createHolidayListConfig } from "./HolidayConfiguration.listConfig";
 
+
 function useHolidayListController() {
   const { user } = useAuth();
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();

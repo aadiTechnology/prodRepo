@@ -36,7 +36,7 @@ def _enforce_legacy_holiday_type_check(mapper, connection, target: Holiday) -> N
     target.holiday_type = db_val
     if not label:
         return
-    aud, c_ids, d_ids, user_notes, _ = unpack_holiday_description(getattr(target, "description", None))
+    aud, c_ids, d_ids, user_notes, _, creator_id = unpack_holiday_description(getattr(target, "description", None))
     aud_resolved = (aud or "STUDENT").strip().upper()
     target.description = pack_holiday_description(
         aud_resolved,
@@ -44,4 +44,5 @@ def _enforce_legacy_holiday_type_check(mapper, connection, target: Holiday) -> N
         d_ids,
         user_notes if user_notes else None,
         holiday_type_label=label,
+        created_by_user_id=creator_id,
     )
