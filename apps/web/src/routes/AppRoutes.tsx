@@ -16,6 +16,7 @@ import AddEditFeeCategory from "../pages/Fees/AddEditFeeCategory";
 import FeeDiscountsPage from "../pages/Fees/FeeDiscountsPage";
 import AddFeeDiscount from "../pages/AddFeeDiscount";
 import StudentList from "../pages/students/StudentList";
+import AttendanceConfigurationPage from "../pages/Attendance/configuration/AttendanceConfigurationPage";
 // ═══════════════════════════════════════════════════════════════════════════
 // Lazy-loaded Pages - Code splitting for better performance
 // ═══════════════════════════════════════════════════════════════════════════
@@ -552,14 +553,14 @@ export default function AppRoutes() {
           <Route path="/attendance/mark" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><MarkAttendance /></ProtectedRoute>} />
           <Route path="/attendance/teacher-marking" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><TeacherAttendanceDashboardPage /></ProtectedRoute>} />
           <Route path="/attendance/report" element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><AttendanceReport /></ProtectedRoute>} />
-          {/* <Route
+        <Route
             path="/attendance/configuration"
             element={
               <ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view">
                 <AttendanceConfigurationPage />
               </ProtectedRoute>
             }
-          /> */}
+          />
 
 
           {/* Admissions – Lead Management */}
