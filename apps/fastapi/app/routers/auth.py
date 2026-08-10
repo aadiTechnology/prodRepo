@@ -287,6 +287,9 @@ async def get_rbac_context(
         raise UnauthorizedException("User not found")
         
     return auth_service.get_login_context(db, user, issue_tokens=False)
+
+
+@router.post("/impersonate/{user_id}", response_model=LoginContextResponse)
 async def impersonate_user(
     user_id: int,
     db: Session = Depends(get_db),
