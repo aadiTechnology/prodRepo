@@ -45,12 +45,6 @@ from app.models.activity_gallery import (
     ActivityGalleryClassMapping,
     ActivityGalleryMedia,
 )
-from app.models.support import (
-    SupportFaq,
-    SupportFaqAttachment,
-    SupportFaqFeedback,
-    SupportProductUpdate,
-)
 from app.models.syllabus import Syllabus, SyllabusAttachment
 from app.models.notification import (
     Notification,
@@ -122,10 +116,6 @@ __all__ = [
     "ActivityGallery",
     "ActivityGalleryMedia",
     "ActivityGalleryClassMapping",
-    "SupportFaq",
-    "SupportFaqAttachment",
-    "SupportFaqFeedback",
-    "SupportProductUpdate",
     "Syllabus",
     "SyllabusAttachment",
     "UserNotification",
