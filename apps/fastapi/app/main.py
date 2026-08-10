@@ -46,6 +46,7 @@ from app.models import (  # noqa: F401
     UserNotification,
     UserNotificationSettings,
     Notification,
+    TenantNotificationScheduleConfig,
 )
 # Import FeePayment + FeePaymentAllocation so create_all creates fee_payment_allocations
 from app.models.fee_payment import FeePayment, FeePaymentAllocation  # noqa: F401
@@ -233,9 +234,23 @@ async def startup_event():
         conn_info = DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL
         logger.info(f"    4. Current connection target: {conn_info}")
 
+    # In-process holiday/exam scheduled notification processor (no Celery/Redis)
+    try:
+        from app.services.notification_scheduler import start_notification_scheduler
+
+        start_notification_scheduler()
+    except Exception as e:
+        logger.error(f"Error starting notification scheduler: {str(e)}")
+
 @app.on_event("shutdown")
 async def shutdown_event():
     """Log application shutdown."""
+    try:
+        from app.services.notification_scheduler import stop_notification_scheduler
+
+        await stop_notification_scheduler()
+    except Exception as e:
+        logger.error(f"Error stopping notification scheduler: {str(e)}")
     logger.info(f"Shutting down {settings.APP_NAME}")
 
 @app.get("/")

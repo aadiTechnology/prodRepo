@@ -58,6 +58,17 @@ const CONFIG_SECTIONS: ConfigSection[] = [
         permission: "ACADEMIC_MGMT:view",
         menuPaths: ["/academics/subjects", "/subjects"],
       },
+      {
+        id: "holiday-exam-reminders",
+        label: "Holiday / Exam reminders",
+        path: "/academics/configuration/notification-schedule",
+        permission: "ACADEMIC_MGMT:view",
+        menuPaths: [
+          "/academics/configuration/notification-schedule",
+          "/academics/configuration/holidays",
+          "/configuration",
+        ],
+      },
     ],
   },
   {

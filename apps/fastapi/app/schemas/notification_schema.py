@@ -98,6 +98,34 @@ class NotificationSettingsUpdateRequest(BaseModel):
     exam: Optional[bool] = None
 
 
+class ScheduleModuleConfig(BaseModel):
+    """Admin config for one of Holiday / Exam scheduled notifications."""
+
+    reminder_enabled: bool = True
+    reminder_days_before: int = Field(default=1, ge=0, le=30)
+    day_enabled: bool = True
+    push_enabled: bool = True
+
+
+class NotificationScheduleConfigResponse(BaseModel):
+    """Tenant admin schedule configuration (holiday.reminder|day, exam.reminder|day)."""
+
+    holiday: ScheduleModuleConfig = Field(default_factory=ScheduleModuleConfig)
+    exam: ScheduleModuleConfig = Field(default_factory=ScheduleModuleConfig)
+
+
+class NotificationScheduleConfigUpdateRequest(BaseModel):
+    holiday: Optional[ScheduleModuleConfig] = None
+    exam: Optional[ScheduleModuleConfig] = None
+
+
+class NotificationScheduleProcessResponse(BaseModel):
+    tenants_processed: int = 0
+    events_processed: int = 0
+    notifications_created: int = 0
+    message: str = "Scheduled notifications processed"
+
+
 DevicePlatform = Literal["android", "ios", "web"]
 
 

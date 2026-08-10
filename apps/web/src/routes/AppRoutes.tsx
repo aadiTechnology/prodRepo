@@ -99,6 +99,9 @@ const NotificationSettingsPage = lazy(
 const ConfigurationHub = lazy(() =>
   import("../pages/configuration").then((module) => ({ default: module.ConfigurationHub }))
 );
+const NotificationScheduleConfigPage = lazy(
+  () => import("../pages/configuration/NotificationScheduleConfigPage")
+);
 const DemoSetupVideosPage = lazy(() => import("../pages/configuration/DemoSetupVideosPage"));
 const DemoSetupVideoFormPage = lazy(() => import("../pages/configuration/DemoSetupVideoFormPage"));
 const DemoSetupVideoDetail = lazy(() => import("../pages/configuration/DemoSetupVideoDetail"));
@@ -403,6 +406,14 @@ export default function AppRoutes() {
           <Route
             path="/academics/configuration/holidays"
             element={<ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view"><HolidayConfiguration /></ProtectedRoute>}
+          />
+          <Route
+            path="/academics/configuration/notification-schedule"
+            element={
+              <ProtectedRoute requiredPermissions="ACADEMIC_MGMT:view">
+                <NotificationScheduleConfigPage />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/academics/configuration/holidays/new"

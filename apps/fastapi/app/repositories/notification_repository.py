@@ -13,12 +13,14 @@ from app.models.holiday import Holiday
 from app.models.notice import Notice, NoticeTarget
 from app.models.notification import (
     Notification,
+    TenantNotificationScheduleConfig,
     UserDeviceToken,
     UserNotification,
     UserNotificationSettings,
 )
 from app.models.role import Role, user_roles
 from app.models.syllabus import Syllabus
+from app.models.tenant import Tenant
 from app.models.user import User, UserRole
 from app.services.homework_access import (
     HomeworkViewerContext,
@@ -508,28 +510,195 @@ def existing_source_keys(
     return {str(r[0]) for r in rows}
 
 
+def user_ids_already_having_source_key(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_ids: Sequence[int],
+    source_key: str,
+) -> set[int]:
+    """Users among user_ids that already have an inbox row for source_key."""
+    if not user_ids or not (source_key or "").strip():
+        return set()
+    rows = (
+        db.query(UserNotification.user_id)
+        .filter(
+            UserNotification.tenant_id == tenant_id,
+            UserNotification.user_id.in_([int(u) for u in user_ids]),
+            UserNotification.source_key == source_key.strip()[:120],
+            UserNotification.is_deleted == False,  # noqa: E712
+        )
+        .all()
+    )
+    return {int(r[0]) for r in rows}
+
+
+def filter_user_ids_by_module_setting(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_ids: Sequence[int],
+    module: str,
+) -> List[int]:
+    """
+    Keep users for whom the module is enabled.
+
+    No settings row → defaults enabled (same as get_or_create_settings).
+    """
+    if not user_ids:
+        return []
+    mod = (module or "general").strip().lower()
+    if mod not in ("syllabus", "holiday", "notice", "exam"):
+        return [int(u) for u in user_ids]
+
+    column_map = {
+        "syllabus": UserNotificationSettings.syllabus_enabled,
+        "holiday": UserNotificationSettings.holiday_enabled,
+        "notice": UserNotificationSettings.notice_enabled,
+        "exam": UserNotificationSettings.exam_enabled,
+    }
+    col = column_map[mod]
+    uid_list = [int(u) for u in user_ids]
+    disabled = {
+        int(r[0])
+        for r in (
+            db.query(UserNotificationSettings.user_id)
+            .filter(
+                UserNotificationSettings.tenant_id == tenant_id,
+                UserNotificationSettings.user_id.in_(uid_list),
+                col == False,  # noqa: E712
+            )
+            .all()
+        )
+    }
+    return [u for u in uid_list if u not in disabled]
+
+
+def get_schedule_config(
+    db: Session,
+    *,
+    tenant_id: int,
+) -> Optional[TenantNotificationScheduleConfig]:
+    return (
+        db.query(TenantNotificationScheduleConfig)
+        .filter(TenantNotificationScheduleConfig.tenant_id == tenant_id)
+        .first()
+    )
+
+
+def get_or_create_schedule_config(
+    db: Session,
+    *,
+    tenant_id: int,
+    created_by: Optional[int] = None,
+) -> TenantNotificationScheduleConfig:
+    existing = get_schedule_config(db, tenant_id=tenant_id)
+    if existing:
+        return existing
+    row = TenantNotificationScheduleConfig(
+        tenant_id=tenant_id,
+        holiday_reminder_enabled=True,
+        holiday_reminder_days_before=1,
+        holiday_day_enabled=True,
+        holiday_push_enabled=True,
+        exam_reminder_enabled=True,
+        exam_reminder_days_before=1,
+        exam_day_enabled=True,
+        exam_push_enabled=True,
+        created_at=datetime.utcnow(),
+        created_by=created_by,
+    )
+    db.add(row)
+    try:
+        db.commit()
+        db.refresh(row)
+        return row
+    except IntegrityError:
+        db.rollback()
+        existing = get_schedule_config(db, tenant_id=tenant_id)
+        if existing:
+            return existing
+        raise
+
+
+def update_schedule_config(
+    db: Session,
+    *,
+    row: TenantNotificationScheduleConfig,
+    holiday_reminder_enabled: Optional[bool] = None,
+    holiday_reminder_days_before: Optional[int] = None,
+    holiday_day_enabled: Optional[bool] = None,
+    holiday_push_enabled: Optional[bool] = None,
+    exam_reminder_enabled: Optional[bool] = None,
+    exam_reminder_days_before: Optional[int] = None,
+    exam_day_enabled: Optional[bool] = None,
+    exam_push_enabled: Optional[bool] = None,
+    updated_by: Optional[int] = None,
+) -> TenantNotificationScheduleConfig:
+    if holiday_reminder_enabled is not None:
+        row.holiday_reminder_enabled = holiday_reminder_enabled
+    if holiday_reminder_days_before is not None:
+        row.holiday_reminder_days_before = int(holiday_reminder_days_before)
+    if holiday_day_enabled is not None:
+        row.holiday_day_enabled = holiday_day_enabled
+    if holiday_push_enabled is not None:
+        row.holiday_push_enabled = holiday_push_enabled
+    if exam_reminder_enabled is not None:
+        row.exam_reminder_enabled = exam_reminder_enabled
+    if exam_reminder_days_before is not None:
+        row.exam_reminder_days_before = int(exam_reminder_days_before)
+    if exam_day_enabled is not None:
+        row.exam_day_enabled = exam_day_enabled
+    if exam_push_enabled is not None:
+        row.exam_push_enabled = exam_push_enabled
+    row.updated_at = datetime.utcnow()
+    row.updated_by = updated_by
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def list_active_tenant_ids(db: Session) -> List[int]:
+    rows = (
+        db.query(Tenant.id)
+        .filter(
+            Tenant.is_deleted == False,  # noqa: E712
+            Tenant.is_active == True,  # noqa: E712
+        )
+        .all()
+    )
+    return [int(r[0]) for r in rows]
+
+
 def bulk_insert_notifications(
     db: Session,
     *,
     rows: List[UserNotification],
-) -> int:
+) -> Tuple[int, List[int]]:
+    """
+    Insert inbox rows, tolerating unique source_key conflicts.
+
+    Returns (created_count, delivered_user_ids).
+    """
     if not rows:
-        return 0
+        return 0, []
     db.add_all(rows)
     try:
         db.commit()
-        return len(rows)
+        return len(rows), [int(r.user_id) for r in rows]
     except IntegrityError:
         db.rollback()
         created = 0
+        delivered: List[int] = []
         for row in rows:
             db.add(row)
             try:
                 db.commit()
                 created += 1
+                delivered.append(int(row.user_id))
             except IntegrityError:
                 db.rollback()
-        return created
+        return created, delivered
 
 
 def insert_notification(
@@ -799,7 +968,8 @@ def create_user_inbox_rows(
     created_by: Optional[int],
     source_key: Optional[str] = None,
     entity_id: Optional[int] = None,
-) -> int:
+    kind: str = "general",
+) -> Tuple[int, List[int]]:
     """
     Fan-out canonical notification to per-user inbox rows.
 
@@ -807,10 +977,15 @@ def create_user_inbox_rows(
     the same key is used for every recipient so unique (tenant, user, source_key)
     dedupes eager create against lazy materialize. Without it, falls back to
     notif:{notification_id}:user:{uid} for generic API creates.
+
+    Returns (created_count, delivered_user_ids) — only newly inserted recipients.
     """
     if not user_ids:
-        return 0
+        return 0, []
     module_key = module if module in VALID_MODULES else "general"
+    kind_key = (kind or "general").strip().lower()
+    if kind_key not in ("reminder", "day", "general"):
+        kind_key = "general"
     rows: List[UserNotification] = []
     now = datetime.utcnow()
     entity = int(entity_id) if entity_id is not None else int(notification_id)
@@ -823,7 +998,7 @@ def create_user_inbox_rows(
                 module=module_key,
                 title=subject[:255],
                 message=body,
-                kind="general",
+                kind=kind_key,
                 is_read=False,
                 source_key=key[:120],
                 entity_id=entity,

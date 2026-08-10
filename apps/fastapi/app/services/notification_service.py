@@ -27,8 +27,12 @@ from app.schemas.notification_schema import (
     NotificationMarkReadResponse,
     NotificationModuleMarkReadResponse,
     NotificationResponse,
+    NotificationScheduleConfigResponse,
+    NotificationScheduleConfigUpdateRequest,
+    NotificationScheduleProcessResponse,
     NotificationSettingsResponse,
     NotificationSettingsUpdateRequest,
+    ScheduleModuleConfig,
 )
 from app.services import fcm_service
 from app.services.homework_access import HomeworkViewerContext, resolve_homework_viewer_context
@@ -223,6 +227,10 @@ def create_notification(
     entity_id: Optional[int] = None,
     source_key: Optional[str] = None,
     event: Optional[str] = None,
+    kind: Optional[str] = None,
+    send_push: bool = True,
+    recipient_user_ids: Optional[Sequence[int]] = None,
+    filter_user_module_settings: bool = False,
     notice_targets: Optional[Sequence[dict]] = None,
     syllabus_class_id: Optional[int] = None,
     holiday_class_ids: Optional[Sequence[int]] = None,
@@ -236,8 +244,8 @@ def create_notification(
     source_keys with materialization so create does not duplicate on list.
 
     Persists to `notifications`, fans out to `user_notifications` for the in-app
-    inbox, then best-effort FCM push to registered device tokens.
-    FCM failures never fail this create.
+    inbox, then best-effort FCM push to registered device tokens (only for newly
+    inserted recipients). FCM failures never fail this create.
     """
     tid = _require_tenant(tenant_id)
 
@@ -271,7 +279,9 @@ def create_notification(
     if module_key not in VALID_MODULES:
         module_key = _infer_module(subj, sender)
 
-    if module_key == "notice":
+    if recipient_user_ids is not None:
+        user_ids = [int(u) for u in recipient_user_ids]
+    elif module_key == "notice":
         user_ids = repo.resolve_notice_recipient_user_ids(
             db,
             tenant_id=tid,
@@ -298,6 +308,11 @@ def create_notification(
         actor_id = int(created_by)
         user_ids = [uid for uid in user_ids if int(uid) != actor_id]
 
+    if filter_user_module_settings and user_ids:
+        user_ids = repo.filter_user_ids_by_module_setting(
+            db, tenant_id=tid, user_ids=user_ids, module=module_key
+        )
+
     inbox_source_key = (source_key or "").strip() or None
     inbox_entity_id = int(entity_id) if entity_id is not None else None
     if not inbox_source_key and inbox_entity_id is not None:
@@ -309,7 +324,25 @@ def create_notification(
             notification_id=int(master.id),
         )
 
-    delivered = repo.create_user_inbox_rows(
+    # Exactly-once: skip users who already have this source_key (re-runs, materialize)
+    if inbox_source_key and user_ids:
+        already = repo.user_ids_already_having_source_key(
+            db,
+            tenant_id=tid,
+            user_ids=user_ids,
+            source_key=inbox_source_key,
+        )
+        if already:
+            user_ids = [uid for uid in user_ids if int(uid) not in already]
+
+    kind_key = (kind or "general").strip().lower()
+    if kind_key not in ("reminder", "day", "general"):
+        kind_key = "general"
+    # Map lifecycle reminder/day events when kind not explicitly set
+    if kind_key == "general" and (event or "").strip().lower() in ("reminder", "day"):
+        kind_key = (event or "").strip().lower()
+
+    delivered, delivered_user_ids = repo.create_user_inbox_rows(
         db,
         tenant_id=tid,
         user_ids=user_ids,
@@ -320,6 +353,7 @@ def create_notification(
         created_by=created_by,
         source_key=inbox_source_key,
         entity_id=inbox_entity_id,
+        kind=kind_key,
     )
     logger.info(
         "Notification created id=%s tenant=%s recipients=%s delivered=%s module=%s source_key=%s",
@@ -331,16 +365,17 @@ def create_notification(
         inbox_source_key,
     )
 
-    # 3) FCM push — best-effort; never fail notification creation
-    _dispatch_fcm_push(
-        db,
-        tenant_id=tid,
-        user_ids=user_ids,
-        subject=subj,
-        body=msg,
-        notification_id=int(master.id),
-        module=module_key,
-    )
+    # 3) FCM push — only newly delivered recipients; never fail notification creation
+    if send_push and delivered_user_ids:
+        _dispatch_fcm_push(
+            db,
+            tenant_id=tid,
+            user_ids=delivered_user_ids,
+            subject=subj,
+            body=msg,
+            notification_id=int(master.id),
+            module=module_key,
+        )
 
     return NotificationCreateResponse(
         id=int(master.id),
@@ -494,7 +529,8 @@ def _to_response(row: UserNotification) -> NotificationResponse:
 
 def _is_exam_holiday(holiday: Holiday) -> bool:
     """Heuristic: treat holiday rows that look exam-related as Exam module events."""
-    text = f"{holiday.holiday_type or ''} {holiday.holiday_name or ''}".upper()
+    _, _, _, _, type_label, _ = unpack_holiday_description(holiday.description)
+    text = f"{holiday.holiday_type or ''} {holiday.holiday_name or ''} {type_label or ''}".upper()
     return "EXAM" in text
 
 
@@ -506,17 +542,338 @@ def _holiday_covers_day(holiday: Holiday, day: date) -> bool:
     return start <= day <= end
 
 
-def _active_holidays_for_window(db: Session, *, tenant_id: int, today: date, tomorrow: date):
-    """Holidays active today or tomorrow (including multi-day ranges)."""
+def _holiday_audience_scope(holiday: Holiday) -> tuple[str, list[int], list[int]]:
+    aud, c_ids, d_ids, _, _, _ = unpack_holiday_description(holiday.description)
+    audience = (aud or "TEACHER").strip().upper() or "TEACHER"
+    return audience, list(c_ids or []), list(d_ids or [])
+
+
+def _active_holidays_for_window(db: Session, *, tenant_id: int, today: date, window_end: date):
+    """Holidays active between today and window_end (including multi-day ranges)."""
     return (
         db.query(Holiday)
         .filter(
             Holiday.tenant_id == tenant_id,
             Holiday.is_active == True,  # noqa: E712
-            Holiday.start_date <= tomorrow,
+            Holiday.start_date <= window_end,
             or_(Holiday.end_date.is_(None), Holiday.end_date >= today),
         )
         .all()
+    )
+
+
+def _clamp_days_before(value: int | None, *, default: int = 1) -> int:
+    try:
+        n = int(value if value is not None else default)
+    except (TypeError, ValueError):
+        n = default
+    if n < 0:
+        return 0
+    if n > 30:
+        return 30
+    return n
+
+
+def _schedule_config_to_response(row) -> NotificationScheduleConfigResponse:
+    return NotificationScheduleConfigResponse(
+        holiday=ScheduleModuleConfig(
+            reminder_enabled=bool(row.holiday_reminder_enabled),
+            reminder_days_before=_clamp_days_before(row.holiday_reminder_days_before),
+            day_enabled=bool(row.holiday_day_enabled),
+            push_enabled=bool(row.holiday_push_enabled),
+        ),
+        exam=ScheduleModuleConfig(
+            reminder_enabled=bool(row.exam_reminder_enabled),
+            reminder_days_before=_clamp_days_before(row.exam_reminder_days_before),
+            day_enabled=bool(row.exam_day_enabled),
+            push_enabled=bool(row.exam_push_enabled),
+        ),
+    )
+
+
+def get_schedule_config(
+    db: Session,
+    *,
+    tenant_id: Optional[int],
+) -> NotificationScheduleConfigResponse:
+    tid = _require_tenant(tenant_id)
+    row = repo.get_or_create_schedule_config(db, tenant_id=tid)
+    return _schedule_config_to_response(row)
+
+
+def update_schedule_config(
+    db: Session,
+    *,
+    tenant_id: Optional[int],
+    payload: NotificationScheduleConfigUpdateRequest,
+    updated_by: Optional[int] = None,
+) -> NotificationScheduleConfigResponse:
+    tid = _require_tenant(tenant_id)
+    if payload.holiday is None and payload.exam is None:
+        raise ValidationException("At least one of holiday or exam config is required")
+
+    row = repo.get_or_create_schedule_config(db, tenant_id=tid, created_by=updated_by)
+    kwargs: dict = {"updated_by": updated_by}
+    if payload.holiday is not None:
+        kwargs.update(
+            holiday_reminder_enabled=payload.holiday.reminder_enabled,
+            holiday_reminder_days_before=_clamp_days_before(
+                payload.holiday.reminder_days_before
+            ),
+            holiday_day_enabled=payload.holiday.day_enabled,
+            holiday_push_enabled=payload.holiday.push_enabled,
+        )
+    if payload.exam is not None:
+        kwargs.update(
+            exam_reminder_enabled=payload.exam.reminder_enabled,
+            exam_reminder_days_before=_clamp_days_before(payload.exam.reminder_days_before),
+            exam_day_enabled=payload.exam.day_enabled,
+            exam_push_enabled=payload.exam.push_enabled,
+        )
+    updated = repo.update_schedule_config(db, row=row, **kwargs)
+    return _schedule_config_to_response(updated)
+
+
+def _build_holiday_exam_copy(
+    *,
+    module: str,
+    name: str,
+    event: str,
+    event_day: date,
+    days_before: int,
+) -> tuple[str, str]:
+    """Title/body for holiday.reminder|day and exam.reminder|day."""
+    if event == "day":
+        if module == "exam":
+            title = f"{name} — today"
+            message = (
+                f"Exam day: {name} is scheduled today. "
+                "Please ensure students arrive on time with required materials."
+            )
+        else:
+            title = f"{name} — today"
+            message = (
+                f"Holiday today: {name}. Classes and regular activities are suspended "
+                "as per the academic calendar."
+            )
+        return title, message
+
+    # reminder
+    if days_before == 1:
+        when = "tomorrow"
+    else:
+        when = f"in {days_before} day{'s' if days_before != 1 else ''}"
+    on_date = event_day.isoformat()
+    if module == "exam":
+        title = f"Reminder: {name} {when}"
+        message = (
+            f"{name} is scheduled for {on_date} ({when}). "
+            "Confirm exam seating and circulate last-minute instructions if needed."
+        )
+    else:
+        title = f"Reminder: {name} {when}"
+        message = (
+            f"{name} is scheduled for {on_date} ({when}). "
+            "Plan activities and communications accordingly."
+        )
+    return title, message
+
+
+def _emit_scheduled_holiday_exam_event(
+    db: Session,
+    *,
+    tenant_id: int,
+    holiday: Holiday,
+    module: str,
+    event: str,
+    event_day: date,
+    days_before: int,
+    send_push: bool,
+) -> int:
+    """
+    Create one holiday/exam reminder or day notification via the shared create API.
+
+    Returns number of newly created inbox rows (0 on skip/error).
+    """
+    is_exam = module == "exam"
+    name = (holiday.holiday_name or "Event").strip() or "Event"
+    title, message = _build_holiday_exam_copy(
+        module=module,
+        name=name,
+        event=event,
+        event_day=event_day,
+        days_before=days_before,
+    )
+    source_key = entity_source_key(module, int(holiday.id), event, day=event_day)
+    audience, class_ids, division_ids = _holiday_audience_scope(holiday)
+
+    try:
+        before_ids = repo.resolve_holiday_recipient_user_ids(
+            db,
+            tenant_id=tenant_id,
+            audience=audience,
+            class_ids=class_ids,
+            division_ids=division_ids,
+        )
+        before_ids = [
+            uid
+            for uid in before_ids
+            if not _holiday_authored_by_user(
+                db, tenant_id=tenant_id, user_id=int(uid), holiday=holiday
+            )
+        ]
+        if not before_ids:
+            return 0
+
+        existing_before = repo.user_ids_already_having_source_key(
+            db,
+            tenant_id=tenant_id,
+            user_ids=before_ids,
+            source_key=source_key,
+        )
+        eligible = [u for u in before_ids if int(u) not in existing_before]
+        if not eligible:
+            return 0
+
+        eligible = repo.filter_user_ids_by_module_setting(
+            db, tenant_id=tenant_id, user_ids=eligible, module=module
+        )
+        if not eligible:
+            return 0
+
+        create_notification(
+            db,
+            tenant_id=tenant_id,
+            from_="System",
+            to=audience,
+            subject=title,
+            body=message,
+            created_by=None,
+            module=module,
+            entity_id=int(holiday.id),
+            source_key=source_key,
+            event=event,
+            kind=event,
+            send_push=send_push,
+            recipient_user_ids=eligible,
+            filter_user_module_settings=False,
+            holiday_class_ids=class_ids,
+            holiday_division_ids=division_ids,
+        )
+        existing_after = repo.user_ids_already_having_source_key(
+            db,
+            tenant_id=tenant_id,
+            user_ids=eligible,
+            source_key=source_key,
+        )
+        created = len(
+            [u for u in eligible if int(u) in existing_after and int(u) not in existing_before]
+        )
+        return max(created, 0)
+    except Exception:
+        logger.exception(
+            "Scheduled %s.%s failed tenant=%s holiday_id=%s day=%s",
+            module,
+            event,
+            tenant_id,
+            holiday.id,
+            event_day,
+        )
+        return 0
+
+
+def process_scheduled_holiday_exam_notifications(
+    db: Session,
+    *,
+    as_of: Optional[date] = None,
+    tenant_ids: Optional[Sequence[int]] = None,
+) -> NotificationScheduleProcessResponse:
+    """
+    Process due holiday/exam reminder and day events for active tenants.
+
+    Uses create_notification + entity_source_key for exactly-once in-app + FCM.
+    Safe to re-run; duplicates are blocked by UQ(tenant, user, source_key).
+    """
+    today = as_of or date.today()
+    ids = list(tenant_ids) if tenant_ids is not None else repo.list_active_tenant_ids(db)
+    tenants_processed = 0
+    events_processed = 0
+    notifications_created = 0
+
+    for tenant_id in ids:
+        tid = int(tenant_id)
+        try:
+            config = repo.get_or_create_schedule_config(db, tenant_id=tid)
+        except Exception:
+            logger.exception("Failed to load schedule config for tenant=%s", tid)
+            continue
+
+        holiday_days = _clamp_days_before(config.holiday_reminder_days_before)
+        exam_days = _clamp_days_before(config.exam_reminder_days_before)
+        window_end = today + timedelta(days=max(holiday_days, exam_days, 1))
+        holidays = _active_holidays_for_window(
+            db, tenant_id=tid, today=today, window_end=window_end
+        )
+        tenants_processed += 1
+
+        for h in holidays:
+            is_exam = _is_exam_holiday(h)
+            module = "exam" if is_exam else "holiday"
+            reminder_enabled = (
+                bool(config.exam_reminder_enabled)
+                if is_exam
+                else bool(config.holiday_reminder_enabled)
+            )
+            day_enabled = (
+                bool(config.exam_day_enabled) if is_exam else bool(config.holiday_day_enabled)
+            )
+            push_enabled = (
+                bool(config.exam_push_enabled)
+                if is_exam
+                else bool(config.holiday_push_enabled)
+            )
+            days_before = exam_days if is_exam else holiday_days
+
+            if day_enabled and _holiday_covers_day(h, today):
+                events_processed += 1
+                notifications_created += _emit_scheduled_holiday_exam_event(
+                    db,
+                    tenant_id=tid,
+                    holiday=h,
+                    module=module,
+                    event="day",
+                    event_day=today,
+                    days_before=0,
+                    send_push=push_enabled,
+                )
+
+            if reminder_enabled and days_before >= 0:
+                target = today + timedelta(days=days_before)
+                if _holiday_covers_day(h, target):
+                    events_processed += 1
+                    notifications_created += _emit_scheduled_holiday_exam_event(
+                        db,
+                        tenant_id=tid,
+                        holiday=h,
+                        module=module,
+                        event="reminder",
+                        event_day=target,
+                        days_before=days_before,
+                        send_push=push_enabled,
+                    )
+
+    logger.info(
+        "Scheduled holiday/exam process as_of=%s tenants=%s events=%s created=%s",
+        today.isoformat(),
+        tenants_processed,
+        events_processed,
+        notifications_created,
+    )
+    return NotificationScheduleProcessResponse(
+        tenants_processed=tenants_processed,
+        events_processed=events_processed,
+        notifications_created=notifications_created,
+        message="Scheduled notifications processed",
     )
 
 
@@ -527,8 +884,19 @@ def _materialize_holiday_exam_events(
     user_id: int,
     today: date,
 ) -> None:
-    tomorrow = today + timedelta(days=1)
-    holidays = _active_holidays_for_window(db, tenant_id=tenant_id, today=today, tomorrow=tomorrow)
+    """
+    Lazy inbox materialization safety net for holiday/exam day + reminder.
+
+    Uses tenant admin schedule config (days before / enabled). Does not send FCM —
+    the background scheduler handles push. source_key guarantees no duplicates.
+    """
+    config = repo.get_or_create_schedule_config(db, tenant_id=tenant_id)
+    holiday_days = _clamp_days_before(config.holiday_reminder_days_before)
+    exam_days = _clamp_days_before(config.exam_reminder_days_before)
+    window_end = today + timedelta(days=max(holiday_days, exam_days, 1))
+    holidays = _active_holidays_for_window(
+        db, tenant_id=tenant_id, today=today, window_end=window_end
+    )
 
     candidates: List[UserNotification] = []
     source_keys: List[str] = []
@@ -538,23 +906,35 @@ def _materialize_holiday_exam_events(
             continue
         is_exam = _is_exam_holiday(h)
         module = "exam" if is_exam else "holiday"
+        # Respect user module settings
+        settings_row = repo.get_settings(db, tenant_id=tenant_id, user_id=user_id)
+        if settings_row is not None:
+            if is_exam and not settings_row.exam_enabled:
+                continue
+            if not is_exam and not settings_row.holiday_enabled:
+                continue
+        # Admin event enabled
+        day_enabled = (
+            bool(config.exam_day_enabled) if is_exam else bool(config.holiday_day_enabled)
+        )
+        reminder_enabled = (
+            bool(config.exam_reminder_enabled)
+            if is_exam
+            else bool(config.holiday_reminder_enabled)
+        )
+        days_before = exam_days if is_exam else holiday_days
         name = (h.holiday_name or "Event").strip() or "Event"
 
-        if _holiday_covers_day(h, today):
+        if day_enabled and _holiday_covers_day(h, today):
             key = entity_source_key(module, int(h.id), "day", day=today)
             source_keys.append(key)
-            if is_exam:
-                title = f"{name} — today"
-                message = (
-                    f"Exam day: {name} is scheduled today. "
-                    "Please ensure students arrive on time with required materials."
-                )
-            else:
-                title = f"{name} — today"
-                message = (
-                    f"Holiday today: {name}. Classes and regular activities are suspended "
-                    "as per the academic calendar."
-                )
+            title, message = _build_holiday_exam_copy(
+                module=module,
+                name=name,
+                event="day",
+                event_day=today,
+                days_before=0,
+            )
             candidates.append(
                 UserNotification(
                     tenant_id=tenant_id,
@@ -571,36 +951,33 @@ def _materialize_holiday_exam_events(
                 )
             )
 
-        if _holiday_covers_day(h, tomorrow):
-            key = entity_source_key(module, int(h.id), "reminder", day=tomorrow)
-            source_keys.append(key)
-            if is_exam:
-                title = f"Reminder: {name} tomorrow"
-                message = (
-                    f"{name} is scheduled for tomorrow. "
-                    "Confirm exam seating and circulate last-minute instructions if needed."
-                )
-            else:
-                title = f"Reminder: {name} tomorrow"
-                message = (
-                    f"{name} is scheduled for tomorrow. "
-                    "Plan activities and communications accordingly."
-                )
-            candidates.append(
-                UserNotification(
-                    tenant_id=tenant_id,
-                    user_id=user_id,
+        if reminder_enabled and days_before >= 0:
+            target = today + timedelta(days=days_before)
+            if _holiday_covers_day(h, target):
+                key = entity_source_key(module, int(h.id), "reminder", day=target)
+                source_keys.append(key)
+                title, message = _build_holiday_exam_copy(
                     module=module,
-                    title=title,
-                    message=message,
-                    kind="reminder",
-                    is_read=False,
-                    source_key=key,
-                    entity_id=h.id,
-                    created_at=datetime.utcnow(),
-                    created_by=user_id,
+                    name=name,
+                    event="reminder",
+                    event_day=target,
+                    days_before=days_before,
                 )
-            )
+                candidates.append(
+                    UserNotification(
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        module=module,
+                        title=title,
+                        message=message,
+                        kind="reminder",
+                        is_read=False,
+                        source_key=key,
+                        entity_id=h.id,
+                        created_at=datetime.utcnow(),
+                        created_by=user_id,
+                    )
+                )
 
     if not candidates:
         return
@@ -610,7 +987,7 @@ def _materialize_holiday_exam_events(
     )
     to_create = [c for c in candidates if c.source_key not in existing]
     if to_create:
-        created = repo.bulk_insert_notifications(db, rows=to_create)
+        created, _ = repo.bulk_insert_notifications(db, rows=to_create)
         logger.info(
             "Materialized %s holiday/exam notification(s) for user %s tenant %s",
             created,
@@ -691,7 +1068,7 @@ def _materialize_notice_events(
             )
         )
     if candidates:
-        created = repo.bulk_insert_notifications(db, rows=candidates)
+        created, _ = repo.bulk_insert_notifications(db, rows=candidates)
         logger.info(
             "Materialized %s notice notification(s) for user %s tenant %s",
             created,
@@ -770,7 +1147,7 @@ def _materialize_syllabus_events(
             )
         )
     if candidates:
-        created = repo.bulk_insert_notifications(db, rows=candidates)
+        created, _ = repo.bulk_insert_notifications(db, rows=candidates)
         logger.info(
             "Materialized %s syllabus notification(s) for user %s tenant %s",
             created,
@@ -788,7 +1165,7 @@ def materialize_notifications(
 ) -> None:
     """
     Idempotently create inbox rows from real module data, scoped to the viewer's class.
-    Holiday/Exam: day + 1-day-before reminder. Notice/Syllabus: recent published/created rows.
+    Holiday/Exam: day + configurable reminder. Notice/Syllabus: recent published/created rows.
     """
     today = date.today()
     try:

@@ -53,6 +53,7 @@ from app.models.support import (
 from app.models.syllabus import Syllabus, SyllabusAttachment
 from app.models.notification import (
     Notification,
+    TenantNotificationScheduleConfig,
     UserDeviceToken,
     UserNotification,
     UserNotificationSettings,
@@ -127,6 +128,7 @@ __all__ = [
     "SyllabusAttachment",
     "UserNotification",
     "UserNotificationSettings",
+    "TenantNotificationScheduleConfig",
     "UserDeviceToken",
     "Notification",
     "AiAssistantSession",

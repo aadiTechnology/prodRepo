@@ -128,6 +128,77 @@ const notificationService = {
     const res = await apiClient.post(`${BASE}/devices`, payload);
     return res.data;
   },
+
+  /** Tenant admin: holiday/exam reminder + day schedule configuration. */
+  getScheduleConfig: async (): Promise<NotificationScheduleConfig> => {
+    const res = await apiClient.get<NotificationScheduleConfigApi>(`${BASE}/admin/schedule-config`);
+    return mapScheduleConfig(res.data);
+  },
+
+  updateScheduleConfig: async (
+    payload: Partial<NotificationScheduleConfig>
+  ): Promise<NotificationScheduleConfig> => {
+    const res = await apiClient.put<NotificationScheduleConfigApi>(
+      `${BASE}/admin/schedule-config`,
+      payload
+    );
+    return mapScheduleConfig(res.data);
+  },
+
+  /** Tenant admin: run scheduled holiday/exam processing now (idempotent). */
+  processScheduled: async (): Promise<{
+    tenantsProcessed: number;
+    eventsProcessed: number;
+    notificationsCreated: number;
+    message: string;
+  }> => {
+    const res = await apiClient.post<{
+      tenants_processed: number;
+      events_processed: number;
+      notifications_created: number;
+      message: string;
+    }>(`${BASE}/admin/process-scheduled`);
+    const d = res.data;
+    return {
+      tenantsProcessed: Number(d?.tenants_processed ?? 0),
+      eventsProcessed: Number(d?.events_processed ?? 0),
+      notificationsCreated: Number(d?.notifications_created ?? 0),
+      message: d?.message || "Scheduled notifications processed",
+    };
+  },
 };
+
+export type ScheduleModuleConfig = {
+  reminder_enabled: boolean;
+  reminder_days_before: number;
+  day_enabled: boolean;
+  push_enabled: boolean;
+};
+
+export type NotificationScheduleConfig = {
+  holiday: ScheduleModuleConfig;
+  exam: ScheduleModuleConfig;
+};
+
+type NotificationScheduleConfigApi = {
+  holiday: ScheduleModuleConfig;
+  exam: ScheduleModuleConfig;
+};
+
+function mapScheduleConfig(data: NotificationScheduleConfigApi): NotificationScheduleConfig {
+  const mapModule = (m?: Partial<ScheduleModuleConfig> | null): ScheduleModuleConfig => ({
+    reminder_enabled: m?.reminder_enabled !== false,
+    reminder_days_before:
+      typeof m?.reminder_days_before === "number" && m.reminder_days_before >= 0
+        ? Math.min(30, Math.floor(m.reminder_days_before))
+        : 1,
+    day_enabled: m?.day_enabled !== false,
+    push_enabled: m?.push_enabled !== false,
+  });
+  return {
+    holiday: mapModule(data?.holiday),
+    exam: mapModule(data?.exam),
+  };
+}
 
 export default notificationService;

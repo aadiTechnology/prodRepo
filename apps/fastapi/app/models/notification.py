@@ -96,6 +96,31 @@ class UserNotificationSettings(Base):
     updated_by = Column(Integer, nullable=True)
 
 
+class TenantNotificationScheduleConfig(Base):
+    """
+    Per-tenant admin config for scheduled Holiday/Exam reminder and day notifications.
+
+    Supported events only:
+      holiday.reminder, holiday.day, exam.reminder, exam.day
+    """
+
+    __tablename__ = "tenant_notification_schedule_config"
+
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), primary_key=True)
+    holiday_reminder_enabled = Column(Boolean, nullable=False, default=True)
+    holiday_reminder_days_before = Column(Integer, nullable=False, default=1)
+    holiday_day_enabled = Column(Boolean, nullable=False, default=True)
+    holiday_push_enabled = Column(Boolean, nullable=False, default=True)
+    exam_reminder_enabled = Column(Boolean, nullable=False, default=True)
+    exam_reminder_days_before = Column(Integer, nullable=False, default=1)
+    exam_day_enabled = Column(Boolean, nullable=False, default=True)
+    exam_push_enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_by = Column(Integer, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+    updated_by = Column(Integer, nullable=True)
+
+
 class UserDeviceToken(Base):
     """FCM device token registration for push delivery."""
 

@@ -93,6 +93,16 @@ class Settings(BaseSettings):
         default="",
         description="Inline Firebase service-account JSON (alternative to path)",
     )
+
+    # In-process holiday/exam schedule processor (no Celery/Redis)
+    NOTIFICATION_SCHEDULER_ENABLED: bool = Field(
+        default=True,
+        description="When True, run holiday/exam schedule processing on a background loop",
+    )
+    NOTIFICATION_SCHEDULER_INTERVAL_SECONDS: int = Field(
+        default=900,
+        description="Seconds between holiday/exam scheduled notification runs (default 15 min)",
+    )
     
     # Logging
     LOG_LEVEL: str = "INFO"

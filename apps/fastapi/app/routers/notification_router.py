@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Path, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_admin
 from app.schemas.auth import CurrentUser
 from app.schemas.notification_schema import (
     DeviceRegisterRequest,
@@ -19,6 +19,9 @@ from app.schemas.notification_schema import (
     NotificationListResponse,
     NotificationMarkReadResponse,
     NotificationModuleMarkReadResponse,
+    NotificationScheduleConfigResponse,
+    NotificationScheduleConfigUpdateRequest,
+    NotificationScheduleProcessResponse,
     NotificationSettingsResponse,
     NotificationSettingsUpdateRequest,
 )
@@ -142,6 +145,66 @@ def update_settings(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         payload=payload,
+    )
+
+
+@router.get(
+    "/admin/schedule-config",
+    response_model=NotificationScheduleConfigResponse,
+)
+def get_schedule_config(
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(require_admin),
+):
+    """Tenant admin: Holiday/Exam reminder and day notification configuration."""
+    return notification_service.get_schedule_config(
+        db,
+        tenant_id=current_user.tenant_id,
+    )
+
+
+@router.put(
+    "/admin/schedule-config",
+    response_model=NotificationScheduleConfigResponse,
+)
+def update_schedule_config(
+    payload: NotificationScheduleConfigUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(require_admin),
+):
+    """Tenant admin: update Holiday/Exam scheduled notification configuration."""
+    return notification_service.update_schedule_config(
+        db,
+        tenant_id=current_user.tenant_id,
+        payload=payload,
+        updated_by=current_user.id,
+    )
+
+
+@router.post(
+    "/admin/process-scheduled",
+    response_model=NotificationScheduleProcessResponse,
+)
+def process_scheduled_notifications(
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(require_admin),
+):
+    """
+    Manually run holiday/exam scheduled processing for the current tenant.
+
+    Idempotent via source_key. Useful for validation without waiting for the loop.
+    """
+    tid = current_user.tenant_id
+    if tid is None:
+        return NotificationScheduleProcessResponse(
+            tenants_processed=0,
+            events_processed=0,
+            notifications_created=0,
+            message="Tenant context required",
+        )
+    return notification_service.process_scheduled_holiday_exam_notifications(
+        db,
+        tenant_ids=[int(tid)],
     )
 
 
