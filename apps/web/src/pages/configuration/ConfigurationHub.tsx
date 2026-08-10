@@ -60,7 +60,7 @@ const CONFIG_SECTIONS: ConfigSection[] = [
       },
       {
         id: "holiday-exam-reminders",
-        label: "Holiday / Exam reminders",
+        label: "Notification Schedule",
         path: "/academics/configuration/notification-schedule",
         permission: "ACADEMIC_MGMT:view",
         menuPaths: [

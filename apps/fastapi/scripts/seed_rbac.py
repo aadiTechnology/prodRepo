@@ -135,6 +135,7 @@ def seed_rbac_data():
                     {"name": "Classes", "path": "/classes", "feature": "ACADEMIC_MGMT"},
                     {"name": "Subjects", "path": "/subjects", "feature": "ACADEMIC_MGMT"},
                     {"name": "Holiday Configuration", "path": "/academics/configuration/holidays", "feature": "ACADEMIC_MGMT"},
+                    {"name": "Notification Schedule", "path": "/academics/configuration/notification-schedule", "feature": "ACADEMIC_MGMT"},
                     {"name": "Academic Calendar", "path": "/calendar/academic", "feature": "ACADEMIC_MGMT"},
                     {"name": "Syllabus Management", "path": "/academics/syllabus", "feature": "ACADEMIC_MGMT"},
                     {"name": "Homework", "path": "/homework", "feature": "HOMEWORK_MGMT"},
