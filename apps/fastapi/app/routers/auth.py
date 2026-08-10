@@ -1,10 +1,17 @@
 """Authentication router."""
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from datetime import timedelta
 from app.core.database import get_db
-from app.services.rbac_service import get_user_roles 
-from app.schemas.auth import LoginRequest, TokenResponse, UserWithRole, LoginContextResponse, TenantInfo, RBACVersionResponse
+from app.schemas.auth import (
+    LoginRequest,
+    TokenResponse,
+    UserWithRole,
+    LoginContextResponse,
+    TenantInfo,
+    RBACVersionResponse,
+    RefreshTokenRequest,
+    LogoutRequest,
+)
 from app.schemas.user import UserCreate, UserResponse
 from app.services import user_service, rbac_service, auth_service, theme_template_service
 from app.models.user import User, UserRole
@@ -14,8 +21,11 @@ from app.core.logging_config import get_logger
 from app.core.dependencies import get_current_user, CurrentUser, get_rbac_role_codes, SYSTEM_ADMIN_ROLE_CODE
 from app.services.auth_service import revoke_token
 from app.models.tenant import Tenant
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from typing import Optional
+
+_optional_bearer = HTTPBearer(auto_error=False)
 
 logger = get_logger(__name__)
 
@@ -116,17 +126,10 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)) -> Toke
     
     user_role = user.roles[0].code if user.roles else user.role.value
 
-    access_token = create_access_token(
-        data={
-            "sub": str(user.id),
-            "email": user.email,
-            "role": user_role,
-            "tenant_id": user.tenant_id,
-        }
-    )
-    
+    tokens = auth_service.issue_token_pair(db, user, user_role)
+
     logger.info(f"User logged in successfully: {user.email}. Role: {user_role}")
-    return TokenResponse(access_token=access_token)
+    return tokens
 
 @router.post("/login/context", response_model=LoginContextResponse)
 async def login_with_context(
@@ -148,10 +151,25 @@ async def login_with_context(
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_access_token(
+    request: Request,
+    body: Optional[RefreshTokenRequest] = None,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
 ) -> TokenResponse:
-    """Issue a new access token for the current session (extends JWT lifetime)."""
+    """
+    Issue a new access token.
+
+    Preferred (mobile/session continuity): body.refresh_token (works after access JWT expires).
+    Legacy (web sliding session): valid Authorization Bearer access token still accepted.
+    """
+    payload = body or RefreshTokenRequest()
+    if payload.refresh_token:
+        tokens = auth_service.refresh_with_refresh_token(db, payload.refresh_token)
+        logger.info("Access token refreshed via refresh token")
+        return tokens
+
+    # Legacy path: re-issue access JWT while it is still valid (no new refresh token).
+    current_user = get_current_user(request=request, credentials=credentials, db=db)
     user = user_service.get_user_by_id(db, current_user.id)
     if not user or not user.is_active or user.is_deleted:  # type: ignore[truthy-bool]
         raise UnauthorizedException("Your account is deactivated. Contact system administrator.")
@@ -170,7 +188,7 @@ async def refresh_access_token(
         token_data["original_user_id"] = current_user.original_user_id
 
     access_token = create_access_token(data=token_data)
-    logger.info(f"Access token refreshed for user: {user.email}")
+    logger.info(f"Access token refreshed for user (legacy bearer): {user.email}")
     return TokenResponse(access_token=access_token)
 
 
@@ -217,10 +235,11 @@ async def get_current_user_info(
 @router.post("/logout")
 async def logout(
     request: Request,
+    body: Optional[LogoutRequest] = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    """Revoke the current JWT token and log the user out."""
+    """Revoke the current JWT + refresh token and log the user out."""
     from app.services.ai_chat_service import clear_chat
 
     user = db.query(User).filter(User.id == current_user.id).first()
@@ -235,6 +254,9 @@ async def logout(
     if token:
         revoke_token(db, token, current_user.id)
         logger.info(f"User logged out: {current_user.email}")
+
+    payload = body or LogoutRequest()
+    auth_service.revoke_refresh_token(db, payload.refresh_token)
     return {"message": "Logged out successfully"}
 
 
@@ -264,9 +286,7 @@ async def get_rbac_context(
     if not user:
         raise UnauthorizedException("User not found")
         
-    return auth_service.get_login_context(db, user)
-
-@router.post("/impersonate/{user_id}", response_model=LoginContextResponse)
+    return auth_service.get_login_context(db, user, issue_tokens=False)
 async def impersonate_user(
     user_id: int,
     db: Session = Depends(get_db),

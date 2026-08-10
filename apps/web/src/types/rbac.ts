@@ -16,6 +16,7 @@ export interface RBACState {
 export interface LoginContextResponse {
   access_token: string;
   token_type: string;
+  refresh_token?: string | null;
   user: User;
   roles: string[];
   permissions: string[];

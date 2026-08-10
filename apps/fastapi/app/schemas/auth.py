@@ -18,6 +18,19 @@ class TokenResponse(BaseModel):
     """Token response schema."""
     access_token: str
     token_type: str = "bearer"
+    refresh_token: Optional[str] = None
+
+
+class RefreshTokenRequest(BaseModel):
+    """Refresh access token using a long-lived refresh token."""
+
+    refresh_token: Optional[str] = None
+
+
+class LogoutRequest(BaseModel):
+    """Optional body to revoke the client's refresh token on logout."""
+
+    refresh_token: Optional[str] = None
 
 class TenantInfo(BaseModel):
     """Tenant information returned at login and /me. Includes theme template config when assigned."""
@@ -76,6 +89,7 @@ class LoginContextResponse(BaseModel):
     """Extended login response including RBAC context."""
     access_token: Optional[str] = None
     token_type: Optional[str] = "bearer"
+    refresh_token: Optional[str] = None
     user: UserWithRole
     roles: List[str]
     permissions: List[str]

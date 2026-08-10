@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
+import hashlib
 import re
+import secrets
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -24,6 +26,16 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash."""
     return pwd_context.verify(plain_password, hashed_password)
+
+
+def generate_refresh_token() -> str:
+    """Generate a high-entropy opaque refresh token for clients."""
+    return secrets.token_urlsafe(48)
+
+
+def hash_refresh_token(token: str) -> str:
+    """SHA-256 hex digest of a refresh token (store only hashes server-side)."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 # JWT Token utilities

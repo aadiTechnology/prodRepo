@@ -6,6 +6,10 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from "axios";
 import { apiBaseUrl, isDevelopment } from "../config";
 import { refreshAccessToken } from "./tokenRefresh";
+import {
+  clearAuthSessionStorage,
+  getAccessTokenSync,
+} from "../utils/authStorage";
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -22,20 +26,8 @@ function shouldAttemptTokenRefresh(config: InternalAxiosRequestConfig | undefine
   return !AUTH_NO_REFRESH_PATHS.some((path) => url.includes(path));
 }
 
-let refreshInFlight: Promise<string | null> | null = null;
-
-function tryRefreshToken(): Promise<string | null> {
-  if (!refreshInFlight) {
-    refreshInFlight = refreshAccessToken().finally(() => {
-      refreshInFlight = null;
-    });
-  }
-  return refreshInFlight;
-}
-
-function forceSessionExpiredLogout(): void {
-  localStorage.removeItem("auth_token");
-  localStorage.removeItem("auth_user");
+async function forceSessionExpiredLogout(): Promise<void> {
+  await clearAuthSessionStorage();
   const currentPath = window.location.pathname;
   if (currentPath !== "/login" && currentPath !== "/session-expired") {
     window.location.href = "/session-expired";
@@ -94,8 +86,8 @@ const createAxiosInstance = (): AxiosInstance => {
         });
       }
 
-      // Add auth token from localStorage
-      const token = localStorage.getItem("auth_token");
+      // Add auth token from storage
+      const token = getAccessTokenSync();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -145,15 +137,15 @@ const createAxiosInstance = (): AxiosInstance => {
           shouldAttemptTokenRefresh(originalConfig)
         ) {
           originalConfig._retry = true;
-          const newToken = await tryRefreshToken();
+          const newToken = await refreshAccessToken();
           if (newToken) {
             originalConfig.headers = originalConfig.headers ?? {};
             originalConfig.headers.Authorization = `Bearer ${newToken}`;
             return instance(originalConfig);
           }
-          forceSessionExpiredLogout();
+          await forceSessionExpiredLogout();
         } else if (error.response.status === 401 && shouldAttemptTokenRefresh(originalConfig)) {
-          forceSessionExpiredLogout();
+          await forceSessionExpiredLogout();
         }
 
         // Server responded with error status

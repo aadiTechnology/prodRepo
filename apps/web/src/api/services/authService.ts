@@ -7,6 +7,8 @@
 import apiClient from "../client";
 import { LoginRequest, TokenResponse, User } from "../../types/auth";
 import { LoginContextResponse } from "../../types/rbac";
+import { getRefreshToken } from "../../utils/authStorage";
+import { refreshTokenPairSingleFlight } from "../tokenRefresh";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Authentication Service - Core methods
@@ -40,7 +42,8 @@ export const authService = {
    * Logout user (invalidate session/token on backend)
    */
   logout: async (): Promise<void> => {
-    await apiClient.post("/auth/logout");
+    const refreshToken = await getRefreshToken();
+    await apiClient.post("/auth/logout", refreshToken ? { refresh_token: refreshToken } : {});
   },
 
   /**
@@ -67,10 +70,19 @@ export const authService = {
     return response.data;
   },
 
-  /** Extend session with a new access token (requires current token still valid). */
+  /**
+   * Extend session with a new access token (single-flight with 401 interceptor).
+   */
   refreshAccessToken: async (): Promise<TokenResponse> => {
-    const response = await apiClient.post<TokenResponse>("/auth/refresh");
-    return response.data;
+    const pair = await refreshTokenPairSingleFlight();
+    if (!pair?.access_token) {
+      throw new Error("Token refresh failed");
+    }
+    return {
+      access_token: pair.access_token,
+      token_type: "bearer",
+      refresh_token: pair.refresh_token,
+    };
   },
 };
 

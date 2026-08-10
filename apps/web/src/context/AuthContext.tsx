@@ -17,6 +17,13 @@ import { getJwtExpiryMs } from "../utils/jwt";
 import { recordUserLogin } from "../utils/lastLoginStorage";
 import { clearAiChatSession } from "../api/services/aiChatService";
 import { isNativePlatform } from "../utils/capacitor";
+import {
+  USER_STORAGE_KEY,
+  clearAuthSessionStorage,
+  getAccessTokenSync,
+  persistTokenPair,
+  setAccessTokenSync,
+} from "../utils/authStorage";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Type Definitions
@@ -32,8 +39,6 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const TOKEN_STORAGE_KEY = "auth_token";
-const USER_STORAGE_KEY = "auth_user";
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 /** Refresh JWT this many ms before `exp` so the session does not hit 401 mid-work. */
 const TOKEN_REFRESH_BEFORE_EXPIRY_MS = 2 * 60 * 1000;
@@ -51,17 +56,6 @@ function syncPushDeviceTokenAfterAuth(): void {
 }
 
 /**
- * Get token from localStorage
- */
-const getStoredToken = (): string | null => {
-  try {
-    return localStorage.getItem(TOKEN_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-};
-
-/**
  * Get user from localStorage
  */
 const getStoredUser = (): User | null => {
@@ -70,17 +64,6 @@ const getStoredUser = (): User | null => {
     return userStr ? JSON.parse(userStr) : null;
   } catch {
     return null;
-  }
-};
-
-/**
- * Save token to localStorage
- */
-const saveToken = (token: string): void => {
-  try {
-    localStorage.setItem(TOKEN_STORAGE_KEY, token);
-  } catch (error) {
-    console.error("Failed to save token:", error);
   }
 };
 
@@ -95,17 +78,9 @@ const saveUser = (user: User): void => {
   }
 };
 
-/**
- * Clear authentication data from localStorage
- */
-const clearAuthData = (): void => {
-  try {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem(USER_STORAGE_KEY);
-  } catch (error) {
-    console.error("Failed to clear auth data:", error);
-  }
-};
+async function persistAuthTokens(accessToken: string, refreshToken?: string | null): Promise<void> {
+  await persistTokenPair(accessToken, refreshToken);
+}
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -113,7 +88,7 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(getStoredUser());
-  const [token, setToken] = useState<string | null>(getStoredToken());
+  const [token, setToken] = useState<string | null>(getAccessTokenSync());
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { clearRBACData, setRBACData } = useRBAC();
@@ -126,7 +101,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Refresh current user information from API
    */
   const refreshUser = useCallback(async () => {
-    if (!token) return;
+    if (!token && !getAccessTokenSync()) return;
 
     try {
       const userData = await authService.getCurrentUser();
@@ -136,7 +111,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error("Failed to refresh user:", error);
       // If token is invalid, logout
       if ((error as ApiError).response?.status === 401) {
-        clearAuthData();
+        await clearAuthSessionStorage();
         setToken(null);
         setUser(null);
       }
@@ -151,18 +126,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(true);
       const tokenResponse = await authService.login(credentials);
 
-      // Save token
       setToken(tokenResponse.access_token);
-      saveToken(tokenResponse.access_token);
+      await persistAuthTokens(tokenResponse.access_token, tokenResponse.refresh_token);
 
-      // Fetch user information
       const userData = await authService.getCurrentUser();
       recordUserLogin(userData.id);
       setUser(userData);
       saveUser(userData);
       syncPushDeviceTokenAfterAuth();
     } catch (error) {
-      clearAuthData();
+      await clearAuthSessionStorage();
       setToken(null);
       setUser(null);
       throw error;
@@ -180,11 +153,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(true);
       const response = await authService.loginWithContext(credentials);
 
-      // Save token
       setToken(response.access_token);
-      saveToken(response.access_token);
+      await persistAuthTokens(response.access_token, response.refresh_token);
 
-      // Merge tenant info and profile_image_path into user
       const userWithExtras = {
         ...response.user,
         tenant: response.tenant || response.user.tenant,
@@ -193,13 +164,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       recordUserLogin(userWithExtras.id);
 
-      // Save user information
       setUser(userWithExtras);
       saveUser(userWithExtras);
 
-      // Populate RBAC (roles, menus, permissions, rbac_version) here so every
-      // caller of loginWithContext gets a consistent RBAC state without having
-      // to remember to call setRBACData themselves.
       setRBACData({
         roles: response.roles,
         menus: response.menus,
@@ -212,7 +179,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       return response;
     } catch (error) {
-      clearAuthData();
+      await clearAuthSessionStorage();
       setToken(null);
       setUser(null);
       throw error;
@@ -223,7 +190,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const applyLoginContextResponse = useCallback((response: LoginContextResponse) => {
     setToken(response.access_token);
-    saveToken(response.access_token);
+    void persistAuthTokens(response.access_token, response.refresh_token);
 
     const userWithExtras = {
       ...response.user,
@@ -258,7 +225,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       // Ignore API errors, proceed to clear session
     } finally {
-      clearAuthData();
+      await clearAuthSessionStorage();
       clearRBACData();
       setToken(null);
       setUser(null);
@@ -293,7 +260,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [applyLoginContextResponse, navigate]);
 
-  /** Keep access token fresh while the user is active (JWT has no refresh until expiry otherwise). */
+  /** Keep access token fresh while the user is active. */
   useEffect(() => {
     if (!token) return;
 
@@ -303,9 +270,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const delay = Math.max(expMs - Date.now() - TOKEN_REFRESH_BEFORE_EXPIRY_MS, 30_000);
       return window.setTimeout(async () => {
         try {
-          const { access_token } = await authService.refreshAccessToken();
-          setToken(access_token);
-          saveToken(access_token);
+          const tokens = await authService.refreshAccessToken();
+          setToken(tokens.access_token);
+          await persistAuthTokens(tokens.access_token, tokens.refresh_token);
         } catch {
           /* 401 handled by api client; ignore transient errors */
         }
@@ -315,25 +282,55 @@ export function AuthProvider({ children }: AuthProviderProps) {
     let timeoutId = scheduleRefresh();
 
     const onTokenRefreshed = (event: Event) => {
-      const detail = (event as CustomEvent<{ access_token?: string }>).detail;
+      const detail = (event as CustomEvent<{ access_token?: string; refresh_token?: string | null }>).detail;
       if (detail?.access_token) {
         setToken(detail.access_token);
-        saveToken(detail.access_token);
+        setAccessTokenSync(detail.access_token);
       }
     };
 
     window.addEventListener(AUTH_TOKEN_REFRESHED_EVENT, onTokenRefreshed);
 
+    // On mobile, refresh when app returns to foreground in case access JWT expired in background.
+    let removeAppListener: (() => void) | undefined;
+    if (isNativePlatform()) {
+      void import("@capacitor/app").then(({ App }) => {
+        const handler = App.addListener("appStateChange", ({ isActive }) => {
+          if (!isActive) return;
+          void authService.refreshAccessToken()
+            .then(async (tokens) => {
+              setToken(tokens.access_token);
+              await persistAuthTokens(tokens.access_token, tokens.refresh_token);
+            })
+            .catch(() => {
+              /* ignore; next API 401 will force login if refresh truly expired */
+            });
+        });
+        void handler.then((h) => {
+          removeAppListener = () => {
+            void h.remove();
+          };
+        });
+      });
+    }
+
     return () => {
       if (timeoutId !== undefined) clearTimeout(timeoutId);
       window.removeEventListener(AUTH_TOKEN_REFRESHED_EVENT, onTokenRefreshed);
+      removeAppListener?.();
     };
   }, [token]);
 
   /**
    * Handle session timeout after inactivity
+   * On native mobile, long refresh-token sessions should not be killed by idle timer
+   * after the app is backgrounded — inactivity timeout remains for browser only.
    */
   useEffect(() => {
+    if (isNativePlatform()) {
+      return;
+    }
+
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const resetTimer = () => {
@@ -365,22 +362,49 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [isAuthenticated, logout]);
 
-  // Initialize: verify token and fetch user on mount
+  // Initialize: verify token (refresh if needed) and fetch user on mount
   useEffect(() => {
     const initializeAuth = async () => {
-      const storedToken = getStoredToken();
+      const storedToken = getAccessTokenSync();
       const storedUser = getStoredUser();
+
+      const hydrateFromRefresh = async (): Promise<boolean> => {
+        try {
+          const { refreshTokenPair } = await import("../api/tokenRefresh");
+          const pair = await refreshTokenPair();
+          if (!pair?.access_token) return false;
+          setToken(pair.access_token);
+          const userData = await authService.getCurrentUser();
+          setUser(userData);
+          saveUser(userData);
+          return true;
+        } catch {
+          return false;
+        }
+      };
 
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(storedUser);
 
-        // Verify token is still valid by fetching current user
         try {
+          // getCurrentUser goes through 401 interceptor which will use refresh token if needed
           await refreshUser();
         } catch {
-          // Token invalid, clear auth data
-          clearAuthData();
+          const recovered = await hydrateFromRefresh();
+          if (!recovered) {
+            await clearAuthSessionStorage();
+            setToken(null);
+            setUser(null);
+          }
+        }
+      } else {
+        // Partial storage or cold reopen: recover via long-lived refresh token when present.
+        const recovered = await hydrateFromRefresh();
+        if (!recovered) {
+          if (storedToken || storedUser) {
+            await clearAuthSessionStorage();
+          }
           setToken(null);
           setUser(null);
         }
@@ -390,7 +414,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     initializeAuth();
-  }, [refreshUser]);
+    // Run once on mount; refreshUser identity is not needed as a dep for init.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Memoize context value to prevent unnecessary re-renders of consumers
   const value: AuthContextType = useMemo(

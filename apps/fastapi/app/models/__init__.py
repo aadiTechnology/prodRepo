@@ -12,6 +12,7 @@ from app.models.feature import Feature
 from app.models.menu import Menu
 from app.models.user_profile import UserProfile
 from app.models.revoked_token import RevokedToken
+from app.models.refresh_token import RefreshToken
 from app.models.ai_entities import Requirement, UserStory, TestCase, DevelopmentTask
 from app.models.theme_template import ThemeTemplate
 from app.models.class_fee_structure_assignment import ClassFeeStructureAssignment, AssignmentStatus
@@ -78,6 +79,7 @@ __all__ = [
     "Permission",
     "role_permissions",
     "RevokedToken",
+    "RefreshToken",
     "Requirement",
     "UserStory",
     "TestCase",
