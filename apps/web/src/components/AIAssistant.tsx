@@ -29,6 +29,8 @@ import {
   isAiAssistantPermissionPath,
   isSidebarHiddenModule,
 } from "../utils/menuNavigation";
+import { isNativePlatform } from "../utils/capacitor";
+import { startNativeSpeechSession } from "../utils/nativeSpeechRecognition";
 import type { MenuNode } from "../types/menu";
 
 type MessageRole = "user" | "assistant";
@@ -1185,7 +1187,69 @@ export default function AIAssistant() {
     setTypeaheadOpen(value.trim().length > 0);
   }, []);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
+    if (chatState === "processing") return;
+
+    // Second tap while listening stops recognition (native + browser).
+    if (chatState === "listening" && recognitionRef.current) {
+      recognitionRef.current.stop();
+      return;
+    }
+
+    // Capacitor Android/iOS: native SpeechRecognizer via Capgo plugin.
+    // Android WebView does not reliably support browser Web Speech API.
+    if (isNativePlatform()) {
+      transcriptRef.current = "";
+      submittedRef.current = false;
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+
+      const session = await startNativeSpeechSession({
+        language: "en-US",
+        onPartial: (text) => {
+          transcriptRef.current = text;
+        },
+        onComplete: (result) => {
+          recognitionRef.current = null;
+          if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+          }
+          setChatState((s) => (s === "listening" ? "idle" : s));
+          if (submittedRef.current) return;
+          if (result.ok) {
+            const transcript = result.transcript.trim();
+            if (!transcript) return;
+            submittedRef.current = true;
+            submitText(transcript, "voice");
+            return;
+          }
+          if (result.failure === "user_cancelled" || !result.message) return;
+          appendLocal("assistant", result.message, true);
+        },
+      });
+
+      if (!session) {
+        // onComplete already reported permission / availability errors
+        return;
+      }
+
+      recognitionRef.current = {
+        stop: () => session.stop({ intentional: true }),
+      };
+      setChatState("listening");
+
+      silenceTimerRef.current = setTimeout(() => {
+        silenceTimerRef.current = null;
+        // Silence timeout is not an intentional cancel → empty result surfaces as no_speech
+        session.stop();
+      }, SILENCE_MS);
+      return;
+    }
+
+    // Browser / web: keep existing Web Speech API implementation.
     const Win = window as Window & {
       SpeechRecognition?: new () => {
         start: () => void;
@@ -1195,7 +1259,7 @@ export default function AIAssistant() {
         lang: string;
         onresult: ((e: { results: Array<Array<{ transcript: string }>> }) => void) | null;
         onend: (() => void) | null;
-        onerror: (() => void) | null;
+        onerror: ((e: Event) => void) | null;
       };
       webkitSpeechRecognition?: new () => {
         start: () => void;
@@ -1205,11 +1269,18 @@ export default function AIAssistant() {
         lang: string;
         onresult: ((e: { results: Array<Array<{ transcript: string }>> }) => void) | null;
         onend: (() => void) | null;
-        onerror: (() => void) | null;
+        onerror: ((e: Event) => void) | null;
       };
     };
     const API = Win.SpeechRecognition ?? Win.webkitSpeechRecognition;
-    if (!API || chatState === "processing") return;
+    if (!API) {
+      appendLocal(
+        "assistant",
+        "Voice chat is not supported in this browser. Please type your message instead.",
+        true
+      );
+      return;
+    }
 
     transcriptRef.current = "";
     submittedRef.current = false;
@@ -1238,14 +1309,50 @@ export default function AIAssistant() {
       submitText(transcript, "voice");
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: Event) => {
+      const speechErr = event as Event & { error?: string; message?: string };
       recognitionRef.current = null;
       setChatState((s) => (s === "listening" ? "idle" : s));
+      const code = speechErr.error ?? "";
+      if (code === "aborted" || code === "aborted-by-user") return;
+      if (code === "not-allowed") {
+        appendLocal(
+          "assistant",
+          "Microphone permission is required for voice chat. Enable it in App Settings → Permissions.",
+          true
+        );
+        return;
+      }
+      if (code === "no-speech" || code === "audio-capture") {
+        appendLocal(
+          "assistant",
+          "I didn't catch any speech. Tap the microphone and try again.",
+          true
+        );
+        return;
+      }
+      if (code === "service-not-allowed" || code === "network") {
+        appendLocal(
+          "assistant",
+          "Voice recognition is unavailable right now. Please type your message instead.",
+          true
+        );
+      }
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
-    setChatState("listening");
+    try {
+      recognition.start();
+      setChatState("listening");
+    } catch {
+      recognitionRef.current = null;
+      appendLocal(
+        "assistant",
+        "Voice recognition failed to start. Please try again or type your message.",
+        true
+      );
+      return;
+    }
 
     silenceTimerRef.current = setTimeout(() => {
       silenceTimerRef.current = null;
@@ -1253,7 +1360,7 @@ export default function AIAssistant() {
         recognitionRef.current.stop();
       }
     }, SILENCE_MS);
-  }, [chatState, submitText]);
+  }, [appendLocal, chatState, submitText]);
 
   useEffect(() => {
     return () => {

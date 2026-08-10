@@ -14,6 +14,7 @@ This guide covers building and running **Preschool ERP** (`com.aaditech.preschoo
 | Path | Purpose |
 |------|---------|
 | `capacitor.config.ts` | App ID, name, web dir, splash/status-bar plugins |
+| `scripts/ensure-android-microphone-permission.mjs` | Declares `RECORD_AUDIO` in AndroidManifest after sync (voice chat) |
 | `.env.production` | Production API URL baked into release builds |
 | `.env.capacitor` | Emulator dev build pointing at host FastAPI (`10.0.2.2`) |
 | `resources/` | Source icon/splash PNGs for `@capacitor/assets` |
@@ -95,6 +96,11 @@ npm run cap:build:dev  # emulator dev API
 ```
 
 You only need `npm run cap:sync` if you changed Capacitor plugins or `capacitor.config.ts`.
+
+`npm run cap:sync` also runs `cap:permissions:android`, which ensures
+`<uses-permission android:name="android.permission.RECORD_AUDIO" />` is present in
+`android/app/src/main/AndroidManifest.xml` (needed for voice chat on Android; the
+native project is gitignored).
 
 ## React Router
 
