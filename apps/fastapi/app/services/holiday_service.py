@@ -400,6 +400,17 @@ def list_holidays(
     )
 
 
+def _looks_like_exam(
+    holiday_name: str,
+    *,
+    holiday_type: str | None = None,
+    holiday_type_label: str | None = None,
+) -> bool:
+    """Match notification_service exam heuristic (type / name / label contains EXAM)."""
+    text = f"{holiday_type or ''} {holiday_name or ''} {holiday_type_label or ''}".upper()
+    return "EXAM" in text
+
+
 def _emit_holiday_notification(
     db: Session,
     *,
@@ -412,9 +423,18 @@ def _emit_holiday_notification(
     actor_name: str | None = None,
     class_ids: list[int] | None = None,
     division_ids: list[int] | None = None,
+    holiday_type: str | None = None,
+    holiday_type_label: str | None = None,
 ) -> None:
-    """Call shared Notification Create API after holiday lifecycle events (non-blocking)."""
+    """Call shared Notification Create API after holiday lifecycle events (non-blocking).
+
+    FCM is gated by tenant schedule Push ON/OFF inside create_notification (module holiday/exam).
+    """
     hname = (holiday_name or "Holiday").strip() or "Holiday"
+    is_exam = _looks_like_exam(
+        hname, holiday_type=holiday_type, holiday_type_label=holiday_type_label
+    )
+    module = "exam" if is_exam else "holiday"
     if event == "updated":
         body = f"{hname} holiday has been updated."
     elif event == "deleted":
@@ -431,7 +451,7 @@ def _emit_holiday_notification(
             subject="Holiday Notification",
             body=body,
             created_by=actor_user_id,
-            module="holiday",
+            module=module,
             entity_id=holiday_id,
             event=event,
             holiday_class_ids=class_ids or [],
@@ -512,6 +532,8 @@ def create_holiday(
         actor_name=actor_name,
         class_ids=c_ids,
         division_ids=d_ids,
+        holiday_type=db_htype,
+        holiday_type_label=htype_label,
     )
 
     return _to_response(row)
@@ -623,6 +645,8 @@ def update_holiday(
         actor_name=actor_name,
         class_ids=c_ids,
         division_ids=d_ids,
+        holiday_type=str(row.holiday_type) if row.holiday_type else None,
+        holiday_type_label=pack_htype_label,
     )
 
     return _to_response(row)
@@ -645,7 +669,7 @@ def delete_holiday(
         return
 
     hname = str(row.holiday_name or "Holiday")
-    stored_aud, stored_c, stored_d, _, _, _ = unpack_holiday_description(row.description)
+    stored_aud, stored_c, stored_d, _, type_label, _ = unpack_holiday_description(row.description)
     aud = (stored_aud or "TEACHER").strip().upper() or "TEACHER"
 
     row.is_active = False
@@ -663,4 +687,6 @@ def delete_holiday(
         actor_name=actor_name,
         class_ids=stored_c,
         division_ids=stored_d,
+        holiday_type=str(row.holiday_type) if row.holiday_type else None,
+        holiday_type_label=type_label,
     )

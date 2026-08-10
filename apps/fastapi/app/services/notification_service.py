@@ -245,7 +245,8 @@ def create_notification(
 
     Persists to `notifications`, fans out to `user_notifications` for the in-app
     inbox, then best-effort FCM push to registered device tokens (only for newly
-    inserted recipients). FCM failures never fail this create.
+    inserted recipients). For holiday/exam modules, FCM is also gated by the tenant
+    schedule config push_enabled flags. FCM failures never fail this create.
     """
     tid = _require_tenant(tenant_id)
 
@@ -365,8 +366,18 @@ def create_notification(
         inbox_source_key,
     )
 
-    # 3) FCM push — only newly delivered recipients; never fail notification creation
-    if send_push and delivered_user_ids:
+    # 3) FCM push — only newly delivered recipients; never fail notification creation.
+    # Holiday/Exam: honor tenant schedule Push ON/OFF for lifecycle and scheduled paths.
+    should_push = bool(send_push) and bool(delivered_user_ids)
+    if should_push and module_key in ("holiday", "exam"):
+        if not _module_schedule_push_enabled(db, tenant_id=tid, module=module_key):
+            logger.info(
+                "FCM suppressed by schedule push_enabled=false notification_id=%s module=%s",
+                master.id,
+                module_key,
+            )
+            should_push = False
+    if should_push:
         _dispatch_fcm_push(
             db,
             tenant_id=tid,
@@ -532,6 +543,14 @@ def _is_exam_holiday(holiday: Holiday) -> bool:
     _, _, _, _, type_label, _ = unpack_holiday_description(holiday.description)
     text = f"{holiday.holiday_type or ''} {holiday.holiday_name or ''} {type_label or ''}".upper()
     return "EXAM" in text
+
+
+def _module_schedule_push_enabled(db: Session, *, tenant_id: int, module: str) -> bool:
+    """Tenant admin schedule Push toggle for holiday/exam (in-app is independent)."""
+    config = repo.get_or_create_schedule_config(db, tenant_id=tenant_id)
+    if (module or "").strip().lower() == "exam":
+        return bool(config.exam_push_enabled)
+    return bool(config.holiday_push_enabled)
 
 
 def _holiday_covers_day(holiday: Holiday, day: date) -> bool:
