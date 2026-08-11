@@ -9,6 +9,10 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import dayjs, { type Dayjs } from "dayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { TimePicker } from "@mui/x-date-pickers/TimePicker";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
 import LockIcon from "@mui/icons-material/Lock";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
@@ -54,6 +58,18 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
   const actionsLocked =
     !isAdminLike &&
     (approvalState === "Waiting for Approval" || approvalState === "Approved");
+  const toPickerValue = (timeValue: string): Dayjs | null => {
+    if (!timeValue) return null;
+    const [hourRaw, minuteRaw] = timeValue.split(":");
+    const hour = Number(hourRaw);
+    const minute = Number(minuteRaw);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    return dayjs().hour(hour).minute(minute).second(0).millisecond(0);
+  };
+  const fromPickerValue = (next: Dayjs | null): string => {
+    if (!next) return "";
+    return next.format("HH:mm");
+  };
 
   const statusChip =
     approvalState === "Approved" ? (
@@ -202,32 +218,40 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
               />
             </Stack>
 
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                label="Check In"
-                type="time"
-                value={markDraft.checkInTime}
-                onChange={(e) => updateMarkDraft("checkInTime", e.target.value)}
-                size="small"
-                fullWidth
-                sx={{ flex: 1 }}
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ "data-testid": "input-mark-check-in" }}
-                data-testid="field-mark-check-in"
-              />
-              <TextField
-                label="Check Out"
-                type="time"
-                value={markDraft.checkOutTime}
-                onChange={(e) => updateMarkDraft("checkOutTime", e.target.value)}
-                size="small"
-                fullWidth
-                sx={{ flex: 1 }}
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ "data-testid": "input-mark-check-out" }}
-                data-testid="field-mark-check-out"
-              />
-            </Stack>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TimePicker
+                  label="Check In"
+                  ampm
+                  value={toPickerValue(markDraft.checkInTime)}
+                  onChange={(next) => updateMarkDraft("checkInTime", fromPickerValue(next))}
+                  slotProps={{
+                    textField: {
+                      size: "small",
+                      fullWidth: true,
+                      sx: { flex: 1 },
+                      inputProps: { "data-testid": "input-mark-check-in" },
+                      "data-testid": "field-mark-check-in",
+                    },
+                  }}
+                />
+                <TimePicker
+                  label="Check Out"
+                  ampm
+                  value={toPickerValue(markDraft.checkOutTime)}
+                  onChange={(next) => updateMarkDraft("checkOutTime", fromPickerValue(next))}
+                  slotProps={{
+                    textField: {
+                      size: "small",
+                      fullWidth: true,
+                      sx: { flex: 1 },
+                      inputProps: { "data-testid": "input-mark-check-out" },
+                      "data-testid": "field-mark-check-out",
+                    },
+                  }}
+                />
+              </Stack>
+            </LocalizationProvider>
 
             <TextField
               label="Remarks"
