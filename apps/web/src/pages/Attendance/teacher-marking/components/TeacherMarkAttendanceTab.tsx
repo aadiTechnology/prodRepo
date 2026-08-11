@@ -232,7 +232,6 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
                       fullWidth: true,
                       sx: { flex: 1 },
                       inputProps: { "data-testid": "input-mark-check-in" },
-                      "data-testid": "field-mark-check-in",
                     },
                   }}
                 />
@@ -247,7 +246,6 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
                       fullWidth: true,
                       sx: { flex: 1 },
                       inputProps: { "data-testid": "input-mark-check-out" },
-                      "data-testid": "field-mark-check-out",
                     },
                   }}
                 />

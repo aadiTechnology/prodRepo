@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -9,6 +9,7 @@ import {
   IconButton,
   MenuItem,
   Stack,
+  TablePagination,
   TextField,
   Tooltip,
   Typography,
@@ -28,6 +29,7 @@ interface AdminAttendanceDetailsTabProps {
 export default function AdminAttendanceDetailsTab({
   controller,
 }: AdminAttendanceDetailsTabProps) {
+  const DEFAULT_ROWS_PER_PAGE = 20;
   const {
     filteredDetailsRecords,
     detailsFilters,
@@ -42,6 +44,22 @@ export default function AdminAttendanceDetailsTab({
 
   const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
+
+  useEffect(() => {
+    setPage(0);
+  }, [detailsFilters.teacherId, detailsFilters.approvalStatus]);
+
+  const pagedRecords = useMemo(
+    () => filteredDetailsRecords.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+    [filteredDetailsRecords, page, rowsPerPage]
+  );
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(filteredDetailsRecords.length / rowsPerPage) - 1);
+    if (page > maxPage) setPage(maxPage);
+  }, [filteredDetailsRecords.length, page, rowsPerPage]);
 
   const openRejectDialog = (recordId: string) => {
     setRejectTargetId(recordId);
@@ -202,7 +220,7 @@ export default function AdminAttendanceDetailsTab({
 
         <DataTable<TeacherAttendanceRecord>
           columns={columns}
-          data={filteredDetailsRecords}
+          data={pagedRecords}
           emptyMessage={
             <Typography variant="body2" color="text.secondary">
               No attendance records match the selected filters.
@@ -212,6 +230,22 @@ export default function AdminAttendanceDetailsTab({
           data-testid="table-attendance-details"
           rowTestId={(row) => `attendance-details-row-${row.id}`}
         />
+        {filteredDetailsRecords.length > DEFAULT_ROWS_PER_PAGE ? (
+          <TablePagination
+            component="div"
+            count={filteredDetailsRecords.length}
+            page={page}
+            onPageChange={(_, nextPage) => setPage(nextPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(event) => {
+              const next = Number(event.target.value) || DEFAULT_ROWS_PER_PAGE;
+              setRowsPerPage(next);
+              setPage(0);
+            }}
+            rowsPerPageOptions={[20, 50, 100]}
+            data-testid="attendance-details-pagination"
+          />
+        ) : null}
       </Stack>
 
       <Dialog
