@@ -38,7 +38,12 @@ from app.models import (  # noqa: F401
     ActivityGallery,
     ActivityGalleryMedia,
     ActivityGalleryClassMapping,
+    SupportFaq,
+    SupportFaqAttachment,
+    SupportFaqFeedback,
+    SupportProductUpdate,
     Syllabus,
+    StaffAttendance,
     UserNotification,
     UserNotificationSettings,
     Notification,
@@ -155,6 +160,11 @@ from app.routers import marketing_hub
 app.include_router(marketing_hub.router)
 from app.routers import activity_gallery_router
 app.include_router(activity_gallery_router.router)
+from app.routers import support_router
+app.include_router(support_router.faq_router)
+app.include_router(support_router.product_update_router)
+from app.routers import staff_attendance_router
+app.include_router(staff_attendance_router.router)
 from app.routers import syllabus_router
 app.include_router(syllabus_router.router)
 from app.routers import notification_router
@@ -175,6 +185,10 @@ os.makedirs("static/activity-gallery-media", exist_ok=True)
 app.mount("/activity-gallery-media", StaticFiles(directory="static/activity-gallery-media"), name="activity-gallery-media")
 os.makedirs("static/notice-attachments", exist_ok=True)
 app.mount("/notice-attachments", StaticFiles(directory="static/notice-attachments"), name="notice-attachments")
+os.makedirs("static/support-faq-attachments", exist_ok=True)
+app.mount("/support-faq-attachments", StaticFiles(directory="static/support-faq-attachments"), name="support-faq-attachments")
+os.makedirs("static/support-release-notes", exist_ok=True)
+app.mount("/support-release-notes", StaticFiles(directory="static/support-release-notes"), name="support-release-notes")
 os.makedirs("static/syllabus-attachments", exist_ok=True)
 app.mount("/syllabus-attachments", StaticFiles(directory="static/syllabus-attachments"), name="syllabus-attachments")
 

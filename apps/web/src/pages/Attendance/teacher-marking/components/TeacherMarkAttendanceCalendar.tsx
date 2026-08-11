@@ -15,39 +15,76 @@ import {
   EventNote as LeaveIcon,
   Warning as HalfDayIcon,
   FiberManualRecord as DotIcon,
+  HourglassEmpty as WaitingIcon,
 } from "@mui/icons-material";
 
 import { colorTokens } from "../../../../tokens/colors";
-import type { TeacherAttendanceStatus } from "../teacherAttendanceMarking.types";
+import type {
+  ApprovalStatus,
+  TeacherAttendanceStatus,
+} from "../teacherAttendanceMarking.types";
 import { toIsoDate } from "../teacherAttendanceMarking.utils";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 const STATUS_META: Record<
   TeacherAttendanceStatus,
-  { color: string; Icon: React.ElementType }
+  { color: string; Icon: React.ElementType; label: string }
 > = {
-  Present: { color: colorTokens.preschool.mint.main, Icon: PresentIcon },
-  Absent: { color: colorTokens.preschool.coral.main, Icon: AbsentIcon },
-  Late: { color: colorTokens.preschool.peach.main, Icon: LateIcon },
-  "Half Day": { color: "#8b5cf6", Icon: HalfDayIcon },
-  Leave: { color: colorTokens.preschool.lavender.main, Icon: LeaveIcon },
-  Holiday: { color: colorTokens.text.secondary, Icon: DotIcon },
-  Others: { color: "#94a3b8", Icon: DotIcon },
+  Present: { color: colorTokens.preschool.mint.main, Icon: PresentIcon, label: "Present" },
+  Absent: { color: colorTokens.preschool.coral.main, Icon: AbsentIcon, label: "Absent" },
+  Late: { color: colorTokens.preschool.peach.main, Icon: LateIcon, label: "Late" },
+  "Half Day": { color: "#8b5cf6", Icon: HalfDayIcon, label: "Half Day" },
+  Leave: { color: colorTokens.preschool.lavender.main, Icon: LeaveIcon, label: "Leave" },
+  Holiday: { color: colorTokens.text.secondary, Icon: DotIcon, label: "Holiday" },
+  Others: { color: "#94a3b8", Icon: DotIcon, label: "Others" },
+};
+
+const APPROVAL_META: Partial<
+  Record<ApprovalStatus, { color: string; Icon: React.ElementType; label: string }>
+> = {
+  Rejected: {
+    color: colorTokens.preschool.coral.main,
+    Icon: AbsentIcon,
+    label: "Rejected",
+  },
+  "Waiting for Approval": {
+    color: colorTokens.preschool.peach.main,
+    Icon: WaitingIcon,
+    label: "Waiting for Approval",
+  },
 };
 
 interface TeacherMarkAttendanceCalendarProps {
   month: Date;
   selectedDate: string;
   statusByDate: Record<string, TeacherAttendanceStatus>;
+  /** Approval overrides calendar icon: Rejected=red, Waiting=orange, Approved=status color */
+  approvalByDate?: Record<string, ApprovalStatus>;
   onMonthChange: (next: Date) => void;
   onDateSelect: (iso: string) => void;
+}
+
+function resolveCellMeta(
+  status: TeacherAttendanceStatus | undefined,
+  approval: ApprovalStatus | undefined
+): { color: string; Icon: React.ElementType; label: string } | null {
+  if (approval === "Rejected") {
+    return APPROVAL_META.Rejected!;
+  }
+  if (approval === "Waiting for Approval") {
+    return APPROVAL_META["Waiting for Approval"]!;
+  }
+  // Approved / draft / no approval → show attendance status (Present=green, Late=orange, …)
+  if (!status) return null;
+  return STATUS_META[status];
 }
 
 export default function TeacherMarkAttendanceCalendar({
   month,
   selectedDate,
   statusByDate,
+  approvalByDate = {},
   onMonthChange,
   onDateSelect,
 }: TeacherMarkAttendanceCalendarProps) {
@@ -72,9 +109,10 @@ export default function TeacherMarkAttendanceCalendar({
         day: dayNumber,
         iso,
         status: statusByDate[iso],
+        approval: approvalByDate[iso],
       };
     });
-  }, [monthIndex, statusByDate, year]);
+  }, [monthIndex, statusByDate, approvalByDate, year]);
 
   const monthLabel = month.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
@@ -129,7 +167,7 @@ export default function TeacherMarkAttendanceCalendar({
           }
 
           const isSelected = cell.iso === selectedDate;
-          const meta = cell.status ? STATUS_META[cell.status] : null;
+          const meta = resolveCellMeta(cell.status, cell.approval);
           const StatusIcon = meta?.Icon;
 
           return (
@@ -166,7 +204,12 @@ export default function TeacherMarkAttendanceCalendar({
               <Typography variant="caption" sx={{ fontWeight: 700, lineHeight: 1 }}>
                 {cell.day}
               </Typography>
-              {StatusIcon ? <StatusIcon sx={{ fontSize: 14, color: meta!.color }} /> : null}
+              {StatusIcon ? (
+                <StatusIcon
+                  sx={{ fontSize: 14, color: meta!.color }}
+                  titleAccess={meta!.label}
+                />
+              ) : null}
             </Box>
           );
         })}

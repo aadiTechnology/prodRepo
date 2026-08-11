@@ -1,31 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import staffAttendanceService, {
+  type StaffAttendanceResponse,
+} from "../api/services/staffAttendanceService";
+import teacherService from "../api/services/teacherService";
+import { useAuth } from "../context/AuthContext";
 import { useAttendanceReportRole } from "./useAttendanceReportRole";
 import {
-  createInitialTeacherAttendanceRecords,
-  getActiveTeachers,
-  getShiftById,
-  getTeacherById,
   MOCK_GRACE_TIME,
-  MOCK_LOGGED_IN_ADMIN_ID,
-  MOCK_LOGGED_IN_TEACHER_ID,
   MOCK_OFFICE_TIMING,
 } from "../pages/Attendance/teacher-marking/teacherAttendanceMarking.mock";
 import type {
   ApprovalStatus,
-  RemarkHistoryEntry,
   TeacherAttendanceRecord,
   TeacherAttendanceStatus,
+  TeacherProfile,
 } from "../pages/Attendance/teacher-marking/teacherAttendanceMarking.types";
 import { MAX_REMARKS_LENGTH } from "../pages/Attendance/teacher-marking/teacherAttendanceMarking.types";
 import {
-  calculateOvertime,
-  calculateWorkingHours,
   formatCurrentTime,
   getTodayIso,
   isFutureDate,
   primaryCalendarStatus,
   resolveStatusAfterCheckIn,
+  toIsoDate,
 } from "../pages/Attendance/teacher-marking/teacherAttendanceMarking.utils";
 
 export type TeacherAttendanceTab = "check-in-out" | "mark-attendance" | "attendance-details";
@@ -40,33 +38,6 @@ export type AttendanceDetailsFilters = {
   teacherId: string;
   approvalStatus: ApprovalStatus | "";
 };
-
-function createId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function createEmptyRecord(teacherId: string, date: string): TeacherAttendanceRecord {
-  return {
-    id: createId("tar"),
-    teacherId,
-    date,
-    statuses: [],
-    checkInTime: null,
-    checkOutTime: null,
-    remarks: "",
-    remarkHistory: [],
-    workingHoursMinutes: null,
-    overtimeMinutes: null,
-    isSubmitted: false,
-    payrollProcessed: false,
-    approvalStatus: "Waiting for Approval",
-    rejectionReason: "",
-  };
-}
-
-function emptyMarkDraft(): TeacherMarkDraft {
-  return { checkInTime: "", checkOutTime: "", remarks: "" };
-}
 
 function parseTimeSafe(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -88,8 +59,56 @@ function upsertRecord(
   return [...records, record];
 }
 
-function getMarkableTeachers() {
-  return getActiveTeachers().filter((t) => t.id !== MOCK_LOGGED_IN_ADMIN_ID);
+function mapApiRecord(row: StaffAttendanceResponse): TeacherAttendanceRecord {
+  const status = (row.status || "Present") as TeacherAttendanceStatus;
+  return {
+    id: String(row.id),
+    teacherId: String(row.teacher_id),
+    date: String(row.attendance_date).slice(0, 10),
+    statuses: status ? [status] : [],
+    checkInTime: row.check_in_time,
+    checkOutTime: row.check_out_time,
+    remarks: row.remarks ?? "",
+    remarkHistory: [],
+    workingHoursMinutes: row.working_hours_minutes,
+    overtimeMinutes: row.overtime_minutes,
+    isSubmitted: !!row.is_submitted,
+    payrollProcessed: false,
+    approvalStatus: (row.approval_status as ApprovalStatus) || "Waiting for Approval",
+    rejectionReason: row.rejection_reason ?? "",
+  };
+}
+
+function createEmptyRecord(teacherId: string, date: string): TeacherAttendanceRecord {
+  return {
+    id: "",
+    teacherId,
+    date,
+    statuses: [],
+    checkInTime: null,
+    checkOutTime: null,
+    remarks: "",
+    remarkHistory: [],
+    workingHoursMinutes: null,
+    overtimeMinutes: null,
+    isSubmitted: false,
+    payrollProcessed: false,
+    approvalStatus: "Waiting for Approval",
+    rejectionReason: "",
+  };
+}
+
+function emptyMarkDraft(): TeacherMarkDraft {
+  return { checkInTime: "", checkOutTime: "", remarks: "" };
+}
+
+function monthRange(month: Date): { from: string; to: string } {
+  const y = month.getFullYear();
+  const m = month.getMonth();
+  const from = toIsoDate(y, m, 1);
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  const to = toIsoDate(y, m, lastDay);
+  return { from, to };
 }
 
 export type TeacherAttendanceMarkingController = ReturnType<
@@ -97,20 +116,24 @@ export type TeacherAttendanceMarkingController = ReturnType<
 >;
 
 export function useTeacherAttendanceMarkingController() {
+  const { user } = useAuth();
   const { isTeacher, isAdminLike } = useAttendanceReportRole();
-  const selfTeacherId = isTeacher ? MOCK_LOGGED_IN_TEACHER_ID : MOCK_LOGGED_IN_ADMIN_ID;
-  const markableTeachers = useMemo(() => getMarkableTeachers(), []);
   const today = getTodayIso();
 
-  const [records, setRecords] = useState<TeacherAttendanceRecord[]>(
-    createInitialTeacherAttendanceRecords
-  );
+  const [teachers, setTeachers] = useState<TeacherProfile[]>([]);
+  const [teachersLoading, setTeachersLoading] = useState(true);
+  const [teachersError, setTeachersError] = useState<string | null>(null);
+  const [selfTeacherId, setSelfTeacherId] = useState<string>("");
+
+  const [records, setRecords] = useState<TeacherAttendanceRecord[]>([]);
+  const [recordsLoading, setRecordsLoading] = useState(false);
+  const [recordsError, setRecordsError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
   const [activeTab, setActiveTab] = useState<TeacherAttendanceTab>("check-in-out");
   const [checkInOutErrors, setCheckInOutErrors] = useState<string[]>([]);
   const [markDate, setMarkDate] = useState(today);
-  const [markTeacherId, setMarkTeacherId] = useState(
-    isTeacher ? MOCK_LOGGED_IN_TEACHER_ID : markableTeachers[0]?.id ?? MOCK_LOGGED_IN_TEACHER_ID
-  );
+  const [markTeacherId, setMarkTeacherId] = useState("");
   const [markDraft, setMarkDraft] = useState<TeacherMarkDraft>(emptyMarkDraft);
   const [markErrors, setMarkErrors] = useState<string[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
@@ -120,15 +143,9 @@ export function useTeacherAttendanceMarkingController() {
     approvalStatus: "",
   });
 
-  const selfTeacher = useMemo(() => getTeacherById(selfTeacherId), [selfTeacherId]);
-  const markTeacher = useMemo(() => getTeacherById(markTeacherId), [markTeacherId]);
-  const selfShift = useMemo(
-    () => (selfTeacher ? getShiftById(selfTeacher.shiftId) : undefined),
-    [selfTeacher]
-  );
-  const markShift = useMemo(
-    () => (markTeacher ? getShiftById(markTeacher.shiftId) : undefined),
-    [markTeacher]
+  const markableTeachers = useMemo(
+    () => teachers.filter((t) => t.employmentStatus === "active"),
+    [teachers]
   );
 
   useEffect(() => {
@@ -136,7 +153,106 @@ export function useTeacherAttendanceMarkingController() {
     return () => clearInterval(timer);
   }, []);
 
+  // Load active teachers from API
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setTeachersLoading(true);
+      setTeachersError(null);
+      try {
+        const res = await teacherService.list({ status: "active", limit: 500, skip: 0 });
+        if (cancelled) return;
+        const mapped: TeacherProfile[] = (res.items || []).map((t) => ({
+          id: String(t.id),
+          name: t.full_name,
+          employmentStatus: t.is_active ? "active" : "inactive",
+          shiftId: "shift-1",
+        }));
+        setTeachers(mapped);
+
+        const linked = (res.items || []).find((t) => t.user_id != null && t.user_id === user?.id);
+        const resolvedSelf = linked ? String(linked.id) : "";
+        setSelfTeacherId(resolvedSelf);
+
+        if (isTeacher && resolvedSelf) {
+          setMarkTeacherId(resolvedSelf);
+        } else if (!isTeacher && mapped[0]) {
+          setMarkTeacherId((prev) => prev || mapped[0].id);
+        }
+      } catch (err: unknown) {
+        if (cancelled) return;
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message?: string }).message || "Failed to load teachers")
+            : "Failed to load teachers";
+        setTeachersError(message);
+        setTeachers([]);
+      } finally {
+        if (!cancelled) setTeachersLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, isTeacher]);
+
+  const refreshRecords = useCallback(
+    async (opts?: { teacherId?: string; month?: Date }) => {
+      const teacherId = opts?.teacherId ?? (isAdminLike ? undefined : selfTeacherId || markTeacherId);
+      const month = opts?.month ?? calendarMonth;
+      const { from, to } = monthRange(month);
+
+      // For approval tab / admin overview, load a wider window when no teacher filter.
+      const fromDate = isAdminLike && activeTab === "attendance-details" ? undefined : from;
+      const toDate = isAdminLike && activeTab === "attendance-details" ? undefined : to;
+
+      setRecordsLoading(true);
+      setRecordsError(null);
+      try {
+        const res = await staffAttendanceService.list({
+          teacher_id: teacherId ? Number(teacherId) : undefined,
+          from_date: fromDate,
+          to_date: toDate,
+        });
+        setRecords((res.items || []).map(mapApiRecord));
+      } catch (err: unknown) {
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message?: string }).message || "Failed to load attendance")
+            : "Failed to load attendance";
+        setRecordsError(message);
+      } finally {
+        setRecordsLoading(false);
+      }
+    },
+    [activeTab, calendarMonth, isAdminLike, markTeacherId, selfTeacherId]
+  );
+
+  useEffect(() => {
+    if (teachersLoading) return;
+    if (isTeacher && !selfTeacherId) return;
+    if (!isTeacher && !markTeacherId && activeTab === "mark-attendance") return;
+    void refreshRecords({
+      teacherId:
+        activeTab === "mark-attendance"
+          ? markTeacherId
+          : activeTab === "check-in-out"
+            ? selfTeacherId
+            : detailsFilters.teacherId || undefined,
+    });
+  }, [
+    teachersLoading,
+    selfTeacherId,
+    markTeacherId,
+    calendarMonth,
+    activeTab,
+    detailsFilters.teacherId,
+    isTeacher,
+    refreshRecords,
+  ]);
+
   const todayRecord = useMemo(() => {
+    if (!selfTeacherId) return createEmptyRecord("", today);
     const existing = records.find((r) => r.teacherId === selfTeacherId && r.date === today);
     return existing ?? createEmptyRecord(selfTeacherId, today);
   }, [records, selfTeacherId, today]);
@@ -148,9 +264,10 @@ export function useTeacherAttendanceMarkingController() {
       ? currentTime
       : "—";
 
-  const showCheckInButton = !todayRecord.checkInTime;
-  const showCheckOutButton = !!todayRecord.checkInTime && !todayRecord.checkOutTime;
-  const buttonsDisabled = !!todayRecord.checkOutTime;
+  const showCheckInButton = !!selfTeacherId && !todayRecord.checkInTime;
+  const showCheckOutButton =
+    !!selfTeacherId && !!todayRecord.checkInTime && !todayRecord.checkOutTime;
+  const buttonsDisabled = !selfTeacherId || !!todayRecord.checkOutTime;
 
   const markRecord = useMemo(
     () => records.find((r) => r.teacherId === markTeacherId && r.date === markDate),
@@ -167,16 +284,25 @@ export function useTeacherAttendanceMarkingController() {
     return map;
   }, [records, markTeacherId]);
 
-  const filteredDetailsRecords = useMemo(() => {
-    let items = records.filter((r) => r.teacherId !== MOCK_LOGGED_IN_ADMIN_ID);
+  /** Used by calendar so Rejected ≠ green Present icon */
+  const calendarApprovalByDate = useMemo(() => {
+    const map: Record<string, ApprovalStatus> = {};
+    for (const record of records.filter((r) => r.teacherId === markTeacherId)) {
+      if (record.isSubmitted || record.approvalStatus === "Rejected") {
+        map[record.date] = record.approvalStatus;
+      }
+    }
+    return map;
+  }, [records, markTeacherId]);
 
+  const filteredDetailsRecords = useMemo(() => {
+    let items = [...records];
     if (detailsFilters.teacherId) {
       items = items.filter((r) => r.teacherId === detailsFilters.teacherId);
     }
     if (detailsFilters.approvalStatus) {
       items = items.filter((r) => r.approvalStatus === detailsFilters.approvalStatus);
     }
-
     return items.sort((a, b) => b.date.localeCompare(a.date));
   }, [records, detailsFilters]);
 
@@ -197,32 +323,66 @@ export function useTeacherAttendanceMarkingController() {
     loadMarkDraftForDate(markDate, markTeacherId);
   }, [markDate, markTeacherId, loadMarkDraftForDate]);
 
-  const handleCheckIn = useCallback(() => {
-    if (todayRecord.checkInTime || todayRecord.checkOutTime) return;
+  const persistMark = useCallback(
+    async (payload: {
+      teacherId: string;
+      date: string;
+      checkInTime: string | null;
+      checkOutTime: string | null;
+      remarks: string;
+      status?: TeacherAttendanceStatus;
+    }) => {
+      const saved = await staffAttendanceService.mark({
+        teacher_id: Number(payload.teacherId),
+        attendance_date: payload.date,
+        check_in_time: payload.checkInTime,
+        check_out_time: payload.checkOutTime,
+        remarks: payload.remarks || null,
+        status: payload.status,
+      });
+      const mapped = mapApiRecord(saved);
+      setRecords((prev) => upsertRecord(prev, mapped));
+      return mapped;
+    },
+    []
+  );
+
+  const handleCheckIn = useCallback(async () => {
+    if (!selfTeacherId || todayRecord.checkInTime || todayRecord.checkOutTime) return;
 
     const checkInTime = formatCurrentTime();
-    const shiftStart = selfShift?.startTime ?? MOCK_OFFICE_TIMING.startTime;
+    const officeStart = MOCK_OFFICE_TIMING.startTime;
     const autoStatus: TeacherAttendanceStatus = resolveStatusAfterCheckIn(
       checkInTime,
-      shiftStart,
+      officeStart,
       MOCK_GRACE_TIME.enabled,
       MOCK_GRACE_TIME.graceMinutes
     );
 
-    const updated: TeacherAttendanceRecord = {
-      ...todayRecord,
-      id: todayRecord.id || createId("tar"),
-      checkInTime,
-      statuses: [autoStatus],
-      approvalStatus: "Waiting for Approval",
-    };
-
-    setRecords((prev) => upsertRecord(prev, updated));
+    setSaving(true);
     setCheckInOutErrors([]);
-  }, [todayRecord, selfShift]);
+    try {
+      await persistMark({
+        teacherId: selfTeacherId,
+        date: today,
+        checkInTime,
+        checkOutTime: null,
+        remarks: todayRecord.remarks || "",
+        status: autoStatus,
+      });
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message?: string }).message || "Check-in failed")
+          : "Check-in failed";
+      setCheckInOutErrors([message]);
+    } finally {
+      setSaving(false);
+    }
+  }, [selfTeacherId, todayRecord, persistMark, today]);
 
-  const handleCheckOut = useCallback(() => {
-    if (!todayRecord.checkInTime || todayRecord.checkOutTime) return;
+  const handleCheckOut = useCallback(async () => {
+    if (!selfTeacherId || !todayRecord.checkInTime || todayRecord.checkOutTime) return;
 
     const checkOutTime = formatCurrentTime();
     if (parseTimeSafe(checkOutTime) < parseTimeSafe(todayRecord.checkInTime)) {
@@ -230,26 +390,27 @@ export function useTeacherAttendanceMarkingController() {
       return;
     }
 
-    const workingMinutes = calculateWorkingHours(todayRecord.checkInTime, checkOutTime);
-    const shiftEnd = selfShift?.endTime ?? MOCK_OFFICE_TIMING.endTime;
-    const overtimeMinutes = calculateOvertime(
-      workingMinutes,
-      todayRecord.checkInTime,
-      shiftEnd
-    );
-
-    const updated: TeacherAttendanceRecord = {
-      ...todayRecord,
-      checkOutTime,
-      workingHoursMinutes: workingMinutes,
-      overtimeMinutes,
-      isSubmitted: true,
-      approvalStatus: "Waiting for Approval",
-    };
-
-    setRecords((prev) => upsertRecord(prev, updated));
+    setSaving(true);
     setCheckInOutErrors([]);
-  }, [todayRecord, selfShift]);
+    try {
+      await persistMark({
+        teacherId: selfTeacherId,
+        date: today,
+        checkInTime: todayRecord.checkInTime,
+        checkOutTime,
+        remarks: todayRecord.remarks || "",
+        status: todayRecord.statuses[0],
+      });
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message?: string }).message || "Check-out failed")
+          : "Check-out failed";
+      setCheckInOutErrors([message]);
+    } finally {
+      setSaving(false);
+    }
+  }, [selfTeacherId, todayRecord, persistMark, today]);
 
   const setMarkDateSafe = useCallback((date: string) => {
     if (isFutureDate(date)) return;
@@ -276,14 +437,11 @@ export function useTeacherAttendanceMarkingController() {
     loadMarkDraftForDate(markDate, markTeacherId);
   }, [loadMarkDraftForDate, markDate, markTeacherId]);
 
-  const saveMarkAttendance = useCallback(() => {
+  const saveMarkAttendance = useCallback(async () => {
     const errors: string[] = [];
-    if (!markDate) {
-      errors.push("Attendance date is required.");
-    }
-    if (markDate && isFutureDate(markDate)) {
-      errors.push("Future date attendance is not allowed.");
-    }
+    if (!markTeacherId) errors.push("Teacher is required.");
+    if (!markDate) errors.push("Attendance date is required.");
+    if (markDate && isFutureDate(markDate)) errors.push("Future date attendance is not allowed.");
     if (markDraft.checkInTime && markDraft.checkOutTime) {
       if (parseTimeSafe(markDraft.checkOutTime) < parseTimeSafe(markDraft.checkInTime)) {
         errors.push("Check-out cannot happen before check-in.");
@@ -296,71 +454,41 @@ export function useTeacherAttendanceMarkingController() {
     setMarkErrors(errors);
     if (errors.length > 0) return;
 
-    const existing = markRecord ?? createEmptyRecord(markTeacherId, markDate);
-    const workingMinutes =
-      markDraft.checkInTime && markDraft.checkOutTime
-        ? calculateWorkingHours(markDraft.checkInTime, markDraft.checkOutTime)
-        : null;
-    const shiftEnd = markShift?.endTime ?? MOCK_OFFICE_TIMING.endTime;
-    const overtimeMinutes =
-      workingMinutes != null && markDraft.checkInTime
-        ? calculateOvertime(workingMinutes, markDraft.checkInTime, shiftEnd)
-        : null;
-
-    const shiftStart = markShift?.startTime ?? MOCK_OFFICE_TIMING.startTime;
-    let statuses: TeacherAttendanceStatus[] = existing.statuses;
-    if (markDraft.checkInTime && statuses.length === 0) {
-      statuses = [
-        resolveStatusAfterCheckIn(
-          markDraft.checkInTime,
-          shiftStart,
-          MOCK_GRACE_TIME.enabled,
-          MOCK_GRACE_TIME.graceMinutes
-        ),
-      ];
+    const officeStart = MOCK_OFFICE_TIMING.startTime;
+    // Always recompute Present/Late from check-in (never keep a sticky Late).
+    let status: TeacherAttendanceStatus | undefined;
+    if (markDraft.checkInTime) {
+      status = resolveStatusAfterCheckIn(
+        markDraft.checkInTime,
+        officeStart,
+        MOCK_GRACE_TIME.enabled,
+        MOCK_GRACE_TIME.graceMinutes
+      );
+    } else if (markRecord?.statuses[0]) {
+      status = markRecord.statuses[0];
     }
 
-    const remarkHistory: RemarkHistoryEntry[] = [...existing.remarkHistory];
-    const updatedBy = isAdminLike
-      ? selfTeacher?.name ?? "School Admin"
-      : markTeacher?.name ?? "Teacher";
-    if (markDraft.remarks.trim() && markDraft.remarks !== existing.remarks) {
-      remarkHistory.push({
-        id: createId("rh"),
-        text: markDraft.remarks,
-        updatedBy,
-        updatedAt: new Date().toISOString(),
+    setSaving(true);
+    try {
+      await persistMark({
+        teacherId: markTeacherId,
+        date: markDate,
+        checkInTime: markDraft.checkInTime || null,
+        checkOutTime: markDraft.checkOutTime || null,
+        remarks: markDraft.remarks.slice(0, MAX_REMARKS_LENGTH),
+        status,
       });
+      setMarkErrors([]);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message?: string }).message || "Save failed")
+          : "Save failed";
+      setMarkErrors([message]);
+    } finally {
+      setSaving(false);
     }
-
-    const updated: TeacherAttendanceRecord = {
-      ...existing,
-      teacherId: markTeacherId,
-      date: markDate,
-      checkInTime: markDraft.checkInTime || null,
-      checkOutTime: markDraft.checkOutTime || null,
-      remarks: markDraft.remarks.slice(0, MAX_REMARKS_LENGTH),
-      workingHoursMinutes: workingMinutes,
-      overtimeMinutes,
-      statuses,
-      remarkHistory,
-      isSubmitted: !!(markDraft.checkInTime && markDraft.checkOutTime),
-      approvalStatus: "Waiting for Approval",
-      rejectionReason: "",
-    };
-
-    setRecords((prev) => upsertRecord(prev, updated));
-    setMarkErrors([]);
-  }, [
-    markDate,
-    markDraft,
-    markRecord,
-    markShift,
-    markTeacher?.name,
-    markTeacherId,
-    isAdminLike,
-    selfTeacher?.name,
-  ]);
+  }, [markTeacherId, markDate, markDraft, markRecord, persistMark]);
 
   const updateDetailsFilter = useCallback(
     <K extends keyof AttendanceDetailsFilters>(key: K, value: AttendanceDetailsFilters[K]) => {
@@ -370,19 +498,25 @@ export function useTeacherAttendanceMarkingController() {
   );
 
   const updateApprovalStatus = useCallback(
-    (recordId: string, approvalStatus: ApprovalStatus, rejectionReason = "") => {
-      setRecords((prev) =>
-        prev.map((record) =>
-          record.id === recordId
-            ? {
-                ...record,
-                approvalStatus,
-                rejectionReason:
-                  approvalStatus === "Rejected" ? rejectionReason : "",
-              }
-            : record
-        )
-      );
+    async (recordId: string, approvalStatus: ApprovalStatus, rejectionReason = "") => {
+      const numericId = Number(recordId);
+      if (!Number.isFinite(numericId) || numericId <= 0) return;
+      setSaving(true);
+      try {
+        const saved = await staffAttendanceService.updateApproval(numericId, {
+          approval_status: approvalStatus,
+          rejection_reason: rejectionReason || null,
+        });
+        setRecords((prev) => upsertRecord(prev, mapApiRecord(saved)));
+      } catch (err: unknown) {
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message?: string }).message || "Approval update failed")
+            : "Approval update failed";
+        setRecordsError(message);
+      } finally {
+        setSaving(false);
+      }
     },
     []
   );
@@ -412,6 +546,7 @@ export function useTeacherAttendanceMarkingController() {
     calendarMonth,
     setCalendarMonth,
     calendarStatusByDate,
+    calendarApprovalByDate,
     selectCalendarDate,
     updateMarkDraft,
     saveMarkAttendance,
@@ -421,5 +556,11 @@ export function useTeacherAttendanceMarkingController() {
     updateDetailsFilter,
     filteredDetailsRecords,
     updateApprovalStatus,
+    teachersLoading,
+    teachersError,
+    recordsLoading,
+    recordsError,
+    saving,
+    selfTeacherId,
   };
 }

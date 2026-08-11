@@ -25,11 +25,19 @@ export default function TeacherCheckInOutTab({ controller }: TeacherCheckInOutTa
     checkInOutErrors,
     handleCheckIn,
     handleCheckOut,
+    selfTeacherId,
+    isTeacher,
+    saving,
   } = controller;
 
   return (
     <Box data-testid="tab-check-in-out-content">
       <Stack spacing={2} alignItems="center">
+        {isTeacher && !selfTeacherId ? (
+          <Alert severity="warning" sx={{ width: "100%" }} data-testid="check-in-no-teacher-profile">
+            No teacher profile is linked to your login. Ask an admin to link your user account to a teacher record.
+          </Alert>
+        ) : null}
         <Stack
           direction="row"
           spacing={1.5}
@@ -50,8 +58,8 @@ export default function TeacherCheckInOutTab({ controller }: TeacherCheckInOutTa
             <Button
               variant="contained"
               startIcon={<LoginIcon />}
-              onClick={handleCheckIn}
-              disabled={buttonsDisabled}
+              onClick={() => void handleCheckIn()}
+              disabled={buttonsDisabled || saving}
               data-testid="btn-check-in"
               sx={{
                 whiteSpace: "nowrap",
@@ -75,8 +83,8 @@ export default function TeacherCheckInOutTab({ controller }: TeacherCheckInOutTa
             <Button
               variant="contained"
               startIcon={<LogoutIcon />}
-              onClick={handleCheckOut}
-              disabled={buttonsDisabled}
+              onClick={() => void handleCheckOut()}
+              disabled={buttonsDisabled || saving}
               data-testid="btn-check-out"
               sx={{
                 whiteSpace: "nowrap",

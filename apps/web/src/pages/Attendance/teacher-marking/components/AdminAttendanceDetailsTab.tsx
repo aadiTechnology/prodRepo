@@ -21,8 +21,6 @@ import { colorTokens } from "../../../../tokens/colors";
 import type { TeacherAttendanceMarkingController } from "../../../../hooks/useTeacherAttendanceMarkingController";
 import type { ApprovalStatus, TeacherAttendanceRecord } from "../teacherAttendanceMarking.types";
 import { APPROVAL_STATUS_OPTIONS } from "../teacherAttendanceMarking.types";
-import { getTeacherById, getActiveTeachers, MOCK_LOGGED_IN_ADMIN_ID } from "../teacherAttendanceMarking.mock";
-
 interface AdminAttendanceDetailsTabProps {
   controller: TeacherAttendanceMarkingController;
 }
@@ -35,9 +33,12 @@ export default function AdminAttendanceDetailsTab({
     detailsFilters,
     updateDetailsFilter,
     updateApprovalStatus,
+    markableTeachers,
   } = controller;
 
-  const activeTeachers = getActiveTeachers().filter((t) => t.id !== MOCK_LOGGED_IN_ADMIN_ID);
+  const activeTeachers = markableTeachers;
+  const teacherName = (teacherId: string) =>
+    markableTeachers.find((t) => t.id === teacherId)?.name ?? "—";
 
   const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -67,7 +68,7 @@ export default function AdminAttendanceDetailsTab({
     {
       id: "teacherName",
       label: "Teacher Name",
-      render: (row) => getTeacherById(row.teacherId)?.name ?? "—",
+      render: (row) => teacherName(row.teacherId),
     },
     {
       id: "checkIn",
@@ -89,13 +90,21 @@ export default function AdminAttendanceDetailsTab({
       label: "Approval Status",
       align: "center",
       headerAlign: "center",
-      render: (row) => (
+      render: (row) => {
+        const isActionBlocked = !row.isSubmitted;
+        return (
         <Stack direction="row" spacing={0.5} justifyContent="center">
-          <Tooltip title="Approve">
+          <Tooltip
+            title={
+              isActionBlocked
+                ? "Complete both check-in and check-out before approval"
+                : "Approve"
+            }
+          >
             <span>
               <IconButton
                 size="small"
-                disabled={row.approvalStatus === "Approved"}
+                disabled={row.approvalStatus === "Approved" || isActionBlocked}
                 onClick={(e) => {
                   e.stopPropagation();
                   updateApprovalStatus(row.id, "Approved");
@@ -107,11 +116,17 @@ export default function AdminAttendanceDetailsTab({
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title="Reject">
+          <Tooltip
+            title={
+              isActionBlocked
+                ? "Complete both check-in and check-out before rejection"
+                : "Reject"
+            }
+          >
             <span>
               <IconButton
                 size="small"
-                disabled={row.approvalStatus === "Rejected"}
+                disabled={row.approvalStatus === "Rejected" || isActionBlocked}
                 onClick={(e) => {
                   e.stopPropagation();
                   openRejectDialog(row.id);
@@ -124,7 +139,7 @@ export default function AdminAttendanceDetailsTab({
             </span>
           </Tooltip>
         </Stack>
-      ),
+      )},
     },
   ];
 

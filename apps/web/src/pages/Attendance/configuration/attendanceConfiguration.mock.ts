@@ -103,8 +103,8 @@ export function createInitialAttendanceConfiguration(): AttendanceConfigurationS
     holidays: MOCK_HOLIDAYS,
     shifts: MOCK_SHIFTS,
     officeTiming: {
-      startTime: "08:00",
-      endTime: "16:00",
+      startTime: "09:00",
+      endTime: "17:00",
       minimumWorkingHours: 6,
     },
     graceTime: {

@@ -36,16 +36,24 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
     calendarMonth,
     setCalendarMonth,
     calendarStatusByDate,
+    calendarApprovalByDate,
     selectCalendarDate,
     updateMarkDraft,
     saveMarkAttendance,
     cancelMarkAttendance,
     today,
+    teachersLoading,
+    teachersError,
+    saving,
   } = controller;
 
   const approvalState =
     markRecord && markRecord.isSubmitted ? markRecord.approvalStatus : null;
   const isRejected = approvalState === "Rejected";
+  // Admins can always correct marks; teachers are locked while Waiting/Approved.
+  const actionsLocked =
+    !isAdminLike &&
+    (approvalState === "Waiting for Approval" || approvalState === "Approved");
 
   const statusChip =
     approvalState === "Approved" ? (
@@ -105,6 +113,7 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
             month={calendarMonth}
             selectedDate={markDate}
             statusByDate={calendarStatusByDate}
+            approvalByDate={calendarApprovalByDate}
             onMonthChange={setCalendarMonth}
             onDateSelect={selectCalendarDate}
           />
@@ -139,6 +148,18 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
               {statusChip}
             </Stack>
 
+            {teachersError ? (
+              <Alert severity="error" data-testid="mark-teachers-error">
+                {teachersError}
+              </Alert>
+            ) : null}
+
+            {isAdminLike && !teachersLoading && markableTeachers.length === 0 ? (
+              <Alert severity="warning" data-testid="mark-teachers-empty">
+                No active teachers found for this school. Add teachers in Teacher Management first.
+              </Alert>
+            ) : null}
+
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               {isAdminLike ? (
                 <TextField
@@ -149,6 +170,7 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
                   size="small"
                   fullWidth
                   sx={{ flex: 1 }}
+                  disabled={teachersLoading || markableTeachers.length === 0}
                   data-testid="field-mark-teacher"
                 >
                   {markableTeachers.map((teacher) => (
@@ -250,7 +272,7 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
             ) : null}
 
             <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
-              {approvalState === "Waiting for Approval" ? (
+              {actionsLocked && approvalState === "Waiting for Approval" ? (
                 <Button
                   variant="contained"
                   color="warning"
@@ -259,7 +281,7 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
                 >
                   Waiting for Approval
                 </Button>
-              ) : approvalState === "Approved" ? (
+              ) : actionsLocked && approvalState === "Approved" ? (
                 <Button
                   variant="contained"
                   color="success"
@@ -273,16 +295,18 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
                   <Button
                     variant="outlined"
                     onClick={cancelMarkAttendance}
+                    disabled={saving}
                     data-testid="btn-mark-cancel"
                   >
                     Cancel
                   </Button>
                   <Button
                     variant="contained"
-                    onClick={saveMarkAttendance}
+                    onClick={() => void saveMarkAttendance()}
+                    disabled={saving || (isAdminLike && markableTeachers.length === 0)}
                     data-testid="btn-mark-save"
                   >
-                    Save
+                    {saving ? "Saving..." : "Save"}
                   </Button>
                 </>
               )}
