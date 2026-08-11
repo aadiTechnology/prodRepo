@@ -214,6 +214,46 @@ export default function TeacherMarkAttendanceCalendar({
           );
         })}
       </Box>
+
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        spacing={1}
+        sx={{ mt: 1.5, px: 0.25 }}
+        data-testid="mark-attendance-calendar-legend"
+      >
+        {[
+          { label: "Present", color: STATUS_META.Present.color },
+          { label: "Rejected", color: APPROVAL_META.Rejected!.color },
+          { label: "Late", color: STATUS_META.Late.color },
+        ].map((item) => (
+          <Stack
+            key={item.label}
+            direction="row"
+            spacing={0.75}
+            alignItems="center"
+            sx={{ minWidth: 0 }}
+          >
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                bgcolor: item.color,
+                flexShrink: 0,
+              }}
+            />
+            <Typography
+              variant="caption"
+              noWrap
+              sx={{ color: colorTokens.text.secondary, fontWeight: 500 }}
+            >
+              {item.label}
+            </Typography>
+          </Stack>
+        ))}
+      </Stack>
     </Box>
   );
 }
