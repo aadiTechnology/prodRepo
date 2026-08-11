@@ -14,15 +14,16 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 2000,
-      launchAutoHide: true,
-      backgroundColor: "#1976d2",
+      // Keep native splash until React SmartKidz splash paints, then AppSplashGate hides it.
+      launchShowDuration: 0,
+      launchAutoHide: false,
+      backgroundColor: "#FFF8F0",
       androidSplashResourceName: "splash",
       showSpinner: false,
     },
     StatusBar: {
       style: "LIGHT",
-      backgroundColor: "#1976d2",
+      backgroundColor: "#FFF8F0",
     },
   },
 };

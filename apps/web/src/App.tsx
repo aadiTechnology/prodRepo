@@ -4,6 +4,7 @@ import AppRoutes from "./routes/AppRoutes";
 import { AuthProvider, RBACProvider } from "./context";
 import ThemeFromTenantProvider from "./theme/ThemeFromTenantProvider";
 import ErrorBoundary from "./components/ErrorBoundary";
+import AppSplashGate from "./components/AppSplashGate";
 import { isNativePlatform } from "./utils/capacitor";
 import PushNotificationNavigationBridge from "./services/PushNotificationNavigationBridge";
 
@@ -43,12 +44,14 @@ export default function App() {
       <BrowserRouter>
         <RBACProvider>
           <AuthProvider>
-            <PushNotificationNavigationBridge />
-            <ThemeFromTenantProvider>
-              <ErrorBoundary>
-                <AppRoutes />
-              </ErrorBoundary>
-            </ThemeFromTenantProvider>
+            <AppSplashGate>
+              <PushNotificationNavigationBridge />
+              <ThemeFromTenantProvider>
+                <ErrorBoundary>
+                  <AppRoutes />
+                </ErrorBoundary>
+              </ThemeFromTenantProvider>
+            </AppSplashGate>
           </AuthProvider>
         </RBACProvider>
       </BrowserRouter>

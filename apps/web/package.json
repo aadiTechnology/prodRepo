@@ -15,7 +15,7 @@
     "cap:sync": "npx cap sync && npm run cap:permissions:android",
     "cap:copy": "npx cap copy",
     "cap:open:android": "npx cap open android",
-    "cap:assets": "npx capacitor-assets generate --assetPath resources --android --iconBackgroundColor \"#1976d2\" --splashBackgroundColor \"#1976d2\"",
+    "cap:assets": "npx capacitor-assets generate --assetPath resources --android --iconBackgroundColor \"#FFF8F0\" --splashBackgroundColor \"#FFF8F0\"",
     "cap:build": "npm run build:capacitor && npm run cap:sync",
     "cap:build:dev": "npm run build:capacitor:dev && npm run cap:sync",
     "cap:android": "npm run cap:build && npm run cap:open:android"

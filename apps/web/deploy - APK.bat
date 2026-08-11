@@ -2,6 +2,9 @@
 
 cd /d C:\Users\lenovo\AadiTech\Product\code\apps\web
 
+echo npm run build
+call npm run build
+
 echo npm run cap:sync
 call npm run cap:sync
 

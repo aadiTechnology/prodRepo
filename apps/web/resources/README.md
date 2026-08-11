@@ -14,6 +14,9 @@ npm run cap:assets
 | `icon-foreground.png` | 1024×1024 px | Adaptive icon foreground (Android) |
 | `splash.png` | 2732×2732 px | Splash screen (logo centered on solid background) |
 
-Current placeholders are copies of `public/aadi-logo.png`. Replace them with production artwork before store release.
+Production SmartKidz artwork:
 
-Background color used for generated assets: `#1976d2` (MUI primary blue).
+- Launcher / native splash: SmartKidz icon composited on warm `#FFF8F0`
+- React animated splash assets (do not regenerate from here): `public/brand/smartkidz-icon.png`, `public/brand/smartkidz-logo.png`
+
+Background color used for generated assets: `#FFF8F0` (warm preschool cream).

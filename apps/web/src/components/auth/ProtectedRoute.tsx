@@ -5,7 +5,7 @@
  */
 
 import { Navigate, useLocation } from "react-router-dom";
-import { Box, CircularProgress, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
 import { hasGrantedMenuAccess } from "../../utils/menuNavigation";
@@ -132,21 +132,18 @@ export default function ProtectedRoute({
   const location = useLocation();
   const userRole = normalizeRole(user?.role);
 
-  // Show loading spinner while checking authentication (avoids blank shell on refresh)
+  // Auth bootstrap is covered by AppSplashGate / SmartKidzSplash on cold start.
+  // Keep a minimal placeholder (no spinner flash) if isLoading is ever true mid-session.
   if (isLoading) {
     return (
       <Box
         sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
           minHeight: "100vh",
           width: "100%",
+          bgcolor: "#FFF8F0",
         }}
         data-testid="auth-loading"
-      >
-        <CircularProgress />
-      </Box>
+      />
     );
   }
 

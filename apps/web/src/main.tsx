@@ -9,25 +9,16 @@ const queryClient = new QueryClient();
 
 async function bootstrap() {
   if (isNativePlatform()) {
-    const [{ StatusBar, Style }, { SplashScreen }] = await Promise.all([
-      import("@capacitor/status-bar"),
-      import("@capacitor/splash-screen"),
-    ]);
-
     try {
+      const { StatusBar, Style } = await import("@capacitor/status-bar");
       // Keep app content below the system status bar (prevents header collapse on Android).
       await StatusBar.setOverlaysWebView({ overlay: false });
       await StatusBar.setStyle({ style: Style.Light });
-      await StatusBar.setBackgroundColor({ color: "#ffffff" });
+      await StatusBar.setBackgroundColor({ color: "#FFF8F0" });
     } catch {
       // Status bar plugin is unavailable on some WebView versions
     }
-
-    try {
-      await SplashScreen.hide();
-    } catch {
-      // Splash screen may already be hidden
-    }
+    // Native splash stays visible until AppSplashGate paints the React splash and calls hide().
   }
 
   ReactDOM.createRoot(document.getElementById("root")!).render(
