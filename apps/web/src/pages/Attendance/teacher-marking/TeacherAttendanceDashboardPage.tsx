@@ -31,7 +31,7 @@ export default function TeacherAttendanceDashboardPage() {
     <PageLayout
       data-testid="page-teacher-attendance-marking"
       pageBackground
-      maxWidth={controller.isAdminLike ? "lg" : "md"}
+      maxWidth={controller.isAdminLike ? "lg" : false}
       header={
         <PageHeader
           links={[

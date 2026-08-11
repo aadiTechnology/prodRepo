@@ -19,6 +19,7 @@ import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import CancelIcon from "@mui/icons-material/Cancel";
 
 import type { TeacherAttendanceMarkingController } from "../../../../hooks/useTeacherAttendanceMarkingController";
+import { FormHeaderIconAction } from "../../../../components/primitives";
 import { MAX_REMARKS_LENGTH } from "../teacherAttendanceMarking.types";
 import TeacherMarkAttendanceCalendar from "./TeacherMarkAttendanceCalendar";
 
@@ -305,33 +306,24 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
                 >
                   Waiting for Approval
                 </Button>
-              ) : actionsLocked && approvalState === "Approved" ? (
-                <Button
-                  variant="contained"
-                  color="success"
-                  disabled
-                  data-testid="btn-mark-status-approved"
-                >
-                  Approved
-                </Button>
-              ) : (
+              ) : actionsLocked && approvalState === "Approved" ? null
+              : (
                 <>
-                  <Button
-                    variant="outlined"
+                  <FormHeaderIconAction
+                    variant="cancel"
+                    tooltipTitle="Cancel changes"
                     onClick={cancelMarkAttendance}
                     disabled={saving}
                     data-testid="btn-mark-cancel"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="contained"
+                  />
+                  <FormHeaderIconAction
+                    variant="save"
+                    tooltipTitle="Save attendance"
                     onClick={() => void saveMarkAttendance()}
-                    disabled={saving || (isAdminLike && markableTeachers.length === 0)}
+                    disabled={isAdminLike && markableTeachers.length === 0}
+                    loading={saving}
                     data-testid="btn-mark-save"
-                  >
-                    {saving ? "Saving..." : "Save"}
-                  </Button>
+                  />
                 </>
               )}
             </Stack>
