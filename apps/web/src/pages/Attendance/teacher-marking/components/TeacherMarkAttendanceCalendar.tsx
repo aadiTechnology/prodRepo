@@ -16,7 +16,7 @@ import {
   Warning as HalfDayIcon,
   FiberManualRecord as DotIcon,
   HourglassEmpty as WaitingIcon,
-  BeachAccess as HolidayIcon,
+  Celebration as HolidayIcon,
 } from "@mui/icons-material";
 
 import { colorTokens } from "../../../../tokens/colors";
@@ -189,7 +189,7 @@ export default function TeacherMarkAttendanceCalendar({
                 if (e.key === "Enter" || e.key === " ") onDateSelect(cell.iso);
               }}
               data-testid={`mark-calendar-cell-${cell.iso}`}
-              title={isHoliday ? `🏖️ ${cell.holidayName}` : undefined}
+              title={isHoliday ? `🎉 ${cell.holidayName}` : undefined}
               sx={{
                 minHeight: 40,
                 borderRadius: 1.5,
