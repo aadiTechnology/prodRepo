@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import staffAttendanceService, {
   type StaffAttendanceResponse,
 } from "../api/services/staffAttendanceService";
+import * as attendanceConfigService from "../api/services/attendanceConfigurationService";
 import teacherService from "../api/services/teacherService";
 import { useAuth } from "../context/AuthContext";
 import { useAttendanceReportRole } from "./useAttendanceReportRole";
@@ -130,6 +131,10 @@ export function useTeacherAttendanceMarkingController() {
   const [recordsError, setRecordsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Holidays state for calendar
+  const [holidays, setHolidays] = useState<Record<string, string>>({});
+  const [holidaysLoading, setHolidaysLoading] = useState(false);
+
   const [activeTab, setActiveTab] = useState<TeacherAttendanceTab>("check-in-out");
   const [checkInOutErrors, setCheckInOutErrors] = useState<string[]>([]);
   const [markDate, setMarkDate] = useState(today);
@@ -250,6 +255,31 @@ export function useTeacherAttendanceMarkingController() {
     isTeacher,
     refreshRecords,
   ]);
+
+  // Fetch holidays when calendar month changes
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      const { from, to } = monthRange(calendarMonth);
+      setHolidaysLoading(true);
+      try {
+        const holidayList = await attendanceConfigService.getHolidaysForCalendar(from, to);
+        const holidayMap: Record<string, string> = {};
+        for (const holiday of holidayList) {
+          // Store holiday name by date
+          holidayMap[holiday.holiday_date] = holiday.name;
+        }
+        setHolidays(holidayMap);
+      } catch (err) {
+        console.error("Failed to load holidays:", err);
+        setHolidays({});
+      } finally {
+        setHolidaysLoading(false);
+      }
+    };
+
+    void fetchHolidays();
+  }, [calendarMonth]);
+
 
   const todayRecord = useMemo(() => {
     if (!selfTeacherId) return createEmptyRecord("", today);
@@ -562,5 +592,7 @@ export function useTeacherAttendanceMarkingController() {
     recordsError,
     saving,
     selfTeacherId,
+    holidays,
+    holidaysLoading,
   };
 }

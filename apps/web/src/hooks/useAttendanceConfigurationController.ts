@@ -1,12 +1,17 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSnackbar } from "notistack";
 
+import attendanceConfigurationService, {
+  getAttendanceConfigErrorMessage,
+  toCheckInRulesPayload,
+  toGraceTimePayload,
+  toOfficeTimingPayload,
+} from "../api/services/attendanceConfigurationService";
+import { academicYearService } from "../api/services/academicYearService";
+import { resolveCurrentAcademicYearId } from "../utils/academicYear";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
-import {
-  createInitialAttendanceConfiguration,
-  MOCK_ACADEMIC_YEARS,
-} from "../pages/Attendance/configuration/attendanceConfiguration.mock";
 import type {
+  AcademicYearOption,
   AttendanceConfigSectionId,
   AttendanceConfigurationState,
   GeneralConfiguration,
@@ -23,15 +28,48 @@ import type {
   AttendanceStatusItem,
 } from "../pages/Attendance/configuration/attendanceConfiguration.types";
 
-function createId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+function emptyConfigurationState(academicYearId = ""): AttendanceConfigurationState {
+  return {
+    general: {
+      academicYearId,
+      configurationScope: "entire-school",
+      allowEditingAfterMarked: true,
+      applyChangesTo: "future-only",
+      attendanceMarkedBy: { teacher: true, schoolAdmin: true },
+    },
+    workingDays: {
+      monday: true,
+      tuesday: true,
+      wednesday: true,
+      thursday: true,
+      friday: true,
+      saturday: false,
+      sunday: false,
+    },
+    holidays: [],
+    shifts: [],
+    officeTiming: {
+      startTime: "09:00",
+      endTime: "17:00",
+      minimumWorkingHours: 6,
+    },
+    graceTime: {
+      enabled: true,
+      graceMinutes: 15,
+      statusAfterGrace: "Late",
+    },
+    statuses: [],
+    checkInRules: {
+      checkInMandatory: true,
+      checkOutMandatory: true,
+      allowAttendanceWithoutCheckOut: false,
+      allowMultipleCheckIn: false,
+      allowNextDayCheckOut: false,
+      autoCalculateWorkingHours: true,
+    },
+    notifications: [],
+  };
 }
-
-export type ListFilterState = {
-  search: string;
-  page: number;
-  rowsPerPage: number;
-};
 
 function useListFilter(defaultRowsPerPage = DEFAULT_LIST_ROWS_PER_PAGE) {
   const [search, setSearch] = useState("");
@@ -73,7 +111,11 @@ export type EditTarget =
 
 export function useAttendanceConfigurationController() {
   const { enqueueSnackbar } = useSnackbar();
-  const [state, setState] = useState<AttendanceConfigurationState>(createInitialAttendanceConfiguration);
+  const [state, setState] = useState<AttendanceConfigurationState>(emptyConfigurationState);
+  const [academicYears, setAcademicYears] = useState<AcademicYearOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<AttendanceConfigSectionId>("general");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [editTarget, setEditTarget] = useState<EditTarget>(null);
@@ -82,6 +124,12 @@ export function useAttendanceConfigurationController() {
   const shiftFilters = useListFilter();
   const statusFilters = useListFilter();
 
+  const academicYearIdNum = useMemo(() => {
+    const raw = state.general.academicYearId;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [state.general.academicYearId]);
+
   const showSuccess = useCallback(
     (message: string) => {
       enqueueSnackbar(message, { variant: "success" });
@@ -89,90 +137,250 @@ export function useAttendanceConfigurationController() {
     [enqueueSnackbar]
   );
 
-  const updateGeneral = useCallback(
-    (patch: Partial<GeneralConfiguration>) => {
-      setState((prev) => ({
-        ...prev,
-        general: { ...prev.general, ...patch },
-      }));
-      showSuccess("Configuration updated successfully.");
+  const showError = useCallback(
+    (error: unknown, fallback: string) => {
+      enqueueSnackbar(getAttendanceConfigErrorMessage(error, fallback), { variant: "error" });
     },
-    [showSuccess]
+    [enqueueSnackbar]
+  );
+
+  const applyState = useCallback((next: AttendanceConfigurationState) => {
+    setState(next);
+    setLoadError(null);
+  }, []);
+
+  const loadConfiguration = useCallback(
+    async (academicYearId: number) => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const next = await attendanceConfigurationService.get(academicYearId);
+        applyState(next);
+      } catch (error) {
+        const message = getAttendanceConfigErrorMessage(
+          error,
+          "Failed to load attendance configuration."
+        );
+        setLoadError(message);
+        setState(emptyConfigurationState(String(academicYearId)));
+        enqueueSnackbar(message, { variant: "error" });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [applyState, enqueueSnackbar]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrap() {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const years = await academicYearService.listActive();
+        if (cancelled) return;
+        const options: AcademicYearOption[] = years.map((y) => ({
+          id: String(y.id),
+          label: y.name,
+        }));
+        setAcademicYears(options);
+
+        const defaultId =
+          resolveCurrentAcademicYearId(years) || (options[0]?.id ?? "");
+        if (!defaultId) {
+          setLoadError("No active academic year found.");
+          setState(emptyConfigurationState());
+          setLoading(false);
+          return;
+        }
+
+        const next = await attendanceConfigurationService.get(Number(defaultId));
+        if (cancelled) return;
+        applyState(next);
+      } catch (error) {
+        if (cancelled) return;
+        const message = getAttendanceConfigErrorMessage(
+          error,
+          "Failed to load attendance configuration."
+        );
+        setLoadError(message);
+        enqueueSnackbar(message, { variant: "error" });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, [applyState, enqueueSnackbar]);
+
+  const runSave = useCallback(
+    async (
+      action: () => Promise<AttendanceConfigurationState>,
+      successMessage: string,
+      errorFallback: string
+    ): Promise<boolean> => {
+      if (academicYearIdNum == null) {
+        enqueueSnackbar("Select an academic year first.", { variant: "warning" });
+        return false;
+      }
+      setSaving(true);
+      try {
+        const next = await action();
+        applyState(next);
+        showSuccess(successMessage);
+        return true;
+      } catch (error) {
+        showError(error, errorFallback);
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [academicYearIdNum, applyState, enqueueSnackbar, showError, showSuccess]
   );
 
   const setAcademicYear = useCallback(
     (academicYearId: string) => {
-      updateGeneral({ academicYearId });
+      setState((prev) => ({
+        ...prev,
+        general: { ...prev.general, academicYearId },
+      }));
+      const id = Number(academicYearId);
+      if (Number.isFinite(id) && id > 0) {
+        void loadConfiguration(id);
+      }
     },
-    [updateGeneral]
+    [loadConfiguration]
   );
 
   const setAllowEditingAfterMarked = useCallback(
     (allowEditingAfterMarked: boolean) => {
-      updateGeneral({ allowEditingAfterMarked });
+      if (academicYearIdNum == null) return;
+      void runSave(
+        () =>
+          attendanceConfigurationService.updateSettings(academicYearIdNum, {
+            allow_editing_after_marked: allowEditingAfterMarked,
+          }),
+        "Configuration updated successfully.",
+        "Failed to update configuration."
+      );
     },
-    [updateGeneral]
+    [academicYearIdNum, runSave]
   );
 
   const setAttendanceMarkedBy = useCallback(
     (attendanceMarkedBy: GeneralConfiguration["attendanceMarkedBy"]) => {
-      updateGeneral({ attendanceMarkedBy });
+      if (academicYearIdNum == null) return;
+      void runSave(
+        () =>
+          attendanceConfigurationService.updateSettings(academicYearIdNum, {
+            attendance_marked_by: {
+              teacher: attendanceMarkedBy.teacher,
+              school_admin: attendanceMarkedBy.schoolAdmin,
+            },
+          }),
+        "Configuration updated successfully.",
+        "Failed to update configuration."
+      );
     },
-    [updateGeneral]
+    [academicYearIdNum, runSave]
   );
 
   const setWorkingDay = useCallback(
     (day: WorkingDayKey, enabled: boolean) => {
-      setState((prev) => ({
-        ...prev,
-        workingDays: { ...prev.workingDays, [day]: enabled },
-      }));
-      showSuccess("Working days updated.");
+      if (academicYearIdNum == null) return;
+      const workingDays = { ...state.workingDays, [day]: enabled };
+      void runSave(
+        () =>
+          attendanceConfigurationService.updateSettings(academicYearIdNum, {
+            working_days: workingDays,
+          }),
+        "Working days updated.",
+        "Failed to update working days."
+      );
     },
-    [showSuccess]
+    [academicYearIdNum, runSave, state.workingDays]
   );
 
   const setWorkingDays = useCallback(
     (workingDays: WorkingDaysConfig) => {
-      setState((prev) => ({ ...prev, workingDays }));
-      showSuccess("Working days updated.");
+      if (academicYearIdNum == null) return;
+      void runSave(
+        () =>
+          attendanceConfigurationService.updateSettings(academicYearIdNum, {
+            working_days: workingDays,
+          }),
+        "Working days updated.",
+        "Failed to update working days."
+      );
     },
-    [showSuccess]
+    [academicYearIdNum, runSave]
   );
 
   const setOfficeTiming = useCallback(
     (officeTiming: OfficeTiming) => {
-      setState((prev) => ({ ...prev, officeTiming }));
-      showSuccess("Office timing saved.");
+      if (academicYearIdNum == null) return;
+      void runSave(
+        () =>
+          attendanceConfigurationService.updateSettings(academicYearIdNum, {
+            office_timing: toOfficeTimingPayload(officeTiming),
+          }),
+        "Office timing saved.",
+        "Failed to save office timing."
+      );
     },
-    [showSuccess]
+    [academicYearIdNum, runSave]
   );
 
   const setGraceTime = useCallback(
     (graceTime: GraceTimeConfig) => {
-      setState((prev) => ({ ...prev, graceTime }));
-      showSuccess("Grace time settings saved.");
+      if (academicYearIdNum == null) return;
+      void runSave(
+        () =>
+          attendanceConfigurationService.updateSettings(academicYearIdNum, {
+            grace_time: toGraceTimePayload(graceTime),
+          }),
+        "Grace time settings saved.",
+        "Failed to save grace time."
+      );
     },
-    [showSuccess]
+    [academicYearIdNum, runSave]
   );
 
   const setCheckInRules = useCallback(
     (checkInRules: CheckInRules) => {
-      setState((prev) => ({ ...prev, checkInRules }));
-      showSuccess("Check-in rules updated.");
+      if (academicYearIdNum == null) return;
+      void runSave(
+        () =>
+          attendanceConfigurationService.updateSettings(academicYearIdNum, {
+            check_in_rules: toCheckInRulesPayload(checkInRules),
+          }),
+        "Check-in rules updated.",
+        "Failed to update check-in rules."
+      );
     },
-    [showSuccess]
+    [academicYearIdNum, runSave]
   );
 
   const toggleNotification = useCallback(
     (id: string, enabled: boolean) => {
-      setState((prev) => ({
-        ...prev,
-        notifications: prev.notifications.map((n) => (n.id === id ? { ...n, enabled } : n)),
-      }));
-      showSuccess("Notification settings updated.");
+      if (academicYearIdNum == null) return;
+      void runSave(
+        () =>
+          attendanceConfigurationService.toggleNotification(
+            academicYearIdNum,
+            Number(id),
+            enabled
+          ),
+        "Notification settings updated.",
+        "Failed to update notification."
+      );
     },
-    [showSuccess]
+    [academicYearIdNum, runSave]
   );
 
   const filteredHolidays = useMemo(() => {
@@ -215,99 +423,119 @@ export function useAttendanceConfigurationController() {
 
   const saveHoliday = useCallback(
     (values: HolidayFormValues) => {
-      if (editTarget?.type === "holiday" && editTarget.item) {
-        const existing = editTarget.item;
-        setState((prev) => ({
-          ...prev,
-          holidays: prev.holidays.map((h) =>
-            h.id === existing.id ? { ...h, ...values } : h
-          ),
-        }));
-        showSuccess("Holiday updated successfully.");
-      } else {
-        const newHoliday: PublicHoliday = { id: createId("hol"), ...values };
-        setState((prev) => ({ ...prev, holidays: [newHoliday, ...prev.holidays] }));
-        showSuccess("Holiday added successfully.");
-      }
-      setEditTarget(null);
+      if (academicYearIdNum == null) return;
+      const editing = editTarget?.type === "holiday" ? editTarget.item : null;
+      void (async () => {
+        const ok = await runSave(
+          () =>
+            editing
+              ? attendanceConfigurationService.updateHoliday(
+                  academicYearIdNum,
+                  Number(editing.id),
+                  values
+                )
+              : attendanceConfigurationService.createHoliday(academicYearIdNum, values),
+          editing ? "Holiday updated successfully." : "Holiday added successfully.",
+          editing ? "Failed to update holiday." : "Failed to add holiday."
+        );
+        if (ok) setEditTarget(null);
+      })();
     },
-    [editTarget, showSuccess]
+    [academicYearIdNum, editTarget, runSave]
   );
 
   const saveShift = useCallback(
     (values: ShiftFormValues) => {
-      if (editTarget?.type === "shift" && editTarget.item) {
-        const existing = editTarget.item;
-        setState((prev) => ({
-          ...prev,
-          shifts: prev.shifts.map((s) =>
-            s.id === existing.id ? { ...s, ...values } : s
-          ),
-        }));
-        showSuccess("Shift updated successfully.");
-      } else {
-        const newShift: Shift = { id: createId("shift"), ...values };
-        setState((prev) => ({ ...prev, shifts: [newShift, ...prev.shifts] }));
-        showSuccess("Shift added successfully.");
-      }
-      setEditTarget(null);
+      if (academicYearIdNum == null) return;
+      const editing = editTarget?.type === "shift" ? editTarget.item : null;
+      void (async () => {
+        const ok = await runSave(
+          () =>
+            editing
+              ? attendanceConfigurationService.updateShift(
+                  academicYearIdNum,
+                  Number(editing.id),
+                  values
+                )
+              : attendanceConfigurationService.createShift(academicYearIdNum, values),
+          editing ? "Shift updated successfully." : "Shift added successfully.",
+          editing ? "Failed to update shift." : "Failed to add shift."
+        );
+        if (ok) setEditTarget(null);
+      })();
     },
-    [editTarget, showSuccess]
+    [academicYearIdNum, editTarget, runSave]
   );
 
   const saveStatus = useCallback(
     (values: StatusFormValues) => {
-      if (editTarget?.type === "status" && editTarget.item) {
-        const existing = editTarget.item;
-        setState((prev) => ({
-          ...prev,
-          statuses: prev.statuses.map((s) =>
-            s.id === existing.id ? { ...s, ...values } : s
-          ),
-        }));
-        showSuccess("Status updated successfully.");
-      } else {
-        const newStatus: AttendanceStatusItem = { id: createId("st"), ...values };
-        setState((prev) => ({ ...prev, statuses: [newStatus, ...prev.statuses] }));
-        showSuccess("Status added successfully.");
-      }
-      setEditTarget(null);
+      if (academicYearIdNum == null) return;
+      const editing = editTarget?.type === "status" ? editTarget.item : null;
+      void (async () => {
+        const ok = await runSave(
+          () =>
+            editing
+              ? attendanceConfigurationService.updateStatus(
+                  academicYearIdNum,
+                  Number(editing.id),
+                  values
+                )
+              : attendanceConfigurationService.createStatus(academicYearIdNum, values),
+          editing ? "Status updated successfully." : "Status added successfully.",
+          editing ? "Failed to update status." : "Failed to add status."
+        );
+        if (ok) setEditTarget(null);
+      })();
     },
-    [editTarget, showSuccess]
+    [academicYearIdNum, editTarget, runSave]
   );
 
   const confirmDelete = useCallback(() => {
-    if (!deleteTarget) return;
-
-    if (deleteTarget.type === "holiday") {
-      const { item } = deleteTarget;
-      setState((prev) => ({
-        ...prev,
-        holidays: prev.holidays.filter((h) => h.id !== item.id),
-      }));
-      showSuccess("Holiday deleted.");
-    } else if (deleteTarget.type === "shift") {
-      const { item } = deleteTarget;
-      setState((prev) => ({
-        ...prev,
-        shifts: prev.shifts.filter((s) => s.id !== item.id),
-      }));
-      showSuccess("Shift deleted.");
-    } else if (deleteTarget.type === "status") {
-      const { item } = deleteTarget;
-      setState((prev) => ({
-        ...prev,
-        statuses: prev.statuses.filter((s) => s.id !== item.id),
-      }));
-      showSuccess("Status deleted.");
-    }
-
+    if (!deleteTarget || academicYearIdNum == null) return;
+    const target = deleteTarget;
     setDeleteTarget(null);
-  }, [deleteTarget, showSuccess]);
+
+    if (target.type === "holiday") {
+      void runSave(
+        () =>
+          attendanceConfigurationService.deleteHoliday(
+            academicYearIdNum,
+            Number(target.item.id)
+          ),
+        "Holiday deleted.",
+        "Failed to delete holiday."
+      );
+      return;
+    }
+    if (target.type === "shift") {
+      void runSave(
+        () =>
+          attendanceConfigurationService.deleteShift(
+            academicYearIdNum,
+            Number(target.item.id)
+          ),
+        "Shift deleted.",
+        "Failed to delete shift."
+      );
+      return;
+    }
+    void runSave(
+      () =>
+        attendanceConfigurationService.deleteStatus(
+          academicYearIdNum,
+          Number(target.item.id)
+        ),
+      "Status deleted.",
+      "Failed to delete status."
+    );
+  }, [academicYearIdNum, deleteTarget, runSave]);
 
   return {
     state,
-    academicYears: MOCK_ACADEMIC_YEARS,
+    academicYears,
+    loading,
+    saving,
+    loadError,
     activeSection,
     setActiveSection,
     deleteTarget,
@@ -336,6 +564,9 @@ export function useAttendanceConfigurationController() {
     saveHoliday,
     saveShift,
     saveStatus,
+    reload: () => {
+      if (academicYearIdNum != null) void loadConfiguration(academicYearIdNum);
+    },
   };
 }
 

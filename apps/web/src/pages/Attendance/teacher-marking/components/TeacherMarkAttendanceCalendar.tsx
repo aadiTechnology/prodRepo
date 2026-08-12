@@ -16,6 +16,7 @@ import {
   Warning as HalfDayIcon,
   FiberManualRecord as DotIcon,
   HourglassEmpty as WaitingIcon,
+  BeachAccess as HolidayIcon,
 } from "@mui/icons-material";
 
 import { colorTokens } from "../../../../tokens/colors";
@@ -33,12 +34,15 @@ const STATUS_META: Record<
 > = {
   Present: { color: colorTokens.preschool.mint.main, Icon: PresentIcon, label: "Present" },
   Absent: { color: colorTokens.preschool.coral.main, Icon: AbsentIcon, label: "Absent" },
-  Late: { color: colorTokens.preschool.peach.main, Icon: LateIcon, label: "Late" },
+  Late: { color: "#eab308", Icon: LateIcon, label: "Late" },           // amber-yellow
   "Half Day": { color: "#8b5cf6", Icon: HalfDayIcon, label: "Half Day" },
   Leave: { color: colorTokens.preschool.lavender.main, Icon: LeaveIcon, label: "Leave" },
   Holiday: { color: colorTokens.text.secondary, Icon: DotIcon, label: "Holiday" },
   Others: { color: "#94a3b8", Icon: DotIcon, label: "Others" },
 };
+
+// Holiday gets its own distinct color — teal/blue-green, nothing like Late (yellow)
+const HOLIDAY_COLOR = "#0ea5e9"; // sky-blue
 
 const APPROVAL_META: Partial<
   Record<ApprovalStatus, { color: string; Icon: React.ElementType; label: string }>
@@ -61,6 +65,8 @@ interface TeacherMarkAttendanceCalendarProps {
   statusByDate: Record<string, TeacherAttendanceStatus>;
   /** Approval overrides calendar icon: Rejected=red, Waiting=orange, Approved=status color */
   approvalByDate?: Record<string, ApprovalStatus>;
+  /** Holidays by date (ISO string -> holiday name) */
+  holidays?: Record<string, string>;
   onMonthChange: (next: Date) => void;
   onDateSelect: (iso: string) => void;
 }
@@ -85,6 +91,7 @@ export default function TeacherMarkAttendanceCalendar({
   selectedDate,
   statusByDate,
   approvalByDate = {},
+  holidays = {},
   onMonthChange,
   onDateSelect,
 }: TeacherMarkAttendanceCalendarProps) {
@@ -110,9 +117,10 @@ export default function TeacherMarkAttendanceCalendar({
         iso,
         status: statusByDate[iso],
         approval: approvalByDate[iso],
+        holidayName: holidays[iso],
       };
     });
-  }, [monthIndex, statusByDate, approvalByDate, year]);
+  }, [monthIndex, statusByDate, approvalByDate, holidays, year]);
 
   const monthLabel = month.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
@@ -169,6 +177,7 @@ export default function TeacherMarkAttendanceCalendar({
           const isSelected = cell.iso === selectedDate;
           const meta = resolveCellMeta(cell.status, cell.approval);
           const StatusIcon = meta?.Icon;
+          const isHoliday = !!cell.holidayName;
 
           return (
             <Box
@@ -180,6 +189,7 @@ export default function TeacherMarkAttendanceCalendar({
                 if (e.key === "Enter" || e.key === " ") onDateSelect(cell.iso);
               }}
               data-testid={`mark-calendar-cell-${cell.iso}`}
+              title={isHoliday ? `🏖️ ${cell.holidayName}` : undefined}
               sx={{
                 minHeight: 40,
                 borderRadius: 1.5,
@@ -191,20 +201,35 @@ export default function TeacherMarkAttendanceCalendar({
                 gap: 0.25,
                 bgcolor: isSelected
                   ? alpha(colorTokens.preschool.turquoise.main, 0.2)
-                  : meta
-                    ? alpha(meta.color, 0.12)
-                    : alpha(colorTokens.border.subtle, 0.35),
+                  : isHoliday
+                    ? alpha(HOLIDAY_COLOR, 0.15)
+                    : meta
+                      ? alpha(meta.color, 0.12)
+                      : alpha(colorTokens.border.subtle, 0.35),
                 border: isSelected
                   ? `2px solid ${colorTokens.preschool.turquoise.main}`
-                  : meta
-                    ? `1px solid ${alpha(meta.color, 0.28)}`
-                    : `1px solid ${colorTokens.border.subtle}`,
+                  : isHoliday
+                    ? `1px solid ${alpha(HOLIDAY_COLOR, 0.5)}`
+                    : meta
+                      ? `1px solid ${alpha(meta.color, 0.28)}`
+                      : `1px solid ${colorTokens.border.subtle}`,
               }}
             >
-              <Typography variant="caption" sx={{ fontWeight: 700, lineHeight: 1 }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  color: isHoliday ? HOLIDAY_COLOR : "inherit",
+                }}
+              >
                 {cell.day}
               </Typography>
-              {StatusIcon ? (
+              {isHoliday ? (
+                <HolidayIcon
+                  sx={{ fontSize: 14, color: HOLIDAY_COLOR }}
+                />
+              ) : StatusIcon ? (
                 <StatusIcon
                   sx={{ fontSize: 14, color: meta!.color }}
                   titleAccess={meta!.label}
@@ -226,7 +251,8 @@ export default function TeacherMarkAttendanceCalendar({
         {[
           { label: "Present", color: STATUS_META.Present.color },
           { label: "Rejected", color: APPROVAL_META.Rejected!.color },
-          { label: "Late", color: STATUS_META.Late.color },
+          { label: "Late", color: "#eab308" },
+          { label: "Holiday", color: HOLIDAY_COLOR },
         ].map((item) => (
           <Stack
             key={item.label}

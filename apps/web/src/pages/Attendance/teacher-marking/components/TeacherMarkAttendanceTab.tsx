@@ -131,6 +131,7 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
             selectedDate={markDate}
             statusByDate={calendarStatusByDate}
             approvalByDate={calendarApprovalByDate}
+            holidays={controller.holidays}
             onMonthChange={setCalendarMonth}
             onDateSelect={selectCalendarDate}
           />
