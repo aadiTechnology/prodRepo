@@ -22,6 +22,8 @@ import {
   formatCurrentTime,
   getTodayIso,
   isFutureDate,
+  isWeekend,
+  isHoliday,
   primaryCalendarStatus,
   resolveStatusAfterCheckIn,
   toIsoDate,
@@ -38,6 +40,12 @@ export type TeacherMarkDraft = {
 export type AttendanceDetailsFilters = {
   teacherId: string;
   approvalStatus: ApprovalStatus | "";
+};
+
+export type SnackbarState = {
+  open: boolean;
+  message: string;
+  severity: "success" | "error" | "warning" | "info";
 };
 
 function parseTimeSafe(time: string): number {
@@ -141,6 +149,11 @@ export function useTeacherAttendanceMarkingController() {
   const [markTeacherId, setMarkTeacherId] = useState("");
   const [markDraft, setMarkDraft] = useState<TeacherMarkDraft>(emptyMarkDraft);
   const [markErrors, setMarkErrors] = useState<string[]>([]);
+  const [snackbar, setSnackbar] = useState<SnackbarState>({
+    open: false,
+    message: "",
+    severity: "info",
+  });
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [currentTime, setCurrentTime] = useState(formatCurrentTime);
   const [detailsFilters, setDetailsFilters] = useState<AttendanceDetailsFilters>({
@@ -472,6 +485,16 @@ export function useTeacherAttendanceMarkingController() {
     if (!markTeacherId) errors.push("Teacher is required.");
     if (!markDate) errors.push("Attendance date is required.");
     if (markDate && isFutureDate(markDate)) errors.push("Future date attendance is not allowed.");
+    
+    // Check for weekends and holidays
+    if (markDate) {
+      if (isWeekend(markDate)) {
+        errors.push("weekends");
+      } else if (isHoliday(markDate, holidays)) {
+        errors.push("holidays");
+      }
+    }
+    
     if (markDraft.checkInTime && markDraft.checkOutTime) {
       if (parseTimeSafe(markDraft.checkOutTime) < parseTimeSafe(markDraft.checkInTime)) {
         errors.push("Check-out cannot happen before check-in.");
@@ -482,7 +505,24 @@ export function useTeacherAttendanceMarkingController() {
     }
 
     setMarkErrors(errors);
-    if (errors.length > 0) return;
+    if (errors.length > 0) {
+      // Show validation errors in snackbar
+      const errorMsg = errors[0];
+      // Simplify weekend/holiday message
+      let displayMsg = errorMsg;
+      if (errorMsg.includes("weekends")) {
+        displayMsg = "Attendance cannot be marked on weekends.";
+      } else if (errorMsg.includes("holidays")) {
+        displayMsg = "Attendance cannot be marked on holidays.";
+      }
+      
+      setSnackbar({
+        open: true,
+        message: displayMsg,
+        severity: "error",
+      });
+      return;
+    }
 
     const officeStart = MOCK_OFFICE_TIMING.startTime;
     // Always recompute Present/Late from check-in (never keep a sticky Late).
@@ -515,10 +555,15 @@ export function useTeacherAttendanceMarkingController() {
           ? String((err as { message?: string }).message || "Save failed")
           : "Save failed";
       setMarkErrors([message]);
+      setSnackbar({
+        open: true,
+        message,
+        severity: "error",
+      });
     } finally {
       setSaving(false);
     }
-  }, [markTeacherId, markDate, markDraft, markRecord, persistMark]);
+  }, [markTeacherId, markDate, markDraft, markRecord, persistMark, holidays]);
 
   const updateDetailsFilter = useCallback(
     <K extends keyof AttendanceDetailsFilters>(key: K, value: AttendanceDetailsFilters[K]) => {
@@ -594,5 +639,7 @@ export function useTeacherAttendanceMarkingController() {
     selfTeacherId,
     holidays,
     holidaysLoading,
+    snackbar,
+    setSnackbar,
   };
 }

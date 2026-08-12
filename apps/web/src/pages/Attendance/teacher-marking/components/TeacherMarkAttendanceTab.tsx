@@ -271,16 +271,6 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
               data-testid="field-mark-remarks"
             />
 
-            {markErrors.length > 0 ? (
-              <Stack spacing={0.5} data-testid="mark-attendance-errors">
-                {markErrors.map((error) => (
-                  <Alert key={error} severity="error">
-                    {error}
-                  </Alert>
-                ))}
-              </Stack>
-            ) : null}
-
             {isRejected ? (
               <TextField
                 label="Reason for Reject"

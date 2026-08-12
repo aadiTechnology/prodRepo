@@ -77,3 +77,14 @@ export function primaryCalendarStatus(
   }
   return statuses[0];
 }
+
+export function isWeekend(iso: string): boolean {
+  const d = new Date(`${iso}T00:00:00`);
+  const dayOfWeek = d.getDay();
+  // 0 = Sunday, 6 = Saturday
+  return dayOfWeek === 0 || dayOfWeek === 6;
+}
+
+export function isHoliday(iso: string, holidays: Record<string, string>): boolean {
+  return iso in holidays;
+}

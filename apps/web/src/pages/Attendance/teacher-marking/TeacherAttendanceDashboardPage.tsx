@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Box, Paper, Tab, Tabs } from "@mui/material";
+import { Box, Paper, Tab, Tabs, Snackbar, Alert } from "@mui/material";
 
 import { PageHeader, PageLayout } from "../../../components/layout";
 import { useTeacherAttendanceMarkingController } from "../../../hooks/useTeacherAttendanceMarkingController";
@@ -87,6 +87,24 @@ export default function TeacherAttendanceDashboardPage() {
           </Box>
         </Paper>
       </Box>
+
+      <Snackbar
+        open={controller.snackbar.open}
+        autoHideDuration={4000}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        onClose={() => controller.setSnackbar({ ...controller.snackbar, open: false })}
+        sx={{ zIndex: 9999 }}
+      >
+        <Alert
+          onClose={() => controller.setSnackbar({ ...controller.snackbar, open: false })}
+          severity={controller.snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: "16px" }}
+          data-testid="teacher-attendance-snackbar"
+        >
+          {controller.snackbar.message}
+        </Alert>
+      </Snackbar>
     </PageLayout>
   );
 }
