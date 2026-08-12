@@ -158,6 +158,8 @@ from app.routers import activity_gallery_router
 app.include_router(activity_gallery_router.router)
 from app.routers import staff_attendance_router
 app.include_router(staff_attendance_router.router)
+from app.routers import attendance_configuration_router
+app.include_router(attendance_configuration_router.router)
 from app.routers import syllabus_router
 app.include_router(syllabus_router.router)
 from app.routers import notification_router

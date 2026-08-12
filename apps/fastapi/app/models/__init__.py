@@ -47,6 +47,13 @@ from app.models.activity_gallery import (
 )
 from app.models.syllabus import Syllabus, SyllabusAttachment
 from app.models.staff_attendance import StaffAttendance
+from app.models.attendance_configuration import (
+    AttendanceConfiguration,
+    AttendanceConfigHoliday,
+    AttendanceConfigShift,
+    AttendanceConfigStatus,
+    AttendanceConfigNotification,
+)
 from app.models.notification import (
     Notification,
     TenantNotificationScheduleConfig,
@@ -120,6 +127,11 @@ __all__ = [
     "Syllabus",
     "SyllabusAttachment",
     "StaffAttendance",
+    "AttendanceConfiguration",
+    "AttendanceConfigHoliday",
+    "AttendanceConfigShift",
+    "AttendanceConfigStatus",
+    "AttendanceConfigNotification",
     "UserNotification",
     "UserNotificationSettings",
     "TenantNotificationScheduleConfig",

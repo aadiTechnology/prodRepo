@@ -15,6 +15,7 @@ from app.schemas.staff_attendance_schema import (
 )
 from app.services.attendance_access import is_admin_like, is_teacher_like
 from app.services import teacher_service
+from app.utils.staff_attendance_working_days import assert_staff_attendance_working_day
 
 DEFAULT_SHIFT_START = "09:00"
 DEFAULT_SHIFT_END = "17:00"
@@ -139,6 +140,13 @@ def mark_staff_attendance(
 
     if payload.attendance_date > date.today():
         raise ValidationException("Future date attendance is not allowed")
+
+    # Validate working day (check for weekends and holidays)
+    assert_staff_attendance_working_day(
+        db,
+        tenant_id=tenant_id,
+        check_date=payload.attendance_date,
+    )
 
     _assert_teacher_in_tenant(db, tenant_id=tenant_id, teacher_id=payload.teacher_id)
     _assert_can_access_teacher(db, current_user, teacher_id=payload.teacher_id)
