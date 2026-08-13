@@ -81,15 +81,6 @@ export default function AttendanceConfigurationPage() {
       }
     >
       <Stack spacing={2}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
-            Attendance Configuration
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Configure attendance settings for your school. Changes are saved locally in this prototype.
-          </Typography>
-        </Box>
-
         <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="flex-start">
           <Paper
             sx={{
@@ -102,9 +93,6 @@ export default function AttendanceConfigurationPage() {
             }}
             data-testid="attendance-config-nav"
           >
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, px: 1, mb: 1 }}>
-              Sections
-            </Typography>
             <List disablePadding>
               {SECTION_NAV.map((section) => {
                 const isActive = controller.activeSection === section.id;
