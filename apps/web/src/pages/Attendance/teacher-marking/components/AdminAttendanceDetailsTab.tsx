@@ -22,6 +22,7 @@ import { colorTokens } from "../../../../tokens/colors";
 import type { TeacherAttendanceMarkingController } from "../../../../hooks/useTeacherAttendanceMarkingController";
 import type { ApprovalStatus, TeacherAttendanceRecord } from "../teacherAttendanceMarking.types";
 import { APPROVAL_STATUS_OPTIONS } from "../teacherAttendanceMarking.types";
+import { SaveButton, CancelButton } from "../../../../components/semantic";
 interface AdminAttendanceDetailsTabProps {
   controller: TeacherAttendanceMarkingController;
 }
@@ -252,36 +253,53 @@ export default function AdminAttendanceDetailsTab({
         open={rejectTargetId !== null}
         onClose={closeRejectDialog}
         fullWidth
-        maxWidth="xs"
+        maxWidth="sm"
         data-testid="dialog-reject-reason"
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
       >
-        <DialogTitle>Reason for Reject</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            label="Reason for Reject"
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-            multiline
-            minRows={3}
-            fullWidth
-            margin="dense"
-            inputProps={{ "data-testid": "input-reject-reason" }}
-            data-testid="field-reject-reason"
-          />
+        <Box
+          sx={(theme) => ({
+            background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
+            px: 3,
+            py: 2,
+          })}
+        >
+          <DialogTitle sx={{ fontWeight: 700, p: 0, color: "white", m: 0 }}>
+            Reason for Reject
+          </DialogTitle>
+        </Box>
+        <DialogContent dividers>
+          <Stack spacing={2.5} sx={{ py: 2 }}>
+            <TextField
+              autoFocus
+              label="Reason for Reject"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              multiline
+              minRows={3}
+              fullWidth
+              size="small"
+              inputProps={{ "data-testid": "input-reject-reason" }}
+              data-testid="field-reject-reason"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  fontSize: "0.95rem",
+                },
+              }}
+            />
+          </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={closeRejectDialog} data-testid="btn-reject-cancel">
+        <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+          <CancelButton onClick={closeRejectDialog} data-testid="btn-reject-cancel">
             Cancel
-          </Button>
-          <Button
-            variant="contained"
+          </CancelButton>
+          <SaveButton
             onClick={confirmReject}
             disabled={rejectReason.trim().length === 0}
             data-testid="btn-reject-save"
           >
             Save
-          </Button>
+          </SaveButton>
         </DialogActions>
       </Dialog>
     </Box>
