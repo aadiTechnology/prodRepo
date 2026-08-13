@@ -19,7 +19,7 @@ type Props = {
 const HOLIDAY_FIELDS = [
   { name: "name", label: "Holiday Name", type: "text" as const, testId: "input-holiday-name", required: true },
   { name: "date", label: "Holiday Date", type: "date" as const, testId: "input-holiday-date", required: true },
-  { name: "description", label: "Description", type: "text" as const, testId: "input-holiday-description" },
+  { name: "description", label: "Description", type: "text" as const, testId: "input-holiday-description", required: false },
   statusField("select-holiday-status"),
 ];
 
