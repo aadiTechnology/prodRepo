@@ -262,11 +262,21 @@ export default function AdminAttendanceDetailsTab({
             background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
             px: 3,
             py: 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
           })}
         >
           <DialogTitle sx={{ fontWeight: 700, p: 0, color: "white", m: 0 }}>
             Reason for Reject
           </DialogTitle>
+          <IconButton
+            aria-label="close"
+            onClick={closeRejectDialog}
+            sx={{ color: "white", bgcolor: "transparent", borderRadius: 2 }}
+          >
+            <CancelIcon sx={{ fontSize: 28 }} />
+          </IconButton>
         </Box>
         <DialogContent dividers>
           <Stack spacing={2.5} sx={{ py: 2 }}>
