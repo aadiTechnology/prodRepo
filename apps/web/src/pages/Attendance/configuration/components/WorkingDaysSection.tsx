@@ -1,6 +1,5 @@
-import { Alert, Checkbox, FormControlLabel, Stack, Typography } from "@mui/material";
+import { Checkbox, FormControlLabel, Stack, Typography } from "@mui/material";
 
-import { HOLIDAY_WARNING_MESSAGE } from "../attendanceConfiguration.mock";
 import type { WorkingDayKey } from "../attendanceConfiguration.types";
 import type { AttendanceConfigurationController } from "../../../../hooks/useAttendanceConfigurationController";
 import ConfigSectionCard from "./ConfigSectionCard";
@@ -48,10 +47,6 @@ export default function WorkingDaysSection({ controller }: Props) {
             />
           ))}
         </Stack>
-        <Alert severity="info" data-testid="alert-holiday-warning-info">
-          If attendance is marked on a holiday, the system shows: &quot;{HOLIDAY_WARNING_MESSAGE}&quot;
-          but still allows submission.
-        </Alert>
       </Stack>
     </ConfigSectionCard>
   );
