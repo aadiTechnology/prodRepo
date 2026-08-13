@@ -3,14 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import staffAttendanceService, {
   type StaffAttendanceResponse,
 } from "../api/services/staffAttendanceService";
-import * as attendanceConfigService from "../api/services/attendanceConfigurationService";
+import attendanceConfigurationService, {
+  getHolidaysForCalendar,
+} from "../api/services/attendanceConfigurationService";
+import academicYearService from "../api/services/academicYearService";
 import teacherService from "../api/services/teacherService";
 import { useAuth } from "../context/AuthContext";
 import { useAttendanceReportRole } from "./useAttendanceReportRole";
-import {
-  MOCK_GRACE_TIME,
-  MOCK_OFFICE_TIMING,
-} from "../pages/Attendance/teacher-marking/teacherAttendanceMarking.mock";
 import type {
   ApprovalStatus,
   TeacherAttendanceRecord,
@@ -142,6 +141,28 @@ export function useTeacherAttendanceMarkingController() {
   // Holidays state for calendar
   const [holidays, setHolidays] = useState<Record<string, string>>({});
   const [holidaysLoading, setHolidaysLoading] = useState(false);
+
+  // Attendance configuration (working days, office timing, grace time)
+  const [workingDays, setWorkingDays] = useState({
+    monday: true,
+    tuesday: true,
+    wednesday: true,
+    thursday: true,
+    friday: true,
+    saturday: false,
+    sunday: false,
+  });
+  const [officeTimingConfig, setOfficeTimingConfig] = useState({
+    startTime: "09:00",
+    endTime: "17:00",
+    minimumWorkingHours: 360,
+  });
+  const [graceTimeConfig, setGraceTimeConfig] = useState({
+    enabled: false,
+    graceMinutes: 0,
+  });
+  const [configLoading, setConfigLoading] = useState(false);
+  const [academicYearId, setAcademicYearId] = useState<number | null>(null);
 
   const [activeTab, setActiveTab] = useState<TeacherAttendanceTab>("check-in-out");
   const [checkInOutErrors, setCheckInOutErrors] = useState<string[]>([]);
@@ -275,7 +296,7 @@ export function useTeacherAttendanceMarkingController() {
       const { from, to } = monthRange(calendarMonth);
       setHolidaysLoading(true);
       try {
-        const holidayList = await attendanceConfigService.getHolidaysForCalendar(from, to);
+        const holidayList = await getHolidaysForCalendar(from, to);
         const holidayMap: Record<string, string> = {};
         for (const holiday of holidayList) {
           // Store holiday name by date
@@ -292,6 +313,60 @@ export function useTeacherAttendanceMarkingController() {
 
     void fetchHolidays();
   }, [calendarMonth]);
+
+  // Load attendance configuration (working days, office timing, grace time)
+  useEffect(() => {
+    let cancelled = false;
+    
+    (async () => {
+      try {
+        // First get active academic year
+        if (!academicYearId) {
+          const years = await academicYearService.listActive();
+          if (cancelled) return;
+          if (years && years.length > 0) {
+            setAcademicYearId(Number(years[0].id));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load academic years:", err);
+      }
+    })();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load attendance configuration once we have academic year ID
+  useEffect(() => {
+    if (!academicYearId) return;
+    
+    let cancelled = false;
+    (async () => {
+      setConfigLoading(true);
+      try {
+        const config = await attendanceConfigurationService.get(academicYearId);
+        if (cancelled) return;
+        
+        setWorkingDays(config.workingDays);
+        setOfficeTimingConfig(config.officeTiming);
+        setGraceTimeConfig({
+          enabled: config.graceTime.enabled,
+          graceMinutes: config.graceTime.graceMinutes,
+        });
+      } catch (err) {
+        console.error("Failed to load attendance configuration:", err);
+        // Keep defaults if load fails
+      } finally {
+        if (!cancelled) setConfigLoading(false);
+      }
+    })();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [academicYearId]);
 
 
   const todayRecord = useMemo(() => {
@@ -394,12 +469,12 @@ export function useTeacherAttendanceMarkingController() {
     if (!selfTeacherId || todayRecord.checkInTime || todayRecord.checkOutTime) return;
 
     const checkInTime = formatCurrentTime();
-    const officeStart = MOCK_OFFICE_TIMING.startTime;
+    const officeStart = officeTimingConfig.startTime;
     const autoStatus: TeacherAttendanceStatus = resolveStatusAfterCheckIn(
       checkInTime,
       officeStart,
-      MOCK_GRACE_TIME.enabled,
-      MOCK_GRACE_TIME.graceMinutes
+      graceTimeConfig.enabled,
+      graceTimeConfig.graceMinutes
     );
 
     setSaving(true);
@@ -413,12 +488,22 @@ export function useTeacherAttendanceMarkingController() {
         remarks: todayRecord.remarks || "",
         status: autoStatus,
       });
+      setSnackbar({
+        open: true,
+        message: "Check-in recorded successfully!",
+        severity: "success",
+      });
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message?: string }).message || "Check-in failed")
           : "Check-in failed";
       setCheckInOutErrors([message]);
+      setSnackbar({
+        open: true,
+        message,
+        severity: "error",
+      });
     } finally {
       setSaving(false);
     }
@@ -444,12 +529,22 @@ export function useTeacherAttendanceMarkingController() {
         remarks: todayRecord.remarks || "",
         status: todayRecord.statuses[0],
       });
+      setSnackbar({
+        open: true,
+        message: "Check-out recorded successfully!",
+        severity: "success",
+      });
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message?: string }).message || "Check-out failed")
           : "Check-out failed";
       setCheckInOutErrors([message]);
+      setSnackbar({
+        open: true,
+        message,
+        severity: "error",
+      });
     } finally {
       setSaving(false);
     }
@@ -486,10 +581,17 @@ export function useTeacherAttendanceMarkingController() {
     if (!markDate) errors.push("Attendance date is required.");
     if (markDate && isFutureDate(markDate)) errors.push("Future date attendance is not allowed.");
     
-    // Check for weekends and holidays
+    // Check for non-working days and holidays (based on configuration)
     if (markDate) {
-      if (isWeekend(markDate)) {
-        errors.push("weekends");
+      // Check if this specific date is a working day
+      const d = new Date(`${markDate}T00:00:00`);
+      const dayOfWeek = d.getDay();
+      const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
+      const dayName = daysOfWeek[dayOfWeek];
+      const isWorkingDayDate = workingDays[dayName as keyof typeof workingDays] ?? false;
+      
+      if (!isWorkingDayDate) {
+        errors.push("non-working-day");
       } else if (isHoliday(markDate, holidays)) {
         errors.push("holidays");
       }
@@ -510,8 +612,8 @@ export function useTeacherAttendanceMarkingController() {
       const errorMsg = errors[0];
       // Simplify weekend/holiday message
       let displayMsg = errorMsg;
-      if (errorMsg.includes("weekends")) {
-        displayMsg = "Attendance cannot be marked on weekends.";
+      if (errorMsg.includes("non-working")) {
+        displayMsg = "Attendance cannot be marked on non-working days.";
       } else if (errorMsg.includes("holidays")) {
         displayMsg = "Attendance cannot be marked on holidays.";
       }
@@ -524,15 +626,16 @@ export function useTeacherAttendanceMarkingController() {
       return;
     }
 
-    const officeStart = MOCK_OFFICE_TIMING.startTime;
+    // Use configured office timing and grace time
+    const officeStart = officeTimingConfig.startTime;
     // Always recompute Present/Late from check-in (never keep a sticky Late).
     let status: TeacherAttendanceStatus | undefined;
     if (markDraft.checkInTime) {
       status = resolveStatusAfterCheckIn(
         markDraft.checkInTime,
         officeStart,
-        MOCK_GRACE_TIME.enabled,
-        MOCK_GRACE_TIME.graceMinutes
+        graceTimeConfig.enabled,
+        graceTimeConfig.graceMinutes
       );
     } else if (markRecord?.statuses[0]) {
       status = markRecord.statuses[0];
@@ -549,6 +652,11 @@ export function useTeacherAttendanceMarkingController() {
         status,
       });
       setMarkErrors([]);
+      setSnackbar({
+        open: true,
+        message: "Attendance marked successfully!",
+        severity: "success",
+      });
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "message" in err
@@ -563,7 +671,7 @@ export function useTeacherAttendanceMarkingController() {
     } finally {
       setSaving(false);
     }
-  }, [markTeacherId, markDate, markDraft, markRecord, persistMark, holidays]);
+  }, [markTeacherId, markDate, markDraft, markRecord, persistMark, holidays, workingDays, officeTimingConfig, graceTimeConfig]);
 
   const updateDetailsFilter = useCallback(
     <K extends keyof AttendanceDetailsFilters>(key: K, value: AttendanceDetailsFilters[K]) => {

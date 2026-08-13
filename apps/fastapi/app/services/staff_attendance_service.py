@@ -13,6 +13,8 @@ from app.schemas.staff_attendance_schema import (
     StaffAttendanceMarkRequest,
     StaffAttendanceResponse,
 )
+from app.models.academic import AcademicYear
+from app.models.attendance_configuration import AttendanceConfiguration
 from app.services.attendance_access import is_admin_like, is_teacher_like
 from app.services import teacher_service
 from app.utils.staff_attendance_working_days import assert_staff_attendance_working_day
@@ -20,6 +22,74 @@ from app.utils.staff_attendance_working_days import assert_staff_attendance_work
 DEFAULT_SHIFT_START = "09:00"
 DEFAULT_SHIFT_END = "17:00"
 DEFAULT_GRACE_MINUTES = 15
+DEFAULT_STATUS_AFTER_GRACE = "Late"
+
+
+class _TimingConfig:
+    __slots__ = ("shift_start", "shift_end", "grace_enabled", "grace_minutes", "status_after_grace")
+
+    def __init__(
+        self,
+        *,
+        shift_start: str,
+        shift_end: str,
+        grace_enabled: bool,
+        grace_minutes: int,
+        status_after_grace: str,
+    ) -> None:
+        self.shift_start = shift_start
+        self.shift_end = shift_end
+        self.grace_enabled = grace_enabled
+        self.grace_minutes = grace_minutes
+        self.status_after_grace = status_after_grace
+
+
+def _load_timing_config(db: Session, *, tenant_id: int) -> _TimingConfig:
+    """Load office timing + grace settings from attendance configuration."""
+    active_year = (
+        db.query(AcademicYear)
+        .filter(
+            AcademicYear.tenant_id == tenant_id,
+            AcademicYear.is_active == True,  # noqa: E712
+            AcademicYear.is_deleted == False,  # noqa: E712
+        )
+        .order_by(AcademicYear.id.desc())
+        .first()
+    )
+    if not active_year:
+        return _TimingConfig(
+            shift_start=DEFAULT_SHIFT_START,
+            shift_end=DEFAULT_SHIFT_END,
+            grace_enabled=True,
+            grace_minutes=DEFAULT_GRACE_MINUTES,
+            status_after_grace=DEFAULT_STATUS_AFTER_GRACE,
+        )
+
+    config = (
+        db.query(AttendanceConfiguration)
+        .filter(
+            AttendanceConfiguration.tenant_id == tenant_id,
+            AttendanceConfiguration.academic_year_id == active_year.id,
+            AttendanceConfiguration.is_deleted == False,  # noqa: E712
+        )
+        .first()
+    )
+    if not config:
+        return _TimingConfig(
+            shift_start=DEFAULT_SHIFT_START,
+            shift_end=DEFAULT_SHIFT_END,
+            grace_enabled=True,
+            grace_minutes=DEFAULT_GRACE_MINUTES,
+            status_after_grace=DEFAULT_STATUS_AFTER_GRACE,
+        )
+
+    return _TimingConfig(
+        shift_start=config.office_start_time or DEFAULT_SHIFT_START,
+        shift_end=config.office_end_time or DEFAULT_SHIFT_END,
+        grace_enabled=bool(config.grace_enabled),
+        grace_minutes=int(config.grace_minutes or DEFAULT_GRACE_MINUTES),
+        status_after_grace=config.status_after_grace or DEFAULT_STATUS_AFTER_GRACE,
+    )
 
 
 def _parse_hhmm(value: str | None, *, field: str) -> int | None:
@@ -38,9 +108,14 @@ def _parse_hhmm(value: str | None, *, field: str) -> int | None:
     return hours * 60 + minutes
 
 
-def _derive_status(check_in_time: str | None, explicit: str | None) -> str:
+def _derive_status(
+    check_in_time: str | None,
+    explicit: str | None,
+    *,
+    timing: _TimingConfig,
+) -> str:
     """
-    Derive Present/Late from check-in vs office start + grace.
+    Derive Present/Late from check-in vs office start + grace from attendance config.
 
     When the client sends an explicit status other than Present/Late (e.g. Leave),
     keep it. Present/Late from the client are ignored so late calculation stays
@@ -50,10 +125,12 @@ def _derive_status(check_in_time: str | None, explicit: str | None) -> str:
         return explicit
     if not check_in_time:
         return "Present"
+    if not timing.grace_enabled:
+        return "Present"
     check_in = _parse_hhmm(check_in_time, field="check_in_time")
-    shift_start = _parse_hhmm(DEFAULT_SHIFT_START, field="shift_start") or 0
-    if check_in is not None and check_in > shift_start + DEFAULT_GRACE_MINUTES:
-        return "Late"
+    shift_start = _parse_hhmm(timing.shift_start, field="shift_start") or 0
+    if check_in is not None and check_in > shift_start + timing.grace_minutes:
+        return timing.status_after_grace or DEFAULT_STATUS_AFTER_GRACE
     return "Present"
 
 
@@ -183,14 +260,16 @@ def mark_staff_attendance(
     if check_in_min is not None and check_out_min is not None and check_out_min < check_in_min:
         raise ValidationException("Check-out cannot happen before check-in")
 
+    timing = _load_timing_config(db, tenant_id=tenant_id)
+
     working = None
     overtime = None
     if check_in_min is not None and check_out_min is not None:
         working = check_out_min - check_in_min
-        shift_end = _parse_hhmm(DEFAULT_SHIFT_END, field="shift_end") or 0
+        shift_end = _parse_hhmm(timing.shift_end, field="shift_end") or 0
         overtime = max(0, (check_in_min + working) - shift_end)
 
-    status = _derive_status(check_in, payload.status)
+    status = _derive_status(check_in, payload.status, timing=timing)
     is_submitted = bool(check_in and check_out)
     approval_status = "Waiting for Approval"
     if is_admin_like(current_user, db) and is_submitted:

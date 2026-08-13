@@ -88,3 +88,23 @@ export function isWeekend(iso: string): boolean {
 export function isHoliday(iso: string, holidays: Record<string, string>): boolean {
   return iso in holidays;
 }
+
+export function isWorkingDay(
+  iso: string,
+  workingDays: {
+    monday: boolean;
+    tuesday: boolean;
+    wednesday: boolean;
+    thursday: boolean;
+    friday: boolean;
+    saturday: boolean;
+    sunday: boolean;
+  }
+): boolean {
+  const d = new Date(`${iso}T00:00:00`);
+  const dayOfWeek = d.getDay();
+  // Map: Sunday=0, Monday=1, ..., Saturday=6
+  const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
+  const dayName = daysOfWeek[dayOfWeek];
+  return workingDays[dayName] ?? false;
+}
