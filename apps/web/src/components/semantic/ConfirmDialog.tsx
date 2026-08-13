@@ -6,7 +6,6 @@
 
 import { Dialog } from "../primitives";
 import { Box, Divider, IconButton, Typography } from "@mui/material";
-import CheckIcon from "@mui/icons-material/Check";
 import CancelIcon from "@mui/icons-material/Cancel";
 import { Button } from "../primitives";
 import CancelButton from "./CancelButton";
@@ -108,26 +107,17 @@ export default function ConfirmDialog({
           textAlign: "left",
         })}
       >
-        <Box sx={{ display: "flex", alignItems: "center", mb: 0.25 }}>
-          <CheckIcon
-            sx={(theme) => ({
-              fontSize: 32,
-              color: theme.palette.success.main,
-              mr: 1.5,
-              p: 0,
-            })}
-          />
-          <Typography
-            variant="h6"
-            sx={(theme) => ({
-              fontWeight: 700,
-              color: theme.palette.text.primary,
-              lineHeight: 1.25,
-            })}
-          >
-            {title}
-          </Typography>
-        </Box>
+        <Typography
+          variant="h6"
+          sx={(theme) => ({
+            fontWeight: 700,
+            color: theme.palette.text.primary,
+            lineHeight: 1.25,
+            mb: 0.25,
+          })}
+        >
+          {title}
+        </Typography>
         {message && typeof message === "string" && (
           <Typography
             variant="body1"

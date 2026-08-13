@@ -6,10 +6,12 @@ import {
   TextField,
   MenuItem,
   Stack,
+  Box,
 } from "@mui/material";
 
 import { SaveButton, CancelButton } from "../../../../components/semantic";
 import type { EntityStatus } from "../attendanceConfiguration.types";
+import { colorTokens } from "../../../../tokens/colors";
 
 export type ConfigEntityDialogField = {
   name: string;
@@ -66,57 +68,109 @@ export default function ConfigEntityDialog({
       fullWidth
       maxWidth="sm"
       data-testid={dataTestId}
-      PaperProps={{ sx: { borderRadius: 3 } }}
+      PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
     >
-      <DialogTitle sx={{ fontWeight: 700 }}>{title}</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ pt: 1 }}>
+      <Box
+        sx={(theme) => ({
+          background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
+          px: 3,
+          py: 2,
+        })}
+      >
+        <DialogTitle sx={{ fontWeight: 700, p: 0, color: "white", m: 0 }}>
+          {title}
+        </DialogTitle>
+      </Box>
+      <DialogContent dividers>
+        <Stack spacing={2.5} sx={{ py: 2 }}>
           {fields.map((field) => {
             if (field.type === "select") {
               return (
-                <TextField
-                  key={field.name}
-                  select
-                  fullWidth
-                  size="small"
-                  label={field.label}
-                  value={String(values[field.name] ?? "")}
-                  onChange={(e) => onChange(field.name, e.target.value)}
-                  required={field.required}
-                  inputProps={{ "data-testid": field.testId }}
-                >
-                  {(field.options ?? []).map((opt) => (
-                    <MenuItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
+                <Box key={field.name}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label={field.label}
+                    value={String(values[field.name] ?? "")}
+                    onChange={(e) => onChange(field.name, e.target.value)}
+                    required={field.required}
+                    inputProps={{ "data-testid": field.testId }}
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        fontSize: "0.95rem",
+                      },
+                    }}
+                  >
+                    {(field.options ?? []).map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+              );
+            }
+
+            if (field.type === "date") {
+              return (
+                <Box key={field.name}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label={field.label}
+                    type="date"
+                    value={values[field.name] ?? ""}
+                    onChange={(e) => onChange(field.name, e.target.value)}
+                    required={field.required}
+                    inputProps={{ "data-testid": field.testId }}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        fontSize: "0.95rem",
+                      },
+                      "& input[type='date']": {
+                        fontSize: "0.95rem",
+                        paddingTop: "10px",
+                        paddingBottom: "10px",
+                      },
+                    }}
+                  />
+                </Box>
               );
             }
 
             return (
-              <TextField
-                key={field.name}
-                fullWidth
-                size="small"
-                label={field.label}
-                type={field.type === "number" ? "number" : field.type === "color" ? "color" : field.type}
-                value={values[field.name] ?? ""}
-                onChange={(e) =>
-                  onChange(
-                    field.name,
-                    field.type === "number" ? Number(e.target.value) : e.target.value
-                  )
-                }
-                required={field.required}
-                inputProps={{ "data-testid": field.testId }}
-                InputLabelProps={field.type === "color" ? { shrink: true } : undefined}
-              />
+              <Box key={field.name}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label={field.label}
+                  type={field.type === "number" ? "number" : field.type === "color" ? "color" : "text"}
+                  value={values[field.name] ?? ""}
+                  onChange={(e) =>
+                    onChange(
+                      field.name,
+                      field.type === "number" ? Number(e.target.value) : e.target.value
+                    )
+                  }
+                  required={field.required}
+                  inputProps={{ "data-testid": field.testId }}
+                  InputLabelProps={field.type === "color" ? { shrink: true } : undefined}
+                  multiline={field.type === "text" && field.name === "description"}
+                  rows={field.name === "description" ? 3 : undefined}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      fontSize: "0.95rem",
+                    },
+                  }}
+                />
+              </Box>
             );
           })}
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
         <CancelButton onClick={onClose} data-testid="btn-dialog-cancel">
           Cancel
         </CancelButton>
