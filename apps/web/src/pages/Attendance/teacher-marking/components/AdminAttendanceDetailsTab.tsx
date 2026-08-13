@@ -252,54 +252,73 @@ export default function AdminAttendanceDetailsTab({
       <Dialog
         open={rejectTargetId !== null}
         onClose={closeRejectDialog}
-        fullWidth
-        maxWidth="sm"
+        maxWidth="xs"
         data-testid="dialog-reject-reason"
-        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 2,
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              width: 500,
+              height: "auto",
+            },
+          },
+        }}
       >
         <Box
-          sx={(theme) => ({
+          sx={{
             background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
-            px: 3,
-            py: 2,
+            px: 1.3,
+            py: 0.7,
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
-          })}
+            justifyContent: "flex-end",
+            flexShrink: 0,
+          }}
         >
-          <DialogTitle sx={{ fontWeight: 700, p: 0, color: "white", m: 0 }}>
-            Reason for Reject
-          </DialogTitle>
           <IconButton
             aria-label="close"
             onClick={closeRejectDialog}
-            sx={{ color: "white", bgcolor: "transparent", borderRadius: 2 }}
+            sx={{ color: "white", bgcolor: "transparent", p: 0.25 }}
           >
-            <CancelIcon sx={{ fontSize: 28 }} />
+            <CancelIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Box>
-        <DialogContent dividers>
-          <Stack spacing={2.5} sx={{ py: 2 }}>
+        <DialogContent
+          dividers={false}
+          sx={{
+            py: 1,
+            px: 1.3,
+            overflowY: "auto",
+            overflowX: "hidden",
+          }}
+        >
+          <Stack spacing={0.7}>
+            <Box sx={{ fontWeight: 700, color: "#000", fontSize: "0.9rem" }}>
+              Reason for Reject
+            </Box>
             <TextField
               autoFocus
-              label="Reason for Reject"
+              label="Reason"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               multiline
               minRows={3}
+              maxRows={3}
               fullWidth
               size="small"
               inputProps={{ "data-testid": "input-reject-reason" }}
               data-testid="field-reject-reason"
               sx={{
-                "& .MuiOutlinedInput-root": {
-                  fontSize: "0.95rem",
-                },
+                "& .MuiOutlinedInput-root": { fontSize: "0.8rem" },
+                "& .MuiFormLabel-root": { fontSize: "0.8rem" },
               }}
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+        <DialogActions sx={{ px: 1.3, py: 0.8, gap: 1, flexShrink: 0 }}>
           <CancelButton onClick={closeRejectDialog} data-testid="btn-reject-cancel">
             Cancel
           </CancelButton>
