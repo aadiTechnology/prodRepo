@@ -28,11 +28,11 @@ const SECTION_NAV: { id: AttendanceConfigSectionId; label: string; testId: strin
   { id: "general", label: "General Configuration", testId: "nav-general" },
   { id: "working-days", label: "Working Days", testId: "nav-working-days" },
   { id: "public-holidays", label: "Public Holidays", testId: "nav-public-holidays" },
-  { id: "shifts", label: "Shift Configuration", testId: "nav-shifts" },
+  // { id: "shifts", label: "Shift Configuration", testId: "nav-shifts" },
   { id: "office-timing", label: "Office Timing", testId: "nav-office-timing" },
   { id: "grace-time", label: "Grace Time", testId: "nav-grace-time" },
-  { id: "attendance-status", label: "Attendance Status", testId: "nav-attendance-status" },
-  { id: "notifications", label: "Notifications", testId: "nav-notifications" },
+  // { id: "attendance-status", label: "Attendance Status", testId: "nav-attendance-status" },
+  // { id: "notifications", label: "Notifications", testId: "nav-notifications" },
 ];
 
 function getDeleteMessage(controller: ReturnType<typeof useAttendanceConfigurationController>): string {
@@ -57,16 +57,16 @@ export default function AttendanceConfigurationPage() {
         return <WorkingDaysSection controller={controller} />;
       case "public-holidays":
         return <PublicHolidaysSection controller={controller} />;
-      case "shifts":
-        return <ShiftConfigurationSection controller={controller} />;
+      // case "shifts":
+      //   return <ShiftConfigurationSection controller={controller} />;
       case "office-timing":
         return <OfficeTimingSection controller={controller} />;
       case "grace-time":
         return <GraceTimeSection controller={controller} />;
-      case "attendance-status":
-        return <AttendanceStatusSection controller={controller} />;
-      case "notifications":
-        return <NotificationSettingsSection controller={controller} />;
+      // case "attendance-status":
+      //   return <AttendanceStatusSection controller={controller} />;
+      // case "notifications":
+      //   return <NotificationSettingsSection controller={controller} />;
       default:
         return null;
     }
