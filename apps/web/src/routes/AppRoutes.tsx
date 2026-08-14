@@ -9,6 +9,7 @@ import { Routes, Route, Outlet, Navigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import ActivityGalleryAccess from "../components/auth/ActivityGalleryAccess";
+import SupportRouteLayout, { SupportIndexRedirect } from "./SupportRouteLayout";
 import ChangePassword from "../pages/ChangePassword";
 import { AIReviewProvider } from "../features/aiReview";
 import FeeCategoryManagement from "../pages/Fees/FeeCategoryManagement";
@@ -108,6 +109,12 @@ const DemoSetupVideoFormPage = lazy(() => import("../pages/configuration/DemoSet
 const DemoSetupVideoDetail = lazy(() => import("../pages/configuration/DemoSetupVideoDetail"));
 const DigitalMarketingHub = lazy(() => import("../pages/marketing/DigitalMarketingHub"));
 const MarketingPlatformFormPage = lazy(() => import("../pages/marketing/MarketingPlatformFormPage"));
+const FaqList = lazy(() => import("../pages/support/FaqList"));
+const AddFaq = lazy(() => import("../pages/support/AddFaq"));
+const FaqDetail = lazy(() => import("../pages/support/FaqDetail"));
+const ContactSupport = lazy(() => import("../pages/support/ContactSupport"));
+const ProductUpdates = lazy(() => import("../pages/support/ProductUpdates"));
+const AddProductUpdate = lazy(() => import("../pages/support/AddProductUpdate"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -587,7 +594,52 @@ export default function AppRoutes() {
           />
           <Route path="/admissions/enrollment/print" element={<ProtectedRoute requiredPermissions="ADMISSIONS_MGMT:view"><EnrollmentPrintPage /></ProtectedRoute>} />
 
-  
+          {/* Support Module */}
+          <Route
+            path="/support"
+            element={
+              <ProtectedRoute
+                requiredRoles={[
+                  "SUPER_ADMIN",
+                  "SYSTEM_ADMIN",
+                  "TENANT_ADMIN",
+                  "ADMIN",
+                  "SCHOOL_ADMIN",
+                  "TEACHER",
+                  "STUDENT",
+                ]}
+              >
+                <SupportRouteLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<SupportIndexRedirect />} />
+            <Route path="faqs" element={<FaqList />} />
+            {/* My Queries */}
+            <Route path="contact" element={<ContactSupport />} />
+            <Route path="contact/add" element={<AddFaq />} />
+            <Route path="contact/:id" element={<FaqDetail />} />
+            <Route path="contact/:id/edit" element={<AddFaq />} />
+            {/* Release Notes */}
+            <Route path="updates" element={<ProductUpdates />} />
+            <Route path="release-notes" element={<ProductUpdates />} />
+            <Route
+              path="updates/add"
+              element={
+                <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN"]}>
+                  <AddProductUpdate />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="updates/:id/edit"
+              element={
+                <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN"]}>
+                  <AddProductUpdate />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
         </Route>
 
       </Routes>
