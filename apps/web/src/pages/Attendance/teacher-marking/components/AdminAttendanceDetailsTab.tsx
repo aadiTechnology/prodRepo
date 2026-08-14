@@ -99,6 +99,7 @@ export default function AdminAttendanceDetailsTab({
   const [rejectReason, setRejectReason] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   // Use controller's date filter instead of local state
   const listDate = detailsFilters.date;
   const setListDate = (date: string) => updateDetailsFilter("date", date);
@@ -160,6 +161,20 @@ export default function AdminAttendanceDetailsTab({
     const displayHour = h % 12 || 12;
     return `${String(displayHour).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
   };
+
+  const toggleRowSelection = (row: TeacherAttendanceRecord) => {
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(row.id)) {
+        next.delete(row.id);
+      } else {
+        next.add(row.id);
+      }
+      return next;
+    });
+  };
+
+  const isRowSelected = (row: TeacherAttendanceRecord) => selectedRows.has(row.id);
 
   const listColumns = [
     {
@@ -445,7 +460,6 @@ useEffect(() => {
                 <IconButton
                   onClick={() => setViewMode("list")}
                   size="small"
-                  disabled={viewMode === "list"}
                   data-testid="btn-list-view"
                   sx={{
                     bgcolor: viewMode === "list"
@@ -472,7 +486,6 @@ useEffect(() => {
                 <IconButton
                   onClick={() => setViewMode("approval")}
                   size="small"
-                  disabled={viewMode === "approval"}
                   data-testid="btn-approval-view"
                   sx={{
                     bgcolor: viewMode === "approval"
@@ -525,6 +538,17 @@ useEffect(() => {
             data-testid={viewMode === "list" ? "table-attendance-list" : "table-attendance-details"}
             rowTestId={(row) => `${viewMode === "list" ? "attendance-list" : "attendance-details"}-row-${row.id}`}
             emptyTestId={viewMode === "list" ? "attendance-list-empty-state" : "attendance-details-empty-state"}
+            onRowClick={toggleRowSelection}
+            getRowSx={(row) => ({
+              backgroundColor: isRowSelected(row)
+                ? alpha(colorTokens.preschool.turquoise.main, 0.12)
+                : undefined,
+              "&.MuiTableRow-hover:hover": {
+                backgroundColor: isRowSelected(row)
+                  ? alpha(colorTokens.preschool.turquoise.main, 0.18)
+                  : alpha(colorTokens.background.default, 0.6),
+              },
+            })}
           />
         </AppCard>
       </Stack>
