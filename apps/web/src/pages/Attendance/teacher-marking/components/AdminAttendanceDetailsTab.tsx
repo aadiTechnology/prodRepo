@@ -1,36 +1,91 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Box,
-  Button,
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   IconButton,
+  InputAdornment,
   MenuItem,
   Stack,
-  TablePagination,
   TextField,
   Tooltip,
   Typography,
+  alpha,
+  FormControl,
+  InputLabel,
+  Select,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import ViewListIcon from "@mui/icons-material/ViewList";
+import HowToVoteIcon from "@mui/icons-material/HowToVote";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 
-import { DataTable, type DataTableColumn } from "../../../../components/reusable";
+import { EntityTableSection } from "../../../../components/reusable";
+import { AppCard } from "../../../../components/primitives";
 import { colorTokens } from "../../../../tokens/colors";
 import type { TeacherAttendanceMarkingController } from "../../../../hooks/useTeacherAttendanceMarkingController";
 import type { ApprovalStatus, TeacherAttendanceRecord } from "../teacherAttendanceMarking.types";
 import { APPROVAL_STATUS_OPTIONS } from "../teacherAttendanceMarking.types";
 import { SaveButton, CancelButton } from "../../../../components/semantic";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../../../utils/listPagination";
+
 interface AdminAttendanceDetailsTabProps {
   controller: TeacherAttendanceMarkingController;
 }
 
+type ViewMode = "list" | "approval";
+
+const filterSelectSx = {
+  minWidth: { xs: "100%", sm: 180 },
+  "& .MuiOutlinedInput-root": {
+    borderRadius: "15px",
+    fontSize: "0.85rem",
+    fontWeight: 600,
+    bgcolor: "#ffffff",
+    "& fieldset": { borderColor: colorTokens.border.subtle },
+    "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
+    "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
+  },
+};
+
+const filterStackSx = {
+  width: "100%",
+  px: { xs: 2, sm: 2.5 },
+  py: 2.25,
+  bgcolor: alpha(colorTokens.primary.main, 0.015),
+  gap: { xs: 2.5, sm: 2 },
+  rowGap: { xs: 2.5, sm: 2.25 },
+  columnGap: { xs: 2.5, sm: 1.5 },
+};
+
+const filterControlSx = {
+  minWidth: { xs: "100%", sm: 180 },
+  width: { xs: "100%", sm: "auto" },
+};
+
+const dateFieldSx = {
+  minWidth: { xs: "100%", sm: 160 },
+  width: { xs: "100%", sm: "auto" },
+  "& .MuiInputLabel-root": {
+    fontSize: "0.85rem",
+    fontWeight: 600,
+  },
+  "& .MuiOutlinedInput-root": {
+    borderRadius: "15px",
+    fontSize: "0.85rem",
+    fontWeight: 600,
+    bgcolor: "#ffffff",
+    "& fieldset": { borderColor: colorTokens.border.subtle },
+    "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
+    "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
+  },
+};
+
 export default function AdminAttendanceDetailsTab({
   controller,
 }: AdminAttendanceDetailsTabProps) {
-  const DEFAULT_ROWS_PER_PAGE = 20;
   const {
     filteredDetailsRecords,
     detailsFilters,
@@ -39,28 +94,41 @@ export default function AdminAttendanceDetailsTab({
     markableTeachers,
   } = controller;
 
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
+  const [listDate, setListDate] = useState<string>("");
+
   const activeTeachers = markableTeachers;
   const teacherName = (teacherId: string) =>
     markableTeachers.find((t) => t.id === teacherId)?.name ?? "—";
 
-  const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
+  const toggleView = () => {
+    setViewMode((prev) => (prev === "list" ? "approval" : "list"));
+    setPage(0);
+  };
 
   useEffect(() => {
     setPage(0);
-  }, [detailsFilters.teacherId, detailsFilters.approvalStatus]);
+  }, [detailsFilters.teacherId, detailsFilters.approvalStatus, viewMode, listDate]);
 
-  const pagedRecords = useMemo(
-    () => filteredDetailsRecords.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
-    [filteredDetailsRecords, page, rowsPerPage]
-  );
+  const displayRecords = useMemo(() => {
+    let items = filteredDetailsRecords;
+    if (viewMode === "list" && listDate) {
+      items = items.filter((r) => r.date === listDate);
+    }
+    return items.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  }, [filteredDetailsRecords, viewMode, listDate, page, rowsPerPage]);
 
   useEffect(() => {
-    const maxPage = Math.max(0, Math.ceil(filteredDetailsRecords.length / rowsPerPage) - 1);
+    const source = viewMode === "list" && listDate
+      ? filteredDetailsRecords.filter((r) => r.date === listDate)
+      : filteredDetailsRecords;
+    const maxPage = Math.max(0, Math.ceil(source.length / rowsPerPage) - 1);
     if (page > maxPage) setPage(maxPage);
-  }, [filteredDetailsRecords.length, page, rowsPerPage]);
+  }, [filteredDetailsRecords.length, page, rowsPerPage, viewMode, listDate]);
 
   const openRejectDialog = (recordId: string) => {
     setRejectTargetId(recordId);
@@ -78,175 +146,327 @@ export default function AdminAttendanceDetailsTab({
     closeRejectDialog();
   };
 
-  const columns: DataTableColumn<TeacherAttendanceRecord>[] = [
+  const formatDate = (date: string) =>
+    new Date(date).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+
+  const listColumns = [
     {
       id: "date",
-      label: "Date",
-      field: "date",
+      label: "DATE",
+      width: "15%",
+      render: (row: TeacherAttendanceRecord) => (
+        <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.primary }}>
+          {formatDate(row.date)}
+        </Typography>
+      ),
     },
     {
       id: "teacherName",
-      label: "Teacher Name",
-      render: (row) => teacherName(row.teacherId),
+      label: "TEACHER NAME",
+      width: "35%",
+      render: (row: TeacherAttendanceRecord) => (
+        <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.primary }}>
+          {teacherName(row.teacherId)}
+        </Typography>
+      ),
     },
     {
       id: "checkIn",
-      label: "Check In Time",
-      render: (row) => row.checkInTime ?? "—",
+      label: "CHECK IN",
+      width: "25%",
+      render: (row: TeacherAttendanceRecord) => (
+        <Typography variant="body2">{row.checkInTime ?? "—"}</Typography>
+      ),
     },
     {
       id: "checkOut",
-      label: "Check Out Time",
-      render: (row) => row.checkOutTime ?? "—",
+      label: "CHECK OUT",
+      width: "25%",
+      render: (row: TeacherAttendanceRecord) => (
+        <Typography variant="body2">{row.checkOutTime ?? "—"}</Typography>
+      ),
+    },
+  ];
+
+  const approvalColumns = [
+    {
+      id: "date",
+      label: "DATE",
+      width: "12%",
+      render: (row: TeacherAttendanceRecord) => (
+        <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.primary }}>
+          {formatDate(row.date)}
+        </Typography>
+      ),
+    },
+    {
+      id: "teacherName",
+      label: "TEACHER NAME",
+      width: "22%",
+      render: (row: TeacherAttendanceRecord) => (
+        <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.primary }}>
+          {teacherName(row.teacherId)}
+        </Typography>
+      ),
+    },
+    {
+      id: "checkIn",
+      label: "CHECK IN",
+      width: "15%",
+      render: (row: TeacherAttendanceRecord) => (
+        <Typography variant="body2">{row.checkInTime ?? "—"}</Typography>
+      ),
+    },
+    {
+      id: "checkOut",
+      label: "CHECK OUT",
+      width: "15%",
+      render: (row: TeacherAttendanceRecord) => (
+        <Typography variant="body2">{row.checkOutTime ?? "—"}</Typography>
+      ),
     },
     {
       id: "remarks",
-      label: "Remarks",
-      render: (row) => row.remarks || "—",
+      label: "REMARKS",
+      width: "20%",
+      render: (row: TeacherAttendanceRecord) => (
+        <Typography variant="body2" color="text.secondary">{row.remarks || "—"}</Typography>
+      ),
     },
     {
       id: "approvalStatus",
-      label: "Approval Status",
-      align: "center",
-      headerAlign: "center",
-      render: (row) => {
+      label: "APPROVAL STATUS",
+      width: "18%",
+      align: "center" as const,
+      headerAlign: "center" as const,
+      render: (row: TeacherAttendanceRecord) => {
         const isActionBlocked = !row.isSubmitted;
         return (
-        <Stack direction="row" spacing={0.5} justifyContent="center">
-          <Tooltip
-            title={
-              isActionBlocked
-                ? "Complete both check-in and check-out before approval"
-                : "Approve"
-            }
-          >
-            <span>
-              <IconButton
-                size="small"
-                disabled={row.approvalStatus === "Approved" || isActionBlocked}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  updateApprovalStatus(row.id, "Approved");
-                }}
-                data-testid={`btn-approval-Approved-${row.id}`}
-                sx={{ color: colorTokens.preschool.mint.main }}
-              >
-                <CheckCircleIcon />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip
-            title={
-              isActionBlocked
-                ? "Complete both check-in and check-out before rejection"
-                : "Reject"
-            }
-          >
-            <span>
-              <IconButton
-                size="small"
-                disabled={row.approvalStatus === "Rejected" || isActionBlocked}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openRejectDialog(row.id);
-                }}
-                data-testid={`btn-approval-Rejected-${row.id}`}
-                sx={{ color: colorTokens.preschool.coral.main }}
-              >
-                <CancelIcon />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Stack>
-      )},
+          <Stack direction="row" spacing={0.5} justifyContent="center">
+            <Tooltip
+              title={
+                isActionBlocked
+                  ? "Complete both check-in and check-out before approval"
+                  : "Approve"
+              }
+            >
+              <span>
+                <IconButton
+                  size="small"
+                  disabled={row.approvalStatus === "Approved" || isActionBlocked}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateApprovalStatus(row.id, "Approved");
+                  }}
+                  data-testid={`btn-approval-Approved-${row.id}`}
+                  sx={{ color: colorTokens.preschool.mint.main }}
+                >
+                  <CheckCircleIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip
+              title={
+                isActionBlocked
+                  ? "Complete both check-in and check-out before rejection"
+                  : "Reject"
+              }
+            >
+              <span>
+                <IconButton
+                  size="small"
+                  disabled={row.approvalStatus === "Rejected" || isActionBlocked}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openRejectDialog(row.id);
+                  }}
+                  data-testid={`btn-approval-Rejected-${row.id}`}
+                  sx={{ color: colorTokens.preschool.coral.main }}
+                >
+                  <CancelIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Stack>
+        );
+      },
     },
   ];
+
+  const currentColumns = viewMode === "list" ? listColumns : approvalColumns;
+
+const tableTotalRows = useMemo(() => {
+  if (viewMode === "list" && listDate) {
+    return filteredDetailsRecords.filter((r) => r.date === listDate).length;
+  }
+  return filteredDetailsRecords.length;
+}, [filteredDetailsRecords, viewMode, listDate]);
+
+const tableData = useMemo(() => {
+  let items = filteredDetailsRecords;
+  if (viewMode === "list" && listDate) {
+    items = items.filter((r) => r.date === listDate);
+  }
+  return items.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+}, [filteredDetailsRecords, viewMode, listDate, page, rowsPerPage]);
+
+useEffect(() => {
+  const maxPage = Math.max(0, Math.ceil(tableTotalRows / rowsPerPage) - 1);
+  if (page > maxPage) setPage(maxPage);
+}, [tableTotalRows, page, rowsPerPage]);
 
   return (
     <Box data-testid="tab-attendance-details-content">
       <Stack spacing={2}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          data-testid="attendance-details-filters"
+        {/* Toggle + Filters Row */}
+        <AppCard
+          paddingSize="none"
+          sx={{
+            borderRadius: "14px",
+            border: `1px solid ${colorTokens.border.default}`,
+            boxShadow: "0 4px 14px rgba(0, 0, 0, 0.03)",
+          }}
         >
-          <TextField
-            select
-            label="Teacher Name"
-            value={detailsFilters.teacherId}
-            onChange={(e) => updateDetailsFilter("teacherId", e.target.value)}
-            size="small"
-            sx={{ minWidth: { xs: "100%", sm: 220 } }}
-            data-testid="filter-details-teacher"
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "stretch", sm: "center" }}
+            justifyContent="space-between"
+            flexWrap="wrap"
+            sx={filterStackSx}
           >
-            <MenuItem value="" data-testid="filter-details-teacher-all">
-              All Teachers
-            </MenuItem>
-            {activeTeachers.map((teacher) => (
-              <MenuItem
-                key={teacher.id}
-                value={teacher.id}
-                data-testid={`filter-details-teacher-${teacher.id}`}
-              >
-                {teacher.name}
-              </MenuItem>
-            ))}
-          </TextField>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              flexWrap="wrap"
+            >
+              <FormControl size="small" sx={filterControlSx}>
+                <InputLabel shrink>Teacher Name</InputLabel>
+                <Select
+                  label="Teacher Name"
+                  value={detailsFilters.teacherId}
+                  displayEmpty
+                  notched
+                  onChange={(e) => updateDetailsFilter("teacherId", e.target.value)}
+                  sx={filterSelectSx}
+                >
+                  <MenuItem value="">
+                    <Typography variant="body2" color="text.secondary">All Teachers</Typography>
+                  </MenuItem>
+                  {activeTeachers.map((teacher) => (
+                    <MenuItem key={teacher.id} value={teacher.id}>
+                      {teacher.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-          <TextField
-            select
-            label="Approval Status"
-            value={detailsFilters.approvalStatus}
-            onChange={(e) =>
-              updateDetailsFilter("approvalStatus", e.target.value as ApprovalStatus | "")
-            }
-            size="small"
-            sx={{ minWidth: { xs: "100%", sm: 220 } }}
-            data-testid="filter-details-approval-status"
-          >
-            <MenuItem value="" data-testid="filter-details-approval-all">
-              All Statuses
-            </MenuItem>
-            {APPROVAL_STATUS_OPTIONS.map((status) => (
-              <MenuItem
-                key={status}
-                value={status}
-                data-testid={`filter-details-approval-${status}`}
-              >
-                {status}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Stack>
+              {viewMode === "list" && (
+                <TextField
+                  label="Date"
+                  type="date"
+                  size="small"
+                  value={listDate}
+                  InputLabelProps={{ shrink: true }}
+                  onChange={(e) => setListDate(e.target.value)}
+                  sx={dateFieldSx}
+                  data-testid="filter-list-date"
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <CalendarTodayIcon sx={{ fontSize: 18, color: colorTokens.text.secondary }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              )}
 
-        <DataTable<TeacherAttendanceRecord>
-          columns={columns}
-          data={pagedRecords}
-          emptyMessage={
-            <Typography variant="body2" color="text.secondary">
-              No attendance records match the selected filters.
-            </Typography>
-          }
-          emptyTestId="attendance-details-empty-state"
-          data-testid="table-attendance-details"
-          rowTestId={(row) => `attendance-details-row-${row.id}`}
-        />
-        {filteredDetailsRecords.length > DEFAULT_ROWS_PER_PAGE ? (
-          <TablePagination
-            component="div"
-            count={filteredDetailsRecords.length}
+              {viewMode === "approval" && (
+                <FormControl size="small" sx={filterControlSx}>
+                  <InputLabel shrink>Approval Status</InputLabel>
+                  <Select
+                    label="Approval Status"
+                    value={detailsFilters.approvalStatus}
+                    displayEmpty
+                    notched
+                    onChange={(e) =>
+                      updateDetailsFilter("approvalStatus", e.target.value as ApprovalStatus | "")
+                    }
+                    sx={filterSelectSx}
+                  >
+                    <MenuItem value="">
+                      <Typography variant="body2" color="text.secondary">All Statuses</Typography>
+                    </MenuItem>
+                    {APPROVAL_STATUS_OPTIONS.map((status) => (
+                      <MenuItem key={status} value={status}>
+                        {status}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+            </Stack>
+
+            <Tooltip title={viewMode === "list" ? "Switch to Approval View" : "Switch to List View"}>
+              <span>
+                <IconButton
+                  onClick={toggleView}
+                  size="small"
+                  data-testid="btn-toggle-view"
+                  sx={{
+                    bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.1),
+                    color: colorTokens.preschool.turquoise.main,
+                    width: 40,
+                    height: 40,
+                    "&:hover": {
+                      bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.2),
+                    },
+                  }}
+                >
+                  {viewMode === "list" ? (
+                    <HowToVoteIcon fontSize="small" />
+                  ) : (
+                    <ViewListIcon fontSize="small" />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Stack>
+        </AppCard>
+
+        {/* Table */}
+        <AppCard
+          paddingSize="none"
+          sx={{
+            borderRadius: "14px",
+            border: `1px solid ${colorTokens.border.default}`,
+            boxShadow: "0 4px 14px rgba(0, 0, 0, 0.03)",
+          }}
+        >
+          <EntityTableSection<TeacherAttendanceRecord>
+            label={viewMode === "list" ? "Attendance List" : "Attendance Approval"}
+            loading={false}
+            totalRows={tableTotalRows}
             page={page}
-            onPageChange={(_, nextPage) => setPage(nextPage)}
             rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={(event) => {
-              const next = Number(event.target.value) || DEFAULT_ROWS_PER_PAGE;
-              setRowsPerPage(next);
+            onPageChange={setPage}
+            onRowsPerPageChange={(v) => {
+              setRowsPerPage(v);
               setPage(0);
             }}
             rowsPerPageOptions={[20, 50, 100]}
-            data-testid="attendance-details-pagination"
+            columns={currentColumns}
+            data={tableData}
+            emptyMessage="No attendance records match the selected filters."
+            stickyHeader
+            data-testid={viewMode === "list" ? "table-attendance-list" : "table-attendance-details"}
+            rowTestId={(row) => `${viewMode === "list" ? "attendance-list" : "attendance-details"}-row-${row.id}`}
+            emptyTestId={viewMode === "list" ? "attendance-list-empty-state" : "attendance-details-empty-state"}
           />
-        ) : null}
+        </AppCard>
       </Stack>
 
       <Dialog
