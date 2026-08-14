@@ -165,7 +165,7 @@ export function useTeacherAttendanceMarkingController() {
   const [configLoading, setConfigLoading] = useState(false);
   const [academicYearId, setAcademicYearId] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<TeacherAttendanceTab>("check-in-out");
+  const [activeTab, setActiveTab] = useState<TeacherAttendanceTab>("mark-attendance");
   const [checkInOutErrors, setCheckInOutErrors] = useState<string[]>([]);
   const [markDate, setMarkDate] = useState(today);
   const [markTeacherId, setMarkTeacherId] = useState("");
