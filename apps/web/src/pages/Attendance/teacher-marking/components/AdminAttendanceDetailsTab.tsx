@@ -154,6 +154,17 @@ export default function AdminAttendanceDetailsTab({
       year: "numeric",
     });
 
+  const formatTimeDisplay = (time: string | null): string => {
+    if (!time) return "—";
+    const [hour, minute] = time.split(":");
+    const h = Number(hour);
+    const m = Number(minute);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return "—";
+    const ampm = h >= 12 ? "PM" : "AM";
+    const displayHour = h % 12 || 12;
+    return `${String(displayHour).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
+  };
+
   const listColumns = [
     {
       id: "date",
@@ -180,7 +191,9 @@ export default function AdminAttendanceDetailsTab({
       label: "CHECK IN",
       width: "25%",
       render: (row: TeacherAttendanceRecord) => (
-        <Typography variant="body2">{row.checkInTime ?? "—"}</Typography>
+        <Tooltip title={formatTimeDisplay(row.checkInTime)}>
+          <Typography variant="body2">{row.checkInTime ?? "—"}</Typography>
+        </Tooltip>
       ),
     },
     {
@@ -188,7 +201,9 @@ export default function AdminAttendanceDetailsTab({
       label: "CHECK OUT",
       width: "25%",
       render: (row: TeacherAttendanceRecord) => (
-        <Typography variant="body2">{row.checkOutTime ?? "—"}</Typography>
+        <Tooltip title={formatTimeDisplay(row.checkOutTime)}>
+          <Typography variant="body2">{row.checkOutTime ?? "—"}</Typography>
+        </Tooltip>
       ),
     },
   ];
@@ -219,7 +234,9 @@ export default function AdminAttendanceDetailsTab({
       label: "CHECK IN",
       width: "15%",
       render: (row: TeacherAttendanceRecord) => (
-        <Typography variant="body2">{row.checkInTime ?? "—"}</Typography>
+        <Tooltip title={formatTimeDisplay(row.checkInTime)}>
+          <Typography variant="body2">{row.checkInTime ?? "—"}</Typography>
+        </Tooltip>
       ),
     },
     {
@@ -227,7 +244,9 @@ export default function AdminAttendanceDetailsTab({
       label: "CHECK OUT",
       width: "15%",
       render: (row: TeacherAttendanceRecord) => (
-        <Typography variant="body2">{row.checkOutTime ?? "—"}</Typography>
+        <Tooltip title={formatTimeDisplay(row.checkOutTime)}>
+          <Typography variant="body2">{row.checkOutTime ?? "—"}</Typography>
+        </Tooltip>
       ),
     },
     {

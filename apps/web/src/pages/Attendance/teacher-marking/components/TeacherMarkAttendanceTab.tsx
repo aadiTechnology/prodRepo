@@ -8,6 +8,8 @@ import {
   Stack,
   TextField,
   Typography,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 import dayjs, { type Dayjs } from "dayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -59,6 +61,9 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
   const actionsLocked =
     !isAdminLike &&
     (approvalState === "Waiting for Approval" || approvalState === "Approved");
+  
+  // Admin view-only mode: don't allow editing
+  const isAdminViewOnly = isAdminLike;
   const toPickerValue = (timeValue: string): Dayjs | null => {
     if (!timeValue) return null;
     const [hourRaw, minuteRaw] = timeValue.split(":");
@@ -70,6 +75,26 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
   const fromPickerValue = (next: Dayjs | null): string => {
     if (!next) return "";
     return next.format("HH:mm");
+  };
+
+  // Format time for display in 12-hour format
+  const formatTimeDisplay = (time: string): string => {
+    if (!time) return "—";
+    const [hour, minute] = time.split(":");
+    const h = Number(hour);
+    const m = Number(minute);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return "—";
+    const ampm = h >= 12 ? "PM" : "AM";
+    const displayHour = h % 12 || 12;
+    return `${String(displayHour).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
+  };
+
+  // Format time range for tooltip
+  const formatTimeRange = (): string => {
+    if (!markDraft.checkInTime || !markDraft.checkOutTime) return "—";
+    const checkIn = formatTimeDisplay(markDraft.checkInTime);
+    const checkOut = formatTimeDisplay(markDraft.checkOutTime);
+    return `${checkIn} - ${checkOut}`;
   };
 
   const statusChip =
@@ -232,7 +257,9 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
                       size: "small",
                       fullWidth: true,
                       sx: { flex: 1 },
-                      inputProps: { "data-testid": "input-mark-check-in" },
+                      inputProps: { 
+                        "data-testid": "input-mark-check-in",
+                      },
                     },
                   }}
                 />
@@ -246,7 +273,9 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
                       size: "small",
                       fullWidth: true,
                       sx: { flex: 1 },
-                      inputProps: { "data-testid": "input-mark-check-out" },
+                      inputProps: { 
+                        "data-testid": "input-mark-check-out",
+                      },
                     },
                   }}
                 />
@@ -265,10 +294,12 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
               inputProps={{
                 maxLength: MAX_REMARKS_LENGTH,
                 "data-testid": "input-mark-remarks",
+                readOnly: isAdminViewOnly,
               }}
               helperText={`${markDraft.remarks.length}/${MAX_REMARKS_LENGTH} characters`}
               FormHelperTextProps={{ sx: { textAlign: "right", m: 0, mt: 0.5 } }}
               data-testid="field-mark-remarks"
+              disabled={isAdminViewOnly}
             />
 
             {isRejected ? (
@@ -286,7 +317,7 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
             ) : null}
 
             <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
-              {actionsLocked && approvalState === "Waiting for Approval" ? (
+              {isAdminViewOnly ? null : actionsLocked && approvalState === "Waiting for Approval" ? (
                 <Button
                   variant="contained"
                   color="warning"
