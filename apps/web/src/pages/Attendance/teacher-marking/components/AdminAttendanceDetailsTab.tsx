@@ -107,11 +107,6 @@ export default function AdminAttendanceDetailsTab({
   const teacherName = (teacherId: string) =>
     markableTeachers.find((t) => t.id === teacherId)?.name ?? "—";
 
-  const toggleView = () => {
-    setViewMode((prev) => (prev === "list" ? "approval" : "list"));
-    setPage(0);
-  };
-
   useEffect(() => {
     setPage(0);
   }, [detailsFilters.teacherId, detailsFilters.approvalStatus, viewMode, listDate]);
@@ -444,30 +439,61 @@ useEffect(() => {
               )}
             </Stack>
 
-            <Tooltip title={viewMode === "list" ? "Switch to Approval View" : "Switch to List View"}>
-              <span>
+            <Stack direction="row" spacing={1} sx={{ ml: { xs: 0, sm: 2 } }}>
+              {/* List View Button */}
+              <Tooltip title="List View">
                 <IconButton
-                  onClick={toggleView}
+                  onClick={() => setViewMode("list")}
                   size="small"
-                  data-testid="btn-toggle-view"
+                  disabled={viewMode === "list"}
+                  data-testid="btn-list-view"
                   sx={{
-                    bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.1),
-                    color: colorTokens.preschool.turquoise.main,
+                    bgcolor: viewMode === "list"
+                      ? alpha(colorTokens.preschool.turquoise.main, 0.2)
+                      : alpha(colorTokens.preschool.turquoise.main, 0.1),
+                    color: viewMode === "list"
+                      ? colorTokens.preschool.turquoise.main
+                      : colorTokens.text.secondary,
                     width: 40,
                     height: 40,
                     "&:hover": {
-                      bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.2),
+                      bgcolor: viewMode === "list"
+                        ? alpha(colorTokens.preschool.turquoise.main, 0.3)
+                        : alpha(colorTokens.preschool.turquoise.main, 0.15),
                     },
                   }}
                 >
-                  {viewMode === "list" ? (
-                    <HowToVoteIcon fontSize="small" />
-                  ) : (
-                    <ViewListIcon fontSize="small" />
-                  )}
+                  <ViewListIcon fontSize="small" />
                 </IconButton>
-              </span>
-            </Tooltip>
+              </Tooltip>
+
+              {/* Approval View Button */}
+              <Tooltip title="Approval View">
+                <IconButton
+                  onClick={() => setViewMode("approval")}
+                  size="small"
+                  disabled={viewMode === "approval"}
+                  data-testid="btn-approval-view"
+                  sx={{
+                    bgcolor: viewMode === "approval"
+                      ? alpha(colorTokens.preschool.turquoise.main, 0.2)
+                      : alpha(colorTokens.preschool.turquoise.main, 0.1),
+                    color: viewMode === "approval"
+                      ? colorTokens.preschool.turquoise.main
+                      : colorTokens.text.secondary,
+                    width: 40,
+                    height: 40,
+                    "&:hover": {
+                      bgcolor: viewMode === "approval"
+                        ? alpha(colorTokens.preschool.turquoise.main, 0.3)
+                        : alpha(colorTokens.preschool.turquoise.main, 0.15),
+                    },
+                  }}
+                >
+                  <HowToVoteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Stack>
           </Stack>
         </AppCard>
 
