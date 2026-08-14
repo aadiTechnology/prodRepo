@@ -39,6 +39,7 @@ export type TeacherMarkDraft = {
 export type AttendanceDetailsFilters = {
   teacherId: string;
   approvalStatus: ApprovalStatus | "";
+  date: string; // YYYY-MM-DD format for specific date filtering
 };
 
 export type SnackbarState = {
@@ -180,6 +181,7 @@ export function useTeacherAttendanceMarkingController() {
   const [detailsFilters, setDetailsFilters] = useState<AttendanceDetailsFilters>({
     teacherId: "",
     approvalStatus: "",
+    date: "",
   });
 
   const markableTeachers = useMemo(
@@ -236,7 +238,7 @@ export function useTeacherAttendanceMarkingController() {
   }, [user?.id, isTeacher]);
 
   const refreshRecords = useCallback(
-    async (opts?: { teacherId?: string; month?: Date }) => {
+    async (opts?: { teacherId?: string; month?: Date; date?: string }) => {
       const teacherId = opts?.teacherId ?? (isAdminLike ? undefined : selfTeacherId || markTeacherId);
       const month = opts?.month ?? calendarMonth;
       const { from, to } = monthRange(month);
@@ -245,13 +247,17 @@ export function useTeacherAttendanceMarkingController() {
       const fromDate = isAdminLike && activeTab === "attendance-details" ? undefined : from;
       const toDate = isAdminLike && activeTab === "attendance-details" ? undefined : to;
 
+      // If a specific date is provided (for attendance-details tab), use it for both from_date and to_date
+      const finalFromDate = opts?.date ? opts.date : fromDate;
+      const finalToDate = opts?.date ? opts.date : toDate;
+
       setRecordsLoading(true);
       setRecordsError(null);
       try {
         const res = await staffAttendanceService.list({
           teacher_id: teacherId ? Number(teacherId) : undefined,
-          from_date: fromDate,
-          to_date: toDate,
+          from_date: finalFromDate,
+          to_date: finalToDate,
         });
         setRecords((res.items || []).map(mapApiRecord));
       } catch (err: unknown) {
@@ -278,6 +284,7 @@ export function useTeacherAttendanceMarkingController() {
           : activeTab === "check-in-out"
             ? selfTeacherId
             : detailsFilters.teacherId || undefined,
+      date: activeTab === "attendance-details" ? detailsFilters.date || undefined : undefined,
     });
   }, [
     teachersLoading,
@@ -286,6 +293,7 @@ export function useTeacherAttendanceMarkingController() {
     calendarMonth,
     activeTab,
     detailsFilters.teacherId,
+    detailsFilters.date,
     isTeacher,
     refreshRecords,
   ]);
