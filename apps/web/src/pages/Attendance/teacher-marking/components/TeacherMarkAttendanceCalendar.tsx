@@ -5,6 +5,7 @@ import {
   Stack,
   Typography,
   alpha,
+  Tooltip,
 } from "@mui/material";
 import {
   ChevronLeft,
@@ -59,12 +60,34 @@ const APPROVAL_META: Partial<
   },
 };
 
+function formatTimeDisplay(time: string | null): string {
+  if (!time) return "—";
+  const [hour, minute] = time.split(":");
+  const h = Number(hour);
+  const m = Number(minute);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return "—";
+  const ampm = h >= 12 ? "PM" : "AM";
+  const displayHour = h % 12 || 12;
+  return `${String(displayHour).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+function formatTimeRange(checkIn: string | null, checkOut: string | null): string {
+  const inTime = formatTimeDisplay(checkIn);
+  const outTime = formatTimeDisplay(checkOut);
+  if (inTime === "—" && outTime === "—") return "No times recorded";
+  if (inTime === "—") return `Check Out: ${outTime}`;
+  if (outTime === "—") return `Check In: ${inTime}`;
+  return `${inTime} - ${outTime}`;
+}
+
 interface TeacherMarkAttendanceCalendarProps {
   month: Date;
   selectedDate: string;
   statusByDate: Record<string, TeacherAttendanceStatus>;
   /** Approval overrides calendar icon: Rejected=red, Waiting=orange, Approved=status color */
   approvalByDate?: Record<string, ApprovalStatus>;
+  /** Records by date for tooltip times */
+  recordsByDate?: Record<string, { checkInTime: string | null; checkOutTime: string | null }>;
   /** Holidays by date (ISO string -> holiday name) */
   holidays?: Record<string, string>;
   onMonthChange: (next: Date) => void;
@@ -91,6 +114,7 @@ export default function TeacherMarkAttendanceCalendar({
   selectedDate,
   statusByDate,
   approvalByDate = {},
+  recordsByDate = {},
   holidays = {},
   onMonthChange,
   onDateSelect,
@@ -178,64 +202,69 @@ export default function TeacherMarkAttendanceCalendar({
           const meta = resolveCellMeta(cell.status, cell.approval);
           const StatusIcon = meta?.Icon;
           const isHoliday = !!cell.holidayName;
+          const recordTimes = recordsByDate[cell.iso];
+          const tooltipText = isHoliday
+            ? `🎉 ${cell.holidayName}`
+            : formatTimeRange(recordTimes?.checkInTime ?? null, recordTimes?.checkOutTime ?? null);
 
           return (
-            <Box
-              key={cell.key}
-              role="button"
-              tabIndex={0}
-              onClick={() => onDateSelect(cell.iso)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") onDateSelect(cell.iso);
-              }}
-              data-testid={`mark-calendar-cell-${cell.iso}`}
-              title={isHoliday ? `🎉 ${cell.holidayName}` : undefined}
-              sx={{
-                minHeight: 40,
-                borderRadius: 1.5,
-                cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 0.25,
-                bgcolor: isSelected
-                  ? alpha(colorTokens.preschool.turquoise.main, 0.2)
-                  : isHoliday
-                    ? alpha(HOLIDAY_COLOR, 0.15)
-                    : meta
-                      ? alpha(meta.color, 0.12)
-                      : alpha(colorTokens.border.subtle, 0.35),
-                border: isSelected
-                  ? `2px solid ${colorTokens.preschool.turquoise.main}`
-                  : isHoliday
-                    ? `1px solid ${alpha(HOLIDAY_COLOR, 0.5)}`
-                    : meta
-                      ? `1px solid ${alpha(meta.color, 0.28)}`
-                      : `1px solid ${colorTokens.border.subtle}`,
-              }}
-            >
-              <Typography
-                variant="caption"
+            <Tooltip title={tooltipText} arrow disableInteractive>
+              <Box
+                key={cell.key}
+                role="button"
+                tabIndex={0}
+                onClick={() => onDateSelect(cell.iso)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") onDateSelect(cell.iso);
+                }}
+                data-testid={`mark-calendar-cell-${cell.iso}`}
                 sx={{
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  color: isHoliday ? HOLIDAY_COLOR : "inherit",
+                  minHeight: 40,
+                  borderRadius: 1.5,
+                  cursor: "pointer",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 0.25,
+                  bgcolor: isSelected
+                    ? alpha(colorTokens.preschool.turquoise.main, 0.2)
+                    : isHoliday
+                      ? alpha(HOLIDAY_COLOR, 0.15)
+                      : meta
+                        ? alpha(meta.color, 0.12)
+                        : alpha(colorTokens.border.subtle, 0.35),
+                  border: isSelected
+                    ? `2px solid ${colorTokens.preschool.turquoise.main}`
+                    : isHoliday
+                      ? `1px solid ${alpha(HOLIDAY_COLOR, 0.5)}`
+                      : meta
+                        ? `1px solid ${alpha(meta.color, 0.28)}`
+                        : `1px solid ${colorTokens.border.subtle}`,
                 }}
               >
-                {cell.day}
-              </Typography>
-              {isHoliday ? (
-                <HolidayIcon
-                  sx={{ fontSize: 14, color: HOLIDAY_COLOR }}
-                />
-              ) : StatusIcon ? (
-                <StatusIcon
-                  sx={{ fontSize: 14, color: meta!.color }}
-                  titleAccess={meta!.label}
-                />
-              ) : null}
-            </Box>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 700,
+                    lineHeight: 1,
+                    color: isHoliday ? HOLIDAY_COLOR : "inherit",
+                  }}
+                >
+                  {cell.day}
+                </Typography>
+                {isHoliday ? (
+                  <HolidayIcon
+                    sx={{ fontSize: 14, color: HOLIDAY_COLOR }}
+                  />
+                ) : StatusIcon ? (
+                  <StatusIcon
+                    sx={{ fontSize: 14, color: meta!.color }}
+                    titleAccess={meta!.label}
+                  />
+                ) : null}
+              </Box>
+            </Tooltip>
           );
         })}
       </Box>

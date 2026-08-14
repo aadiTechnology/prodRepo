@@ -410,6 +410,14 @@ export function useTeacherAttendanceMarkingController() {
     return map;
   }, [records, markTeacherId]);
 
+  const calendarRecordsByDate = useMemo(() => {
+    const map: Record<string, { checkInTime: string | null; checkOutTime: string | null }> = {};
+    for (const record of records.filter((r) => r.teacherId === markTeacherId)) {
+      map[record.date] = { checkInTime: record.checkInTime, checkOutTime: record.checkOutTime };
+    }
+    return map;
+  }, [records, markTeacherId]);
+
   /** Used by calendar so Rejected ≠ green Present icon */
   const calendarApprovalByDate = useMemo(() => {
     const map: Record<string, ApprovalStatus> = {};
@@ -738,6 +746,7 @@ export function useTeacherAttendanceMarkingController() {
     setCalendarMonth,
     calendarStatusByDate,
     calendarApprovalByDate,
+    calendarRecordsByDate,
     selectCalendarDate,
     updateMarkDraft,
     saveMarkAttendance,

@@ -44,6 +44,7 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
     setCalendarMonth,
     calendarStatusByDate,
     calendarApprovalByDate,
+    calendarRecordsByDate,
     selectCalendarDate,
     updateMarkDraft,
     saveMarkAttendance,
@@ -156,6 +157,7 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
             selectedDate={markDate}
             statusByDate={calendarStatusByDate}
             approvalByDate={calendarApprovalByDate}
+            recordsByDate={calendarRecordsByDate}
             holidays={controller.holidays}
             onMonthChange={setCalendarMonth}
             onDateSelect={selectCalendarDate}
