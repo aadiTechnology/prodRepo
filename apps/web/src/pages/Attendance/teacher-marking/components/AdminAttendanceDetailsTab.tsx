@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Dialog,
@@ -100,6 +100,7 @@ export default function AdminAttendanceDetailsTab({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [listDate, setListDate] = useState<string>("");
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const activeTeachers = markableTeachers;
   const teacherName = (teacherId: string) =>
@@ -374,10 +375,19 @@ useEffect(() => {
                   onChange={(e) => setListDate(e.target.value)}
                   sx={dateFieldSx}
                   data-testid="filter-list-date"
+                  inputRef={dateInputRef}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
-                        <CalendarTodayIcon sx={{ fontSize: 18, color: colorTokens.text.secondary }} />
+                        <IconButton
+                          onClick={() => dateInputRef.current?.click()}
+                          disabled={dateInputRef.current?.disabled}
+                          aria-label="Open calendar"
+                          size="small"
+                          sx={{ p: 0, color: colorTokens.text.secondary }}
+                        >
+                          <CalendarTodayIcon fontSize="small" />
+                        </IconButton>
                       </InputAdornment>
                     ),
                   }}

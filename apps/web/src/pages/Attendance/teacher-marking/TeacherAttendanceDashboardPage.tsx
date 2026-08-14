@@ -13,17 +13,17 @@ const BASE_TABS: { id: TeacherAttendanceTab; label: string; testId: string }[] =
   { id: "mark-attendance", label: "Mark Attendance", testId: "tab-mark-attendance" },
 ];
 
-const ADMIN_TAB: { id: TeacherAttendanceTab; label: string; testId: string } = {
-  id: "attendance-details",
-  label: "Attendance Approval",
-  testId: "tab-attendance-details",
-};
+const ADMIN_TABS: { id: TeacherAttendanceTab; label: string; testId: string }[] = [
+  // { id: "check-in-out", label: "Check In / Check Out", testId: "tab-check-in-out" },
+  { id: "mark-attendance", label: "Mark Attendance", testId: "tab-mark-attendance" },
+  { id: "attendance-details", label: "Attendance Approval", testId: "tab-attendance-details" },
+];
 
 export default function TeacherAttendanceDashboardPage() {
   const controller = useTeacherAttendanceMarkingController();
 
   const tabs = useMemo(
-    () => (controller.isAdminLike ? [...BASE_TABS, ADMIN_TAB] : BASE_TABS),
+    () => (controller.isAdminLike ? ADMIN_TABS : BASE_TABS),
     [controller.isAdminLike]
   );
 
