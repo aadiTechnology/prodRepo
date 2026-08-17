@@ -614,9 +614,17 @@ export default function AppRoutes() {
             }
           >
             <Route index element={<SupportIndexRedirect />} />
-            <Route path="faqs" element={<FaqList />} />
+            <Route path="faqs" element={<Navigate to="/support/contact" replace />} />
             {/* My Queries */}
             <Route path="contact" element={<ContactSupport />} />
+            <Route
+              path="contact/categories"
+              element={
+                <ProtectedRoute requiredRoles={["SUPER_ADMIN", "SYSTEM_ADMIN"]}>
+                  <FaqList />
+                </ProtectedRoute>
+              }
+            />
             <Route path="contact/add" element={<AddFaq />} />
             <Route path="contact/:id" element={<FaqDetail />} />
             <Route path="contact/:id/edit" element={<AddFaq />} />

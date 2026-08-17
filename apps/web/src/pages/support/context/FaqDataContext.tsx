@@ -1,146 +1,236 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import type { FaqItem, SupportQueryItem, SupportQueryStatus } from "../support.types";
-
-const INITIAL_QUERIES: SupportQueryItem[] = [
-  {
-    id: "QRY-001",
-    category: "Technical Issue",
-    subject: "Attendance configuration issue",
-    description:
-      "Unable to save attendance configuration changes for Nursery section. The Save button remains disabled after selecting statuses.",
-    attachmentName: "attendance-config-screenshot.png",
-    createdBy: "Super Admin",
-    createdByRole: "SUPER_ADMIN",
-    createdAt: "2026-08-01T09:15:00",
-    status: "Open",
-    messages: [
-      {
-        id: "msg-001-1",
-        author: "Super Admin",
-        authorRole: "SUPER_ADMIN",
-        body: "Raised after noticing Save is disabled on Attendance Configuration.",
-        createdAt: "2026-08-01T09:15:00",
-      },
-    ],
-  },
-  {
-    id: "QRY-002",
-    category: "Student Related",
-    subject: "Student attendance issue",
-    description:
-      "Student roll numbers are missing for Class A when generating the weekly attendance summary.",
-    createdBy: "Admin",
-    createdByRole: "ADMIN",
-    createdAt: "2026-08-02T11:30:00",
-    status: "In Progress",
-    messages: [
-      {
-        id: "msg-002-1",
-        author: "Admin",
-        authorRole: "ADMIN",
-        body: "Parents reported blank roll numbers on the weekly summary PDF.",
-        createdAt: "2026-08-02T11:30:00",
-      },
-    ],
-  },
-  {
-    id: "QRY-003",
-    category: "Attendance",
-    subject: "Unable to mark attendance",
-    description:
-      "Teacher attendance marking page shows an empty student list for Grade 1 - Section B.",
-    createdBy: "Teacher",
-    createdByRole: "TEACHER",
-    createdAt: "2026-08-03T08:45:00",
-    status: "Resolved",
-    messages: [
-      {
-        id: "msg-003-1",
-        author: "Teacher",
-        authorRole: "TEACHER",
-        body: "No students appear when I open Teacher Attendance for Grade 1B.",
-        createdAt: "2026-08-03T08:45:00",
-      },
-    ],
-  },
-  {
-    id: "QRY-004",
-    category: "Fees",
-    subject: "Term fee balance clarification",
-    description:
-      "Student needs clarification on the outstanding Term 2 fee balance shown on the portal.",
-    createdBy: "Student",
-    createdByRole: "STUDENT",
-    createdAt: "2026-08-04T17:10:00",
-    status: "Open",
-    messages: [
-      {
-        id: "msg-004-1",
-        author: "Student",
-        authorRole: "STUDENT",
-        body: "The portal shows a different balance than the receipt I received.",
-        createdAt: "2026-08-04T17:10:00",
-      },
-    ],
-  },
-  {
-    id: "QRY-005",
-    category: "Fees",
-    subject: "Fee receipt not downloading",
-    description:
-      "Student portal shows an error when downloading the latest fee receipt for Term 1.",
-    createdBy: "Student",
-    createdByRole: "STUDENT",
-    createdAt: "2026-08-06T10:20:00",
-    status: "Open",
-    messages: [
-      {
-        id: "msg-005-1",
-        author: "Student",
-        authorRole: "STUDENT",
-        body: "Clicking Download Receipt fails with a blank page.",
-        createdAt: "2026-08-06T10:20:00",
-      },
-    ],
-  },
-];
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import supportService from "../../../api/services/supportService";
+import type {
+  FaqItem,
+  SupportCategory,
+  SupportCategoryStatus,
+  SupportQueryItem,
+  SupportQueryStatus,
+} from "../support.types";
+import {
+  loadSupportCategoriesFromStorage,
+  nextSupportCategoryId,
+  normalizeSupportCategoryName,
+  notifySupportUnreadChanged,
+  saveSupportCategoriesToStorage,
+} from "../support.types";
 
 type FaqDataContextValue = {
   faqs: FaqItem[];
   setFaqs: React.Dispatch<React.SetStateAction<FaqItem[]>>;
   deleteFaq: (id: string) => void;
   queries: SupportQueryItem[];
-  addQuery: (query: SupportQueryItem) => void;
-  updateQuery: (id: string, patch: Partial<SupportQueryItem>) => void;
-  deleteQuery: (id: string) => void;
+  queriesLoading: boolean;
+  refreshQueries: () => Promise<void>;
+  createQuery: (payload: {
+    category: string;
+    subject: string;
+    description: string;
+  }) => Promise<SupportQueryItem>;
+  updateQuery: (
+    id: string,
+    patch: {
+      category?: string;
+      subject?: string;
+      description?: string;
+      status?: SupportQueryStatus;
+    }
+  ) => Promise<SupportQueryItem>;
+  deleteQuery: (id: string) => Promise<void>;
   getQueryById: (id: string) => SupportQueryItem | undefined;
+  fetchQueryById: (id: string) => Promise<SupportQueryItem>;
   appendQueryMessage: (
     id: string,
-    message: SupportQueryItem["messages"][number],
+    body: string,
     nextStatus?: SupportQueryStatus
-  ) => void;
-  forwardQueryToSuperAdmin: (id: string, forwardedBy: string) => void;
+  ) => Promise<SupportQueryItem>;
+  forwardQueryToSuperAdmin: (id: string) => Promise<SupportQueryItem>;
+  uploadQueryAttachment: (id: string, file: File) => Promise<SupportQueryItem>;
+  categories: SupportCategory[];
+  activeCategories: SupportCategory[];
+  activeCategoryNames: string[];
+  categoryFilterOptions: { label: string; value: string }[];
+  addSupportCategory: (name: string) => { ok: true } | { ok: false; error: string };
+  updateSupportCategory: (
+    id: string,
+    name: string
+  ) => { ok: true } | { ok: false; error: string };
+  setSupportCategoryStatus: (id: string, status: SupportCategoryStatus) => void;
+  deleteSupportCategory: (id: string) => void;
 };
 
 const FaqDataContext = createContext<FaqDataContextValue | undefined>(undefined);
 
+function upsertQuery(list: SupportQueryItem[], item: SupportQueryItem): SupportQueryItem[] {
+  const index = list.findIndex((q) => q.id === item.id);
+  if (index === -1) return [item, ...list];
+  const next = [...list];
+  next[index] = item;
+  return next;
+}
+
+function hasDuplicateCategoryName(
+  categories: SupportCategory[],
+  name: string,
+  excludeId?: string
+): boolean {
+  const normalized = name.trim().toLowerCase();
+  return categories.some(
+    (category) =>
+      category.id !== excludeId && category.name.trim().toLowerCase() === normalized
+  );
+}
+
 export function FaqDataProvider({ children }: { children: ReactNode }) {
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
-  const [queries, setQueries] = useState<SupportQueryItem[]>(INITIAL_QUERIES);
+  const [queries, setQueries] = useState<SupportQueryItem[]>([]);
+  const [queriesLoading, setQueriesLoading] = useState(true);
+  const [categories, setCategories] = useState<SupportCategory[]>(() =>
+    loadSupportCategoriesFromStorage()
+  );
+
+  useEffect(() => {
+    saveSupportCategoriesToStorage(categories);
+  }, [categories]);
+
+  const activeCategories = useMemo(
+    () =>
+      categories
+        .filter((category) => category.status === "Active")
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [categories]
+  );
+
+  const activeCategoryNames = useMemo(
+    () => activeCategories.map((category) => category.name),
+    [activeCategories]
+  );
+
+  const categoryFilterOptions = useMemo(
+    () => [
+      { label: "All Categories", value: "" },
+      ...activeCategories.map((category) => ({
+        label: category.name,
+        value: category.name,
+      })),
+    ],
+    [activeCategories]
+  );
+
+  const addSupportCategory = useCallback((name: string) => {
+    const normalized = normalizeSupportCategoryName(name);
+    if (!normalized) {
+      return { ok: false as const, error: "Please enter category name." };
+    }
+    let duplicate = false;
+    setCategories((prev) => {
+      if (hasDuplicateCategoryName(prev, normalized)) {
+        duplicate = true;
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          id: nextSupportCategoryId(prev),
+          name: normalized,
+          status: "Active",
+        },
+      ];
+    });
+    if (duplicate) {
+      return { ok: false as const, error: "Category already exists." };
+    }
+    return { ok: true as const };
+  }, []);
+
+  const updateSupportCategory = useCallback((id: string, name: string) => {
+    const normalized = normalizeSupportCategoryName(name);
+    if (!normalized) {
+      return { ok: false as const, error: "Please enter category name." };
+    }
+    let duplicate = false;
+    setCategories((prev) => {
+      if (hasDuplicateCategoryName(prev, normalized, id)) {
+        duplicate = true;
+        return prev;
+      }
+      return prev.map((category) =>
+        category.id === id ? { ...category, name: normalized } : category
+      );
+    });
+    if (duplicate) {
+      return { ok: false as const, error: "Category already exists." };
+    }
+    return { ok: true as const };
+  }, []);
+
+  const setSupportCategoryStatus = useCallback((id: string, status: SupportCategoryStatus) => {
+    setCategories((prev) =>
+      prev.map((category) => (category.id === id ? { ...category, status } : category))
+    );
+  }, []);
+
+  const deleteSupportCategory = useCallback((id: string) => {
+    setCategories((prev) => prev.filter((category) => category.id !== id));
+  }, []);
+
+  const refreshQueries = useCallback(async () => {
+    setQueriesLoading(true);
+    try {
+      const items = await supportService.listQueries({ page: 0, size: 100 });
+      setQueries(items);
+    } finally {
+      setQueriesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshQueries();
+  }, [refreshQueries]);
 
   const deleteFaq = useCallback((id: string) => {
     setFaqs((prev) => prev.filter((faq) => faq.id !== id));
   }, []);
 
-  const addQuery = useCallback((query: SupportQueryItem) => {
-    setQueries((prev) => [query, ...prev]);
-  }, []);
+  const createQuery = useCallback(
+    async (payload: { category: string; subject: string; description: string }) => {
+      const created = await supportService.createQuery(payload);
+      setQueries((prev) => upsertQuery(prev, created));
+      notifySupportUnreadChanged();
+      return created;
+    },
+    []
+  );
 
-  const updateQuery = useCallback((id: string, patch: Partial<SupportQueryItem>) => {
-    setQueries((prev) => prev.map((q) => (q.id === id ? { ...q, ...patch } : q)));
-  }, []);
+  const updateQuery = useCallback(
+    async (
+      id: string,
+      patch: {
+        category?: string;
+        subject?: string;
+        description?: string;
+        status?: SupportQueryStatus;
+      }
+    ) => {
+      const updated = await supportService.updateQuery(id, patch);
+      setQueries((prev) => upsertQuery(prev, updated));
+      notifySupportUnreadChanged();
+      return updated;
+    },
+    []
+  );
 
-  const deleteQuery = useCallback((id: string) => {
+  const deleteQuery = useCallback(async (id: string) => {
+    await supportService.deleteQuery(id);
     setQueries((prev) => prev.filter((q) => q.id !== id));
   }, []);
 
@@ -149,52 +239,33 @@ export function FaqDataProvider({ children }: { children: ReactNode }) {
     [queries]
   );
 
+  const fetchQueryById = useCallback(async (id: string) => {
+    const item = await supportService.getQuery(id);
+    setQueries((prev) => upsertQuery(prev, item));
+    return item;
+  }, []);
+
   const appendQueryMessage = useCallback(
-    (
-      id: string,
-      message: SupportQueryItem["messages"][number],
-      nextStatus?: SupportQueryStatus
-    ) => {
-      setQueries((prev) =>
-        prev.map((q) =>
-          q.id === id
-            ? {
-                ...q,
-                messages: [...q.messages, message],
-                status: nextStatus ?? q.status,
-              }
-            : q
-        )
-      );
+    async (id: string, body: string, nextStatus?: SupportQueryStatus) => {
+      const updated = await supportService.addQueryMessage(id, body, nextStatus);
+      setQueries((prev) => upsertQuery(prev, updated));
+      notifySupportUnreadChanged();
+      return updated;
     },
     []
   );
 
-  const forwardQueryToSuperAdmin = useCallback((id: string, forwardedBy: string) => {
-    const forwardedAt = new Date().toISOString();
-    setQueries((prev) =>
-      prev.map((q) =>
-        q.id === id
-          ? {
-              ...q,
-              forwardedToSuperAdmin: true,
-              forwardedBy,
-              forwardedAt,
-              status: q.status === "Closed" ? q.status : "In Progress",
-              messages: [
-                ...q.messages,
-                {
-                  id: `${id}-fwd-${Date.now()}`,
-                  author: forwardedBy,
-                  authorRole: "ADMIN",
-                  body: "Forwarded this Student query to Super Admin for further assistance.",
-                  createdAt: forwardedAt,
-                },
-              ],
-            }
-          : q
-      )
-    );
+  const forwardQueryToSuperAdmin = useCallback(async (id: string) => {
+    const updated = await supportService.forwardQuery(id);
+    setQueries((prev) => upsertQuery(prev, updated));
+    notifySupportUnreadChanged();
+    return updated;
+  }, []);
+
+  const uploadQueryAttachment = useCallback(async (id: string, file: File) => {
+    const updated = await supportService.uploadQueryAttachment(id, file);
+    setQueries((prev) => upsertQuery(prev, updated));
+    return updated;
   }, []);
 
   const value = useMemo<FaqDataContextValue>(
@@ -203,23 +274,47 @@ export function FaqDataProvider({ children }: { children: ReactNode }) {
       setFaqs,
       deleteFaq,
       queries,
-      addQuery,
+      queriesLoading,
+      refreshQueries,
+      createQuery,
       updateQuery,
       deleteQuery,
       getQueryById,
+      fetchQueryById,
       appendQueryMessage,
       forwardQueryToSuperAdmin,
+      uploadQueryAttachment,
+      categories,
+      activeCategories,
+      activeCategoryNames,
+      categoryFilterOptions,
+      addSupportCategory,
+      updateSupportCategory,
+      setSupportCategoryStatus,
+      deleteSupportCategory,
     }),
     [
       faqs,
       deleteFaq,
       queries,
-      addQuery,
+      queriesLoading,
+      refreshQueries,
+      createQuery,
       updateQuery,
       deleteQuery,
       getQueryById,
+      fetchQueryById,
       appendQueryMessage,
       forwardQueryToSuperAdmin,
+      uploadQueryAttachment,
+      categories,
+      activeCategories,
+      activeCategoryNames,
+      categoryFilterOptions,
+      addSupportCategory,
+      updateSupportCategory,
+      setSupportCategoryStatus,
+      deleteSupportCategory,
     ]
   );
 

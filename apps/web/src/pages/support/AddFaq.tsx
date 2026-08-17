@@ -4,6 +4,9 @@ import {
   Alert,
   Box,
   Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   FormControl,
   IconButton,
   InputLabel,
@@ -30,10 +33,12 @@ import { colorTokens } from "../../tokens/colors";
 import { useSupportPermissions } from "../../hooks/useSupportPermissions";
 import { useFaqData } from "./context/FaqDataContext";
 import {
-  SUPPORT_QUERY_CATEGORIES,
+  SUPPORT_QUERY_INVALID_FILE_MESSAGE,
+  getSupportQueryAttachmentKind,
+  isSupportQueryAttachmentAllowed,
   isSupportQueryOwner,
+  openSupportQueryAttachment,
   type SupportQueryFormData,
-  type SupportQueryItem,
 } from "./support.types";
 
 const EMPTY_FORM: SupportQueryFormData = {
@@ -43,7 +48,6 @@ const EMPTY_FORM: SupportQueryFormData = {
   attachmentName: "",
 };
 
-const ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx", ".png", ".jpg", ".jpeg"] as const;
 const MAX_SIZE_BYTES = 10 * 1024 * 1024;
 
 const REQUIRED_ASTERISK_SX = {
@@ -55,45 +59,13 @@ type PendingAttachment = {
   fileName: string;
   url: string;
   sizeBytes: number;
+  file?: File;
 };
-
-function nextQueryId(existing: SupportQueryItem[]): string {
-  const max = existing.reduce((acc, q) => {
-    const match = /^QRY-(\d+)$/i.exec(q.id);
-    if (!match) return acc;
-    return Math.max(acc, Number(match[1]));
-  }, 0);
-  return `QRY-${String(max + 1).padStart(3, "0")}`;
-}
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function isAllowedAttachment(fileName: string): boolean {
-  const lower = fileName.toLowerCase();
-  return ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext));
-}
-
-function downloadAttachment(fileName: string, url?: string) {
-  if (url && url !== "#") {
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = fileName;
-    anchor.target = "_blank";
-    anchor.rel = "noopener noreferrer";
-    anchor.click();
-    return;
-  }
-  const blob = new Blob([`Support query attachment: ${fileName}`], { type: "text/plain" });
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = objectUrl;
-  anchor.download = fileName;
-  anchor.click();
-  URL.revokeObjectURL(objectUrl);
 }
 
 export default function AddFaq() {
@@ -102,17 +74,33 @@ export default function AddFaq() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const perms = useSupportPermissions();
-  const { queries, addQuery, updateQuery, getQueryById } = useFaqData();
+  const {
+    createQuery,
+    updateQuery,
+    getQueryById,
+    fetchQueryById,
+    uploadQueryAttachment,
+    activeCategoryNames,
+  } = useFaqData();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [saving, setSaving] = useState(false);
 
   const existing = useMemo(
     () => (id ? getQueryById(id) : undefined),
     [getQueryById, id]
   );
 
+  useEffect(() => {
+    if (!isEditMode || !id || existing) return;
+    void fetchQueryById(id).catch(() => undefined);
+  }, [existing, fetchQueryById, id, isEditMode]);
+
   const [values, setValues] = useState<SupportQueryFormData>(EMPTY_FORM);
   const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<{ url: string; fileName: string } | null>(
+    null
+  );
   const [attempted, setAttempted] = useState(false);
   const [hydratedId, setHydratedId] = useState<string | null>(null);
 
@@ -127,7 +115,7 @@ export default function AddFaq() {
     if (existing.attachmentName) {
       setAttachment({
         fileName: existing.attachmentName,
-        url: "#",
+        url: existing.attachmentUrl ?? "#",
         sizeBytes: 0,
       });
     } else {
@@ -135,6 +123,14 @@ export default function AddFaq() {
     }
     setHydratedId(existing.id);
   }, [existing, hydratedId, isEditMode]);
+
+  const categoryOptions = useMemo(() => {
+    const names = new Set(activeCategoryNames);
+    if (values.category.trim()) {
+      names.add(values.category.trim());
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [activeCategoryNames, values.category]);
 
   const errors = useMemo(() => {
     const next: Partial<Record<keyof SupportQueryFormData, string>> = {};
@@ -146,55 +142,48 @@ export default function AddFaq() {
 
   const goBack = () => navigate("/support/contact");
 
-  const saveQuery = () => {
+  const saveQuery = async () => {
     setAttempted(true);
-    if (Object.keys(errors).length > 0 || !perms.actorRole) return;
+    if (Object.keys(errors).length > 0 || !perms.actorRole || saving) return;
 
-    const createdAt = new Date().toISOString();
-    const attachmentName = attachment?.fileName || undefined;
+    setSaving(true);
+    try {
+      const attachmentFile = attachment?.file;
 
-    if (isEditMode && existing) {
-      updateQuery(existing.id, {
+      if (isEditMode && existing) {
+        await updateQuery(existing.id, {
+          category: values.category.trim(),
+          subject: values.subject.trim(),
+          description: values.description.trim(),
+        });
+        if (attachmentFile) {
+          await uploadQueryAttachment(existing.id, attachmentFile);
+        }
+        enqueueSnackbar(`Query ${existing.id} updated successfully.`, { variant: "success" });
+        navigate("/support/contact");
+        return;
+      }
+
+      const created = await createQuery({
         category: values.category.trim(),
         subject: values.subject.trim(),
         description: values.description.trim(),
-        attachmentName,
       });
-      enqueueSnackbar(`Query ${existing.id} updated successfully.`, { variant: "success" });
+      if (attachmentFile) {
+        await uploadQueryAttachment(created.id, attachmentFile);
+      }
+      enqueueSnackbar(`Query ${created.id} created successfully.`, { variant: "success" });
       navigate("/support/contact");
-      return;
+    } catch {
+      enqueueSnackbar("Failed to save query. Please try again.", { variant: "error" });
+    } finally {
+      setSaving(false);
     }
-
-    const queryId = nextQueryId(queries);
-    const query: SupportQueryItem = {
-      id: queryId,
-      category: values.category.trim(),
-      subject: values.subject.trim(),
-      description: values.description.trim(),
-      attachmentName,
-      createdBy: perms.actorDisplayName,
-      createdByRole: perms.actorRole,
-      createdAt,
-      status: "Open",
-      messages: [
-        {
-          id: `${queryId}-msg-1`,
-          author: perms.actorDisplayName,
-          authorRole: perms.actorRole,
-          body: values.description.trim(),
-          createdAt,
-        },
-      ],
-    };
-
-    addQuery(query);
-    enqueueSnackbar(`Query ${queryId} created successfully.`, { variant: "success" });
-    navigate("/support/contact");
   };
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    saveQuery();
+    void saveQuery();
   };
 
   if (!perms.canAccessSupport || !perms.canCreateQuery) {
@@ -233,8 +222,8 @@ export default function AddFaq() {
 
   const handleFileSelect = (file: File | null) => {
     if (!file) return;
-    if (!isAllowedAttachment(file.name)) {
-      setAttachmentError("Allowed file types: PDF, DOC, DOCX, JPG, PNG.");
+    if (!isSupportQueryAttachmentAllowed(file.name)) {
+      setAttachmentError(SUPPORT_QUERY_INVALID_FILE_MESSAGE);
       return;
     }
     if (file.size > MAX_SIZE_BYTES) {
@@ -250,6 +239,7 @@ export default function AddFaq() {
       fileName: file.name,
       url,
       sizeBytes: file.size,
+      file,
     });
     setValues((prev) => ({ ...prev, attachmentName: file.name }));
   };
@@ -318,10 +308,15 @@ export default function AddFaq() {
                 onChange={(e) =>
                   setValues((prev) => ({ ...prev, category: String(e.target.value) }))
                 }
-                data-testid="select-query-category"
+                data-testid="support-query-category"
+                inputProps={{ "data-testid": "select-query-category" }}
               >
-                {SUPPORT_QUERY_CATEGORIES.map((category) => (
-                  <MenuItem key={category} value={category}>
+                {categoryOptions.map((category) => (
+                  <MenuItem
+                    key={category}
+                    value={category}
+                    data-testid="support-query-category-option"
+                  >
                     {category}
                   </MenuItem>
                 ))}
@@ -364,7 +359,7 @@ export default function AddFaq() {
           <Grid size={12}>
             <Box data-testid="section-query-attachment">
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                Attachment (optional). Allowed: PDF, DOC, DOCX, JPG, PNG. Max 10 MB.
+                Attachment (optional). Allowed: PDF, DOC, DOCX, JPG, JPEG, PNG. Max 10 MB.
               </Typography>
 
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
@@ -409,23 +404,46 @@ export default function AddFaq() {
                     alignItems={{ sm: "center" }}
                     justifyContent="space-between"
                   >
-                    <Box>
-                      <Typography variant="body2" fontWeight={600}>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography
+                        variant="body2"
+                        fontWeight={600}
+                        onClick={() =>
+                          openSupportQueryAttachment(
+                            attachment.fileName,
+                            attachment.url,
+                            (url, fileName) => setImagePreview({ url, fileName })
+                          )
+                        }
+                        sx={{
+                          cursor: "pointer",
+                          color: colorTokens.primary.main,
+                          wordBreak: "break-word",
+                          "&:hover": { textDecoration: "underline" },
+                        }}
+                      >
                         {attachment.fileName}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {attachment.sizeBytes > 0
                           ? formatFileSize(attachment.sizeBytes)
                           : "Saved attachment"}
+                        {getSupportQueryAttachmentKind(attachment.fileName) === "image"
+                          ? " · Click to preview"
+                          : " · Click to open"}
                       </Typography>
                     </Box>
                     <Stack direction="row" spacing={0.5}>
-                      <Tooltip title="Download">
+                      <Tooltip title="Open">
                         <IconButton
                           size="small"
-                          aria-label="Download attachment"
+                          aria-label="Open attachment"
                           onClick={() =>
-                            downloadAttachment(attachment.fileName, attachment.url)
+                            openSupportQueryAttachment(
+                              attachment.fileName,
+                              attachment.url,
+                              (url, fileName) => setImagePreview({ url, fileName })
+                            )
                           }
                           sx={{
                             color: colorTokens.primary.main,
@@ -482,6 +500,35 @@ export default function AddFaq() {
           </SaveButton>
         </Box>
       </Box>
+
+      <Dialog
+        open={Boolean(imagePreview)}
+        onClose={() => setImagePreview(null)}
+        maxWidth="md"
+        fullWidth
+        data-testid="dialog-query-attachment-preview"
+      >
+        <DialogTitle sx={{ pr: 6 }}>{imagePreview?.fileName}</DialogTitle>
+        <DialogContent>
+          {imagePreview ? (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 280,
+              }}
+            >
+              <Box
+                component="img"
+                src={imagePreview.url}
+                alt={imagePreview.fileName}
+                sx={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }}
+              />
+            </Box>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </ListPageLayout>
   );
 }

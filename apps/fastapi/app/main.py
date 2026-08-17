@@ -44,6 +44,10 @@ from app.models import (  # noqa: F401
     UserNotificationSettings,
     Notification,
     TenantNotificationScheduleConfig,
+    SupportQuery,
+    SupportQueryMessage,
+    SupportQueryRead,
+    SupportReleaseNote,
 )
 # Import FeePayment + FeePaymentAllocation so create_all creates fee_payment_allocations
 from app.models.fee_payment import FeePayment, FeePaymentAllocation  # noqa: F401
@@ -164,6 +168,8 @@ from app.routers import syllabus_router
 app.include_router(syllabus_router.router)
 from app.routers import notification_router
 app.include_router(notification_router.router)
+from app.routers import support_router
+app.include_router(support_router.router)
 
 
 
@@ -182,6 +188,18 @@ os.makedirs("static/notice-attachments", exist_ok=True)
 app.mount("/notice-attachments", StaticFiles(directory="static/notice-attachments"), name="notice-attachments")
 os.makedirs("static/syllabus-attachments", exist_ok=True)
 app.mount("/syllabus-attachments", StaticFiles(directory="static/syllabus-attachments"), name="syllabus-attachments")
+os.makedirs("static/support-query-attachments", exist_ok=True)
+app.mount(
+    "/support-query-attachments",
+    StaticFiles(directory="static/support-query-attachments"),
+    name="support-query-attachments",
+)
+os.makedirs("static/support-release-notes", exist_ok=True)
+app.mount(
+    "/support-release-notes",
+    StaticFiles(directory="static/support-release-notes"),
+    name="support-release-notes",
+)
 
 @app.on_event("startup")
 async def startup_event():

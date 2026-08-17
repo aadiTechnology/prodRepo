@@ -1,62 +1,114 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import type { ProductUpdateItem } from "../support.types";
-
-const INITIAL_RELEASE_NOTES: ProductUpdateItem[] = [
-  {
-    id: "RN-001",
-    title: "Attendance configuration improvements",
-    version: "2.4.0",
-    releaseDate: "2026-08-01",
-    description: "Adds multi-status attendance marking and improved configuration validation.",
-    status: "Done",
-    attachmentName: "release-notes-2.4.0.pdf",
-    attachmentType: "pdf",
-    attachmentUrl: "#",
-    createdBy: "Super Admin",
-    modifiedBy: "Super Admin",
-    modifiedDate: "2026-08-01",
-    showTo: { admin: true, teacher: true, student: false },
-  },
-  {
-    id: "RN-002",
-    title: "Parent dashboard attendance visibility",
-    version: "2.3.1",
-    releaseDate: "2026-07-15",
-    description: "Fixes delayed attendance visibility for parent users.",
-    status: "Done",
-    attachmentName: "release-notes-2.3.1.pdf",
-    attachmentType: "pdf",
-    attachmentUrl: "#",
-    createdBy: "Super Admin",
-    modifiedBy: "Admin",
-    modifiedDate: "2026-07-15",
-    showTo: { admin: true, teacher: false, student: true },
-  },
-];
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import supportService from "../../../api/services/supportService";
+import type { ProductUpdateItem, ReleaseNoteShowTo } from "../support.types";
 
 type ProductUpdateContextValue = {
   productUpdates: ProductUpdateItem[];
-  setProductUpdates: React.Dispatch<React.SetStateAction<ProductUpdateItem[]>>;
-  addProductUpdate: (item: ProductUpdateItem) => void;
-  updateProductUpdate: (id: string, patch: Partial<ProductUpdateItem>) => void;
-  deleteProductUpdate: (id: string) => void;
+  releaseNotesLoading: boolean;
+  refreshReleaseNotes: () => Promise<void>;
+  createReleaseNote: (payload: {
+    version: string;
+    releaseDate: string;
+    description: string;
+    showTo: ReleaseNoteShowTo;
+  }) => Promise<ProductUpdateItem>;
+  updateReleaseNote: (
+    id: string,
+    patch: {
+      version?: string;
+      releaseDate?: string;
+      description?: string;
+      showTo?: ReleaseNoteShowTo;
+    }
+  ) => Promise<ProductUpdateItem>;
+  deleteReleaseNote: (id: string) => Promise<void>;
   getProductUpdateById: (id: string) => ProductUpdateItem | undefined;
+  fetchReleaseNoteById: (id: string) => Promise<ProductUpdateItem>;
+  uploadReleaseNoteAttachment: (id: string, file: File) => Promise<ProductUpdateItem>;
 };
 
 const ProductUpdateContext = createContext<ProductUpdateContextValue | undefined>(undefined);
 
+function upsertReleaseNote(
+  list: ProductUpdateItem[],
+  item: ProductUpdateItem
+): ProductUpdateItem[] {
+  const index = list.findIndex((note) => note.id === item.id);
+  if (index === -1) return [item, ...list];
+  const next = [...list];
+  next[index] = item;
+  return next;
+}
+
 export function ProductUpdateProvider({ children }: { children: ReactNode }) {
-  const [productUpdates, setProductUpdates] = useState<ProductUpdateItem[]>(INITIAL_RELEASE_NOTES);
+  const [productUpdates, setProductUpdates] = useState<ProductUpdateItem[]>([]);
+  const [releaseNotesLoading, setReleaseNotesLoading] = useState(true);
 
-  const addProductUpdate = useCallback((item: ProductUpdateItem) => {
-    setProductUpdates((prev) => [item, ...prev]);
+  const refreshReleaseNotes = useCallback(async () => {
+    setReleaseNotesLoading(true);
+    try {
+      const items = await supportService.listReleaseNotes({ page: 0, size: 100 });
+      setProductUpdates(items);
+    } finally {
+      setReleaseNotesLoading(false);
+    }
   }, []);
 
-  const updateProductUpdate = useCallback((id: string, patch: Partial<ProductUpdateItem>) => {
-    setProductUpdates((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
-  }, []);
+  useEffect(() => {
+    void refreshReleaseNotes();
+  }, [refreshReleaseNotes]);
 
-  const deleteProductUpdate = useCallback((id: string) => {
+  const createReleaseNote = useCallback(
+    async (payload: {
+      version: string;
+      releaseDate: string;
+      description: string;
+      showTo: ReleaseNoteShowTo;
+    }) => {
+      const created = await supportService.createReleaseNote({
+        version: payload.version,
+        release_date: payload.releaseDate,
+        description: payload.description,
+        show_to: payload.showTo,
+      });
+      setProductUpdates((prev) => upsertReleaseNote(prev, created));
+      return created;
+    },
+    []
+  );
+
+  const updateReleaseNote = useCallback(
+    async (
+      id: string,
+      patch: {
+        version?: string;
+        releaseDate?: string;
+        description?: string;
+        showTo?: ReleaseNoteShowTo;
+      }
+    ) => {
+      const updated = await supportService.updateReleaseNote(id, {
+        version: patch.version,
+        release_date: patch.releaseDate,
+        description: patch.description,
+        show_to: patch.showTo,
+      });
+      setProductUpdates((prev) => upsertReleaseNote(prev, updated));
+      return updated;
+    },
+    []
+  );
+
+  const deleteReleaseNote = useCallback(async (id: string) => {
+    await supportService.deleteReleaseNote(id);
     setProductUpdates((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
@@ -65,25 +117,46 @@ export function ProductUpdateProvider({ children }: { children: ReactNode }) {
     [productUpdates]
   );
 
+  const fetchReleaseNoteById = useCallback(async (id: string) => {
+    const item = await supportService.getReleaseNote(id);
+    setProductUpdates((prev) => upsertReleaseNote(prev, item));
+    return item;
+  }, []);
+
+  const uploadReleaseNoteAttachment = useCallback(async (id: string, file: File) => {
+    const updated = await supportService.uploadReleaseNoteAttachment(id, file);
+    setProductUpdates((prev) => upsertReleaseNote(prev, updated));
+    return updated;
+  }, []);
+
   const value = useMemo<ProductUpdateContextValue>(
     () => ({
       productUpdates,
-      setProductUpdates,
-      addProductUpdate,
-      updateProductUpdate,
-      deleteProductUpdate,
+      releaseNotesLoading,
+      refreshReleaseNotes,
+      createReleaseNote,
+      updateReleaseNote,
+      deleteReleaseNote,
       getProductUpdateById,
+      fetchReleaseNoteById,
+      uploadReleaseNoteAttachment,
     }),
     [
       productUpdates,
-      addProductUpdate,
-      updateProductUpdate,
-      deleteProductUpdate,
+      releaseNotesLoading,
+      refreshReleaseNotes,
+      createReleaseNote,
+      updateReleaseNote,
+      deleteReleaseNote,
       getProductUpdateById,
+      fetchReleaseNoteById,
+      uploadReleaseNoteAttachment,
     ]
   );
 
-  return <ProductUpdateContext.Provider value={value}>{children}</ProductUpdateContext.Provider>;
+  return (
+    <ProductUpdateContext.Provider value={value}>{children}</ProductUpdateContext.Provider>
+  );
 }
 
 export function useProductUpdates() {

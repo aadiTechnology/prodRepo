@@ -5,44 +5,58 @@ import type { SupportQueryActorRole } from "../pages/support/support.types";
 
 const SUPER_ADMIN_ROLES = ["SUPER_ADMIN", "SYSTEM_ADMIN"];
 const SCHOOL_ADMIN_ROLES = ["TENANT_ADMIN", "ADMIN", "SCHOOL_ADMIN"];
+const TEACHER_ROLE_TOKENS = ["TEACHER", "TEACHERS"];
+const STUDENT_ROLE_TOKENS = ["STUDENT", "STUDENTS"];
 const SUPPORT_VIEW_ROLES = [
   ...SUPER_ADMIN_ROLES,
   ...SCHOOL_ADMIN_ROLES,
-  "TEACHER",
-  "STUDENT",
+  ...TEACHER_ROLE_TOKENS,
+  ...STUDENT_ROLE_TOKENS,
 ];
 const MY_QUERIES_ROLES = [
   ...SUPER_ADMIN_ROLES,
   ...SCHOOL_ADMIN_ROLES,
-  "TEACHER",
+  ...TEACHER_ROLE_TOKENS,
 ];
 
+function normalizeRoleToken(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 function roleCodesInclude(roleCodes: string[], candidates: string[]): boolean {
-  const normalized = roleCodes.map((r) => r.toUpperCase());
-  return candidates.some((c) => normalized.includes(c.toUpperCase()));
+  const normalized = roleCodes.map(normalizeRoleToken);
+  return candidates.some((candidate) => normalized.includes(normalizeRoleToken(candidate)));
 }
 
 export function resolveSupportActorRole(roleCodes: string[]): SupportQueryActorRole | null {
-  const normalized = roleCodes.map((r) => r.toUpperCase());
-  if (roleCodesInclude(normalized, SUPER_ADMIN_ROLES)) return "SUPER_ADMIN";
-  if (roleCodesInclude(normalized, SCHOOL_ADMIN_ROLES)) return "ADMIN";
-  if (normalized.includes("TEACHER")) return "TEACHER";
-  if (normalized.includes("STUDENT")) return "STUDENT";
+  if (roleCodesInclude(roleCodes, SUPER_ADMIN_ROLES)) return "SUPER_ADMIN";
+  if (roleCodesInclude(roleCodes, SCHOOL_ADMIN_ROLES)) return "ADMIN";
+  if (roleCodesInclude(roleCodes, TEACHER_ROLE_TOKENS)) return "TEACHER";
+  if (roleCodesInclude(roleCodes, STUDENT_ROLE_TOKENS)) return "STUDENT";
   return null;
 }
 
 export function useSupportPermissions() {
   const { user } = useAuth();
-  const { hasAnyRole } = useRBAC();
+  const { hasAnyRole, roles: rbacRoles } = useRBAC();
 
   return useMemo(() => {
-    const roleCodes = user?.roles ?? (user?.role ? [user.role] : []);
+    const roleCodes =
+      rbacRoles.length > 0
+        ? rbacRoles
+        : user?.roles?.length
+          ? user.roles
+          : user?.role
+            ? [user.role]
+            : [];
     const isSuperAdmin =
       hasAnyRole(SUPER_ADMIN_ROLES) || roleCodesInclude(roleCodes, SUPER_ADMIN_ROLES);
     const isSchoolAdmin =
       hasAnyRole(SCHOOL_ADMIN_ROLES) || roleCodesInclude(roleCodes, SCHOOL_ADMIN_ROLES);
-    const isTeacher = hasAnyRole(["TEACHER"]) || roleCodesInclude(roleCodes, ["TEACHER"]);
-    const isStudent = hasAnyRole(["STUDENT"]) || roleCodesInclude(roleCodes, ["STUDENT"]);
+    const isTeacher =
+      hasAnyRole(TEACHER_ROLE_TOKENS) || roleCodesInclude(roleCodes, TEACHER_ROLE_TOKENS);
+    const isStudent =
+      hasAnyRole(STUDENT_ROLE_TOKENS) || roleCodesInclude(roleCodes, STUDENT_ROLE_TOKENS);
 
     const canAccessSupport =
       hasAnyRole(SUPPORT_VIEW_ROLES) || roleCodesInclude(roleCodes, SUPPORT_VIEW_ROLES);
@@ -91,5 +105,5 @@ export function useSupportPermissions() {
       viewAllTenants: isSuperAdmin,
       roleCodes,
     };
-  }, [hasAnyRole, user]);
+  }, [hasAnyRole, rbacRoles, user]);
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Alert,
@@ -6,10 +6,14 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Divider,
   FormControl,
   IconButton,
   InputLabel,
+  Link,
   MenuItem,
   Select,
   Stack,
@@ -17,15 +21,17 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import Grid from "@mui/material/Grid2";
 import {
+  AttachFile as AttachFileIcon,
   ChatBubbleOutline as ChatIcon,
   EditNote as EditNoteIcon,
-  ImageOutlined as ImageIcon,
   Send as SendIcon,
   Shortcut as ForwardIcon,
 } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
+import supportService from "../../api/services/supportService";
 import { PageHeader } from "../../components/layout";
 import { FormHeaderIconAction } from "../../components/primitives";
 import { ListPageLayout } from "../../components/reusable";
@@ -36,6 +42,9 @@ import {
   SUPPORT_QUERY_STATUSES,
   canForwardQueryToSuperAdmin,
   canViewSupportQuery,
+  getSupportQueryAttachmentKind,
+  notifySupportUnreadChanged,
+  openSupportQueryAttachment,
   type SupportQueryStatus,
 } from "./support.types";
 
@@ -83,11 +92,32 @@ export default function FaqDetail() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const perms = useSupportPermissions();
-  const { getQueryById, appendQueryMessage, forwardQueryToSuperAdmin } = useFaqData();
+  const { getQueryById, fetchQueryById, appendQueryMessage, forwardQueryToSuperAdmin } =
+    useFaqData();
   const [reply, setReply] = useState("");
   const [statusDraft, setStatusDraft] = useState<SupportQueryStatus | "">("");
+  const [submitting, setSubmitting] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ url: string; fileName: string } | null>(
+    null
+  );
 
   const query = useMemo(() => (id ? getQueryById(id) : undefined), [getQueryById, id]);
+
+  useEffect(() => {
+    if (!id || query) return;
+    void fetchQueryById(id).catch(() => undefined);
+  }, [fetchQueryById, id, query]);
+
+  useEffect(() => {
+    if (!id || !query || !canViewSupportQuery(query, perms.actorRole)) return;
+    void supportService
+      .markQueryViewed(id)
+      .then(() => {
+        notifySupportUnreadChanged();
+        return fetchQueryById(id);
+      })
+      .catch(() => undefined);
+  }, [fetchQueryById, id, query, perms.actorRole]);
 
   if (!perms.canAccessSupport) {
     return (
@@ -126,35 +156,42 @@ export default function FaqDetail() {
   const canForward = canForwardQueryToSuperAdmin(query, perms.actorRole);
   const activeStatus = statusDraft || query.status;
 
-  const handleForward = () => {
-    forwardQueryToSuperAdmin(query.id, perms.actorDisplayName);
-    enqueueSnackbar("Query forwarded to Super Admin.", { variant: "success" });
+  const handleForward = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await forwardQueryToSuperAdmin(query.id);
+      enqueueSnackbar("Query forwarded to Super Admin.", { variant: "success" });
+    } catch {
+      enqueueSnackbar("Failed to forward query.", { variant: "error" });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleRespond = (event: FormEvent) => {
+  const handleRespond = async (event: FormEvent) => {
     event.preventDefault();
     const body = reply.trim();
     if (!body) {
       enqueueSnackbar("Enter a response before submitting.", { variant: "warning" });
       return;
     }
+    if (submitting) return;
 
     const nextStatus =
       statusDraft && statusDraft !== query.status ? statusDraft : undefined;
-    appendQueryMessage(
-      query.id,
-      {
-        id: `${query.id}-msg-${query.messages.length + 1}`,
-        author: perms.actorDisplayName,
-        authorRole: perms.actorRole ?? "USER",
-        body,
-        createdAt: new Date().toISOString(),
-      },
-      nextStatus
-    );
-    setReply("");
-    setStatusDraft("");
-    enqueueSnackbar("Response added.", { variant: "success" });
+
+    setSubmitting(true);
+    try {
+      await appendQueryMessage(query.id, body, nextStatus);
+      setReply("");
+      setStatusDraft("");
+      enqueueSnackbar("Response added.", { variant: "success" });
+    } catch {
+      enqueueSnackbar("Failed to add response.", { variant: "error" });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -284,16 +321,41 @@ export default function FaqDetail() {
                   bgcolor: "#fff",
                   border: "1px solid",
                   borderColor: "divider",
+                  cursor: "pointer",
+                  transition: "background-color 0.15s ease",
+                  "&:hover": { bgcolor: alpha(colorTokens.primary.main, 0.04) },
                 }}
                 data-testid="query-detail-attachment"
+                onClick={() =>
+                  openSupportQueryAttachment(
+                    query.attachmentName!,
+                    query.attachmentUrl,
+                    (url, fileName) => setImagePreview({ url, fileName })
+                  )
+                }
               >
-                <ImageIcon sx={{ color: "text.secondary", fontSize: 20 }} />
-                <Typography
-                  variant="body2"
-                  sx={{ color: colorTokens.preschool.coral.main, fontWeight: 600 }}
-                >
-                  {query.attachmentName}
-                </Typography>
+                <AttachFileIcon sx={{ color: colorTokens.primary.main, fontSize: 20 }} />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Link
+                    component="span"
+                    underline="hover"
+                    variant="body2"
+                    sx={{
+                      fontWeight: 600,
+                      color: colorTokens.primary.main,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {query.attachmentName}
+                  </Link>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    {getSupportQueryAttachmentKind(query.attachmentName) === "image"
+                      ? "Click to preview image"
+                      : getSupportQueryAttachmentKind(query.attachmentName) === "pdf"
+                        ? "Click to open PDF"
+                        : "Click to download"}
+                  </Typography>
+                </Box>
               </Box>
             ) : (
               <Typography variant="body2" color="text.secondary">
@@ -468,6 +530,35 @@ export default function FaqDetail() {
           </Box>
         </Grid>
       </Grid>
+
+      <Dialog
+        open={Boolean(imagePreview)}
+        onClose={() => setImagePreview(null)}
+        maxWidth="md"
+        fullWidth
+        data-testid="dialog-query-attachment-preview"
+      >
+        <DialogTitle sx={{ pr: 6 }}>{imagePreview?.fileName}</DialogTitle>
+        <DialogContent>
+          {imagePreview ? (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 280,
+              }}
+            >
+              <Box
+                component="img"
+                src={imagePreview.url}
+                alt={imagePreview.fileName}
+                sx={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }}
+              />
+            </Box>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </ListPageLayout>
   );
 }

@@ -32,7 +32,6 @@ import {
 } from "./context/ProductUpdateContext";
 import type {
   ProductUpdateFormData,
-  ProductUpdateItem,
   ReleaseNoteFileType,
   ReleaseNoteShowTo,
 } from "./support.types";
@@ -65,16 +64,8 @@ type PendingAttachment = {
   fileType: ReleaseNoteFileType;
   url: string;
   sizeBytes: number;
+  file?: File;
 };
-
-function nextReleaseNoteId(existing: ProductUpdateItem[]): string {
-  const max = existing.reduce((acc, item) => {
-    const match = /^RN-(\d+)$/i.exec(item.id);
-    if (!match) return acc;
-    return Math.max(acc, Number(match[1]));
-  }, 0);
-  return `RN-${String(max + 1).padStart(3, "0")}`;
-}
 
 function resolveAttachmentType(fileName: string): ReleaseNoteFileType | null {
   const lower = fileName.toLowerCase();
@@ -97,16 +88,23 @@ export default function AddProductUpdate() {
   const { enqueueSnackbar } = useSnackbar();
   const perms = useSupportPermissions();
   const {
-    productUpdates,
-    addProductUpdate,
-    updateProductUpdate,
+    createReleaseNote,
+    updateReleaseNote,
     getProductUpdateById,
+    fetchReleaseNoteById,
+    uploadReleaseNoteAttachment,
   } = useProductUpdates();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [saving, setSaving] = useState(false);
   const existing = useMemo(
     () => (id ? getProductUpdateById(id) : undefined),
     [getProductUpdateById, id]
   );
+
+  useEffect(() => {
+    if (!isEditMode || !id || existing) return;
+    void fetchReleaseNoteById(id).catch(() => undefined);
+  }, [existing, fetchReleaseNoteById, id, isEditMode]);
 
   const [values, setValues] = useState<ProductUpdateFormData>(EMPTY_FORM);
   const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
@@ -147,51 +145,56 @@ export default function AddProductUpdate() {
 
   const goBack = () => navigate("/support/updates");
 
-  const saveReleaseNote = () => {
+  const saveReleaseNote = async () => {
     setAttempted(true);
     const hasShowTo =
       values.showTo.admin || values.showTo.teacher || values.showTo.student;
     if (!hasShowTo) {
-      setShowToError("Select at least one role.");
+      setShowToError("Please select at least one user role.");
     } else {
       setShowToError(null);
     }
-    if (Object.keys(errors).length > 0 || !hasShowTo) return;
+    if (Object.keys(errors).length > 0 || !hasShowTo || saving) return;
 
-    const today = new Date().toISOString().slice(0, 10);
-    const version = values.version.trim();
-    const payload = {
-      title: `Release ${version}`,
-      version,
-      releaseDate: values.releaseDate,
-      description: values.description.trim(),
-      attachmentName: attachment?.fileName ?? "",
-      attachmentType: attachment?.fileType ?? existing?.attachmentType ?? "pdf",
-      attachmentUrl: attachment?.url ?? "#",
-      modifiedBy: perms.actorDisplayName,
-      modifiedDate: today,
-      showTo: { ...values.showTo },
-    };
+    setSaving(true);
+    try {
+      const version = values.version.trim();
+      const attachmentFile = attachment?.file;
 
-    if (isEditMode && existing) {
-      updateProductUpdate(existing.id, payload);
-      enqueueSnackbar(`Release note ${version} updated.`, { variant: "success" });
-    } else {
-      const item: ProductUpdateItem = {
-        id: nextReleaseNoteId(productUpdates),
-        status: "Done",
-        createdBy: perms.actorDisplayName,
-        ...payload,
-      };
-      addProductUpdate(item);
-      enqueueSnackbar(`Release note ${version} created.`, { variant: "success" });
+      if (isEditMode && existing) {
+        await updateReleaseNote(existing.id, {
+          version,
+          releaseDate: values.releaseDate,
+          description: values.description.trim(),
+          showTo: { ...values.showTo },
+        });
+        if (attachmentFile) {
+          await uploadReleaseNoteAttachment(existing.id, attachmentFile);
+        }
+        enqueueSnackbar(`Release note ${version} updated.`, { variant: "success" });
+      } else {
+        const created = await createReleaseNote({
+          version,
+          releaseDate: values.releaseDate,
+          description: values.description.trim(),
+          showTo: { ...values.showTo },
+        });
+        if (attachmentFile) {
+          await uploadReleaseNoteAttachment(created.id, attachmentFile);
+        }
+        enqueueSnackbar(`Release note ${version} created.`, { variant: "success" });
+      }
+      goBack();
+    } catch {
+      enqueueSnackbar("Failed to save release note.", { variant: "error" });
+    } finally {
+      setSaving(false);
     }
-    goBack();
   };
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    saveReleaseNote();
+    void saveReleaseNote();
   };
 
   if (!perms.canManageProductUpdates) {
@@ -236,6 +239,7 @@ export default function AddProductUpdate() {
       fileType: type,
       url,
       sizeBytes: file.size,
+      file,
     });
     setValues((prev) => ({ ...prev, attachmentName: file.name }));
   };

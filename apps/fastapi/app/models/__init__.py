@@ -63,6 +63,7 @@ from app.models.notification import (
 )
 from app.models.ai_assistant_chat import AiAssistantSession, AiAssistantMessage
 from app.models.ai_assistant_tenant_config import AiAssistantTenantConfig
+from app.models.support import SupportQuery, SupportQueryMessage, SupportQueryRead, SupportReleaseNote
 
 # Export all models for convenience
 __all__ = [
@@ -140,5 +141,9 @@ __all__ = [
     "AiAssistantSession",
     "AiAssistantMessage",
     "AiAssistantTenantConfig",
+    "SupportQuery",
+    "SupportQueryMessage",
+    "SupportQueryRead",
+    "SupportReleaseNote",
 ]
 

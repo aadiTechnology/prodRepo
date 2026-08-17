@@ -23,7 +23,7 @@ export default function ProductUpdates() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const perms = useSupportPermissions();
-  const { productUpdates, deleteProductUpdate } = useProductUpdates();
+  const { productUpdates, deleteReleaseNote } = useProductUpdates();
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ProductUpdateItem | null>(null);
 
@@ -47,11 +47,15 @@ export default function ProductUpdates() {
     );
   }, [visibleNotes, search]);
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
-    deleteProductUpdate(deleteTarget.id);
-    enqueueSnackbar(`Release note v${deleteTarget.version} deleted.`, { variant: "success" });
-    setDeleteTarget(null);
+    try {
+      await deleteReleaseNote(deleteTarget.id);
+      enqueueSnackbar(`Release note v${deleteTarget.version} deleted.`, { variant: "success" });
+      setDeleteTarget(null);
+    } catch {
+      enqueueSnackbar("Failed to delete release note.", { variant: "error" });
+    }
   };
 
   if (!perms.canAccessReleaseNotesPage) {

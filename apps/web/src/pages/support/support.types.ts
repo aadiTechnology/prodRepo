@@ -1,3 +1,5 @@
+import { apiBaseUrl } from "../../config";
+
 export type SupportStatus = "Not Started" | "In Progress" | "Done" | "TBD";
 
 /** @deprecated Use SupportStatus — kept for FAQ module compatibility */
@@ -85,10 +87,86 @@ export type ProductUpdateFormData = {
 };
 
 export const EMPTY_RELEASE_NOTE_SHOW_TO: ReleaseNoteShowTo = {
-  admin: true,
-  teacher: true,
-  student: true,
+  admin: false,
+  teacher: false,
+  student: false,
 };
+
+export const SUPPORT_QUERY_ALLOWED_EXTENSIONS = [
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".jpg",
+  ".jpeg",
+  ".png",
+] as const;
+
+export const SUPPORT_QUERY_INVALID_FILE_MESSAGE =
+  "Please upload a valid file. Allowed file types: PDF, DOC, DOCX, JPG, JPEG, PNG.";
+
+export type SupportQueryAttachmentKind = "image" | "pdf" | "document" | "unknown";
+
+export function isSupportQueryAttachmentAllowed(fileName: string): boolean {
+  const lower = fileName.toLowerCase();
+  return SUPPORT_QUERY_ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+export function getSupportQueryAttachmentKind(fileName: string): SupportQueryAttachmentKind {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png")) {
+    return "image";
+  }
+  if (lower.endsWith(".pdf")) return "pdf";
+  if (lower.endsWith(".doc") || lower.endsWith(".docx")) return "document";
+  return "unknown";
+}
+
+/** Resolve API, Azure SAS, static-mount, or blob URLs for support query attachments. */
+export function resolveSupportQueryAttachmentUrl(raw?: string | null): string | undefined {
+  if (!raw || raw === "#") return undefined;
+  if (raw.startsWith("blob:") || raw.startsWith("data:")) return raw;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+
+  const staticRoot = apiBaseUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
+
+  if (raw.startsWith("support-query-attachments/")) {
+    return `${staticRoot}/${raw}`;
+  }
+  const path = raw.startsWith("/") ? raw : `/${raw}`;
+  if (path.startsWith("/support-query-attachments/")) {
+    return `${staticRoot}${path}`;
+  }
+  return `${apiBaseUrl}${path}`;
+}
+
+export function openSupportQueryAttachment(
+  fileName: string,
+  rawUrl?: string | null,
+  onPreviewImage?: (url: string, fileName: string) => void
+): void {
+  const url = resolveSupportQueryAttachmentUrl(rawUrl);
+  if (!url) return;
+
+  const kind = getSupportQueryAttachmentKind(fileName);
+  if (kind === "image") {
+    onPreviewImage?.(url, fileName);
+    return;
+  }
+  if (kind === "pdf") {
+    window.open(url, "_blank", "noopener,noreferrer");
+    return;
+  }
+  if (kind === "document") {
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    anchor.click();
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
 
 export type HelpVideoItem = {
   id: string;
@@ -148,6 +226,7 @@ export type SupportQueryItem = {
   subject: string;
   description: string;
   attachmentName?: string;
+  attachmentUrl?: string;
   createdBy: string;
   createdByRole: SupportQueryActorRole;
   createdAt: string;
@@ -157,6 +236,8 @@ export type SupportQueryItem = {
   forwardedToSuperAdmin?: boolean;
   forwardedBy?: string;
   forwardedAt?: string;
+  /** False when query has unread activity for the current user (new query, reply, status change). */
+  isViewed?: boolean;
 };
 
 export type SupportQueryFormData = {
@@ -173,13 +254,76 @@ export const SUPPORT_QUERY_STATUSES: SupportQueryStatus[] = [
   "Closed",
 ];
 
-export const SUPPORT_QUERY_CATEGORIES = [
+export type SupportCategoryStatus = "Active" | "Inactive";
+
+export type SupportCategory = {
+  id: string;
+  name: string;
+  status: SupportCategoryStatus;
+};
+
+export const SUPPORT_CATEGORIES_STORAGE_KEY = "support-configured-categories";
+
+export const DEFAULT_SUPPORT_CATEGORY_NAMES = [
   "Technical Issue",
-  "Student Related",
   "Attendance",
-  "Fees",
-  "Other",
+  "Student",
+  "Teacher",
+  "Fees & Payment",
+  "Academic",
+  "Homework & Assignment",
+  "Communication & Notification",
+  "Account & Access",
+  "General Query",
 ] as const;
+
+export function normalizeSupportCategoryName(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+export function createDefaultSupportCategories(): SupportCategory[] {
+  return DEFAULT_SUPPORT_CATEGORY_NAMES.map((name, index) => ({
+    id: `CAT-${String(index + 1).padStart(3, "0")}`,
+    name,
+    status: "Active" as const,
+  }));
+}
+
+export function loadSupportCategoriesFromStorage(): SupportCategory[] {
+  if (typeof window === "undefined") return createDefaultSupportCategories();
+  try {
+    const raw = window.localStorage.getItem(SUPPORT_CATEGORIES_STORAGE_KEY);
+    if (!raw) return createDefaultSupportCategories();
+    const parsed = JSON.parse(raw) as SupportCategory[];
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return createDefaultSupportCategories();
+    }
+    return parsed.map((item) => ({
+      id: String(item.id),
+      name: normalizeSupportCategoryName(String(item.name)),
+      status: item.status === "Inactive" ? "Inactive" : "Active",
+    }));
+  } catch {
+    return createDefaultSupportCategories();
+  }
+}
+
+export function saveSupportCategoriesToStorage(categories: SupportCategory[]): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SUPPORT_CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+}
+
+export function nextSupportCategoryId(categories: SupportCategory[]): string {
+  const max = categories.reduce((acc, item) => {
+    const match = /^CAT-(\d+)$/.exec(item.id);
+    if (!match) return acc;
+    return Math.max(acc, Number(match[1]));
+  }, 0);
+  return `CAT-${String(max + 1).padStart(3, "0")}`;
+}
+
+/** @deprecated Use configured categories from FaqDataContext instead. */
+export const SUPPORT_QUERY_CATEGORIES = DEFAULT_SUPPORT_CATEGORY_NAMES;
 
 /** School-level requesters whose queries are handled by Admin */
 const ADMIN_INBOX_ROLES: SupportQueryActorRole[] = ["STUDENT", "TEACHER"];
@@ -196,7 +340,11 @@ export function canViewSupportQuery(
   }
 
   if (actorRole === "SUPER_ADMIN") {
-    return query.createdByRole === "ADMIN" || Boolean(query.forwardedToSuperAdmin);
+    return (
+      query.createdByRole === "ADMIN" ||
+      query.createdByRole === "TEACHER" ||
+      Boolean(query.forwardedToSuperAdmin)
+    );
   }
 
   return false;
@@ -218,4 +366,12 @@ export function isSupportQueryOwner(
   actorRole: SupportQueryActorRole | null
 ): boolean {
   return Boolean(actorRole && query.createdByRole === actorRole);
+}
+
+/** Cross-component refresh for Support sidebar unread badge. */
+export const SUPPORT_UNREAD_CHANGED_EVENT = "support-unread-changed";
+
+export function notifySupportUnreadChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(SUPPORT_UNREAD_CHANGED_EVENT));
 }

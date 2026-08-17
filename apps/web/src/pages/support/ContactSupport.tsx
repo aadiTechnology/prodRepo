@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Alert, Box, Button, Chip, Stack, Typography } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -16,6 +16,7 @@ import { useFaqListController } from "../../hooks/useFaqListController";
 import { useFaqData } from "./context/FaqDataContext";
 import {
   isSupportQueryOwner,
+  SUPPORT_UNREAD_CHANGED_EVENT,
   type SupportQueryItem,
   type SupportQueryStatus,
 } from "./support.types";
@@ -47,8 +48,16 @@ export default function ContactSupport() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const c = useFaqListController();
-  const { deleteQuery } = useFaqData();
+  const { deleteQuery, refreshQueries } = useFaqData();
   const [deleteTarget, setDeleteTarget] = useState<SupportQueryItem | null>(null);
+
+  useEffect(() => {
+    const onUnreadChanged = () => {
+      void refreshQueries();
+    };
+    window.addEventListener(SUPPORT_UNREAD_CHANGED_EVENT, onUnreadChanged);
+    return () => window.removeEventListener(SUPPORT_UNREAD_CHANGED_EVENT, onUnreadChanged);
+  }, [refreshQueries]);
 
   const columns = useMemo<DataTableColumn<SupportQueryItem>[]>(() => {
     const cols: DataTableColumn<SupportQueryItem>[] = [
@@ -167,11 +176,15 @@ export default function ContactSupport() {
     ]
   );
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
-    deleteQuery(deleteTarget.id);
-    enqueueSnackbar(`Query ${deleteTarget.id} deleted.`, { variant: "success" });
-    setDeleteTarget(null);
+    try {
+      await deleteQuery(deleteTarget.id);
+      enqueueSnackbar(`Query ${deleteTarget.id} deleted.`, { variant: "success" });
+      setDeleteTarget(null);
+    } catch {
+      enqueueSnackbar("Failed to delete query.", { variant: "error" });
+    }
   };
 
   if (!c.perms.canAccessSupport || !c.perms.canViewMyQueries) {
@@ -215,21 +228,29 @@ export default function ContactSupport() {
               onSearchChange={c.setSearch}
               searchPlaceholder="Search by ID, subject, category…"
               searchTestId="input-query-search"
-              addButtonTestId="btn-create-query"
-              onAddClick={
-                c.perms.canCreateQuery && !c.perms.isSuperAdmin
-                  ? () => navigate("/support/contact/add")
-                  : undefined
+              addButtonTestId={
+                c.perms.isSuperAdmin ? "support-category-add" : "btn-create-query"
               }
-              addLabel="Create Query"
+              onAddClick={
+                c.perms.isSuperAdmin
+                  ? () => navigate("/support/contact/categories")
+                  : c.perms.canCreateQuery
+                    ? () => navigate("/support/contact/add")
+                    : undefined
+              }
+              addLabel={c.perms.isSuperAdmin ? "Add" : "Create Query"}
               addIcon={<AddIcon sx={{ fontSize: 24 }} />}
-              filters={toolbarFilters}
+              filters={toolbarFilters.map((filter) =>
+                filter.label === "Category"
+                  ? { ...filter, testId: "support-query-category-filter" }
+                  : filter
+              )}
             />
           }
         />
       }
     >
-      <Box data-testid="page-support-queries">
+      <Box data-testid="support-my-queries">
         <EntityTableSection<SupportQueryItem>
           label=""
           showInfoBar={false}
@@ -247,6 +268,11 @@ export default function ContactSupport() {
           emptyMessage={emptyMessage}
           emptyTestId="empty-support-queries-table"
           getRowKey={(row) => row.id}
+          getRowSx={(row) =>
+            !row.isViewed
+              ? { fontWeight: 700, color: "text.primary" }
+              : { fontWeight: 500 }
+          }
           stickyHeader
           size="small"
           showPagination={c.totalRows > 0}

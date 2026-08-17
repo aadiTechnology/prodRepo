@@ -11,7 +11,7 @@ import { useSupportPermissions } from "./useSupportPermissions";
 const MIN_SUGGESTION_CHARS = 3;
 
 export function useFaqListController() {
-  const { queries } = useFaqData();
+  const { queries, categoryFilterOptions } = useFaqData();
   const perms = useSupportPermissions();
 
   const [search, setSearch] = useState("");
@@ -63,13 +63,7 @@ export function useFaqListController() {
     return filteredQueries.slice(start, start + rowsPerPage);
   }, [filteredQueries, page, rowsPerPage]);
 
-  const categoryOptions = useMemo(() => {
-    const unique = Array.from(new Set(visibleQueries.map((q) => q.category))).sort();
-    return [
-      { label: "All Categories", value: "" },
-      ...unique.map((c) => ({ label: c, value: c })),
-    ];
-  }, [visibleQueries]);
+  const categoryOptions = categoryFilterOptions;
 
   const statusOptions = useMemo(
     () => [

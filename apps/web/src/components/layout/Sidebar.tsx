@@ -5,7 +5,7 @@
  */
 
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Drawer,
   Box,
@@ -40,6 +40,8 @@ import { toRoleLabel } from "../../utils/formatters";
 import { toMediaUrl } from "../../utils/mediaUrl";
 import { useHomeworkSidebarCount } from "../../hooks/useHomeworkSidebarCount";
 import { useNoticeSidebarCount } from "../../hooks/useNoticeSidebarCount";
+import supportService from "../../api/services/supportService";
+import { SUPPORT_UNREAD_CHANGED_EVENT } from "../../pages/support/support.types";
 import { isNativePlatform } from "../../utils/capacitor";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -216,6 +218,12 @@ function isNoticeMenuEntry(label: string, path?: string): boolean {
   );
 }
 
+function isSupportMenuEntry(label: string, path?: string): boolean {
+  const normalizedLabel = label.trim().toLowerCase();
+  const normalizedPath = (path ?? "").trim().toLowerCase();
+  return normalizedLabel === "support" || normalizedPath.startsWith("/support");
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Icon Mapping
 // ═══════════════════════════════════════════════════════════════════════════
@@ -311,6 +319,16 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
       { id: "demo-setup-videos", label: "Demo Setup Videos", path: "/demo-setup-videos" },
       // { id: "digital-marketing-hub", label: "Digital Marketing Hub", path: "/marketing/hub" }
     ]
+  },
+  {
+    id: "support",
+    label: "Support",
+    icon: letterIcon,
+    color: colorTokens.menuColors.settings,
+    children: [
+      { id: "my-queries", label: "My Queries", path: "/support/contact" },
+      { id: "release-notes", label: "Release Notes", path: "/support/updates" },
+    ],
   }
 ];
 
@@ -346,7 +364,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   }, [user?.tenant?.id, user?.tenant?.logo_url]);
 
   const menuItems: MenuItemData[] = useMemo(() => {
-    if (rbacRoles.includes("super_admin")) {
+    if (rbacRoles.includes("super_admin") || rbacRoles.includes("system_admin")) {
       return SYSTEM_ADMIN_MENU;
     }
 
@@ -499,6 +517,50 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
   );
   const noticeCount = useNoticeSidebarCount(hasNoticeMenu);
 
+  const hasSupportMenu = useMemo(
+    () =>
+      menuItems.some(
+        (item) =>
+          isSupportMenuEntry(item.label, item.path) ||
+          item.children?.some((child) => isSupportMenuEntry(child.label, child.path))
+      ),
+    [menuItems]
+  );
+  const userId = user?.id ?? null;
+  const [supportUnreadCount, setSupportUnreadCount] = useState(0);
+  const [supportRefreshTick, setSupportRefreshTick] = useState(0);
+  const refreshSupportUnread = useCallback(() => {
+    setSupportRefreshTick((t) => t + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!hasSupportMenu) return;
+    const onChanged = () => refreshSupportUnread();
+    window.addEventListener(SUPPORT_UNREAD_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(SUPPORT_UNREAD_CHANGED_EVENT, onChanged);
+  }, [hasSupportMenu, refreshSupportUnread]);
+
+  useEffect(() => {
+    if (!hasSupportMenu || userId == null) {
+      setSupportUnreadCount(0);
+      return;
+    }
+
+    let cancelled = false;
+    supportService
+      .getUnreadCount()
+      .then((response) => {
+        if (!cancelled) setSupportUnreadCount(response.count ?? 0);
+      })
+      .catch(() => {
+        if (!cancelled) setSupportUnreadCount(0);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasSupportMenu, userId, supportRefreshTick]);
+
   // Inline pill (not floating MUI Badge) so it sits left of the expand chevron.
   const renderMenuBadge = (count?: number) => {
     if (!count || count <= 0) return null;
@@ -601,7 +663,10 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                 : isNoticeMenuEntry(item.label, item.path) ||
                     item.children?.some((child) => isNoticeMenuEntry(child.label, child.path))
                   ? noticeCount
-                  : undefined;
+                  : isSupportMenuEntry(item.label, item.path) ||
+                      item.children?.some((child) => isSupportMenuEntry(child.label, child.path))
+                    ? supportUnreadCount
+                    : undefined;
 
             return (
               <Box key={item.id} sx={{ mb: 0.5 }}>
