@@ -48,6 +48,10 @@ export type SnackbarState = {
   severity: "success" | "error" | "warning" | "info";
 };
 
+function resolveDefaultAttendanceTab(isAdminLike: boolean): TeacherAttendanceTab {
+  return isAdminLike ? "attendance-details" : "check-in-out";
+}
+
 function parseTimeSafe(time: string): number {
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;
@@ -165,7 +169,9 @@ export function useTeacherAttendanceMarkingController() {
   const [configLoading, setConfigLoading] = useState(false);
   const [academicYearId, setAcademicYearId] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<TeacherAttendanceTab>("mark-attendance");
+  const [activeTab, setActiveTab] = useState<TeacherAttendanceTab>(() =>
+    resolveDefaultAttendanceTab(isAdminLike)
+  );
   const [checkInOutErrors, setCheckInOutErrors] = useState<string[]>([]);
   const [markDate, setMarkDate] = useState(today);
   const [markTeacherId, setMarkTeacherId] = useState("");
@@ -181,7 +187,7 @@ export function useTeacherAttendanceMarkingController() {
   const [detailsFilters, setDetailsFilters] = useState<AttendanceDetailsFilters>({
     teacherId: "",
     approvalStatus: "",
-    date: "",
+    date: today,
   });
 
   const markableTeachers = useMemo(
