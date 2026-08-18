@@ -341,7 +341,11 @@ const HUB_CHILD_MODULE_NAMES = new Set([
   "User Related",
   "Academics",
   "Fees Related",
+  "Attendance Related",
 ]);
+
+/** Hub-only routes that must not appear as sidebar child links. */
+const SIDEBAR_HIDDEN_MENU_PATHS = new Set(["/attendance/configuration"]);
 
 export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggleCollapse }: SidebarProps) {
   const navigate = useNavigate();
@@ -405,11 +409,16 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
         path: normalizeMenuPath(node.path) ?? undefined,
         color: color,
         children: hasMenuChildren(node.children)
-          ? node.children!.map(child => ({
-              id: child.id.toString(),
-              label: child.name,
-              path: normalizeMenuPath(child.path) ?? "",
-            }))
+          ? node.children!
+              .filter((child) => {
+                const childPath = normalizeMenuPath(child.path);
+                return !childPath || !SIDEBAR_HIDDEN_MENU_PATHS.has(childPath);
+              })
+              .map((child) => ({
+                id: child.id.toString(),
+                label: child.name,
+                path: normalizeMenuPath(child.path) ?? "",
+              }))
           : undefined,
       };
     });

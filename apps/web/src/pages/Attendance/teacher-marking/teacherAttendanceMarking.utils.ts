@@ -1,7 +1,18 @@
-import type { TeacherAttendanceStatus } from "./teacherAttendanceMarking.types";
+import type {
+  TeacherAttendanceRecord,
+  TeacherAttendanceStatus,
+  TeacherProfile,
+} from "./teacherAttendanceMarking.types";
 
 export function getTodayIso(): string {
   const d = new Date();
+  return toIsoDate(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/** Default report-style range start (e.g. last 7 days through today). */
+export function getDefaultFromDateIso(daysBack = 7): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysBack);
   return toIsoDate(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
@@ -107,4 +118,60 @@ export function isWorkingDay(
   const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
   const dayName = daysOfWeek[dayOfWeek];
   return workingDays[dayName] ?? false;
+}
+
+/** Inclusive ISO date strings from `fromIso` through `toIso`, newest first. */
+export function listDatesInRange(fromIso: string, toIso: string): string[] {
+  if (!fromIso || !toIso || fromIso > toIso) return [];
+
+  const dates: string[] = [];
+  const cursor = new Date(`${fromIso}T00:00:00`);
+  const end = new Date(`${toIso}T00:00:00`);
+
+  while (cursor <= end) {
+    dates.push(toIsoDate(cursor.getFullYear(), cursor.getMonth(), cursor.getDate()));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dates.reverse();
+}
+
+/** Admin list view: one row per teacher per date (check-in/out when marked, otherwise blank). */
+export function buildAttendanceListGrid(
+  teachers: TeacherProfile[],
+  dates: string[],
+  records: TeacherAttendanceRecord[]
+): TeacherAttendanceRecord[] {
+  const recordByKey = new Map(records.map((r) => [`${r.teacherId}:${r.date}`, r]));
+  const sortedTeachers = [...teachers].sort((a, b) => a.name.localeCompare(b.name));
+  const rows: TeacherAttendanceRecord[] = [];
+
+  for (const date of dates) {
+    for (const teacher of sortedTeachers) {
+      const existing = recordByKey.get(`${teacher.id}:${date}`);
+      if (existing) {
+        rows.push(existing);
+        continue;
+      }
+
+      rows.push({
+        id: `grid-${teacher.id}-${date}`,
+        teacherId: teacher.id,
+        date,
+        statuses: [] as TeacherAttendanceStatus[],
+        checkInTime: null,
+        checkOutTime: null,
+        remarks: "",
+        remarkHistory: [],
+        workingHoursMinutes: null,
+        overtimeMinutes: null,
+        isSubmitted: false,
+        payrollProcessed: false,
+        approvalStatus: "Waiting for Approval",
+        rejectionReason: "",
+      });
+    }
+  }
+
+  return rows;
 }

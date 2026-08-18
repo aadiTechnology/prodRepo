@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Box,
+  Badge,
   Dialog,
   DialogActions,
   DialogContent,
@@ -88,10 +89,13 @@ export default function AdminAttendanceDetailsTab({
 }: AdminAttendanceDetailsTabProps) {
   const {
     filteredDetailsRecords,
+    attendanceListGridRecords,
+    pendingApprovalCount,
     detailsFilters,
     updateDetailsFilter,
     updateApprovalStatus,
     markableTeachers,
+    today,
   } = controller;
 
   const [viewMode, setViewMode] = useState<ViewMode>("list");
@@ -100,9 +104,6 @@ export default function AdminAttendanceDetailsTab({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-  // Use controller's date filter instead of local state
-  const listDate = detailsFilters.date;
-  const setListDate = (date: string) => updateDetailsFilter("date", date);
 
   const activeTeachers = markableTeachers;
   const teacherName = (teacherId: string) =>
@@ -110,23 +111,13 @@ export default function AdminAttendanceDetailsTab({
 
   useEffect(() => {
     setPage(0);
-  }, [detailsFilters.teacherId, detailsFilters.approvalStatus, viewMode, listDate]);
-
-  const displayRecords = useMemo(() => {
-    let items = filteredDetailsRecords;
-    if (viewMode === "list" && listDate) {
-      items = items.filter((r) => r.date === listDate);
-    }
-    return items.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  }, [filteredDetailsRecords, viewMode, listDate, page, rowsPerPage]);
-
-  useEffect(() => {
-    const source = viewMode === "list" && listDate
-      ? filteredDetailsRecords.filter((r) => r.date === listDate)
-      : filteredDetailsRecords;
-    const maxPage = Math.max(0, Math.ceil(source.length / rowsPerPage) - 1);
-    if (page > maxPage) setPage(maxPage);
-  }, [filteredDetailsRecords.length, page, rowsPerPage, viewMode, listDate]);
+  }, [
+    detailsFilters.teacherId,
+    detailsFilters.approvalStatus,
+    detailsFilters.fromDate,
+    detailsFilters.toDate,
+    viewMode,
+  ]);
 
   const openRejectDialog = (recordId: string) => {
     setRejectTargetId(recordId);
@@ -162,6 +153,12 @@ export default function AdminAttendanceDetailsTab({
     return `${String(displayHour).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
   };
 
+  /** Check-in/out visible only after admin approval (hidden while pending). */
+  const displayApprovedTimeOnly = (row: TeacherAttendanceRecord, time: string | null): string => {
+    if (row.approvalStatus !== "Approved") return "—";
+    return formatTimeDisplay(time);
+  };
+
   const toggleRowSelection = (row: TeacherAttendanceRecord) => {
     setSelectedRows((prev) => {
       const next = new Set(prev);
@@ -176,46 +173,64 @@ export default function AdminAttendanceDetailsTab({
 
   const isRowSelected = (row: TeacherAttendanceRecord) => selectedRows.has(row.id);
 
+  const isPendingApproval = (row: TeacherAttendanceRecord) =>
+    row.isSubmitted && row.approvalStatus === "Waiting for Approval";
+
+  /** Past-date requests still waiting for admin approval (approval queue only). */
+  const isApprovalQueueItem = (row: TeacherAttendanceRecord) =>
+    isPendingApproval(row) && row.date < today;
+
+  const viewRecords = useMemo(() => {
+    if (viewMode === "approval") {
+      return filteredDetailsRecords.filter(isApprovalQueueItem);
+    }
+    return attendanceListGridRecords;
+  }, [filteredDetailsRecords, attendanceListGridRecords, viewMode, today]);
+
+  const renderTextCell = (value: string, secondary = false) => (
+    <Typography
+      variant="body2"
+      color={secondary ? "text.secondary" : "text.primary"}
+      sx={{ fontWeight: "inherit" }}
+    >
+      {value}
+    </Typography>
+  );
+
+  const openDatePicker = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    const input = e.currentTarget
+      .closest(".MuiInputBase-root")
+      ?.querySelector('input[type="date"]') as HTMLInputElement | null;
+    input?.showPicker?.();
+  };
+
   const listColumns = [
     {
       id: "date",
       label: "DATE",
       width: "15%",
-      render: (row: TeacherAttendanceRecord) => (
-        <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.primary }}>
-          {formatDate(row.date)}
-        </Typography>
-      ),
+      render: (row: TeacherAttendanceRecord) => renderTextCell(formatDate(row.date)),
     },
     {
       id: "teacherName",
       label: "TEACHER NAME",
       width: "35%",
-      render: (row: TeacherAttendanceRecord) => (
-        <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.primary }}>
-          {teacherName(row.teacherId)}
-        </Typography>
-      ),
+      render: (row: TeacherAttendanceRecord) => renderTextCell(teacherName(row.teacherId)),
     },
     {
       id: "checkIn",
       label: "CHECK IN",
       width: "25%",
-      render: (row: TeacherAttendanceRecord) => (
-        <Tooltip title={formatTimeDisplay(row.checkInTime)}>
-          <Typography variant="body2">{row.checkInTime ?? "—"}</Typography>
-        </Tooltip>
-      ),
+      render: (row: TeacherAttendanceRecord) =>
+        renderTextCell(displayApprovedTimeOnly(row, row.checkInTime)),
     },
     {
       id: "checkOut",
       label: "CHECK OUT",
       width: "25%",
-      render: (row: TeacherAttendanceRecord) => (
-        <Tooltip title={formatTimeDisplay(row.checkOutTime)}>
-          <Typography variant="body2">{row.checkOutTime ?? "—"}</Typography>
-        </Tooltip>
-      ),
+      render: (row: TeacherAttendanceRecord) =>
+        renderTextCell(displayApprovedTimeOnly(row, row.checkOutTime)),
     },
   ];
 
@@ -224,49 +239,34 @@ export default function AdminAttendanceDetailsTab({
       id: "date",
       label: "DATE",
       width: "12%",
-      render: (row: TeacherAttendanceRecord) => (
-        <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.primary }}>
-          {formatDate(row.date)}
-        </Typography>
-      ),
+      render: (row: TeacherAttendanceRecord) => renderTextCell(formatDate(row.date)),
     },
     {
       id: "teacherName",
       label: "TEACHER NAME",
       width: "22%",
-      render: (row: TeacherAttendanceRecord) => (
-        <Typography variant="body2" sx={{ fontWeight: 600, color: colorTokens.text.primary }}>
-          {teacherName(row.teacherId)}
-        </Typography>
-      ),
+      render: (row: TeacherAttendanceRecord) => renderTextCell(teacherName(row.teacherId)),
     },
     {
       id: "checkIn",
       label: "CHECK IN",
       width: "15%",
-      render: (row: TeacherAttendanceRecord) => (
-        <Tooltip title={formatTimeDisplay(row.checkInTime)}>
-          <Typography variant="body2">{row.checkInTime ?? "—"}</Typography>
-        </Tooltip>
-      ),
+      render: (row: TeacherAttendanceRecord) =>
+        renderTextCell(displayApprovedTimeOnly(row, row.checkInTime)),
     },
     {
       id: "checkOut",
       label: "CHECK OUT",
       width: "15%",
-      render: (row: TeacherAttendanceRecord) => (
-        <Tooltip title={formatTimeDisplay(row.checkOutTime)}>
-          <Typography variant="body2">{row.checkOutTime ?? "—"}</Typography>
-        </Tooltip>
-      ),
+      render: (row: TeacherAttendanceRecord) =>
+        renderTextCell(displayApprovedTimeOnly(row, row.checkOutTime)),
     },
     {
       id: "remarks",
       label: "REMARKS",
       width: "20%",
-      render: (row: TeacherAttendanceRecord) => (
-        <Typography variant="body2" color="text.secondary">{row.remarks || "—"}</Typography>
-      ),
+      render: (row: TeacherAttendanceRecord) =>
+        renderTextCell(row.remarks || "—", true),
     },
     {
       id: "approvalStatus",
@@ -330,25 +330,24 @@ export default function AdminAttendanceDetailsTab({
 
   const currentColumns = viewMode === "list" ? listColumns : approvalColumns;
 
-const tableTotalRows = useMemo(() => {
-  if (viewMode === "list" && listDate) {
-    return filteredDetailsRecords.filter((r) => r.date === listDate).length;
-  }
-  return filteredDetailsRecords.length;
-}, [filteredDetailsRecords, viewMode, listDate]);
+const tableTotalRows = viewRecords.length;
 
-const tableData = useMemo(() => {
-  let items = filteredDetailsRecords;
-  if (viewMode === "list" && listDate) {
-    items = items.filter((r) => r.date === listDate);
-  }
-  return items.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-}, [filteredDetailsRecords, viewMode, listDate, page, rowsPerPage]);
+const tableData = useMemo(
+  () => viewRecords.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+  [viewRecords, page, rowsPerPage]
+);
 
 useEffect(() => {
   const maxPage = Math.max(0, Math.ceil(tableTotalRows / rowsPerPage) - 1);
   if (page > maxPage) setPage(maxPage);
 }, [tableTotalRows, page, rowsPerPage]);
+
+  const tableLabel =
+    viewMode === "approval" && pendingApprovalCount > 0
+      ? `Attendance Approval (${pendingApprovalCount} pending)`
+      : viewMode === "list"
+        ? "Attendance List"
+        : "Attendance Approval";
 
   return (
     <Box data-testid="tab-attendance-details-content">
@@ -395,38 +394,56 @@ useEffect(() => {
                 </Select>
               </FormControl>
 
-              {viewMode === "list" && (
-                <TextField
-                  label="Date"
-                  type="date"
-                  size="small"
-                  value={listDate}
-                  InputLabelProps={{ shrink: true }}
-                  onChange={(e) => setListDate(e.target.value)}
-                  sx={dateFieldSx}
-                  data-testid="filter-list-date"
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          onClick={(e) => {
-                            e.preventDefault();
-                            const input = e.currentTarget.closest('.MuiInputBase-root')?.querySelector('input[type="date"]') as HTMLInputElement | null;
-                            if (input) {
-                              input.showPicker?.();
-                            }
-                          }}
-                          aria-label="Open calendar"
-                          size="small"
-                          sx={{ p: 0, color: colorTokens.text.secondary }}
-                        >
-                          <CalendarTodayIcon fontSize="small" />
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              )}
+              <TextField
+                label="From Date"
+                type="date"
+                size="small"
+                value={detailsFilters.fromDate}
+                InputLabelProps={{ shrink: true }}
+                onChange={(e) => updateDetailsFilter("fromDate", e.target.value)}
+                sx={dateFieldSx}
+                data-testid="filter-from-date"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={openDatePicker}
+                        aria-label="Open from date calendar"
+                        size="small"
+                        sx={{ p: 0, color: colorTokens.text.secondary }}
+                      >
+                        <CalendarTodayIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+
+              <TextField
+                label="To Date"
+                type="date"
+                size="small"
+                value={detailsFilters.toDate}
+                InputLabelProps={{ shrink: true }}
+                onChange={(e) => updateDetailsFilter("toDate", e.target.value)}
+                sx={dateFieldSx}
+                data-testid="filter-to-date"
+                inputProps={{ max: today }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={openDatePicker}
+                        aria-label="Open to date calendar"
+                        size="small"
+                        sx={{ p: 0, color: colorTokens.text.secondary }}
+                      >
+                        <CalendarTodayIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
 
               {viewMode === "approval" && (
                 <FormControl size="small" sx={filterControlSx}>
@@ -503,7 +520,15 @@ useEffect(() => {
                     },
                   }}
                 >
-                  <HowToVoteIcon fontSize="small" />
+                  <Badge
+                    badgeContent={pendingApprovalCount}
+                    color="warning"
+                    invisible={pendingApprovalCount === 0}
+                    data-testid="badge-approval-view-count"
+                    sx={{ "& .MuiBadge-badge": { right: 2, top: 2 } }}
+                  >
+                    <HowToVoteIcon fontSize="small" />
+                  </Badge>
                 </IconButton>
               </Tooltip>
             </Stack>
@@ -520,7 +545,7 @@ useEffect(() => {
           }}
         >
           <EntityTableSection<TeacherAttendanceRecord>
-            label={viewMode === "list" ? "Attendance List" : "Attendance Approval"}
+            label={tableLabel}
             loading={false}
             totalRows={tableTotalRows}
             page={page}
@@ -539,16 +564,29 @@ useEffect(() => {
             rowTestId={(row) => `${viewMode === "list" ? "attendance-list" : "attendance-details"}-row-${row.id}`}
             emptyTestId={viewMode === "list" ? "attendance-list-empty-state" : "attendance-details-empty-state"}
             onRowClick={toggleRowSelection}
-            getRowSx={(row) => ({
-              backgroundColor: isRowSelected(row)
-                ? alpha(colorTokens.preschool.turquoise.main, 0.12)
-                : undefined,
-              "&.MuiTableRow-hover:hover": {
-                backgroundColor: isRowSelected(row)
-                  ? alpha(colorTokens.preschool.turquoise.main, 0.18)
-                  : alpha(colorTokens.background.default, 0.6),
-              },
-            })}
+            getRowSx={(row) => {
+              const selected = isRowSelected(row);
+
+              if (selected) {
+                return {
+                  fontWeight: viewMode === "approval" ? 700 : 500,
+                  color: "text.primary",
+                  bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.12),
+                  "&.MuiTableRow-hover:hover": {
+                    bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.18),
+                  },
+                };
+              }
+
+              if (viewMode === "approval") {
+                return {
+                  fontWeight: 700,
+                  color: "text.primary",
+                };
+              }
+
+              return { fontWeight: 500 };
+            }}
           />
         </AppCard>
       </Stack>

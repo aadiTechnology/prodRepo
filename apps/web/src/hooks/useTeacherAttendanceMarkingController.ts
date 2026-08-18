@@ -20,7 +20,10 @@ import { MAX_REMARKS_LENGTH } from "../pages/Attendance/teacher-marking/teacherA
 import {
   formatCurrentTime,
   getTodayIso,
+  getDefaultFromDateIso,
   isFutureDate,
+  listDatesInRange,
+  buildAttendanceListGrid,
   isWeekend,
   isHoliday,
   primaryCalendarStatus,
@@ -39,7 +42,8 @@ export type TeacherMarkDraft = {
 export type AttendanceDetailsFilters = {
   teacherId: string;
   approvalStatus: ApprovalStatus | "";
-  date: string; // YYYY-MM-DD format for specific date filtering
+  fromDate: string;
+  toDate: string;
 };
 
 export type SnackbarState = {
@@ -187,7 +191,8 @@ export function useTeacherAttendanceMarkingController() {
   const [detailsFilters, setDetailsFilters] = useState<AttendanceDetailsFilters>({
     teacherId: "",
     approvalStatus: "",
-    date: today,
+    fromDate: getDefaultFromDateIso(7),
+    toDate: today,
   });
 
   const markableTeachers = useMemo(
@@ -244,18 +249,19 @@ export function useTeacherAttendanceMarkingController() {
   }, [user?.id, isTeacher]);
 
   const refreshRecords = useCallback(
-    async (opts?: { teacherId?: string; month?: Date; date?: string }) => {
+    async (opts?: { teacherId?: string; month?: Date; fromDate?: string; toDate?: string }) => {
       const teacherId = opts?.teacherId ?? (isAdminLike ? undefined : selfTeacherId || markTeacherId);
       const month = opts?.month ?? calendarMonth;
       const { from, to } = monthRange(month);
 
-      // For approval tab / admin overview, load a wider window when no teacher filter.
-      const fromDate = isAdminLike && activeTab === "attendance-details" ? undefined : from;
-      const toDate = isAdminLike && activeTab === "attendance-details" ? undefined : to;
+      const isDetailsTab = isAdminLike && activeTab === "attendance-details";
+      const finalFromDate = isDetailsTab ? opts?.fromDate : from;
+      const finalToDate = isDetailsTab ? opts?.toDate : to;
 
-      // If a specific date is provided (for attendance-details tab), use it for both from_date and to_date
-      const finalFromDate = opts?.date ? opts.date : fromDate;
-      const finalToDate = opts?.date ? opts.date : toDate;
+      if (finalFromDate && finalToDate && finalFromDate > finalToDate) {
+        setRecordsError("From date cannot be after To date.");
+        return;
+      }
 
       setRecordsLoading(true);
       setRecordsError(null);
@@ -290,7 +296,8 @@ export function useTeacherAttendanceMarkingController() {
           : activeTab === "check-in-out"
             ? selfTeacherId
             : detailsFilters.teacherId || undefined,
-      date: activeTab === "attendance-details" ? detailsFilters.date || undefined : undefined,
+      fromDate: activeTab === "attendance-details" ? detailsFilters.fromDate : undefined,
+      toDate: activeTab === "attendance-details" ? detailsFilters.toDate : undefined,
     });
   }, [
     teachersLoading,
@@ -299,7 +306,8 @@ export function useTeacherAttendanceMarkingController() {
     calendarMonth,
     activeTab,
     detailsFilters.teacherId,
-    detailsFilters.date,
+    detailsFilters.fromDate,
+    detailsFilters.toDate,
     isTeacher,
     refreshRecords,
   ]);
@@ -435,16 +443,60 @@ export function useTeacherAttendanceMarkingController() {
     return map;
   }, [records, markTeacherId]);
 
-  const filteredDetailsRecords = useMemo(() => {
+  const detailsRecordsInRange = useMemo(() => {
     let items = [...records];
+    if (detailsFilters.fromDate) {
+      items = items.filter((r) => r.date >= detailsFilters.fromDate);
+    }
+    if (detailsFilters.toDate) {
+      items = items.filter((r) => r.date <= detailsFilters.toDate);
+    }
     if (detailsFilters.teacherId) {
       items = items.filter((r) => r.teacherId === detailsFilters.teacherId);
     }
+    return items;
+  }, [records, detailsFilters.fromDate, detailsFilters.toDate, detailsFilters.teacherId]);
+
+  const attendanceListGridRecords = useMemo(() => {
+    const teachers = detailsFilters.teacherId
+      ? markableTeachers.filter((t) => t.id === detailsFilters.teacherId)
+      : markableTeachers;
+    const dates = listDatesInRange(detailsFilters.fromDate, detailsFilters.toDate);
+    return buildAttendanceListGrid(teachers, dates, detailsRecordsInRange);
+  }, [
+    detailsFilters.teacherId,
+    detailsFilters.fromDate,
+    detailsFilters.toDate,
+    markableTeachers,
+    detailsRecordsInRange,
+  ]);
+
+  const filteredDetailsRecords = useMemo(() => {
+    let items = [...detailsRecordsInRange];
     if (detailsFilters.approvalStatus) {
       items = items.filter((r) => r.approvalStatus === detailsFilters.approvalStatus);
     }
     return items.sort((a, b) => b.date.localeCompare(a.date));
-  }, [records, detailsFilters]);
+  }, [detailsRecordsInRange, detailsFilters.approvalStatus]);
+
+  const pendingApprovalCount = useMemo(() => {
+    let items = records.filter(
+      (r) =>
+        r.isSubmitted &&
+        r.approvalStatus === "Waiting for Approval" &&
+        r.date < today
+    );
+    if (detailsFilters.fromDate) {
+      items = items.filter((r) => r.date >= detailsFilters.fromDate);
+    }
+    if (detailsFilters.toDate) {
+      items = items.filter((r) => r.date <= detailsFilters.toDate);
+    }
+    if (detailsFilters.teacherId) {
+      items = items.filter((r) => r.teacherId === detailsFilters.teacherId);
+    }
+    return items.length;
+  }, [records, detailsFilters.fromDate, detailsFilters.toDate, detailsFilters.teacherId, today]);
 
   const loadMarkDraftForDate = useCallback(
     (date: string, teacherId: string) => {
@@ -767,6 +819,8 @@ export function useTeacherAttendanceMarkingController() {
     detailsFilters,
     updateDetailsFilter,
     filteredDetailsRecords,
+    attendanceListGridRecords,
+    pendingApprovalCount,
     updateApprovalStatus,
     teachersLoading,
     teachersError,

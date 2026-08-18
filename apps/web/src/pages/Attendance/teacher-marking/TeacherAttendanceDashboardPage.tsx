@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Box, Paper, Tab, Tabs, Snackbar, Alert } from "@mui/material";
+import { Badge, Box, Paper, Tab, Tabs, Snackbar, Alert } from "@mui/material";
 
 import { PageHeader, PageLayout } from "../../../components/layout";
 import { useTeacherAttendanceMarkingController } from "../../../hooks/useTeacherAttendanceMarkingController";
@@ -70,7 +70,20 @@ export default function TeacherAttendanceDashboardPage() {
               <Tab
                 key={tab.id}
                 value={tab.id}
-                label={tab.label}
+                label={
+                  tab.id === "attendance-details" && controller.pendingApprovalCount > 0 ? (
+                    <Badge
+                      badgeContent={controller.pendingApprovalCount}
+                      color="warning"
+                      data-testid="badge-attendance-approval-count"
+                      sx={{ "& .MuiBadge-badge": { right: -14, top: 2 } }}
+                    >
+                      {tab.label}
+                    </Badge>
+                  ) : (
+                    tab.label
+                  )
+                }
                 data-testid={tab.testId}
               />
             ))}
