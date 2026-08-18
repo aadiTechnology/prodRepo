@@ -619,6 +619,12 @@ export function useTeacherAttendanceMarkingController() {
       }
     }
     
+    if (!markDraft.checkInTime.trim()) {
+      errors.push("Check-in time is required.");
+    }
+    if (!markDraft.checkOutTime.trim()) {
+      errors.push("Check-out time is required.");
+    }
     if (markDraft.checkInTime && markDraft.checkOutTime) {
       if (parseTimeSafe(markDraft.checkOutTime) < parseTimeSafe(markDraft.checkInTime)) {
         errors.push("Check-out cannot happen before check-in.");

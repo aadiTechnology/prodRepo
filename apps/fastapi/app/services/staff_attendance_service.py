@@ -108,6 +108,37 @@ def _parse_hhmm(value: str | None, *, field: str) -> int | None:
     return hours * 60 + minutes
 
 
+def _validate_attendance_times(check_in: str | None, check_out: str | None) -> None:
+    """Allow in-progress check-in (check-in only); reject empty or check-out without check-in."""
+    if check_out and not check_in:
+        raise ValidationException("Check-in time is required when check-out is provided.")
+    if not check_in and not check_out:
+        raise ValidationException("Check-in and check-out times are required.")
+
+
+def _resolve_approval_status(
+    *,
+    is_submitted: bool,
+    status: str,
+    is_admin: bool,
+    existing,
+) -> str:
+    if not is_submitted:
+        return existing.approval_status if existing else "Waiting for Approval"
+
+    if is_admin:
+        return "Approved"
+
+    # On-time Present attendance is auto-approved; late/other statuses need admin review.
+    if status == "Present":
+        return "Approved"
+
+    if existing and existing.approval_status == "Rejected":
+        return "Waiting for Approval"
+
+    return "Waiting for Approval"
+
+
 def _derive_status(
     check_in_time: str | None,
     explicit: str | None,
@@ -255,6 +286,8 @@ def mark_staff_attendance(
     check_out = (payload.check_out_time or "").strip() or None
     remarks = (payload.remarks or "").strip() or None
 
+    _validate_attendance_times(check_in, check_out)
+
     check_in_min = _parse_hhmm(check_in, field="check_in_time")
     check_out_min = _parse_hhmm(check_out, field="check_out_time")
     if check_in_min is not None and check_out_min is not None and check_out_min < check_in_min:
@@ -271,12 +304,12 @@ def mark_staff_attendance(
 
     status = _derive_status(check_in, payload.status, timing=timing)
     is_submitted = bool(check_in and check_out)
-    approval_status = "Waiting for Approval"
-    if is_admin_like(current_user, db) and is_submitted:
-        # Admin marking on behalf completes the workflow.
-        approval_status = "Approved"
-    elif existing and existing.approval_status == "Rejected":
-        approval_status = "Waiting for Approval"
+    approval_status = _resolve_approval_status(
+        is_submitted=is_submitted,
+        status=status,
+        is_admin=is_admin_like(current_user, db),
+        existing=existing,
+    )
 
     row = repo.upsert_mark(
         db,
