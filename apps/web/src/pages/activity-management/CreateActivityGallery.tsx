@@ -795,41 +795,39 @@ export default function CreateActivityGallery() {
           {label}
         </Typography>
         {!isNativeApp ? (
-          <>
+          <IconButton
+            size="small"
+            color="primary"
+            aria-label="View media"
+            onClick={() => setPreviewMedia(item)}
+            sx={{ p: 0.5 }}
+          >
+            <VisibilityIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        ) : null}
+        {perms.canEdit || perms.canCreate ? (
+          <Tooltip title="Delete">
             <IconButton
               size="small"
-              color="primary"
-              aria-label="View media"
-              onClick={() => setPreviewMedia(item)}
-              sx={{ p: 0.5 }}
+              aria-label="Delete media"
+              onClick={() => void onDeleteMedia(item.id)}
+              disabled={deletingMediaId === item.id}
+              sx={{
+                color: colorTokens.preschool.coral.main,
+                "&:hover": {
+                  bgcolor: alpha(colorTokens.preschool.coral.main, 0.1),
+                  transform: "scale(1.15) rotate(5deg)",
+                },
+                transition: "all 0.2s",
+              }}
             >
-              <VisibilityIcon sx={{ fontSize: 18 }} />
+              <DeleteIcon fontSize="small" />
             </IconButton>
-            {perms.canEdit ? (
-              <Tooltip title="Delete">
-                <IconButton
-                  size="small"
-                  aria-label="Delete media"
-                  onClick={() => void onDeleteMedia(item.id)}
-                  disabled={deletingMediaId === item.id}
-                  sx={{
-                    color: colorTokens.preschool.coral.main,
-                    "&:hover": {
-                      bgcolor: alpha(colorTokens.preschool.coral.main, 0.1),
-                      transform: "scale(1.15) rotate(5deg)",
-                    },
-                    transition: "all 0.2s",
-                  }}
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            ) : null}
-          </>
+          </Tooltip>
         ) : null}
       </Box>
     ),
-    [deletingMediaId, isNativeApp, onDeleteMedia, perms.canEdit],
+    [deletingMediaId, isNativeApp, onDeleteMedia, perms.canCreate, perms.canEdit],
   );
 
   const photoUploadSlot = (
