@@ -82,6 +82,10 @@ const dateFieldSx = {
     "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
     "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
   },
+  "& input[type='date']::-webkit-calendar-picker-indicator": {
+    display: "none",
+    WebkitAppearance: "none",
+  },
 };
 
 export default function AdminAttendanceDetailsTab({
@@ -408,9 +412,10 @@ useEffect(() => {
                     <InputAdornment position="end">
                       <IconButton
                         onClick={openDatePicker}
+                        onMouseDown={(event) => event.preventDefault()}
                         aria-label="Open from date calendar"
                         size="small"
-                        sx={{ p: 0, color: colorTokens.text.secondary }}
+                        sx={{ p: 0.25, color: colorTokens.text.secondary }}
                       >
                         <CalendarTodayIcon fontSize="small" />
                       </IconButton>
@@ -434,9 +439,10 @@ useEffect(() => {
                     <InputAdornment position="end">
                       <IconButton
                         onClick={openDatePicker}
+                        onMouseDown={(event) => event.preventDefault()}
                         aria-label="Open to date calendar"
                         size="small"
-                        sx={{ p: 0, color: colorTokens.text.secondary }}
+                        sx={{ p: 0.25, color: colorTokens.text.secondary }}
                       >
                         <CalendarTodayIcon fontSize="small" />
                       </IconButton>
