@@ -8,11 +8,16 @@ import {
   type ReactNode,
 } from "react";
 import supportService from "../../../api/services/supportService";
-import type { ProductUpdateItem, ReleaseNoteShowTo } from "../support.types";
+import {
+  getSupportApiErrorMessage,
+  type ProductUpdateItem,
+  type ReleaseNoteShowTo,
+} from "../support.types";
 
 type ProductUpdateContextValue = {
   productUpdates: ProductUpdateItem[];
   releaseNotesLoading: boolean;
+  releaseNotesError: string | null;
   refreshReleaseNotes: () => Promise<void>;
   createReleaseNote: (payload: {
     version: string;
@@ -51,12 +56,16 @@ function upsertReleaseNote(
 export function ProductUpdateProvider({ children }: { children: ReactNode }) {
   const [productUpdates, setProductUpdates] = useState<ProductUpdateItem[]>([]);
   const [releaseNotesLoading, setReleaseNotesLoading] = useState(true);
+  const [releaseNotesError, setReleaseNotesError] = useState<string | null>(null);
 
   const refreshReleaseNotes = useCallback(async () => {
     setReleaseNotesLoading(true);
+    setReleaseNotesError(null);
     try {
       const items = await supportService.listReleaseNotes({ page: 0, size: 100 });
       setProductUpdates(items);
+    } catch (error) {
+      setReleaseNotesError(getSupportApiErrorMessage(error, "Failed to load release notes."));
     } finally {
       setReleaseNotesLoading(false);
     }
@@ -133,6 +142,7 @@ export function ProductUpdateProvider({ children }: { children: ReactNode }) {
     () => ({
       productUpdates,
       releaseNotesLoading,
+      releaseNotesError,
       refreshReleaseNotes,
       createReleaseNote,
       updateReleaseNote,
@@ -144,6 +154,7 @@ export function ProductUpdateProvider({ children }: { children: ReactNode }) {
     [
       productUpdates,
       releaseNotesLoading,
+      releaseNotesError,
       refreshReleaseNotes,
       createReleaseNote,
       updateReleaseNote,

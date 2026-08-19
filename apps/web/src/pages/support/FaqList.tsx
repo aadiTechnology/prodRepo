@@ -16,7 +16,7 @@ import { CancelButton, SaveButton } from "../../components/semantic";
 import { colorTokens } from "../../tokens/colors";
 import { useSupportPermissions } from "../../hooks/useSupportPermissions";
 import { useFaqData } from "./context/FaqDataContext";
-import type { SupportCategory } from "./support.types";
+import { SUPPORT_SUCCESS_SNACKBAR_OPTIONS, type SupportCategory } from "./support.types";
 
 type CategoryDialogMode = "add" | "edit";
 
@@ -105,7 +105,7 @@ export default function FaqList() {
 
     enqueueSnackbar(
       dialogMode === "add" ? "Category added successfully." : "Category updated successfully.",
-      { variant: "success" }
+      SUPPORT_SUCCESS_SNACKBAR_OPTIONS
     );
     closeDialog();
   };
@@ -113,7 +113,7 @@ export default function FaqList() {
   const confirmDelete = () => {
     if (!deleteTarget) return;
     deleteSupportCategory(deleteTarget.id);
-    enqueueSnackbar("Category deleted successfully.", { variant: "success" });
+    enqueueSnackbar("Category deleted successfully.", SUPPORT_SUCCESS_SNACKBAR_OPTIONS);
     setDeleteTarget(null);
   };
 
@@ -204,6 +204,7 @@ export default function FaqList() {
             data={paginatedCategories}
             loading={false}
             emptyMessage="No categories configured."
+            emptyTestId="empty-support-categories"
             getRowKey={(row) => row.id}
             stickyHeader
             size="small"

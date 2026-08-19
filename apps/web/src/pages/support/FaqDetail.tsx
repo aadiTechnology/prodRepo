@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Alert,
@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -40,9 +41,12 @@ import { useFaqData } from "./context/FaqDataContext";
 import { useSupportPermissions } from "../../hooks/useSupportPermissions";
 import {
   SUPPORT_QUERY_STATUSES,
+  SUPPORT_SUCCESS_SNACKBAR_OPTIONS,
   canForwardQueryToSuperAdmin,
   canViewSupportQuery,
+  getSupportApiErrorMessage,
   getSupportQueryAttachmentKind,
+  isSupportNotFoundError,
   notifySupportUnreadChanged,
   openSupportQueryAttachment,
   type SupportQueryStatus,
@@ -92,11 +96,17 @@ export default function FaqDetail() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const perms = useSupportPermissions();
-  const { getQueryById, fetchQueryById, appendQueryMessage, forwardQueryToSuperAdmin } =
+  const { getQueryById, fetchQueryById, appendQueryMessage, forwardQueryToSuperAdmin, queriesLoading } =
     useFaqData();
   const [reply, setReply] = useState("");
   const [statusDraft, setStatusDraft] = useState<SupportQueryStatus | "">("");
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const requestedIdRef = useRef<string | null>(null);
+  const [detailStatus, setDetailStatus] = useState<"loading" | "ready" | "error" | "missing">(
+    id ? "loading" : "missing"
+  );
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<{ url: string; fileName: string } | null>(
     null
   );
@@ -104,9 +114,46 @@ export default function FaqDetail() {
   const query = useMemo(() => (id ? getQueryById(id) : undefined), [getQueryById, id]);
 
   useEffect(() => {
-    if (!id || query) return;
-    void fetchQueryById(id).catch(() => undefined);
-  }, [fetchQueryById, id, query]);
+    requestedIdRef.current = null;
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) {
+      setDetailStatus("missing");
+      return;
+    }
+    if (query) {
+      setDetailStatus("ready");
+      setDetailError(null);
+      return;
+    }
+    if (queriesLoading) {
+      setDetailStatus("loading");
+      return;
+    }
+    if (requestedIdRef.current === id) return;
+    requestedIdRef.current = id;
+    let cancelled = false;
+    setDetailStatus("loading");
+    setDetailError(null);
+    void fetchQueryById(id)
+      .then(() => {
+        if (!cancelled) setDetailStatus("ready");
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        if (isSupportNotFoundError(error)) {
+          setDetailStatus("missing");
+          setDetailError(null);
+          return;
+        }
+        setDetailStatus("error");
+        setDetailError(getSupportApiErrorMessage(error, "Failed to load query."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchQueryById, id, query, queriesLoading]);
 
   useEffect(() => {
     if (!id || !query || !canViewSupportQuery(query, perms.actorRole)) return;
@@ -123,6 +170,27 @@ export default function FaqDetail() {
     return (
       <Box sx={{ p: 3 }} data-testid="page-query-detail-denied">
         <Alert severity="warning">Access Denied</Alert>
+      </Box>
+    );
+  }
+
+  if (detailStatus === "loading" || (id && !query && detailStatus !== "error" && detailStatus !== "missing")) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", p: 4 }} data-testid="loading-query-detail">
+        <CircularProgress sx={(t) => ({ color: t.palette.primary.main })} />
+      </Box>
+    );
+  }
+
+  if (detailStatus === "error" && !query) {
+    return (
+      <Box sx={{ p: 3 }} data-testid="error-query-detail">
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {detailError ?? "Failed to load query."}
+        </Alert>
+        <Button variant="outlined" onClick={() => navigate("/support/contact")}>
+          Back to My Queries
+        </Button>
       </Box>
     );
   }
@@ -157,14 +225,16 @@ export default function FaqDetail() {
   const activeStatus = statusDraft || query.status;
 
   const handleForward = async () => {
-    if (submitting) return;
+    if (submittingRef.current || submitting) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       await forwardQueryToSuperAdmin(query.id);
-      enqueueSnackbar("Query forwarded to Super Admin.", { variant: "success" });
+      enqueueSnackbar("Query forwarded to Super Admin.", SUPPORT_SUCCESS_SNACKBAR_OPTIONS);
     } catch {
       enqueueSnackbar("Failed to forward query.", { variant: "error" });
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -176,20 +246,22 @@ export default function FaqDetail() {
       enqueueSnackbar("Enter a response before submitting.", { variant: "warning" });
       return;
     }
-    if (submitting) return;
+    if (submittingRef.current || submitting) return;
 
     const nextStatus =
       statusDraft && statusDraft !== query.status ? statusDraft : undefined;
 
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       await appendQueryMessage(query.id, body, nextStatus);
       setReply("");
       setStatusDraft("");
-      enqueueSnackbar("Response added.", { variant: "success" });
+      enqueueSnackbar("Response added.", SUPPORT_SUCCESS_SNACKBAR_OPTIONS);
     } catch {
       enqueueSnackbar("Failed to add response.", { variant: "error" });
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -215,6 +287,7 @@ export default function FaqDetail() {
                 color="warning"
                 startIcon={<ForwardIcon />}
                 onClick={handleForward}
+                disabled={submitting}
                 data-testid="btn-forward-query-super-admin"
                 sx={{ textTransform: "none", fontWeight: 700 }}
               >
@@ -262,7 +335,12 @@ export default function FaqDetail() {
                   />
                 ) : null}
               </Stack>
-              <Typography variant="caption" color="text.secondary">
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                data-testid="query-detail-created-at"
+                data-datetime={query.createdAt}
+              >
                 {formatDateTime(query.createdAt)}
               </Typography>
             </Stack>
@@ -407,7 +485,12 @@ export default function FaqDetail() {
                     <Typography variant="subtitle2" fontWeight={700}>
                       {message.author}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      data-testid={`query-message-created-at-${message.id}`}
+                      data-datetime={message.createdAt}
+                    >
                       {formatDateTime(message.createdAt)}
                     </Typography>
                   </Stack>
@@ -504,25 +587,28 @@ export default function FaqDetail() {
                     }}
                   />
                   <Tooltip title="Send">
-                    <IconButton
-                      type="submit"
-                      size="small"
-                      aria-label="Send"
-                      data-testid="btn-submit-query-response"
-                      sx={{
-                        color: "#fff",
-                        bgcolor: colorTokens.primary.main,
-                        width: 36,
-                        height: 36,
-                        border: `1.5px solid ${colorTokens.primary.main}`,
-                        "&:hover": {
-                          bgcolor: colorTokens.primary.dark,
-                          transform: "translateY(-1px)",
-                        },
-                      }}
-                    >
-                      <SendIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
+                    <span>
+                      <IconButton
+                        type="submit"
+                        size="small"
+                        aria-label="Send"
+                        disabled={submitting}
+                        data-testid="btn-submit-query-response"
+                        sx={{
+                          color: "#fff",
+                          bgcolor: colorTokens.primary.main,
+                          width: 36,
+                          height: 36,
+                          border: `1.5px solid ${colorTokens.primary.main}`,
+                          "&:hover": {
+                            bgcolor: colorTokens.primary.dark,
+                            transform: "translateY(-1px)",
+                          },
+                        }}
+                      >
+                        <SendIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </span>
                   </Tooltip>
                 </Stack>
               </Stack>

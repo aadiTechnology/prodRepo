@@ -16,11 +16,14 @@ import type {
   SupportQueryStatus,
 } from "../support.types";
 import {
+  getSupportApiErrorMessage,
   loadSupportCategoriesFromStorage,
   nextSupportCategoryId,
   normalizeSupportCategoryName,
   notifySupportUnreadChanged,
   saveSupportCategoriesToStorage,
+  SUPPORT_ALL_FILTER_VALUE,
+  type SupportFilterOption,
 } from "../support.types";
 
 type FaqDataContextValue = {
@@ -29,6 +32,7 @@ type FaqDataContextValue = {
   deleteFaq: (id: string) => void;
   queries: SupportQueryItem[];
   queriesLoading: boolean;
+  queriesError: string | null;
   refreshQueries: () => Promise<void>;
   createQuery: (payload: {
     category: string;
@@ -57,7 +61,7 @@ type FaqDataContextValue = {
   categories: SupportCategory[];
   activeCategories: SupportCategory[];
   activeCategoryNames: string[];
-  categoryFilterOptions: { label: string; value: string }[];
+  categoryFilterOptions: SupportFilterOption[];
   addSupportCategory: (name: string) => { ok: true } | { ok: false; error: string };
   updateSupportCategory: (
     id: string,
@@ -93,6 +97,7 @@ export function FaqDataProvider({ children }: { children: ReactNode }) {
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
   const [queries, setQueries] = useState<SupportQueryItem[]>([]);
   const [queriesLoading, setQueriesLoading] = useState(true);
+  const [queriesError, setQueriesError] = useState<string | null>(null);
   const [categories, setCategories] = useState<SupportCategory[]>(() =>
     loadSupportCategoriesFromStorage()
   );
@@ -115,12 +120,17 @@ export function FaqDataProvider({ children }: { children: ReactNode }) {
     [activeCategories]
   );
 
-  const categoryFilterOptions = useMemo(
+  const categoryFilterOptions = useMemo<SupportFilterOption[]>(
     () => [
-      { label: "All Categories", value: "" },
+      {
+        label: "All Categories",
+        value: SUPPORT_ALL_FILTER_VALUE,
+        testId: "support-query-category-filter-option-all",
+      },
       ...activeCategories.map((category) => ({
         label: category.name,
         value: category.name,
+        testId: `support-query-category-filter-option-${category.id}`,
       })),
     ],
     [activeCategories]
@@ -185,9 +195,12 @@ export function FaqDataProvider({ children }: { children: ReactNode }) {
 
   const refreshQueries = useCallback(async () => {
     setQueriesLoading(true);
+    setQueriesError(null);
     try {
       const items = await supportService.listQueries({ page: 0, size: 100 });
       setQueries(items);
+    } catch (error) {
+      setQueriesError(getSupportApiErrorMessage(error, "Failed to load queries."));
     } finally {
       setQueriesLoading(false);
     }
@@ -275,6 +288,7 @@ export function FaqDataProvider({ children }: { children: ReactNode }) {
       deleteFaq,
       queries,
       queriesLoading,
+      queriesError,
       refreshQueries,
       createQuery,
       updateQuery,
@@ -298,6 +312,7 @@ export function FaqDataProvider({ children }: { children: ReactNode }) {
       deleteFaq,
       queries,
       queriesLoading,
+      queriesError,
       refreshQueries,
       createQuery,
       updateQuery,

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Alert, Box, Chip, IconButton, Stack, Tooltip, Typography, alpha } from "@mui/material";
+import { Alert, Box, Chip, CircularProgress, IconButton, Stack, Tooltip, Typography, alpha } from "@mui/material";
 import { Add as AddIcon, Download as DownloadIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useSnackbar } from "notistack";
@@ -11,7 +11,7 @@ import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import { colorTokens } from "../../tokens/colors";
 import { useSupportPermissions } from "../../hooks/useSupportPermissions";
 import type { ProductUpdateItem } from "./support.types";
-import { canViewReleaseNoteForRole } from "./support.types";
+import { canViewReleaseNoteForRole, SUPPORT_SUCCESS_SNACKBAR_OPTIONS } from "./support.types";
 import {
   downloadReleaseAttachment,
   useProductUpdates,
@@ -23,7 +23,7 @@ export default function ProductUpdates() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const perms = useSupportPermissions();
-  const { productUpdates, deleteReleaseNote } = useProductUpdates();
+  const { productUpdates, deleteReleaseNote, releaseNotesLoading, releaseNotesError } = useProductUpdates();
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ProductUpdateItem | null>(null);
 
@@ -51,7 +51,7 @@ export default function ProductUpdates() {
     if (!deleteTarget) return;
     try {
       await deleteReleaseNote(deleteTarget.id);
-      enqueueSnackbar(`Release note v${deleteTarget.version} deleted.`, { variant: "success" });
+      enqueueSnackbar(`Release note v${deleteTarget.version} deleted.`, SUPPORT_SUCCESS_SNACKBAR_OPTIONS);
       setDeleteTarget(null);
     } catch {
       enqueueSnackbar("Failed to delete release note.", { variant: "error" });
@@ -93,8 +93,19 @@ export default function ProductUpdates() {
     >
       <Box data-testid="page-release-notes">
         <Stack spacing={2}>
-          {filteredNotes.length === 0 ? (
-            <AppCard>
+          {releaseNotesLoading ? (
+            <Box
+              sx={{ display: "flex", justifyContent: "center", p: 4 }}
+              data-testid="loading-release-notes"
+            >
+              <CircularProgress sx={(t) => ({ color: t.palette.primary.main })} />
+            </Box>
+          ) : releaseNotesError ? (
+            <Alert severity="error" data-testid="error-release-notes">
+              {releaseNotesError}
+            </Alert>
+          ) : filteredNotes.length === 0 ? (
+            <AppCard data-testid="empty-release-notes">
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 No release notes found
               </Typography>

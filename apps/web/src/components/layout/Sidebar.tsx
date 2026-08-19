@@ -229,6 +229,18 @@ function isSupportMenuEntry(label: string, path?: string): boolean {
   const normalizedPath = (path ?? "").trim().toLowerCase();
   return normalizedLabel === "support" || normalizedPath.startsWith("/support");
 }
+function supportNavTestId(label: string): string | undefined {
+  switch (label.trim().toLowerCase()) {
+    case "support":
+      return "nav-support";
+    case "my queries":
+      return "nav-my-queries";
+    case "release notes":
+      return "nav-release-notes";
+    default:
+      return undefined;
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Icon Mapping
@@ -688,6 +700,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                 <Tooltip title={collapsed ? item.label : ""} placement="right">
                   <NavItem
                     collapsed={collapsed}
+                    data-testid={supportNavTestId(item.label)}
                     onClick={() => {
                       const route = normalizeMenuPath(item.path);
                       if (route) {
@@ -769,6 +782,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                         return (
                           <SubNavItem
                             key={child.id}
+                            data-testid={supportNavTestId(child.label)}
                             onClick={() => {
                               const route = normalizeMenuPath(child.path);
                               if (route) handleMenuNavigate(route);

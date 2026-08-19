@@ -4,10 +4,12 @@ import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogContent,
   DialogTitle,
   FormControl,
+  FormHelperText,
   IconButton,
   InputLabel,
   MenuItem,
@@ -34,7 +36,10 @@ import { useSupportPermissions } from "../../hooks/useSupportPermissions";
 import { useFaqData } from "./context/FaqDataContext";
 import {
   SUPPORT_QUERY_INVALID_FILE_MESSAGE,
+  SUPPORT_SUCCESS_SNACKBAR_OPTIONS,
+  getSupportApiErrorMessage,
   getSupportQueryAttachmentKind,
+  isSupportNotFoundError,
   isSupportQueryAttachmentAllowed,
   isSupportQueryOwner,
   openSupportQueryAttachment,
@@ -81,9 +86,16 @@ export default function AddFaq() {
     fetchQueryById,
     uploadQueryAttachment,
     activeCategoryNames,
+    queriesLoading,
   } = useFaqData();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const savingRef = useRef(false);
+  const requestedIdRef = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editStatus, setEditStatus] = useState<"loading" | "ready" | "error" | "missing">(
+    isEditMode ? "loading" : "ready"
+  );
+  const [editError, setEditError] = useState<string | null>(null);
 
   const existing = useMemo(
     () => (id ? getQueryById(id) : undefined),
@@ -91,9 +103,46 @@ export default function AddFaq() {
   );
 
   useEffect(() => {
-    if (!isEditMode || !id || existing) return;
-    void fetchQueryById(id).catch(() => undefined);
-  }, [existing, fetchQueryById, id, isEditMode]);
+    requestedIdRef.current = null;
+  }, [id]);
+
+  useEffect(() => {
+    if (!isEditMode || !id) {
+      setEditStatus("ready");
+      return;
+    }
+    if (existing) {
+      setEditStatus("ready");
+      setEditError(null);
+      return;
+    }
+    if (queriesLoading) {
+      setEditStatus("loading");
+      return;
+    }
+    if (requestedIdRef.current === id) return;
+    requestedIdRef.current = id;
+    let cancelled = false;
+    setEditStatus("loading");
+    setEditError(null);
+    void fetchQueryById(id)
+      .then(() => {
+        if (!cancelled) setEditStatus("ready");
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        if (isSupportNotFoundError(error)) {
+          setEditStatus("missing");
+          setEditError(null);
+          return;
+        }
+        setEditStatus("error");
+        setEditError(getSupportApiErrorMessage(error, "Failed to load query."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [existing, fetchQueryById, id, isEditMode, queriesLoading]);
 
   const [values, setValues] = useState<SupportQueryFormData>(EMPTY_FORM);
   const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
@@ -144,8 +193,9 @@ export default function AddFaq() {
 
   const saveQuery = async () => {
     setAttempted(true);
-    if (Object.keys(errors).length > 0 || !perms.actorRole || saving) return;
+    if (Object.keys(errors).length > 0 || !perms.actorRole || saving || savingRef.current) return;
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const attachmentFile = attachment?.file;
@@ -159,7 +209,7 @@ export default function AddFaq() {
         if (attachmentFile) {
           await uploadQueryAttachment(existing.id, attachmentFile);
         }
-        enqueueSnackbar(`Query ${existing.id} updated successfully.`, { variant: "success" });
+        enqueueSnackbar(`Query ${existing.id} updated successfully.`, SUPPORT_SUCCESS_SNACKBAR_OPTIONS);
         navigate("/support/contact");
         return;
       }
@@ -172,11 +222,12 @@ export default function AddFaq() {
       if (attachmentFile) {
         await uploadQueryAttachment(created.id, attachmentFile);
       }
-      enqueueSnackbar(`Query ${created.id} created successfully.`, { variant: "success" });
+      enqueueSnackbar(`Query ${created.id} created successfully.`, SUPPORT_SUCCESS_SNACKBAR_OPTIONS);
       navigate("/support/contact");
     } catch {
       enqueueSnackbar("Failed to save query. Please try again.", { variant: "error" });
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -194,11 +245,32 @@ export default function AddFaq() {
     );
   }
 
+  if (isEditMode && (editStatus === "loading" || (!existing && editStatus !== "error" && editStatus !== "missing"))) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", p: 4 }} data-testid="loading-edit-query">
+        <CircularProgress sx={(t) => ({ color: t.palette.primary.main })} />
+      </Box>
+    );
+  }
+
   if (isEditMode && existing && !isSupportQueryOwner(existing, perms.actorRole)) {
     return (
       <Box sx={{ p: 3 }} data-testid="page-edit-query-forbidden">
         <Alert severity="warning" sx={{ mb: 2 }}>
           Access Denied. You can only edit your own queries.
+        </Alert>
+        <Button variant="outlined" onClick={goBack}>
+          Back to My Queries
+        </Button>
+      </Box>
+    );
+  }
+
+  if (isEditMode && editStatus === "error" && !existing) {
+    return (
+      <Box sx={{ p: 3 }} data-testid="error-edit-query">
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {editError ?? "Failed to load query."}
         </Alert>
         <Button variant="outlined" onClick={goBack}>
           Back to My Queries
@@ -284,6 +356,7 @@ export default function AddFaq() {
                 variant="save"
                 tooltipTitle="Save"
                 onClick={saveQuery}
+                loading={saving}
                 data-testid="btn-header-save-query"
               />
             </Box>
@@ -321,6 +394,9 @@ export default function AddFaq() {
                   </MenuItem>
                 ))}
               </Select>
+              {attempted && errors.category ? (
+                <FormHelperText data-testid="error-query-category">{errors.category}</FormHelperText>
+              ) : null}
             </FormControl>
           </Grid>
 
@@ -438,6 +514,7 @@ export default function AddFaq() {
                         <IconButton
                           size="small"
                           aria-label="Open attachment"
+                          data-testid="btn-open-query-attachment"
                           onClick={() =>
                             openSupportQueryAttachment(
                               attachment.fileName,
@@ -495,7 +572,7 @@ export default function AddFaq() {
           <CancelButton type="button" onClick={goBack} data-testid="btn-cancel-create-query">
             Cancel
           </CancelButton>
-          <SaveButton type="submit" data-testid="btn-submit-create-query">
+          <SaveButton type="submit" loading={saving} data-testid="btn-submit-create-query">
             Save
           </SaveButton>
         </Box>

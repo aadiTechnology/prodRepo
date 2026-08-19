@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   Checkbox,
+  CircularProgress,
   FormControlLabel,
   IconButton,
   Stack,
@@ -35,7 +36,12 @@ import type {
   ReleaseNoteFileType,
   ReleaseNoteShowTo,
 } from "./support.types";
-import { EMPTY_RELEASE_NOTE_SHOW_TO } from "./support.types";
+import {
+  EMPTY_RELEASE_NOTE_SHOW_TO,
+  SUPPORT_SUCCESS_SNACKBAR_OPTIONS,
+  getSupportApiErrorMessage,
+  isSupportNotFoundError,
+} from "./support.types";
 
 const EMPTY_FORM: ProductUpdateFormData = {
   version: "",
@@ -93,18 +99,62 @@ export default function AddProductUpdate() {
     getProductUpdateById,
     fetchReleaseNoteById,
     uploadReleaseNoteAttachment,
+    releaseNotesLoading,
   } = useProductUpdates();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const savingRef = useRef(false);
+  const requestedIdRef = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editStatus, setEditStatus] = useState<"loading" | "ready" | "error" | "missing">(
+    isEditMode ? "loading" : "ready"
+  );
+  const [editError, setEditError] = useState<string | null>(null);
   const existing = useMemo(
     () => (id ? getProductUpdateById(id) : undefined),
     [getProductUpdateById, id]
   );
 
   useEffect(() => {
-    if (!isEditMode || !id || existing) return;
-    void fetchReleaseNoteById(id).catch(() => undefined);
-  }, [existing, fetchReleaseNoteById, id, isEditMode]);
+    requestedIdRef.current = null;
+  }, [id]);
+
+  useEffect(() => {
+    if (!isEditMode || !id) {
+      setEditStatus("ready");
+      return;
+    }
+    if (existing) {
+      setEditStatus("ready");
+      setEditError(null);
+      return;
+    }
+    if (releaseNotesLoading) {
+      setEditStatus("loading");
+      return;
+    }
+    if (requestedIdRef.current === id) return;
+    requestedIdRef.current = id;
+    let cancelled = false;
+    setEditStatus("loading");
+    setEditError(null);
+    void fetchReleaseNoteById(id)
+      .then(() => {
+        if (!cancelled) setEditStatus("ready");
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        if (isSupportNotFoundError(error)) {
+          setEditStatus("missing");
+          setEditError(null);
+          return;
+        }
+        setEditStatus("error");
+        setEditError(getSupportApiErrorMessage(error, "Failed to load release note."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [existing, fetchReleaseNoteById, id, isEditMode, releaseNotesLoading]);
 
   const [values, setValues] = useState<ProductUpdateFormData>(EMPTY_FORM);
   const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
@@ -154,8 +204,9 @@ export default function AddProductUpdate() {
     } else {
       setShowToError(null);
     }
-    if (Object.keys(errors).length > 0 || !hasShowTo || saving) return;
+    if (Object.keys(errors).length > 0 || !hasShowTo || saving || savingRef.current) return;
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const version = values.version.trim();
@@ -171,7 +222,7 @@ export default function AddProductUpdate() {
         if (attachmentFile) {
           await uploadReleaseNoteAttachment(existing.id, attachmentFile);
         }
-        enqueueSnackbar(`Release note ${version} updated.`, { variant: "success" });
+        enqueueSnackbar(`Release note ${version} updated.`, SUPPORT_SUCCESS_SNACKBAR_OPTIONS);
       } else {
         const created = await createReleaseNote({
           version,
@@ -182,12 +233,13 @@ export default function AddProductUpdate() {
         if (attachmentFile) {
           await uploadReleaseNoteAttachment(created.id, attachmentFile);
         }
-        enqueueSnackbar(`Release note ${version} created.`, { variant: "success" });
+        enqueueSnackbar(`Release note ${version} created.`, SUPPORT_SUCCESS_SNACKBAR_OPTIONS);
       }
       goBack();
     } catch {
       enqueueSnackbar("Failed to save release note.", { variant: "error" });
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -201,6 +253,27 @@ export default function AddProductUpdate() {
     return (
       <Box sx={{ p: 3 }} data-testid="page-add-release-note-denied">
         <Alert severity="warning">Access Denied</Alert>
+      </Box>
+    );
+  }
+
+  if (isEditMode && (editStatus === "loading" || (!existing && editStatus !== "error" && editStatus !== "missing"))) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", p: 4 }} data-testid="loading-edit-release-note">
+        <CircularProgress sx={(t) => ({ color: t.palette.primary.main })} />
+      </Box>
+    );
+  }
+
+  if (isEditMode && editStatus === "error" && !existing) {
+    return (
+      <Box sx={{ p: 3 }} data-testid="error-edit-release-note">
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {editError ?? "Failed to load release note."}
+        </Alert>
+        <Button variant="outlined" onClick={goBack}>
+          Back to Release Notes
+        </Button>
       </Box>
     );
   }
@@ -284,6 +357,7 @@ export default function AddProductUpdate() {
                 variant="save"
                 tooltipTitle="Save"
                 onClick={saveReleaseNote}
+                loading={saving}
                 data-testid="btn-header-save-release-note"
               />
             </Box>
@@ -373,7 +447,12 @@ export default function AddProductUpdate() {
               ))}
             </Stack>
             {attempted && showToError ? (
-              <Typography variant="caption" color="error.main" sx={{ mt: 0.5, display: "block" }}>
+              <Typography
+                variant="caption"
+                color="error.main"
+                sx={{ mt: 0.5, display: "block" }}
+                data-testid="error-release-show-to"
+              >
                 {showToError}
               </Typography>
             ) : null}
@@ -499,7 +578,7 @@ export default function AddProductUpdate() {
           >
             Cancel
           </CancelButton>
-          <SaveButton type="submit" data-testid="btn-submit-add-release-note">
+          <SaveButton type="submit" loading={saving} data-testid="btn-submit-add-release-note">
             Save
           </SaveButton>
         </Box>

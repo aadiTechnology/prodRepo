@@ -1,4 +1,5 @@
 import { apiBaseUrl } from "../../config";
+import type { HTMLAttributes } from "react";
 
 export type SupportStatus = "Not Started" | "In Progress" | "Done" | "TBD";
 
@@ -374,4 +375,36 @@ export const SUPPORT_UNREAD_CHANGED_EVENT = "support-unread-changed";
 export function notifySupportUnreadChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(SUPPORT_UNREAD_CHANGED_EVENT));
+}
+
+/** Unique Select value for "All" filter options (placeholder already uses ""). */
+export const SUPPORT_ALL_FILTER_VALUE = "__all__";
+
+export type SupportFilterOption = {
+  label: string;
+  value: string;
+  testId?: string;
+};
+
+export const SUPPORT_SUCCESS_SNACKBAR_OPTIONS: {
+  variant: "success";
+  SnackbarProps: HTMLAttributes<HTMLDivElement>;
+} = {
+  variant: "success",
+  SnackbarProps: {
+    "data-testid": "snackbar-support-success",
+  } as unknown as HTMLAttributes<HTMLDivElement>,
+};
+
+export function getSupportApiErrorMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
+
+export function isSupportNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  return (error as { response?: { status?: number } }).response?.status === 404;
 }

@@ -15,7 +15,7 @@ export interface ToolbarFilter {
   value: string;
   onChange: (value: string) => void;
   label: string;
-  options: { label: string; value: string }[];
+  options: { label: string; value: string; testId?: string }[];
   disabled?: boolean;
   /** Stable test hook for Playwright (e.g. filter-syllabus-month). */
   testId?: string;
@@ -100,7 +100,7 @@ export default function ListPageToolbar({
                 </Typography>
               </MenuItem>
               {filter.options.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
+                <MenuItem key={`${filter.label}-${opt.value}`} value={opt.value} data-testid={opt.testId}>
                   {opt.label}
                 </MenuItem>
               ))}

@@ -85,6 +85,7 @@ export default function TablePaginationBar({
             disabled={page <= 0}
             onClick={() => onPageChange(page - 1)}
             aria-label="Previous page"
+            data-testid="btn-pagination-previous"
             sx={(theme) => ({
               border: 1,
               borderColor: theme.palette.divider,
@@ -101,6 +102,7 @@ export default function TablePaginationBar({
             disabled={page >= lastPage}
             onClick={() => onPageChange(page + 1)}
             aria-label="Next page"
+            data-testid="btn-pagination-next"
             sx={(theme) => ({
               border: 1,
               borderColor: theme.palette.divider,

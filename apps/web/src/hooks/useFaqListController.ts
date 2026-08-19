@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import type { SupportQueryItem, SupportQueryStatus } from "../pages/support/support.types";
 import {
+  SUPPORT_ALL_FILTER_VALUE,
   SUPPORT_QUERY_STATUSES,
   canViewSupportQuery,
 } from "../pages/support/support.types";
@@ -10,8 +11,12 @@ import { useSupportPermissions } from "./useSupportPermissions";
 
 const MIN_SUGGESTION_CHARS = 3;
 
+function statusFilterOptionTestId(status: SupportQueryStatus): string {
+  return `support-query-status-filter-option-${status.toLowerCase().replace(/\s+/g, "-")}`;
+}
+
 export function useFaqListController() {
-  const { queries, categoryFilterOptions } = useFaqData();
+  const { queries, queriesLoading, queriesError, categoryFilterOptions } = useFaqData();
   const perms = useSupportPermissions();
 
   const [search, setSearch] = useState("");
@@ -67,8 +72,16 @@ export function useFaqListController() {
 
   const statusOptions = useMemo(
     () => [
-      { label: "All Statuses", value: "" },
-      ...SUPPORT_QUERY_STATUSES.map((s: SupportQueryStatus) => ({ label: s, value: s })),
+      {
+        label: "All Statuses",
+        value: SUPPORT_ALL_FILTER_VALUE,
+        testId: "support-query-status-filter-option-all",
+      },
+      ...SUPPORT_QUERY_STATUSES.map((s: SupportQueryStatus) => ({
+        label: s,
+        value: s,
+        testId: statusFilterOptionTestId(s),
+      })),
     ],
     []
   );
@@ -81,12 +94,12 @@ export function useFaqListController() {
     },
     categoryFilter,
     setCategoryFilter: (value: string) => {
-      setCategoryFilter(value);
+      setCategoryFilter(value === SUPPORT_ALL_FILTER_VALUE ? "" : value);
       setPage(0);
     },
     statusFilter,
     setStatusFilter: (value: string) => {
-      setStatusFilter(value);
+      setStatusFilter(value === SUPPORT_ALL_FILTER_VALUE ? "" : value);
       setPage(0);
     },
     page,
@@ -101,6 +114,8 @@ export function useFaqListController() {
     categoryOptions,
     statusOptions,
     ownQueryCount: visibleQueries.length,
+    queriesLoading,
+    queriesError,
     perms,
   };
 }
