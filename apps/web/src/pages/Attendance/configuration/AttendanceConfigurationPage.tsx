@@ -1,10 +1,14 @@
 import { useMemo } from "react";
 import {
   Box,
+  FormControl,
+  InputLabel,
   List,
   ListItemButton,
   ListItemText,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Typography,
 } from "@mui/material";
@@ -16,7 +20,6 @@ import { useAttendanceConfigurationController } from "../../../hooks/useAttendan
 import { useConfigHubNavigation } from "../../../hooks/useConfigHubNavigation";
 import type { AttendanceConfigSectionId } from "./attendanceConfiguration.types";
 import AttendanceStatusSection from "./components/AttendanceStatusSection";
-import GeneralConfigurationSection from "./components/GeneralConfigurationSection";
 import GraceTimeSection from "./components/GraceTimeSection";
 import NotificationSettingsSection from "./components/NotificationSettingsSection";
 import OfficeTimingSection from "./components/OfficeTimingSection";
@@ -25,7 +28,6 @@ import ShiftConfigurationSection from "./components/ShiftConfigurationSection";
 import WorkingDaysSection from "./components/WorkingDaysSection";
 
 const SECTION_NAV: { id: AttendanceConfigSectionId; label: string; testId: string }[] = [
-  { id: "general", label: "General Configuration", testId: "nav-general" },
   { id: "working-days", label: "Working Days", testId: "nav-working-days" },
   { id: "public-holidays", label: "Public Holidays", testId: "nav-public-holidays" },
   // { id: "shifts", label: "Shift Configuration", testId: "nav-shifts" },
@@ -51,8 +53,6 @@ export default function AttendanceConfigurationPage() {
 
   const activeContent = useMemo(() => {
     switch (controller.activeSection) {
-      case "general":
-        return <GeneralConfigurationSection controller={controller} />;
       case "working-days":
         return <WorkingDaysSection controller={controller} />;
       case "public-holidays":
@@ -93,6 +93,26 @@ export default function AttendanceConfigurationPage() {
             }}
             data-testid="attendance-config-nav"
           >
+            <FormControl fullWidth size="small" sx={{ mb: 1.5, px: 0.5 }}>
+              <InputLabel id="label-attendance-config-academic-year">Academic Year</InputLabel>
+              <Select
+                labelId="label-attendance-config-academic-year"
+                label="Academic Year"
+                value={controller.state.general.academicYearId}
+                onChange={(e) => controller.setAcademicYear(e.target.value)}
+                inputProps={{ "data-testid": "select-academic-year" }}
+              >
+                {controller.academicYears.map((year) => (
+                  <MenuItem
+                    key={year.id}
+                    value={year.id}
+                    data-testid={`option-academic-year-${year.id}`}
+                  >
+                    {year.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <List disablePadding>
               {SECTION_NAV.map((section) => {
                 const isActive = controller.activeSection === section.id;

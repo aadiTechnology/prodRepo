@@ -116,7 +116,7 @@ export function useAttendanceConfigurationController() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<AttendanceConfigSectionId>("general");
+  const [activeSection, setActiveSection] = useState<AttendanceConfigSectionId>("working-days");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [editTarget, setEditTarget] = useState<EditTarget>(null);
 

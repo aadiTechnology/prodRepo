@@ -153,8 +153,8 @@ export default function AdminAttendanceDetailsTab({
     return `${String(displayHour).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
   };
 
-  /** Check-in/out visible only after admin approval (hidden while pending). */
-  const displayApprovedTimeOnly = (row: TeacherAttendanceRecord, time: string | null): string => {
+  /** List view: times visible only after admin approval. */
+  const displayListTime = (row: TeacherAttendanceRecord, time: string | null): string => {
     if (row.approvalStatus !== "Approved") return "—";
     return formatTimeDisplay(time);
   };
@@ -223,14 +223,14 @@ export default function AdminAttendanceDetailsTab({
       label: "CHECK IN",
       width: "25%",
       render: (row: TeacherAttendanceRecord) =>
-        renderTextCell(displayApprovedTimeOnly(row, row.checkInTime)),
+        renderTextCell(displayListTime(row, row.checkInTime)),
     },
     {
       id: "checkOut",
       label: "CHECK OUT",
       width: "25%",
       render: (row: TeacherAttendanceRecord) =>
-        renderTextCell(displayApprovedTimeOnly(row, row.checkOutTime)),
+        renderTextCell(displayListTime(row, row.checkOutTime)),
     },
   ];
 
@@ -252,14 +252,14 @@ export default function AdminAttendanceDetailsTab({
       label: "CHECK IN",
       width: "15%",
       render: (row: TeacherAttendanceRecord) =>
-        renderTextCell(displayApprovedTimeOnly(row, row.checkInTime)),
+        renderTextCell(formatTimeDisplay(row.checkInTime)),
     },
     {
       id: "checkOut",
       label: "CHECK OUT",
       width: "15%",
       render: (row: TeacherAttendanceRecord) =>
-        renderTextCell(displayApprovedTimeOnly(row, row.checkOutTime)),
+        renderTextCell(formatTimeDisplay(row.checkOutTime)),
     },
     {
       id: "remarks",
