@@ -180,7 +180,6 @@ export function useTeacherAttendanceMarkingController() {
     resolveDefaultAttendanceTab(isAdminLike)
   );
   const [checkInOutErrors, setCheckInOutErrors] = useState<string[]>([]);
-  const [checkInOutSuccess, setCheckInOutSuccess] = useState<string | null>(null);
   const [markDate, setMarkDate] = useState(today);
   const [markTeacherId, setMarkTeacherId] = useState("");
   const [markDraft, setMarkDraft] = useState<TeacherMarkDraft>(emptyMarkDraft);
@@ -402,11 +401,7 @@ export function useTeacherAttendanceMarkingController() {
   }, [records, selfTeacherId, today]);
 
   const displayCheckInTime = todayRecord.checkInTime ?? currentTime;
-  const displayCheckOutTime = todayRecord.checkOutTime
-    ? todayRecord.checkOutTime
-    : todayRecord.checkInTime
-      ? currentTime
-      : "—";
+  const displayCheckOutTime = todayRecord.checkOutTime ?? "—";
 
   const showCheckInButton = !!selfTeacherId && !todayRecord.checkInTime;
   const showCheckOutButton =
@@ -557,7 +552,6 @@ export function useTeacherAttendanceMarkingController() {
 
     setSaving(true);
     setCheckInOutErrors([]);
-    setCheckInOutSuccess(null);
     try {
       await persistMark({
         teacherId: selfTeacherId,
@@ -567,7 +561,6 @@ export function useTeacherAttendanceMarkingController() {
         remarks: todayRecord.remarks || "",
         status: autoStatus,
       });
-      setCheckInOutSuccess(CHECK_IN_SUCCESS_MESSAGE);
       setSnackbar({
         open: true,
         message: CHECK_IN_SUCCESS_MESSAGE,
@@ -600,7 +593,6 @@ export function useTeacherAttendanceMarkingController() {
 
     setSaving(true);
     setCheckInOutErrors([]);
-    setCheckInOutSuccess(null);
     try {
       await persistMark({
         teacherId: selfTeacherId,
@@ -610,7 +602,6 @@ export function useTeacherAttendanceMarkingController() {
         remarks: todayRecord.remarks || "",
         status: todayRecord.statuses[0],
       });
-      setCheckInOutSuccess(CHECK_OUT_SUCCESS_MESSAGE);
       setSnackbar({
         open: true,
         message: CHECK_OUT_SUCCESS_MESSAGE,
@@ -804,7 +795,6 @@ export function useTeacherAttendanceMarkingController() {
     showCheckOutButton,
     buttonsDisabled,
     checkInOutErrors,
-    checkInOutSuccess,
     handleCheckIn,
     handleCheckOut,
     markDate,
