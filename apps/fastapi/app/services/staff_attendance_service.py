@@ -122,6 +122,7 @@ def _resolve_approval_status(
     status: str,
     is_admin: bool,
     existing,
+    attendance_date: date,
 ) -> str:
     if not is_submitted:
         return existing.approval_status if existing else "Waiting for Approval"
@@ -129,14 +130,14 @@ def _resolve_approval_status(
     if is_admin:
         return "Approved"
 
-    # On-time Present attendance is auto-approved; late/other statuses need admin review.
-    if status == "Present":
-        return "Approved"
+    today = date.today()
 
-    if existing and existing.approval_status == "Rejected":
+    # Past-date marks always need admin approval (including Mark Attendance back-dates).
+    if attendance_date < today:
         return "Waiting for Approval"
 
-    return "Waiting for Approval"
+    # Today: completed check-in/out is auto-approved (excluded from approval queue).
+    return "Approved"
 
 
 def _derive_status(
@@ -265,22 +266,13 @@ def mark_staff_attendance(
         teacher_id=payload.teacher_id,
         attendance_date=payload.attendance_date,
     )
-    if (
-        existing
-        and existing.is_submitted
-        and existing.approval_status in ("Waiting for Approval", "Approved")
-        and not is_admin_like(current_user, db)
-    ):
-        raise ValidationException("Attendance is locked and waiting for approval")
+    if existing and existing.is_submitted and not is_admin_like(current_user, db):
+        if existing.approval_status == "Waiting for Approval":
+            raise ValidationException("Attendance is locked and waiting for approval")
+        if existing.approval_status == "Approved":
+            raise ValidationException("Approved attendance cannot be edited")
 
     # Admins may update even while waiting/approved (correction path).
-    if (
-        existing
-        and existing.is_submitted
-        and existing.approval_status == "Approved"
-        and not is_admin_like(current_user, db)
-    ):
-        raise ValidationException("Approved attendance cannot be edited")
 
     check_in = (payload.check_in_time or "").strip() or None
     check_out = (payload.check_out_time or "").strip() or None
@@ -309,6 +301,7 @@ def mark_staff_attendance(
         status=status,
         is_admin=is_admin_like(current_user, db),
         existing=existing,
+        attendance_date=payload.attendance_date,
     )
 
     row = repo.upsert_mark(

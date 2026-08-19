@@ -20,7 +20,6 @@ import { MAX_REMARKS_LENGTH } from "../pages/Attendance/teacher-marking/teacherA
 import {
   formatCurrentTime,
   getTodayIso,
-  getDefaultFromDateIso,
   isFutureDate,
   listDatesInRange,
   buildAttendanceListGrid,
@@ -191,7 +190,7 @@ export function useTeacherAttendanceMarkingController() {
   const [detailsFilters, setDetailsFilters] = useState<AttendanceDetailsFilters>({
     teacherId: "",
     approvalStatus: "",
-    fromDate: getDefaultFromDateIso(7),
+    fromDate: today,
     toDate: today,
   });
 
