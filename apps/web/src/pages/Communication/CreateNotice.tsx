@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Autocomplete, Button, TextField, Typography, Box, FormHeaderIconAction } from "../../components/primitives";
+import {
+  Autocomplete,
+  Button,
+  TextField,
+  Typography,
+  Box,
+  FormHeaderIconAction,
+  IconButton,
+  Tooltip,
+} from "../../components/primitives";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { useNoticePermissions } from "../../hooks/useNoticePermissions";
 import { useTeacherStudentListScope } from "../../hooks/useTeacherStudentListScope";
 import { useAuth } from "../../context/AuthContext";
@@ -600,6 +610,9 @@ export default function CreateNotice() {
       setPendingFile(null);
       setSavedAttachment(null);
       setAttachmentCleared(true);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       return;
     }
     if (!ALLOWED_FILE_TYPES.includes(file.type.toLowerCase()) || file.size > MAX_ATTACHMENT_SIZE) {
@@ -677,9 +690,17 @@ export default function CreateNotice() {
           {attachmentDisplayName ? (
             <>
               <Typography variant="body2">{attachmentDisplayName}</Typography>
-              <Button variant="text" color="error" onClick={() => onAttachmentSelect(undefined)}>
-                Remove
-              </Button>
+              <Tooltip title="Delete attachment">
+                <IconButton
+                  size="small"
+                  color="error"
+                  aria-label="Delete attachment"
+                  onClick={() => onAttachmentSelect(undefined)}
+                  disabled={loading}
+                >
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
             </>
           ) : null}
         </Box>
