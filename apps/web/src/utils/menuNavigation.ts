@@ -50,6 +50,24 @@ export function isAiAssistantPermissionPath(path: string | null | undefined): bo
   return AI_ASSISTANT_MENU_PATHS.has(normalized);
 }
 
+export const STAFF_ATTENDANCE_MENU_PATH = "/attendance/teacher-marking";
+export const STAFF_ATTENDANCE_MENU_LABEL = "Staff Attendance";
+
+/** Display label for sidebar / RBAC menu entries (path and legacy name overrides). */
+export function resolveSidebarMenuLabel(
+  path: string | null | undefined,
+  name: string
+): string {
+  const normalized = normalizeMenuPath(path);
+  if (normalized === STAFF_ATTENDANCE_MENU_PATH) {
+    return STAFF_ATTENDANCE_MENU_LABEL;
+  }
+  if (name === "Teacher Attendance") {
+    return STAFF_ATTENDANCE_MENU_LABEL;
+  }
+  return name;
+}
+
 /** True when the user has sidebar access to this route (exact or child path). */
 export function hasGrantedMenuAccess(pathname: string, grantedMenuPaths: Set<string>): boolean {
   if (grantedMenuPaths.has(pathname)) return true;

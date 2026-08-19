@@ -8,8 +8,12 @@ import {
 import LoginIcon from "@mui/icons-material/Login";
 import LogoutIcon from "@mui/icons-material/Logout";
 
-import { colorTokens } from "../../../../tokens/colors";
+import {
+  CHECK_IN_SUCCESS_MESSAGE,
+  CHECK_OUT_SUCCESS_MESSAGE,
+} from "../teacherAttendanceMarking.types";
 import type { TeacherAttendanceMarkingController } from "../../../../hooks/useTeacherAttendanceMarkingController";
+import { colorTokens } from "../../../../tokens/colors";
 
 interface TeacherCheckInOutTabProps {
   controller: TeacherAttendanceMarkingController;
@@ -23,6 +27,7 @@ export default function TeacherCheckInOutTab({ controller }: TeacherCheckInOutTa
     showCheckOutButton,
     buttonsDisabled,
     checkInOutErrors,
+    checkInOutSuccess,
     handleCheckIn,
     handleCheckOut,
     selfTeacherId,
@@ -96,6 +101,22 @@ export default function TeacherCheckInOutTab({ controller }: TeacherCheckInOutTa
             </Button>
           ) : null}
         </Stack>
+
+        {checkInOutSuccess ? (
+          <Alert
+            severity="success"
+            sx={{ width: "100%", maxWidth: 480 }}
+            data-testid={
+              checkInOutSuccess === CHECK_IN_SUCCESS_MESSAGE
+                ? "alert-check-in-success"
+                : checkInOutSuccess === CHECK_OUT_SUCCESS_MESSAGE
+                  ? "alert-check-out-success"
+                  : "alert-check-in-out-success"
+            }
+          >
+            {checkInOutSuccess}
+          </Alert>
+        ) : null}
 
         {checkInOutErrors.length > 0 ? (
           <Stack spacing={0.5} data-testid="check-in-out-errors" sx={{ width: "100%", maxWidth: 480 }}>

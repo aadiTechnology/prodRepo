@@ -69,7 +69,7 @@ export default function AttendanceMarkingSection({ controller }: AttendanceMarki
       description={
         isTeacher
           ? "Mark your attendance for the selected date"
-          : "Mark or edit teacher attendance on behalf of staff"
+          : "Mark or edit staff attendance on behalf of staff"
       }
       data-testid="section-attendance-marking"
     >

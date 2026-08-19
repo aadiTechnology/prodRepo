@@ -35,7 +35,13 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
 import { colorTokens } from "../../tokens/colors";
-import { normalizeMenuPath, hasMenuChildren, isSidebarHiddenModule } from "../../utils/menuNavigation";
+import {
+  normalizeMenuPath,
+  hasMenuChildren,
+  isSidebarHiddenModule,
+  resolveSidebarMenuLabel,
+  STAFF_ATTENDANCE_MENU_LABEL,
+} from "../../utils/menuNavigation";
 import { toRoleLabel } from "../../utils/formatters";
 import { toMediaUrl } from "../../utils/mediaUrl";
 import { useHomeworkSidebarCount } from "../../hooks/useHomeworkSidebarCount";
@@ -287,7 +293,7 @@ const SYSTEM_ADMIN_MENU: MenuItemData[] = [
     color: colorTokens.menuColors.academics,
     children: [
       { id: "mark-attendance", label: "Mark Attendance", path: "/attendance/mark" },
-      { id: "teacher-attendance-marking", label: "Teacher Attendance", path: "/attendance/teacher-marking" }
+      { id: "teacher-attendance-marking", label: STAFF_ATTENDANCE_MENU_LABEL, path: "/attendance/teacher-marking" }
 
     ]
   },
@@ -404,7 +410,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
 
       return {
         id: node.id.toString(),
-        label: node.name,
+        label: resolveSidebarMenuLabel(node.path, node.name),
         icon: icon,
         path: normalizeMenuPath(node.path) ?? undefined,
         color: color,
@@ -416,7 +422,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
               })
               .map((child) => ({
                 id: child.id.toString(),
-                label: child.name,
+                label: resolveSidebarMenuLabel(child.path, child.name),
                 path: normalizeMenuPath(child.path) ?? "",
               }))
           : undefined,

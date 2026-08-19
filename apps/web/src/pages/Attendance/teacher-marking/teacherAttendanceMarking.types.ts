@@ -105,3 +105,9 @@ export const REMARKS_REQUIRED_STATUSES: TeacherAttendanceStatus[] = [
 ];
 
 export const MAX_REMARKS_LENGTH = 50;
+
+/** User-facing page title (admin view). */
+export const STAFF_ATTENDANCE_PAGE_TITLE = "Staff Attendance";
+
+export const CHECK_IN_SUCCESS_MESSAGE = "Check-in recorded successfully!";
+export const CHECK_OUT_SUCCESS_MESSAGE = "Check-out recorded successfully!";

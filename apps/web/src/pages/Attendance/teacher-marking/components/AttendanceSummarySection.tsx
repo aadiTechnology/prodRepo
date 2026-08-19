@@ -65,7 +65,7 @@ export default function AttendanceSummarySection({ controller }: AttendanceSumma
     <TeacherSectionCard
       id="attendance-summary"
       title="Attendance Summary"
-      description="Today's teacher attendance overview"
+      description="Today's staff attendance overview"
       data-testid="section-attendance-summary"
     >
       <Stack spacing={2}>

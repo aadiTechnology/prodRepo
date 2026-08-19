@@ -16,7 +16,11 @@ import type {
   TeacherAttendanceStatus,
   TeacherProfile,
 } from "../pages/Attendance/teacher-marking/teacherAttendanceMarking.types";
-import { MAX_REMARKS_LENGTH } from "../pages/Attendance/teacher-marking/teacherAttendanceMarking.types";
+import {
+  MAX_REMARKS_LENGTH,
+  CHECK_IN_SUCCESS_MESSAGE,
+  CHECK_OUT_SUCCESS_MESSAGE,
+} from "../pages/Attendance/teacher-marking/teacherAttendanceMarking.types";
 import {
   formatCurrentTime,
   getTodayIso,
@@ -176,6 +180,7 @@ export function useTeacherAttendanceMarkingController() {
     resolveDefaultAttendanceTab(isAdminLike)
   );
   const [checkInOutErrors, setCheckInOutErrors] = useState<string[]>([]);
+  const [checkInOutSuccess, setCheckInOutSuccess] = useState<string | null>(null);
   const [markDate, setMarkDate] = useState(today);
   const [markTeacherId, setMarkTeacherId] = useState("");
   const [markDraft, setMarkDraft] = useState<TeacherMarkDraft>(emptyMarkDraft);
@@ -552,6 +557,7 @@ export function useTeacherAttendanceMarkingController() {
 
     setSaving(true);
     setCheckInOutErrors([]);
+    setCheckInOutSuccess(null);
     try {
       await persistMark({
         teacherId: selfTeacherId,
@@ -561,9 +567,10 @@ export function useTeacherAttendanceMarkingController() {
         remarks: todayRecord.remarks || "",
         status: autoStatus,
       });
+      setCheckInOutSuccess(CHECK_IN_SUCCESS_MESSAGE);
       setSnackbar({
         open: true,
-        message: "Check-in recorded successfully!",
+        message: CHECK_IN_SUCCESS_MESSAGE,
         severity: "success",
       });
     } catch (err: unknown) {
@@ -593,6 +600,7 @@ export function useTeacherAttendanceMarkingController() {
 
     setSaving(true);
     setCheckInOutErrors([]);
+    setCheckInOutSuccess(null);
     try {
       await persistMark({
         teacherId: selfTeacherId,
@@ -602,9 +610,10 @@ export function useTeacherAttendanceMarkingController() {
         remarks: todayRecord.remarks || "",
         status: todayRecord.statuses[0],
       });
+      setCheckInOutSuccess(CHECK_OUT_SUCCESS_MESSAGE);
       setSnackbar({
         open: true,
-        message: "Check-out recorded successfully!",
+        message: CHECK_OUT_SUCCESS_MESSAGE,
         severity: "success",
       });
     } catch (err: unknown) {
@@ -795,6 +804,7 @@ export function useTeacherAttendanceMarkingController() {
     showCheckOutButton,
     buttonsDisabled,
     checkInOutErrors,
+    checkInOutSuccess,
     handleCheckIn,
     handleCheckOut,
     markDate,

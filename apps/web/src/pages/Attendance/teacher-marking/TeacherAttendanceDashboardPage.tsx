@@ -4,6 +4,7 @@ import { Badge, Box, Paper, Tab, Tabs, Snackbar, Alert } from "@mui/material";
 import { PageHeader, PageLayout } from "../../../components/layout";
 import { useTeacherAttendanceMarkingController } from "../../../hooks/useTeacherAttendanceMarkingController";
 import type { TeacherAttendanceTab } from "../../../hooks/useTeacherAttendanceMarkingController";
+import { STAFF_ATTENDANCE_PAGE_TITLE, CHECK_IN_SUCCESS_MESSAGE, CHECK_OUT_SUCCESS_MESSAGE } from "./teacherAttendanceMarking.types";
 import AdminAttendanceDetailsTab from "./components/AdminAttendanceDetailsTab";
 import TeacherCheckInOutTab from "./components/TeacherCheckInOutTab";
 import TeacherMarkAttendanceTab from "./components/TeacherMarkAttendanceTab";
@@ -36,7 +37,7 @@ export default function TeacherAttendanceDashboardPage() {
         <PageHeader
           links={[
             {
-              title: controller.isAdminLike ? "Teacher Attendance" : "My Attendance",
+              title: controller.isAdminLike ? STAFF_ATTENDANCE_PAGE_TITLE : "My Attendance",
               path: "/attendance/teacher-marking",
             },
           ]}
@@ -113,7 +114,13 @@ export default function TeacherAttendanceDashboardPage() {
           severity={controller.snackbar.severity}
           variant="filled"
           sx={{ width: "100%", borderRadius: "16px" }}
-          data-testid="teacher-attendance-snackbar"
+          data-testid={
+            controller.snackbar.message === CHECK_IN_SUCCESS_MESSAGE
+              ? "snackbar-check-in-success"
+              : controller.snackbar.message === CHECK_OUT_SUCCESS_MESSAGE
+                ? "snackbar-check-out-success"
+                : "teacher-attendance-snackbar"
+          }
         >
           {controller.snackbar.message}
         </Alert>
