@@ -48,7 +48,6 @@ export interface UseMarkAttendanceControllerResult {
   fetchStudents: () => Promise<void>;
   updateStudentStatus: (studentId: number, status: string) => void;
   updateStudentRemarks: (studentId: number, remarks: string) => void;
-  markAllPresent: () => void;
   saveAttendance: () => Promise<void>;
   resetFilters: () => void;
   filteredClasses: SchoolClass[];
@@ -608,10 +607,6 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     setStudents((prev) => prev.map((s) => (s.student_id === studentId ? { ...s, remarks } : s)));
   };
 
-  const markAllPresent = () => {
-    setStudents((prev) => prev.map((s) => ({ ...s, status: "Present" })));
-  };
-
   const saveAttendance = async () => {
     if (!students.length) return;
     if (!filters.class_id) {
@@ -750,7 +745,6 @@ export function useMarkAttendanceController(): UseMarkAttendanceControllerResult
     fetchStudents,
     updateStudentStatus,
     updateStudentRemarks,
-    markAllPresent,
     saveAttendance,
     resetFilters,
     filteredClasses,

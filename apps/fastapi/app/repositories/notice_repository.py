@@ -81,6 +81,12 @@ def _build_target_scope_exists_clauses(
     return scope_clauses
 
 
+NOTICE_HAS_NO_TARGETS_SQL = """NOT EXISTS (
+  SELECT 1 FROM communication_notice_targets t
+  WHERE t.notice_id = n.id AND t.is_deleted = 0
+)"""
+
+
 def _apply_consumer_visibility(
     where_sql: list[str],
     params: dict,
@@ -97,22 +103,25 @@ def _apply_consumer_visibility(
         where_sql.append("(n.expiry_date IS NULL OR n.expiry_date >= :viewer_now)")
 
     if viewer_context.kind == "teacher":
-        visibility_parts = ["n.audience_type = 'TEACHER'"]
+        visibility_parts = [
+            "n.audience_type = 'TEACHER'",
+            f"(n.audience_type = 'ALL' AND {NOTICE_HAS_NO_TARGETS_SQL})",
+        ]
         scopes = viewer_context.scopes
         if scopes:
             scope_clauses = _build_target_scope_exists_clauses(scopes, params, param_prefix="tc")
-            visibility_parts.append(
-                f"(n.audience_type = 'STUDENT' AND ({' OR '.join(scope_clauses)}))"
-            )
+            matched = " OR ".join(scope_clauses)
+            visibility_parts.append(f"(n.audience_type = 'STUDENT' AND ({matched}))")
+            visibility_parts.append(f"(n.audience_type = 'ALL' AND ({matched}))")
         where_sql.append(f"({' OR '.join(visibility_parts)})")
     elif viewer_context.kind in ("student", "parent"):
-        where_sql.append("n.audience_type IN ('STUDENT', 'ALL')")
+        visibility_parts = [f"(n.audience_type = 'ALL' AND {NOTICE_HAS_NO_TARGETS_SQL})"]
         scopes = viewer_context.scopes
-        if not scopes:
-            where_sql.append("1 = 0")
-            return
-        scope_clauses = _build_target_scope_exists_clauses(scopes, params, param_prefix="vc")
-        where_sql.append(f"({' OR '.join(scope_clauses)})")
+        if scopes:
+            scope_clauses = _build_target_scope_exists_clauses(scopes, params, param_prefix="vc")
+            matched = " OR ".join(scope_clauses)
+            visibility_parts.append(f"(n.audience_type IN ('STUDENT', 'ALL') AND ({matched}))")
+        where_sql.append(f"({' OR '.join(visibility_parts)})")
 
 
 def list_recent_published_notices(

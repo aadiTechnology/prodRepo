@@ -18,7 +18,6 @@ import {
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
-  DoneAll as DoneAllIcon,
 } from "@mui/icons-material";
 
 import { PageHeader, PageLayout } from "../../components/layout";
@@ -161,7 +160,6 @@ const MarkAttendance = () => {
     setSnackbar,
     updateStudentStatus,
     updateStudentRemarks,
-    markAllPresent,
     saveAttendance,
     resetFilters,
     filteredClasses,
@@ -175,8 +173,6 @@ const MarkAttendance = () => {
     dateLockInfo,
     handleAttendanceDateChange,
   } = controller;
-
-  const allRowsPresent = students.length > 0 && students.every((s) => s.status === "Present");
 
   const paginatedStudents = students.slice(
     page * rowsPerPage,
@@ -308,12 +304,6 @@ const MarkAttendance = () => {
           onClick={resetFilters}
           icon={<RefreshIcon sx={{ fontSize: 22 }} />}
           label="Clear filters and roster"
-        />
-        <HeaderGradientIconButton
-          onClick={markAllPresent}
-          icon={<DoneAllIcon sx={{ fontSize: 22 }} />}
-          label={allRowsPresent ? "All marked present" : "Mark All Present"}
-          disabled={allRowsPresent || students.length === 0}
         />
         <FormHeaderIconAction
           variant="save"

@@ -119,7 +119,7 @@ export default function ConfirmDialog({
             fontWeight: 700,
             color: theme.palette.text.primary,
             lineHeight: 1.25,
-            mb: 0.25,
+            mb: children && !message && !messageNode ? 1.5 : 0.25,
           })}
         >
           {title}
@@ -147,7 +147,17 @@ export default function ConfirmDialog({
         {warningContent && (
            <Box sx={{ px: 4, mb: 2 }}>{warningContent}</Box>
         )}
-        {children ? <Box sx={{ mt: 1.5, mb: 2 }}>{children}</Box> : null}
+        {children ? (
+          <Box
+            sx={{
+              mt: message || messageNode ? 1.5 : 2,
+              mb: 2,
+              pt: 0.75,
+            }}
+          >
+            {children}
+          </Box>
+        ) : null}
         <Divider sx={{ my: 0.5 }} />
         <Box
           sx={{

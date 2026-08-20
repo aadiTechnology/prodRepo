@@ -3,8 +3,8 @@ Role-wise Notice unread counts (sidebar Communication badge).
 
 Rules:
   - Tenant admin : all published unread notices in tenant
-  - Teacher      : TEACHER audience + STUDENT notices for class-teacher class/div
-  - Student/parent: STUDENT/ALL notices targeted to their assigned class only
+  - Teacher      : TEACHER + ALL + STUDENT notices for class-teacher class/div
+  - Student/parent: ALL (school-wide or their class) + STUDENT notices for their class
 
 Usage (from apps/fastapi):
     python scripts/check_notice_role_counts.py
@@ -82,8 +82,8 @@ def _scope_summary(db, *, tenant_id: int, user_id: int, ctx) -> str:
         )
         if pairs:
             pair_txt = ", ".join(f"class={c}/div={d}" for c, d in sorted(pairs))
-            return f"TEACHER audience + STUDENT for [{pair_txt}]"
-        return "TEACHER audience only (no class-teacher assignment)"
+            return f"TEACHER + ALL + STUDENT for [{pair_txt}]"
+        return "TEACHER + unscoped ALL (no class-teacher assignment)"
     if not ctx.scopes:
         return "NO class scopes (count should be 0)"
     parts = [
@@ -105,8 +105,8 @@ def main() -> int:
         _print(f"NOTICE ROLE COUNTS  tenant={args.tenant_id}")
         _print("=" * 72)
         _print(
-            "Rules: admin=all | teacher=TEACHER+class-teacher STUDENT | "
-            "student=own class"
+            "Rules: admin=all | teacher=TEACHER+ALL+class-teacher STUDENT | "
+            "student=ALL + own class STUDENT"
         )
         _print("")
 
