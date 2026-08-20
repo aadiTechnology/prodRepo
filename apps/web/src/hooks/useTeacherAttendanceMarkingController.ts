@@ -24,6 +24,7 @@ import {
 import {
   formatCurrentTime,
   getTodayIso,
+  getCurrentMonthStartIso,
   isFutureDate,
   listDatesInRange,
   buildAttendanceListGrid,
@@ -149,6 +150,7 @@ export function useTeacherAttendanceMarkingController() {
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [recordsError, setRecordsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
 
   // Holidays state for calendar
   const [holidays, setHolidays] = useState<Record<string, string>>({});
@@ -193,7 +195,7 @@ export function useTeacherAttendanceMarkingController() {
   const [currentTime, setCurrentTime] = useState(formatCurrentTime);
   const [detailsFilters, setDetailsFilters] = useState<AttendanceDetailsFilters>({
     teacherId: "",
-    approvalStatus: "",
+    approvalStatus: "Waiting for Approval",
     fromDate: today,
     toDate: today,
   });
@@ -258,12 +260,11 @@ export function useTeacherAttendanceMarkingController() {
       const { from, to } = monthRange(month);
 
       const isDetailsTab = isAdminLike && activeTab === "attendance-details";
-      const finalFromDate = isDetailsTab ? opts?.fromDate : from;
-      const finalToDate = isDetailsTab ? opts?.toDate : to;
+      let finalFromDate = isDetailsTab ? opts?.fromDate : from;
+      let finalToDate = isDetailsTab ? opts?.toDate : to;
 
       if (finalFromDate && finalToDate && finalFromDate > finalToDate) {
-        setRecordsError("From date cannot be after To date.");
-        return;
+        finalFromDate = finalToDate;
       }
 
       setRecordsLoading(true);
@@ -478,24 +479,33 @@ export function useTeacherAttendanceMarkingController() {
     return items.sort((a, b) => b.date.localeCompare(a.date));
   }, [detailsRecordsInRange, detailsFilters.approvalStatus]);
 
-  const pendingApprovalCount = useMemo(() => {
-    let items = records.filter(
-      (r) =>
-        r.isSubmitted &&
-        r.approvalStatus === "Waiting for Approval" &&
-        r.date < today
-    );
-    if (detailsFilters.fromDate) {
-      items = items.filter((r) => r.date >= detailsFilters.fromDate);
+  const refreshPendingCount = useCallback(async () => {
+    if (!isAdminLike) {
+      setPendingApprovalCount(0);
+      return;
     }
-    if (detailsFilters.toDate) {
-      items = items.filter((r) => r.date <= detailsFilters.toDate);
+    try {
+      const res = await staffAttendanceService.list({
+        from_date: getCurrentMonthStartIso(),
+        to_date: today,
+      });
+      const count = (res.items || []).filter((row) => {
+        const date = String(row.attendance_date).slice(0, 10);
+        return (
+          !!row.is_submitted &&
+          row.approval_status === "Waiting for Approval" &&
+          date < today
+        );
+      }).length;
+      setPendingApprovalCount(count);
+    } catch {
+      // Keep the last known badge count if the count request fails.
     }
-    if (detailsFilters.teacherId) {
-      items = items.filter((r) => r.teacherId === detailsFilters.teacherId);
-    }
-    return items.length;
-  }, [records, detailsFilters.fromDate, detailsFilters.toDate, detailsFilters.teacherId, today]);
+  }, [isAdminLike, today]);
+
+  useEffect(() => {
+    void refreshPendingCount();
+  }, [refreshPendingCount]);
 
   const loadMarkDraftForDate = useCallback(
     (date: string, teacherId: string) => {
@@ -533,9 +543,10 @@ export function useTeacherAttendanceMarkingController() {
       });
       const mapped = mapApiRecord(saved);
       setRecords((prev) => upsertRecord(prev, mapped));
+      void refreshPendingCount();
       return mapped;
     },
-    []
+    [refreshPendingCount]
   );
 
   const handleCheckIn = useCallback(async () => {
@@ -770,6 +781,7 @@ export function useTeacherAttendanceMarkingController() {
           rejection_reason: rejectionReason || null,
         });
         setRecords((prev) => upsertRecord(prev, mapApiRecord(saved)));
+        void refreshPendingCount();
       } catch (err: unknown) {
         const message =
           err && typeof err === "object" && "message" in err
@@ -780,7 +792,7 @@ export function useTeacherAttendanceMarkingController() {
         setSaving(false);
       }
     },
-    []
+    [refreshPendingCount]
   );
 
   return {

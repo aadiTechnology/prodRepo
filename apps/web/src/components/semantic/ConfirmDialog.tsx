@@ -31,6 +31,10 @@ export interface ConfirmDialogProps {
   cancelLabel?: string;
   /** Disable buttons and show loading state on confirm. */
   loading?: boolean;
+  /** Disable confirm without blocking cancel (e.g. empty required input). */
+  confirmDisabled?: boolean;
+  /** Optional content below the message (e.g. a reason field). */
+  children?: React.ReactNode;
   /** Stable test hook for the dialog root. */
   "data-testid"?: string;
 }
@@ -46,6 +50,8 @@ export default function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   loading = false,
+  confirmDisabled = false,
+  children,
   "data-testid": dataTestId,
 }: ConfirmDialogProps) {
   return (
@@ -141,6 +147,7 @@ export default function ConfirmDialog({
         {warningContent && (
            <Box sx={{ px: 4, mb: 2 }}>{warningContent}</Box>
         )}
+        {children ? <Box sx={{ mt: 1.5, mb: 2 }}>{children}</Box> : null}
         <Divider sx={{ my: 0.5 }} />
         <Box
           sx={{
@@ -155,9 +162,9 @@ export default function ConfirmDialog({
             {cancelLabel}
           </CancelButton>
           <Button
-            autoFocus
+            autoFocus={!children}
             onClick={onConfirm}
-            disabled={loading}
+            disabled={loading || confirmDisabled}
             data-testid="btn-confirm"
             sx={(theme) => ({
             color: theme.palette.success.main,

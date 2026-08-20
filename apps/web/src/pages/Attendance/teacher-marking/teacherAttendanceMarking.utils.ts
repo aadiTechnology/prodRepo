@@ -9,6 +9,12 @@ export function getTodayIso(): string {
   return toIsoDate(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+/** First day of the current month (YYYY-MM-DD). */
+export function getCurrentMonthStartIso(): string {
+  const d = new Date();
+  return toIsoDate(d.getFullYear(), d.getMonth(), 1);
+}
+
 /** Default report-style range start (e.g. last 7 days through today). */
 export function getDefaultFromDateIso(daysBack = 7): string {
   const d = new Date();

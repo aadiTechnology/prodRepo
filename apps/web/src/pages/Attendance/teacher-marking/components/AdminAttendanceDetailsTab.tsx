@@ -2,9 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Badge,
-  Dialog,
-  DialogActions,
-  DialogContent,
   IconButton,
   InputAdornment,
   MenuItem,
@@ -29,8 +26,9 @@ import { colorTokens } from "../../../../tokens/colors";
 import type { TeacherAttendanceMarkingController } from "../../../../hooks/useTeacherAttendanceMarkingController";
 import type { ApprovalStatus, TeacherAttendanceRecord } from "../teacherAttendanceMarking.types";
 import { APPROVAL_STATUS_OPTIONS } from "../teacherAttendanceMarking.types";
-import { SaveButton, CancelButton } from "../../../../components/semantic";
+import ConfirmDialog from "../../../../components/semantic/ConfirmDialog";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../../../utils/listPagination";
+import { getCurrentMonthStartIso } from "../teacherAttendanceMarking.utils";
 
 interface AdminAttendanceDetailsTabProps {
   controller: TeacherAttendanceMarkingController;
@@ -157,9 +155,9 @@ export default function AdminAttendanceDetailsTab({
     return `${String(displayHour).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
   };
 
-  /** List view: times visible only after admin approval. */
+  /** List view shows times only after approval. Waiting/rejected stay on the approval list. */
   const displayListTime = (row: TeacherAttendanceRecord, time: string | null): string => {
-    if (row.approvalStatus !== "Approved") return "—";
+    if (row.isSubmitted && row.approvalStatus !== "Approved") return "—";
     return formatTimeDisplay(time);
   };
 
@@ -177,19 +175,15 @@ export default function AdminAttendanceDetailsTab({
 
   const isRowSelected = (row: TeacherAttendanceRecord) => selectedRows.has(row.id);
 
-  const isPendingApproval = (row: TeacherAttendanceRecord) =>
-    row.isSubmitted && row.approvalStatus === "Waiting for Approval";
-
-  /** Past-date requests still waiting for admin approval (approval queue only). */
-  const isApprovalQueueItem = (row: TeacherAttendanceRecord) =>
-    isPendingApproval(row) && row.date < today;
+  /** Complete attendance stays in the approval list after approve or reject. */
+  const isApprovalListItem = (row: TeacherAttendanceRecord) => row.isSubmitted;
 
   const viewRecords = useMemo(() => {
     if (viewMode === "approval") {
-      return filteredDetailsRecords.filter(isApprovalQueueItem);
+      return filteredDetailsRecords.filter(isApprovalListItem);
     }
     return attendanceListGridRecords;
-  }, [filteredDetailsRecords, attendanceListGridRecords, viewMode, today]);
+  }, [filteredDetailsRecords, attendanceListGridRecords, viewMode]);
 
   const renderTextCell = (value: string, secondary = false) => (
     <Typography
@@ -270,7 +264,12 @@ export default function AdminAttendanceDetailsTab({
       label: "REMARKS",
       width: "20%",
       render: (row: TeacherAttendanceRecord) =>
-        renderTextCell(row.remarks || "—", true),
+        renderTextCell(
+          (row.approvalStatus === "Rejected"
+            ? row.rejectionReason?.trim()
+            : row.remarks?.trim()) || "—",
+          true
+        ),
     },
     {
       id: "approvalStatus",
@@ -481,7 +480,10 @@ useEffect(() => {
               {/* List View Button */}
               <Tooltip title="List View">
                 <IconButton
-                  onClick={() => setViewMode("list")}
+                  onClick={() => {
+                    setViewMode("list");
+                    updateDetailsFilter("fromDate", today);
+                  }}
                   size="small"
                   data-testid="btn-list-view"
                   sx={{
@@ -507,7 +509,11 @@ useEffect(() => {
               {/* Approval View Button */}
               <Tooltip title="Approval View">
                 <IconButton
-                  onClick={() => setViewMode("approval")}
+                  onClick={() => {
+                    setViewMode("approval");
+                    updateDetailsFilter("fromDate", getCurrentMonthStartIso());
+                    updateDetailsFilter("approvalStatus", "Waiting for Approval");
+                  }}
                   size="small"
                   data-testid="btn-approval-view"
                   sx={{
@@ -599,88 +605,30 @@ useEffect(() => {
         </AppCard>
       </Stack>
 
-      <Dialog
+      <ConfirmDialog
         open={rejectTargetId !== null}
         onClose={closeRejectDialog}
-        maxWidth="xs"
+        onConfirm={confirmReject}
+        title="Reject Attendance?"
+        message="Are you sure you want to reject this attendance?"
+        confirmLabel="Reject"
+        confirmDisabled={rejectReason.trim().length === 0}
         data-testid="dialog-reject-reason"
-        slotProps={{
-          paper: {
-            sx: {
-              borderRadius: 2,
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-              width: 500,
-              height: "auto",
-            },
-          },
-        }}
       >
-        <Box
-          sx={{
-            background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
-            px: 1.3,
-            py: 0.7,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            flexShrink: 0,
-          }}
-        >
-          <IconButton
-            aria-label="close"
-            onClick={closeRejectDialog}
-            sx={{ color: "white", bgcolor: "transparent", p: 0.25 }}
-          >
-            <CancelIcon sx={{ fontSize: 18 }} />
-          </IconButton>
-        </Box>
-        <DialogContent
-          dividers={false}
-          sx={{
-            py: 1,
-            px: 1.3,
-            overflowY: "auto",
-            overflowX: "hidden",
-          }}
-        >
-          <Stack spacing={0.7}>
-            <Box sx={{ fontWeight: 700, color: "#000", fontSize: "0.9rem" }}>
-              Reason for Reject
-            </Box>
-            <TextField
-              autoFocus
-              label="Reason"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              multiline
-              minRows={3}
-              maxRows={3}
-              fullWidth
-              size="small"
-              inputProps={{ "data-testid": "input-reject-reason" }}
-              data-testid="field-reject-reason"
-              sx={{
-                "& .MuiOutlinedInput-root": { fontSize: "0.8rem" },
-                "& .MuiFormLabel-root": { fontSize: "0.8rem" },
-              }}
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 1.3, py: 0.8, gap: 1, flexShrink: 0 }}>
-          <CancelButton onClick={closeRejectDialog} data-testid="btn-reject-cancel">
-            Cancel
-          </CancelButton>
-          <SaveButton
-            onClick={confirmReject}
-            disabled={rejectReason.trim().length === 0}
-            data-testid="btn-reject-save"
-          >
-            Save
-          </SaveButton>
-        </DialogActions>
-      </Dialog>
+        <TextField
+          autoFocus
+          label="Reason"
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          multiline
+          minRows={3}
+          maxRows={3}
+          fullWidth
+          size="small"
+          inputProps={{ "data-testid": "input-reject-reason" }}
+          data-testid="field-reject-reason"
+        />
+      </ConfirmDialog>
     </Box>
   );
 }
