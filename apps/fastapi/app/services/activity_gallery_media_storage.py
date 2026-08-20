@@ -6,6 +6,11 @@ from uuid import uuid4
 
 from app.core.exceptions import ValidationException
 from app.services import azure_blob_service
+from app.services.image_compression_service import (
+    JPEG_CONTENT_TYPE,
+    MAX_ORIGINAL_IMAGE_BYTES,
+    compress_image_to_jpeg,
+)
 
 GALLERY_MEDIA_PREFIX = "activity-gallery-media"
 
@@ -56,7 +61,10 @@ def validate_media_file(
             "Invalid file format. Allowed: JPG, JPEG, PNG, JFIF for photos; MP4, AVI, MOV for videos"
         )
 
-    if media_type == "Video":
+    if media_type == "Photo":
+        if len(content) > MAX_ORIGINAL_IMAGE_BYTES:
+            raise ValidationException("Image size must not exceed 4 MB")
+    elif media_type == "Video":
         size_mb = len(content) / (1024 * 1024)
         if size_mb > MAX_FILE_SIZE_MB:
             raise ValidationException(
@@ -74,14 +82,14 @@ def build_gallery_photo_file_name(
     content: bytes,
     content_type: str | None = None,
 ) -> str:
-    extension = validate_media_file(
+    validate_media_file(
         filename=original_filename,
         content=content,
         media_type="Photo",
         content_type=content_type,
     )
     unique_suffix = datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
-    return f"{tenant_id}_{gallery_id}_{unique_suffix}{extension}"
+    return f"{tenant_id}_{gallery_id}_{unique_suffix}.jpg"
 
 
 def save_gallery_photo_file(
@@ -91,33 +99,37 @@ def save_gallery_photo_file(
     original_filename: str,
     content: bytes,
     content_type: str | None = None,
-) -> tuple[str, str]:
+) -> tuple[str, str, bytes]:
     """
     Upload a gallery photo to Azure Blob Storage.
 
-    Returns (blob_name, safe_file_name).
+    Returns (blob_name, safe_file_name, stored_bytes).
     """
     if not azure_blob_service.is_azure_storage_configured():
         raise ValidationException("Azure Blob Storage is not configured")
 
+    validate_media_file(
+        filename=original_filename,
+        content=content,
+        media_type="Photo",
+        content_type=content_type,
+    )
+    stored_bytes = compress_image_to_jpeg(content)
     safe_name = build_gallery_photo_file_name(
         tenant_id=tenant_id,
         gallery_id=gallery_id,
         original_filename=original_filename,
-        content=content,
-        content_type=content_type,
+        content=stored_bytes,
+        content_type=JPEG_CONTENT_TYPE,
     )
     blob_name = f"{GALLERY_MEDIA_PREFIX}/{safe_name}"
-    mime = mime_type_for_file_name(safe_name)
-    if content_type:
-        mime = content_type.lower().split(";")[0].strip() or mime
 
     azure_blob_service.upload_bytes(
         blob_name=blob_name,
-        content=content,
-        content_type=mime,
+        content=stored_bytes,
+        content_type=JPEG_CONTENT_TYPE,
     )
-    return blob_name, safe_name
+    return blob_name, safe_name, stored_bytes
 
 
 def gallery_media_content_path(*, gallery_id: int, media_id: int) -> str:

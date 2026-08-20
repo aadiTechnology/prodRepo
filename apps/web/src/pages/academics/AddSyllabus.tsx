@@ -21,6 +21,11 @@ import syllabusService, {
   SYLLABUS_MONTHS,
   type SyllabusMonth,
 } from "../../api/services/syllabusService";
+import {
+  compressImageIfNeeded,
+  isCompressableImage,
+  MAX_ORIGINAL_IMAGE_BYTES,
+} from "../../utils/compressImage";
 
 type FormData = {
   academic_year_id: string;
@@ -29,7 +34,7 @@ type FormData = {
 };
 
 const UPLOAD_HINT =
-  "Accepted: pdf, doc, docx, xls, xlsx, ppt, pptx, jpg, jpeg, png. Limit 10 MB";
+  "Accepted: pdf, doc, docx, xls, xlsx, ppt, pptx, jpg, jpeg, png. Images max 4 MB; other files max 10 MB";
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 export default function AddSyllabus() {
@@ -168,7 +173,7 @@ export default function AddSyllabus() {
     };
   }, [editId, isEditMode, isTeacher, setFormData]);
 
-  const onFileSelect = (file?: File) => {
+  const onFileSelect = async (file?: File) => {
     if (!file) {
       setPendingFile(null);
       if (!isEditMode || !savedFileName) setFileError("Attachment is required");
@@ -179,14 +184,25 @@ export default function AddSyllabus() {
       setFileError(`Invalid file type. ${UPLOAD_HINT}`);
       return;
     }
+    if (isCompressableImage(file) && file.size > MAX_ORIGINAL_IMAGE_BYTES) {
+      setPendingFile(null);
+      setFileError("Image size must not exceed 4 MB.");
+      return;
+    }
     if (file.size > MAX_ATTACHMENT_BYTES) {
       setPendingFile(null);
       setFileError("File size exceeded. Maximum allowed size is 10 MB");
       return;
     }
-    setPendingFile(file);
-    setFileError(null);
-    setError(null);
+    try {
+      const ready = await compressImageIfNeeded(file);
+      setPendingFile(ready);
+      setFileError(null);
+      setError(null);
+    } catch (err) {
+      setPendingFile(null);
+      setFileError(err instanceof Error ? err.message : "Unable to process image.");
+    }
   };
 
   const displayFileName = pendingFile?.name ?? savedFileName;
@@ -211,7 +227,7 @@ export default function AddSyllabus() {
           data-testid="input-syllabus-attachment"
           aria-label="Attachment"
           onChange={(e) => {
-            onFileSelect(e.target.files?.[0]);
+            void onFileSelect(e.target.files?.[0]);
             e.target.value = "";
           }}
         />

@@ -39,6 +39,11 @@ import { useSnackbar } from "notistack";
 import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
 import { isTeacherNoticeUser } from "../../utils/noticeAudience";
 import { HOMEWORK_STATUS_ACTIVE, HOMEWORK_STATUS_DRAFT } from "../../utils/homeworkStatus";
+import {
+  compressImageIfNeeded,
+  isCompressableImage,
+  MAX_ORIGINAL_IMAGE_BYTES,
+} from "../../utils/compressImage";
 
 type DropdownOption = { label: string; value: string };
 
@@ -55,7 +60,7 @@ function formatBytes(bytes: number): string {
 }
 
 const ALLOWED_TYPES = [
-  "image/jpeg", "image/png", "image/webp",
+  "image/jpeg", "image/jpg", "image/png", "image/webp",
   "application/pdf",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -265,7 +270,7 @@ export default function AddHomework() {
   // ---------------------------------------------------------------------------
   // File handling
   // ---------------------------------------------------------------------------
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setFileError(null);
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
@@ -276,11 +281,20 @@ export default function AddHomework() {
         setFileError("Invalid file format. Allowed: images, PDF, Word, TXT");
         continue;
       }
+      if (isCompressableImage(file) && file.size > MAX_ORIGINAL_IMAGE_BYTES) {
+        setFileError("Image size must not exceed 4 MB.");
+        continue;
+      }
       if (file.size > MAX_SIZE_BYTES) {
         setFileError("File size exceeded. Maximum 10 MB per file.");
         continue;
       }
-      validated.push({ id: `${Date.now()}-${file.name}`, file });
+      try {
+        const ready = await compressImageIfNeeded(file);
+        validated.push({ id: `${Date.now()}-${ready.name}`, file: ready });
+      } catch (err) {
+        setFileError(err instanceof Error ? err.message : "Unable to process image.");
+      }
     }
     setPendingFiles((prev) => [...prev, ...validated]);
     // Reset input so same file can be re-added after removal
@@ -517,7 +531,7 @@ export default function AddHomework() {
           multiple
           accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.txt"
           style={{ display: "none" }}
-          onChange={handleFileSelect}
+          onChange={(e) => void handleFileSelect(e)}
         />
         <Button
           variant="outlined"
@@ -529,7 +543,7 @@ export default function AddHomework() {
           Upload File
         </Button>
         <Typography variant="caption" color="text.secondary">
-          PDF, Word, images (max 10 MB each)
+          PDF, Word, images (images max 4 MB; other files max 10 MB)
         </Typography>
       </Box>
 

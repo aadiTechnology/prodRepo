@@ -17,6 +17,7 @@ import BaseForm from "../../components/reusable/BaseForm";
 import type { SelectItemOption, MediaUploadSlotItem } from "../../components/semantic";
 import { addTeacherFormConfig, type AddTeacherFormData } from "./AddTeacher.formConfig";
 import { toMediaUrl } from "../../utils/mediaUrl";
+import { compressImage, isCompressableImage } from "../../utils/compressImage";
 
 const MULTI_ASSIGNED_CLASS_VALUE = "__multi_assigned_class__";
 const MULTI_ASSIGNED_DIVISION_VALUE = "__multi_assigned_division__";
@@ -272,13 +273,23 @@ export default function AddTeacher() {
   const handleAddMediaFiles = async (files: FileList | File[]) => {
     const file = files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      setUploadItems([{ id: file.name, previewUrl: dataUrl }]);
-      handleFieldValueChange("photo_url", dataUrl);
-    };
-    reader.readAsDataURL(file);
+    if (!isCompressableImage(file)) {
+      setError("Please select an image (JPG, PNG, or JFIF).");
+      return;
+    }
+    try {
+      const ready = await compressImage(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setUploadItems([{ id: ready.name, previewUrl: dataUrl }]);
+        handleFieldValueChange("photo_url", dataUrl);
+      };
+      reader.readAsDataURL(ready);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to process image.");
+    }
   };
 
   const handleRemoveMediaItem = (itemId: string) => {

@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from app.core.exceptions import ValidationException
 from app.services import azure_blob_service
+from app.services.image_compression_service import prepare_file_for_storage
 
 QUERY_ATTACHMENTS_PREFIX = "support-query-attachments"
 QUERY_UPLOAD_DIR = os.path.join("static", "support-query-attachments")
@@ -46,16 +47,22 @@ def save_query_attachment_file(
     if not azure_blob_service.is_azure_storage_configured():
         raise ValidationException("Azure Blob Storage is not configured")
 
+    stored_bytes, stored_type, stored_ext = prepare_file_for_storage(
+        file_name=file_name,
+        content=content,
+        content_type=content_type,
+        max_bytes=QUERY_MAX_FILE_BYTES,
+    )
     unique_suffix = datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
-    safe_name = f"{tenant_id}_{query_id}_{unique_suffix}{extension}"
+    safe_name = f"{tenant_id}_{query_id}_{unique_suffix}{stored_ext}"
     blob_name = f"{QUERY_ATTACHMENTS_PREFIX}/{safe_name}"
 
     stored = azure_blob_service.upload_bytes(
         blob_name=blob_name,
-        content=content,
-        content_type=content_type or "application/octet-stream",
+        content=stored_bytes,
+        content_type=stored_type or content_type or "application/octet-stream",
     )
-    file_type = extension.lstrip(".")
+    file_type = stored_ext.lstrip(".")
     return stored, file_type
 
 

@@ -46,6 +46,7 @@ import { colorTokens } from "../../tokens/colors";
 import { apiBaseUrl } from "../../config";
 import { buildVideoEmbedUrl, isDirectVideoFileUrl } from "../../utils/videoEmbed";
 import { isNativePlatform } from "../../utils/capacitor";
+import { compressImage, MAX_ORIGINAL_IMAGE_BYTES } from "../../utils/compressImage";
 
 const GALLERY_PATH = "/activity-management/photo-video-gallery";
 
@@ -657,6 +658,9 @@ export default function CreateActivityGallery() {
         if (!isAllowedPhoto(file)) {
           return `Invalid photo format. Allowed: ${PHOTO_FORMATS_LABEL}`;
         }
+        if (file.size > MAX_ORIGINAL_IMAGE_BYTES) {
+          return "Each photo must be 4 MB or smaller";
+        }
       }
       return null;
     },
@@ -725,10 +729,14 @@ export default function CreateActivityGallery() {
         setUploadLoading(true);
         setFileError(null);
         const targetId = effectiveGalleryId ?? (await persistGallery());
+        const compressed: File[] = [];
+        for (const file of selected) {
+          compressed.push(await compressImage(file));
+        }
         const uploaded =
-          selected.length > 1
-            ? await activityGalleryService.uploadMediaBulk(targetId, selected)
-            : [await activityGalleryService.uploadMedia(targetId, selected[0])];
+          compressed.length > 1
+            ? await activityGalleryService.uploadMediaBulk(targetId, compressed)
+            : [await activityGalleryService.uploadMedia(targetId, compressed[0])];
         setSavedMedia((prev) => [...prev, ...uploaded]);
       } catch (err: unknown) {
         const { fieldErrors: apiFieldErrors, message } = mapApiErrorsToFields(err);
@@ -851,7 +859,7 @@ export default function CreateActivityGallery() {
           onChange={(e) => void onFileSelect(e.target.files)}
         />
         <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-          {`Single or bulk upload supported (max ${MAX_MEDIA} photos, ${MAX_PHOTO_TOTAL_MB} MB total)`}
+          {`Single or bulk upload supported (max ${MAX_MEDIA} photos, ${MAX_PHOTO_TOTAL_MB} MB total). Each photo max 4 MB; images are compressed before upload.`}
         </Typography>
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
           Allowed formats: {PHOTO_FORMATS_LABEL}

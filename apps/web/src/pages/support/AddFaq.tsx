@@ -45,6 +45,11 @@ import {
   openSupportQueryAttachment,
   type SupportQueryFormData,
 } from "./support.types";
+import {
+  compressImageIfNeeded,
+  isCompressableImage,
+  MAX_ORIGINAL_IMAGE_BYTES,
+} from "../../utils/compressImage";
 
 const EMPTY_FORM: SupportQueryFormData = {
   category: "",
@@ -292,28 +297,37 @@ export default function AddFaq() {
     );
   }
 
-  const handleFileSelect = (file: File | null) => {
+  const handleFileSelect = async (file: File | null) => {
     if (!file) return;
     if (!isSupportQueryAttachmentAllowed(file.name)) {
       setAttachmentError(SUPPORT_QUERY_INVALID_FILE_MESSAGE);
+      return;
+    }
+    if (isCompressableImage(file) && file.size > MAX_ORIGINAL_IMAGE_BYTES) {
+      setAttachmentError("Image size must not exceed 4 MB.");
       return;
     }
     if (file.size > MAX_SIZE_BYTES) {
       setAttachmentError("File size must be 10 MB or less.");
       return;
     }
-    setAttachmentError(null);
-    if (attachment?.url && attachment.url.startsWith("blob:")) {
-      URL.revokeObjectURL(attachment.url);
+    try {
+      const ready = await compressImageIfNeeded(file);
+      setAttachmentError(null);
+      if (attachment?.url && attachment.url.startsWith("blob:")) {
+        URL.revokeObjectURL(attachment.url);
+      }
+      const url = URL.createObjectURL(ready);
+      setAttachment({
+        fileName: ready.name,
+        url,
+        sizeBytes: ready.size,
+        file: ready,
+      });
+      setValues((prev) => ({ ...prev, attachmentName: ready.name }));
+    } catch (err) {
+      setAttachmentError(err instanceof Error ? err.message : "Unable to process image.");
     }
-    const url = URL.createObjectURL(file);
-    setAttachment({
-      fileName: file.name,
-      url,
-      sizeBytes: file.size,
-      file,
-    });
-    setValues((prev) => ({ ...prev, attachmentName: file.name }));
   };
 
   const clearAttachment = () => {
@@ -435,7 +449,7 @@ export default function AddFaq() {
           <Grid size={12}>
             <Box data-testid="section-query-attachment">
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                Attachment (optional). Allowed: PDF, DOC, DOCX, JPG, JPEG, PNG. Max 10 MB.
+                Attachment (optional). Allowed: PDF, DOC, DOCX, JPG, JPEG, PNG. Images max 4 MB; other files max 10 MB.
               </Typography>
 
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
@@ -445,7 +459,7 @@ export default function AddFaq() {
                   accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
                   style={{ display: "none" }}
                   data-testid="input-query-attachment"
-                  onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
+                  onChange={(e) => void handleFileSelect(e.target.files?.[0] ?? null)}
                 />
                 <Button
                   variant="outlined"

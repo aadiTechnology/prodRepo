@@ -39,6 +39,7 @@ import profileService, { ProfileResponse } from "../api/services/profileService"
 import { colorTokens } from "../tokens/colors";
 import { toMediaUrl } from "../utils/mediaUrl";
 import { formatShortDate } from "../utils/formatters";
+import { compressImage, MAX_ORIGINAL_IMAGE_BYTES } from "../utils/compressImage";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -51,8 +52,8 @@ const formatRole = (role: string): string =>
 const PROFILE_PHOTO_FORMATS_LABEL = "JPEG, PNG, GIF, WebP";
 const PROFILE_PHOTO_ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const PROFILE_PHOTO_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
-const PROFILE_PHOTO_MAX_SIZE_BYTES = 5 * 1024 * 1024;
-const PROFILE_PHOTO_UPLOAD_TOOLTIP = `Allowed formats: ${PROFILE_PHOTO_FORMATS_LABEL}. Max size: 5 MB.`;
+const PROFILE_PHOTO_MAX_SIZE_BYTES = MAX_ORIGINAL_IMAGE_BYTES;
+const PROFILE_PHOTO_UPLOAD_TOOLTIP = `Allowed formats: ${PROFILE_PHOTO_FORMATS_LABEL}. Max size: 4 MB.`;
 
 // ─── Section Header ───────────────────────────────────────────────────────────
 
@@ -197,13 +198,14 @@ const ProfilePage = () => {
             return;
         }
         if (file.size > PROFILE_PHOTO_MAX_SIZE_BYTES) {
-            setSnack({ msg: "Image must be smaller than 5 MB.", severity: "error" });
+            setSnack({ msg: "Image must be smaller than 4 MB.", severity: "error" });
             setFileInputKey(prev => prev + 1); // Reset input
             return;
         }
         setUploading(true);
         try {
-            const updated = await profileService.uploadImage(file);
+            const compressed = await compressImage(file);
+            const updated = await profileService.uploadImage(compressed);
             setProfile(updated);
             setAvatarKey(prev => prev + 1); // Force avatar re-render
             setSnack({ msg: "Profile photo updated successfully.", severity: "success" });
@@ -211,8 +213,11 @@ const ProfilePage = () => {
             window.dispatchEvent(new Event("profile-image-updated"));
             window.dispatchEvent(new Event("profile-updated"));
             setFileInputKey(prev => prev + 1); // Reset input to allow re-uploading
-        } catch {
-            setSnack({ msg: "Unable to upload image. Please try again.", severity: "error" });
+        } catch (err) {
+            const msg = err instanceof Error && err.message
+                ? err.message
+                : "Unable to upload image. Please try again.";
+            setSnack({ msg, severity: "error" });
             setFileInputKey(prev => prev + 1); // Reset input
         } finally {
             setUploading(false);

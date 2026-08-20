@@ -11,6 +11,10 @@ from app.models.teacher import Teacher
 from app.models.user import User
 from app.models.user_profile import UserProfile
 from app.utils.student_login_email import normalize_email
+from app.services.image_compression_service import (
+    MAX_ORIGINAL_IMAGE_BYTES,
+    prepare_file_for_storage,
+)
 
 UPLOAD_DIR = "static/profile-images"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -166,11 +170,17 @@ def save_user_profile_image(db: Session, user_id: int, photo_source: str | None)
     match = _DATA_URL_RE.match(photo_source)
     if match:
         mime, b64_data = match.group(1), match.group(2)
-        ext = _extension_from_mime(mime)
-        filename = f"{user_id}{ext}"
+        raw = base64.b64decode(b64_data)
+        stored, _, _ = prepare_file_for_storage(
+            file_name=f"photo{_extension_from_mime(mime)}",
+            content=raw,
+            content_type=mime,
+            max_bytes=MAX_ORIGINAL_IMAGE_BYTES,
+        )
+        filename = f"{user_id}.jpg"
         file_path = os.path.join(UPLOAD_DIR, filename)
         with open(file_path, "wb") as file_handle:
-            file_handle.write(base64.b64decode(b64_data))
+            file_handle.write(stored)
         public_path = f"/profile-images/{filename}?v={int(time.time())}"
         _upsert_user_profile(db, user_id, public_path)
         _sync_teacher_photo_url(db, user_id, public_path)
@@ -186,6 +196,33 @@ def save_user_profile_image(db: Session, user_id: int, photo_source: str | None)
         return photo_source
 
     return None
+
+
+def save_uploaded_profile_image_file(
+    db: Session,
+    *,
+    user_id: int,
+    file_name: str,
+    content: bytes,
+    content_type: str | None,
+) -> str:
+    """Compress and persist a multipart profile photo as JPEG."""
+    stored, _, _ = prepare_file_for_storage(
+        file_name=file_name,
+        content=content,
+        content_type=content_type,
+        max_bytes=MAX_ORIGINAL_IMAGE_BYTES,
+    )
+    filename = f"{user_id}.jpg"
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    with open(file_path, "wb") as file_handle:
+        file_handle.write(stored)
+    public_path = f"/profile-images/{filename}?v={int(time.time())}"
+    _upsert_user_profile(db, user_id, public_path)
+    _sync_teacher_photo_url(db, user_id, public_path)
+    _sync_student_photo_url(db, user_id, public_path)
+    db.commit()
+    return public_path
 
 
 def resolve_user_profile_image_path(db: Session, user_id: int) -> str | None:

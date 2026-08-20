@@ -505,7 +505,7 @@ def upload_media(
     if media_type == "Photo":
         _assert_photo_gallery_total_size(db, gallery_id=gallery_id, incoming_bytes=len(content))
 
-    blob_name, safe_name = save_gallery_photo_file(
+    blob_name, safe_name, stored_bytes = save_gallery_photo_file(
         tenant_id=tenant_id,
         gallery_id=gallery_id,
         original_filename=filename,
@@ -520,7 +520,7 @@ def upload_media(
         original_file_name=filename,
         file_path=blob_name,
         file_content=None,
-        file_size=len(content),
+        file_size=len(stored_bytes),
         display_order=current_count + 1,
     )
     media_row = repo.get_media_by_id(db, gallery_id=gallery_id, media_id=media_id)

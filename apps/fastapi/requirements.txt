@@ -16,4 +16,5 @@ google-generativeai
 langchain-openai
 langchain-core
 azure-storage-blob
+Pillow
 firebase-admin

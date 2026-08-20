@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from app.core.exceptions import ValidationException
 from app.services import azure_blob_service
+from app.services.image_compression_service import prepare_file_for_storage
 
 NOTICE_ATTACHMENTS_PREFIX = "notice-attachments"
 NOTICE_ATTACHMENTS_URL_PREFIX = "/notice-attachments"
@@ -84,15 +85,20 @@ def save_notice_attachment_file(
     if not azure_blob_service.is_azure_storage_configured():
         raise ValidationException("Azure Blob Storage is not configured")
 
-    ext = MIME_TO_EXT.get(mime) or os.path.splitext(file_name or "")[1].lower() or ".bin"
+    stored, stored_type, ext = prepare_file_for_storage(
+        file_name=file_name,
+        content=content,
+        content_type=mime,
+        max_bytes=MAX_FILE_BYTES,
+    )
     unique_suffix = datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
     safe_name = f"{tenant_id}_{notice_id}_{unique_suffix}{ext}"
     blob_name = f"{NOTICE_ATTACHMENTS_PREFIX}/{safe_name}"
 
     return azure_blob_service.upload_bytes(
         blob_name=blob_name,
-        content=content,
-        content_type=mime,
+        content=stored,
+        content_type=stored_type or mime,
     )
 
 

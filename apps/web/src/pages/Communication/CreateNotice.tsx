@@ -27,6 +27,7 @@ import { createNoticeFormConfig, type CreateNoticeFormData, type SelectOption } 
 import type { Notice, NoticeAudienceType, NoticeCreateTarget } from "../../types/notice";
 import { audienceTypeLabel, noticeTypeLabel } from "../../utils/noticeLabels";
 import { notifyNoticeCountChanged } from "../../utils/noticeCountEvents";
+import { compressImageIfNeeded } from "../../utils/compressImage";
 
 const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 255;
@@ -605,7 +606,7 @@ export default function CreateNotice() {
     ]
   );
 
-  const onAttachmentSelect = useCallback((file?: File) => {
+  const onAttachmentSelect = useCallback(async (file?: File) => {
     if (!file) {
       setPendingFile(null);
       setSavedAttachment(null);
@@ -619,10 +620,15 @@ export default function CreateNotice() {
       setError(`Invalid file format or size exceeded. ${UPLOAD_FILE_HINT}`);
       return;
     }
-    setPendingFile(file);
-    setSavedAttachment(null);
-    setAttachmentCleared(false);
-    setError(null);
+    try {
+      const ready = await compressImageIfNeeded(file);
+      setPendingFile(ready);
+      setSavedAttachment(null);
+      setAttachmentCleared(false);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Invalid file format or size exceeded. ${UPLOAD_FILE_HINT}`);
+    }
   }, []);
 
   const attachmentDisplayName = pendingFile?.name ?? savedAttachment?.file_name ?? null;

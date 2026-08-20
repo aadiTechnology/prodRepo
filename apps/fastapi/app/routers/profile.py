@@ -9,6 +9,7 @@ from app.models.user_profile import UserProfile
 from app.models.teacher import Teacher
 from app.schemas.profile import ProfileResponse, ProfileUpdate
 from app.core.logging_config import get_logger
+from app.core.exceptions import ValidationException
 from app.services import profile_image_service
 
 logger = get_logger(__name__)
@@ -134,7 +135,6 @@ async def upload_profile_image(
         logger.error(f"Invalid current_user: {current_user}")
         raise HTTPException(status_code=401, detail="Invalid user session")
 
-    # Validate file extension
     extension = os.path.splitext(file.filename or "")[1].lower()
     if extension not in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
         raise HTTPException(
@@ -142,71 +142,30 @@ async def upload_profile_image(
             detail="Invalid file type. Allowed: jpg, jpeg, png, gif, webp.",
         )
 
-    # Create filename with USER_ID to ensure uniqueness
-    filename = f"{current_user.id}{extension}"
-    file_path = os.path.join(UPLOAD_DIR, filename)
-
     logger.info(
-        f"[UPLOAD] User {current_user.id} ({current_user.email}) uploading image: {filename}"
+        f"[UPLOAD] User {current_user.id} ({current_user.email}) uploading profile image"
     )
 
-    # Save file to disk
+    content = await file.read()
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        logger.info(f"[DISK] File saved: {file_path}")
+        public_path = profile_image_service.save_uploaded_profile_image_file(
+            db,
+            user_id=current_user.id,
+            file_name=file.filename or "photo.jpg",
+            content=content,
+            content_type=file.content_type,
+        )
+    except ValidationException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as e:
         logger.error(f"[DISK ERROR] Failed to save profile image for user {current_user.id}: {e}")
-        raise HTTPException(status_code=500, detail="Unable to save image. Please try again.")
+        raise HTTPException(status_code=500, detail="Unable to save image. Please try again.") from e
 
-    # Add timestamp for cache-busting (browser will fetch new image)
-    import time
-    timestamp = int(time.time())
-    public_path = f"/profile-images/{filename}?v={timestamp}"
-
-    # Upsert into UserProfile table (user_id enforced)
-    try:
-        profile = db.query(UserProfile).filter(UserProfile.UserId == current_user.id).first()
-        if profile:
-            old_path = profile.ProfileImagePath
-            profile.ProfileImagePath = public_path
-            logger.info(
-                f"[DB] Updating existing UserProfile for user {current_user.id} | "
-                f"{old_path} → {public_path}"
-            )
-        else:
-            profile = UserProfile(UserId=current_user.id, ProfileImagePath=public_path)
-            db.add(profile)
-            logger.info(
-                f"[DB] Creating new UserProfile for user {current_user.id} | {public_path}"
-            )
-
-        db.commit()
-        db.refresh(profile)
-        logger.info(
-            f"✓ Profile image committed to DB for user {current_user.id}: {public_path}"
-        )
-    except Exception as e:
-        db.rollback()
-        logger.error(
-            f"✗ Database error for user {current_user.id}: {type(e).__name__}: {str(e)}"
-        )
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
-    profile_image_service.sync_teacher_photo_from_profile_path(
-        db, current_user.id, profile.ProfileImagePath
-    )
-    profile_image_service.sync_student_photo_from_profile_path(
-        db, current_user.id, profile.ProfileImagePath
-    )
-
-    # Get updated User record
     db_user = db.query(User).filter(User.id == current_user.id).first()
     logger.info(
-        f"✓ Profile image upload complete for user {current_user.id} ({db_user.email}) "
-        f"→ {public_path}"
+        f"✓ Profile image upload complete for user {current_user.id} → {public_path}"
     )
-    return _build_response(db_user, profile.ProfileImagePath, db)
+    return _build_response(db_user, public_path, db)
 
 
 @router.delete("/image", response_model=ProfileResponse)
