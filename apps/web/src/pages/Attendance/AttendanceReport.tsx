@@ -906,14 +906,8 @@ const AttendanceReport = () => {
         <PageHeader
           links={
             isStudent
-              ? [
-                  { title: "Attendance", path: "/attendance/report" },
-                  { title: "My Attendance", path: "/attendance/report" },
-                ]
-              : [
-                  { title: "Attendance", path: "/attendance/mark" },
-                  { title: "Attendance Report", path: "/attendance/report" },
-                ]
+              ? [{ title: "My Attendance", path: "/attendance/report" }]
+              : [{ title: "Attendance Report", path: "/attendance/report" }]
           }
           homePath="/"
           actions={headerActions}

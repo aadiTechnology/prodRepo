@@ -2489,8 +2489,8 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
               ) : (
                 <Box sx={{ mt: 1 }}>
                   {/* Header row */}
-                  <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 80px", gap: 1, px: 1.5, mb: 0.75 }}>
-                    {["Title / Subject", "Class", "Due Date", "Status"].map((h) => (
+                  <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr 80px", gap: 1, px: 1.5, mb: 0.75 }}>
+                    {["Title / Subject", "Class", "Status"].map((h) => (
                       <Typography key={h} sx={{ fontSize: "10px", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.4px" }}>
                         {h}
                       </Typography>
@@ -2501,7 +2501,7 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
                     const isDraft = item.status?.toLowerCase() === "draft";
                     return (
                       <Box key={item.id} onClick={() => navigate("/homework")} sx={{
-                        display: "grid", gridTemplateColumns: "2fr 1fr 1fr 80px", gap: 1,
+                        display: "grid", gridTemplateColumns: "2fr 1fr 80px", gap: 1,
                         px: 1.5, py: 1.2, borderRadius: "10px", cursor: "pointer", alignItems: "center",
                         borderBottom: i < hw.length - 1 ? `1px solid ${C.border}` : "none",
                         "&:hover": { bgcolor: C.blueGlass },
@@ -2518,9 +2518,6 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
                         </Box>
                         <Typography sx={{ fontSize: "12px", color: C.slateText, fontWeight: 600 }} noWrap>
                           {item.class_name}{item.division_name ? ` — ${item.division_name}` : ""}
-                        </Typography>
-                        <Typography sx={{ fontSize: "12px", color: C.muted }}>
-                          {item.submission_date ?? "—"}
                         </Typography>
                         <Chip
                           label={item.status}

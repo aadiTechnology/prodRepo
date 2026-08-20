@@ -548,10 +548,7 @@ const MarkAttendance = () => {
       pageBackground
       header={
         <PageHeader
-          links={[
-            { title: "Attendance", path: "#" },
-            { title: "Mark Attendance", path: "/attendance/mark" },
-          ]}
+          links={[{ title: "Mark Attendance", path: "/attendance/mark" }]}
           homePath="/"
           actions={headerActions}
         />
