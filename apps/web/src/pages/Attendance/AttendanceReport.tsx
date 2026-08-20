@@ -52,6 +52,7 @@ import {
 } from "./components/AttendanceMonthCalendar";
 import holidayApi, { parseHolidayDateRange } from "../../services/holidayApi";
 import { isWeekendIso } from "../calendar/academicCalendar.utils";
+import { downloadBlobFile } from "../../utils/downloadFile";
 
 const STUDENT_REPORT_LIMIT = 500;
 const EXPORT_REPORT_LIMIT = 10000;
@@ -64,7 +65,7 @@ const escapeCsvCell = (value: string | number | null | undefined) => {
   return str;
 };
 
-const exportAttendanceReportCsv = (
+const exportAttendanceReportCsv = async (
   records: AttendanceReportResponse["records"],
   fromDate: string,
   toDate: string
@@ -83,13 +84,8 @@ const exportAttendanceReportCsv = (
     ),
   ].join("\n");
 
-  const blob = new Blob([csvRows], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `Attendance_Report_${fromDate}_to_${toDate}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
+  const blob = new Blob(["\uFEFF", csvRows], { type: "text/csv;charset=utf-8;" });
+  return downloadBlobFile(blob, `Attendance_Report_${fromDate}_to_${toDate}.csv`);
 };
 
 // ── Shared select style ───────────────────────────────────────────────────────
@@ -548,7 +544,8 @@ const AttendanceReport = () => {
         return;
       }
 
-      exportAttendanceReportCsv(data.records, filters.from_date, filters.to_date);
+      const result = await exportAttendanceReportCsv(data.records, filters.from_date, filters.to_date);
+      if (result === "cancelled") return;
       setSnackbar({ open: true, message: "Attendance report exported successfully", severity: "success" });
     } catch (err) {
       console.error("Failed to export attendance report", err);
