@@ -55,6 +55,13 @@ export const marketingHubService = {
     return response.data;
   },
 
+  getNextSortOrder: async (): Promise<number> => {
+    const response = await apiClient.get<{ next_sort_order: number }>(
+      `${BASE_URL}/platforms/next-sort-order`
+    );
+    return Number(response.data.next_sort_order) || 1;
+  },
+
   createPlatform: async (platformData: {
     name: string;
     code: string;

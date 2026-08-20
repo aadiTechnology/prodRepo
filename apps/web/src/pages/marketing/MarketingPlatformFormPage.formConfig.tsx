@@ -66,9 +66,8 @@ export function createMarketingPlatformFormConfig({
         label: "Sort Order",
         type: "text",
         props: { htmlInput: { type: "number", min: 1, step: 1 } },
-        helperText: isEditMode
-          ? "Lower numbers appear first. If this number is already used, the two platforms swap."
-          : "Defaults to the next number. You can change it. If that number is already used, that platform moves to the end — no duplicates.",
+        helperText:
+          "Lower numbers appear first. If this number is already used, the two platforms swap.",
       },
       integration_url: {
         name: "integration_url",

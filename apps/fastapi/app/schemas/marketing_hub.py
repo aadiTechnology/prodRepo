@@ -75,6 +75,10 @@ class MarketingSocialMediaLinkResponse(MarketingSocialMediaLinkBase):
     updated_at: datetime | None = None
 
 
+class NextSortOrderResponse(BaseModel):
+    next_sort_order: int
+
+
 class MarketingHubConfigResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

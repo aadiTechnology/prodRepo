@@ -82,13 +82,18 @@ export default function MarketingPlatformFormPage() {
     const loadNextSortOrder = async () => {
       setFetchLoading(true);
       try {
-        const platforms = await marketingHubService.listPlatforms(false);
+        let nextSortOrder = 1;
+        try {
+          nextSortOrder = await marketingHubService.getNextSortOrder();
+        } catch {
+          const platforms = await marketingHubService.listPlatforms(false);
+          const maxOrder = platforms.reduce(
+            (max, platform) => Math.max(max, Number(platform.sort_order) || 0),
+            0,
+          );
+          nextSortOrder = maxOrder + 1;
+        }
         if (cancelled) return;
-        const maxOrder = platforms.reduce(
-          (max, platform) => Math.max(max, Number(platform.sort_order) || 0),
-          0,
-        );
-        const nextSortOrder = maxOrder + 1;
         setFormData((prev) => ({ ...prev, sort_order: nextSortOrder }));
       } catch {
         if (!cancelled) {

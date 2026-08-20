@@ -17,25 +17,29 @@ def _swap_sort_order_if_taken(
     exclude_platform_id: int | None = None,
     previous_sort_order: int | None = None,
 ) -> None:
-    """If another platform already has desired_sort_order, swap/displace it.
+    """If another platform already has desired_sort_order, swap with it.
 
-    Edit: occupant takes previous_sort_order (true swap).
-    Create: occupant moves to max(sort_order)+1 (new platform takes the slot).
+    Create and Edit use the same rule: the occupant takes previous_sort_order
+    (the slot the incoming platform is leaving / would have used). Extra
+    duplicate occupants of the same number are moved to unused next slots.
     """
     query = db.query(MarketingPlatform).filter(
         MarketingPlatform.sort_order == desired_sort_order
     )
     if exclude_platform_id is not None:
         query = query.filter(MarketingPlatform.id != exclude_platform_id)
-    occupant = query.first()
-    if not occupant:
+    occupants = query.order_by(MarketingPlatform.id.asc()).all()
+    if not occupants:
         return
 
-    if previous_sort_order is not None:
-        occupant.sort_order = previous_sort_order
-        return
-
-    occupant.sort_order = next_sort_order(db)
+    replacement = (
+        previous_sort_order if previous_sort_order is not None else next_sort_order(db)
+    )
+    occupants[0].sort_order = replacement
+    db.flush()
+    for extra in occupants[1:]:
+        extra.sort_order = next_sort_order(db)
+        db.flush()
 
 
 def next_sort_order(db: Session) -> int:
@@ -217,6 +221,7 @@ def update_platform(
             previous_sort_order=previous_sort_order,
         )
         platform.sort_order = data.sort_order
+        db.flush()
     if data.is_active is not None:
         platform.is_active = data.is_active
 
@@ -281,11 +286,18 @@ def create_platform(
     if existing:
         raise ConflictException(f"Platform with code '{data.code}' already exists.")
 
+    vacated_sort_order = next_sort_order(db)
     sort_order = int(data.sort_order or 0)
     if sort_order < 1:
-        sort_order = next_sort_order(db)
+        sort_order = vacated_sort_order
 
-    _swap_sort_order_if_taken(db, desired_sort_order=sort_order)
+    # Same swap as Edit: e.g. YouTube=1, new default=24, user saves 1
+    # -> new platform=1, YouTube=24.
+    _swap_sort_order_if_taken(
+        db,
+        desired_sort_order=sort_order,
+        previous_sort_order=vacated_sort_order if sort_order != vacated_sort_order else None,
+    )
 
     platform = MarketingPlatform(
         name=data.name.strip(),

@@ -13,6 +13,7 @@ from app.schemas.marketing_hub import (
     MarketingSocialMediaLinkResponse,
     MarketingSocialMediaLinkCreate,
     MarketingHubConfigResponse,
+    NextSortOrderResponse,
 )
 from app.services import marketing_hub_service
 
@@ -54,6 +55,15 @@ def save_marketing_link(
         is_active=payload.is_active,
         user_id=current_user.id
     )
+
+
+@router.get("/platforms/next-sort-order", response_model=NextSortOrderResponse)
+def get_next_marketing_platform_sort_order(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> NextSortOrderResponse:
+    """Next Sort Order for Add Platform (max existing + 1)."""
+    return NextSortOrderResponse(next_sort_order=marketing_hub_service.next_sort_order(db))
 
 
 @router.get("/platforms", response_model=List[MarketingPlatformResponse])
