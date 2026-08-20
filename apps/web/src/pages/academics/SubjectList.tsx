@@ -42,6 +42,7 @@ export default function SubjectList() {
         navigate: navigateWithConfigHub,
         onDeleteClick: controller.handleDeleteClick,
     });
+    
 
     return (
         <ListPageLayout
