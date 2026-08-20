@@ -187,9 +187,9 @@ export default function AddProductUpdate() {
 
   const errors = useMemo(() => {
     const next: Partial<Record<keyof ProductUpdateFormData, string>> = {};
-    if (!values.version.trim()) next.version = "Required.";
-    if (!values.releaseDate.trim()) next.releaseDate = "Required.";
-    if (!values.description.trim()) next.description = "Required.";
+    if (!values.version.trim()) next.version = "Please enter version";
+    if (!values.releaseDate.trim()) next.releaseDate = "Please select release date";
+    if (!values.description.trim()) next.description = "Please enter description";
     return next;
   }, [values]);
 
@@ -365,7 +365,13 @@ export default function AddProductUpdate() {
         />
       }
     >
-      <Box component="form" onSubmit={handleSubmit} noValidate autoComplete="off">
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        noValidate
+        autoComplete="off"
+        data-testid="support-release-note-validation"
+      >
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import type { SupportQueryItem, SupportQueryStatus } from "../pages/support/support.types";
 import {
@@ -67,6 +67,13 @@ export function useFaqListController() {
     const start = page * rowsPerPage;
     return filteredQueries.slice(start, start + rowsPerPage);
   }, [filteredQueries, page, rowsPerPage]);
+
+  useEffect(() => {
+    const lastPage = Math.max(0, Math.ceil(filteredQueries.length / rowsPerPage) - 1);
+    if (page > lastPage) {
+      setPage(lastPage);
+    }
+  }, [filteredQueries.length, page, rowsPerPage]);
 
   const categoryOptions = categoryFilterOptions;
 

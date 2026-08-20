@@ -23,6 +23,7 @@ from app.schemas.support_schema import (
     SupportQueryCreateRequest,
     SupportQueryListResponse,
     SupportQueryMessageCreateRequest,
+    SupportQueryMessageUpdateRequest,
     SupportQueryResponse,
     SupportQueryUpdateRequest,
     SupportMarkViewedResponse,
@@ -194,6 +195,46 @@ async def add_query_message(
         current_user=current_user,
         query_key=query_key,
         payload=payload,
+    )
+
+
+@router.put(
+    "/queries/{query_key}/messages/{message_id}",
+    response_model=SupportQueryResponse,
+    summary="Update a conversation message (author only)",
+)
+async def update_query_message(
+    payload: SupportQueryMessageUpdateRequest,
+    query_key: str,
+    message_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_query_access),
+):
+    return support_service.update_query_message(
+        db,
+        current_user=current_user,
+        query_key=query_key,
+        message_id=message_id,
+        payload=payload,
+    )
+
+
+@router.delete(
+    "/queries/{query_key}/messages/{message_id}",
+    response_model=SupportQueryResponse,
+    summary="Delete a conversation message (author only)",
+)
+async def delete_query_message(
+    query_key: str,
+    message_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_query_access),
+):
+    return support_service.delete_query_message(
+        db,
+        current_user=current_user,
+        query_key=query_key,
+        message_id=message_id,
     )
 
 

@@ -47,6 +47,10 @@ class SupportQueryMessageCreateRequest(BaseModel):
     status: SupportQueryStatus | None = None
 
 
+class SupportQueryMessageUpdateRequest(BaseModel):
+    body: str = Field(..., min_length=1)
+
+
 class SupportQueryResponse(BaseModel):
     id: str
     category: str

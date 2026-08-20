@@ -188,9 +188,10 @@ export default function AddFaq() {
 
   const errors = useMemo(() => {
     const next: Partial<Record<keyof SupportQueryFormData, string>> = {};
-    if (!values.category.trim()) next.category = "Required.";
-    if (!values.subject.trim()) next.subject = "Required.";
-    if (!values.description.trim()) next.description = "Required.";
+    
+    if (!values.category.trim()) next.category = "Please select category";
+    if (!values.subject.trim()) next.subject = "Please enter subject";
+    if (!values.description.trim()) next.description = "Please enter description";
     return next;
   }, [values]);
 
@@ -378,7 +379,14 @@ export default function AddFaq() {
         />
       }
     >
-      <Box component="form" onSubmit={handleSubmit} noValidate autoComplete="off">
+      
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        noValidate
+        autoComplete="off"
+        data-testid="support-query-validation"
+      >
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
             <FormControl

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Alert, Box, Chip, CircularProgress, IconButton, Stack, Tooltip, Typography, alpha } from "@mui/material";
+import { Alert, Box, CircularProgress, IconButton, Stack, Tooltip, Typography, alpha } from "@mui/material";
 import { Add as AddIcon, Download as DownloadIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useSnackbar } from "notistack";
@@ -131,7 +131,6 @@ export default function ProductUpdates() {
                       <Typography variant="h6" sx={{ fontWeight: 700 }}>
                         {note.title || `Release ${note.version}`}
                       </Typography>
-                      <Chip size="small" label={`v${note.version}`} color="info" />
                     </Stack>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       Released {note.releaseDate} · {note.createdBy}
@@ -191,7 +190,7 @@ export default function ProductUpdates() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Delete Release Note"
-        message={`Permanently delete release note v${deleteTarget?.version ?? ""}? This cannot be undone.`}
+        message="Are you sure you want to delete this Release Notes?"
         confirmLabel="Delete"
         cancelLabel="Cancel"
         onConfirm={confirmDelete}

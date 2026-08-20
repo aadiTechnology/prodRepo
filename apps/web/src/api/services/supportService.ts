@@ -1,4 +1,5 @@
 import { apiClient } from "../client";
+import { parseApiUtcDateTime } from "../../utils/formatters";
 import type {
   ProductUpdateItem,
   ReleaseNoteFileType,
@@ -106,7 +107,7 @@ export interface ReleaseNoteUpdatePayload {
 
 function toIsoDateTime(value: string | null | undefined): string {
   if (!value) return "";
-  const date = new Date(value);
+  const date = parseApiUtcDateTime(value);
   return Number.isNaN(date.getTime()) ? value : date.toISOString();
 }
 
@@ -212,6 +213,28 @@ const supportService = {
     const res = await apiClient.post<SupportQueryApi>(
       `${BASE}/queries/${encodeURIComponent(queryKey)}/messages`,
       { body, status: status ?? null }
+    );
+    return mapSupportQuery(res.data);
+  },
+
+  updateQueryMessage: async (
+    queryKey: string,
+    messageId: string,
+    body: string
+  ): Promise<SupportQueryItem> => {
+    const res = await apiClient.put<SupportQueryApi>(
+      `${BASE}/queries/${encodeURIComponent(queryKey)}/messages/${encodeURIComponent(messageId)}`,
+      { body }
+    );
+    return mapSupportQuery(res.data);
+  },
+
+  deleteQueryMessage: async (
+    queryKey: string,
+    messageId: string
+  ): Promise<SupportQueryItem> => {
+    const res = await apiClient.delete<SupportQueryApi>(
+      `${BASE}/queries/${encodeURIComponent(queryKey)}/messages/${encodeURIComponent(messageId)}`
     );
     return mapSupportQuery(res.data);
   },

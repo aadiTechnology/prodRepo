@@ -56,6 +56,9 @@ type FaqDataContextValue = {
     body: string,
     nextStatus?: SupportQueryStatus
   ) => Promise<SupportQueryItem>;
+  updateQueryMessage: (queryId: string, messageId: string, body: string) => Promise<SupportQueryItem>;
+  deleteQueryMessage: (queryId: string, messageId: string) => Promise<SupportQueryItem>;
+  setQueryViewedLocal: (id: string) => void;
   forwardQueryToSuperAdmin: (id: string) => Promise<SupportQueryItem>;
   uploadQueryAttachment: (id: string, file: File) => Promise<SupportQueryItem>;
   categories: SupportCategory[];
@@ -268,6 +271,33 @@ export function FaqDataProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const updateQueryMessage = useCallback(
+    async (queryId: string, messageId: string, body: string) => {
+      const trimmed = body.trim();
+      if (!trimmed) {
+        throw new Error("Message body is required.");
+      }
+      const updated = await supportService.updateQueryMessage(queryId, messageId, trimmed);
+      setQueries((prev) => upsertQuery(prev, updated));
+      notifySupportUnreadChanged();
+      return updated;
+    },
+    []
+  );
+
+  const deleteQueryMessage = useCallback(async (queryId: string, messageId: string) => {
+    const updated = await supportService.deleteQueryMessage(queryId, messageId);
+    setQueries((prev) => upsertQuery(prev, updated));
+    notifySupportUnreadChanged();
+    return updated;
+  }, []);
+
+  const setQueryViewedLocal = useCallback((id: string) => {
+    setQueries((prev) =>
+      prev.map((query) => (query.id === id ? { ...query, isViewed: true } : query))
+    );
+  }, []);
+
   const forwardQueryToSuperAdmin = useCallback(async (id: string) => {
     const updated = await supportService.forwardQuery(id);
     setQueries((prev) => upsertQuery(prev, updated));
@@ -296,6 +326,9 @@ export function FaqDataProvider({ children }: { children: ReactNode }) {
       getQueryById,
       fetchQueryById,
       appendQueryMessage,
+      updateQueryMessage,
+      deleteQueryMessage,
+      setQueryViewedLocal,
       forwardQueryToSuperAdmin,
       uploadQueryAttachment,
       categories,
@@ -320,6 +353,9 @@ export function FaqDataProvider({ children }: { children: ReactNode }) {
       getQueryById,
       fetchQueryById,
       appendQueryMessage,
+      updateQueryMessage,
+      deleteQueryMessage,
+      setQueryViewedLocal,
       forwardQueryToSuperAdmin,
       uploadQueryAttachment,
       categories,

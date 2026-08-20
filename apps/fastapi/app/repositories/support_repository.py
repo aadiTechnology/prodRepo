@@ -160,6 +160,38 @@ def add_query_message(
     return row
 
 
+def get_query_message(
+    db: Session,
+    *,
+    query_id: int,
+    message_id: int,
+) -> SupportQueryMessage | None:
+    return (
+        db.query(SupportQueryMessage)
+        .filter(
+            SupportQueryMessage.id == message_id,
+            SupportQueryMessage.query_id == query_id,
+        )
+        .first()
+    )
+
+
+def update_query_message_body(
+    db: Session,
+    message: SupportQueryMessage,
+    *,
+    body: str,
+) -> SupportQueryMessage:
+    message.body = body
+    db.flush()
+    return message
+
+
+def delete_query_message_row(db: Session, message: SupportQueryMessage) -> None:
+    db.delete(message)
+    db.flush()
+
+
 def forward_query(
     db: Session,
     row: SupportQuery,

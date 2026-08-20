@@ -18,6 +18,7 @@ from app.schemas.support_schema import (
     SupportQueryCreateRequest,
     SupportQueryListResponse,
     SupportQueryMessageCreateRequest,
+    SupportQueryMessageUpdateRequest,
     SupportQueryMessageResponse,
     SupportQueryResponse,
     SupportQueryUpdateRequest,
@@ -394,6 +395,71 @@ def add_query_message(
 
     _auto_mark_query_read(db, row=row, user_id=int(getattr(current_user, "id")))
 
+    db.commit()
+    db.refresh(row)
+    return _build_query_response(db, row, is_viewed=True)
+
+
+def update_query_message(
+    db: Session,
+    *,
+    current_user: object,
+    query_key: str,
+    message_id: int,
+    payload: SupportQueryMessageUpdateRequest,
+) -> SupportQueryResponse:
+    tenant_id = resolve_support_tenant_id(db, current_user)
+    row = support_repository.resolve_query(db, query_key=query_key, tenant_id=tenant_id)
+    if not row or not can_view_query(db, current_user, row):
+        raise NotFoundException("Support query", query_key)
+
+    message = support_repository.get_query_message(
+        db,
+        query_id=row.id,
+        message_id=message_id,
+    )
+    if not message:
+        raise NotFoundException("Support query message", str(message_id))
+
+    user_id = int(getattr(current_user, "id"))
+    if message.author_user_id != user_id:
+        raise ForbiddenException("Only the message author can edit this message")
+
+    support_repository.update_query_message_body(db, message, body=payload.body.strip())
+    support_repository.update_query_row(db, row, user_id=user_id, updates={})
+    _auto_mark_query_read(db, row=row, user_id=user_id)
+    db.commit()
+    db.refresh(row)
+    return _build_query_response(db, row, is_viewed=True)
+
+
+def delete_query_message(
+    db: Session,
+    *,
+    current_user: object,
+    query_key: str,
+    message_id: int,
+) -> SupportQueryResponse:
+    tenant_id = resolve_support_tenant_id(db, current_user)
+    row = support_repository.resolve_query(db, query_key=query_key, tenant_id=tenant_id)
+    if not row or not can_view_query(db, current_user, row):
+        raise NotFoundException("Support query", query_key)
+
+    message = support_repository.get_query_message(
+        db,
+        query_id=row.id,
+        message_id=message_id,
+    )
+    if not message:
+        raise NotFoundException("Support query message", str(message_id))
+
+    user_id = int(getattr(current_user, "id"))
+    if message.author_user_id != user_id:
+        raise ForbiddenException("Only the message author can delete this message")
+
+    support_repository.delete_query_message_row(db, message)
+    support_repository.update_query_row(db, row, user_id=user_id, updates={})
+    _auto_mark_query_read(db, row=row, user_id=user_id)
     db.commit()
     db.refresh(row)
     return _build_query_response(db, row, is_viewed=True)

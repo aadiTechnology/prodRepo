@@ -13,7 +13,9 @@ import TableRowActions from "../../components/reusable/TableRowActions";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import type { DataTableColumn } from "../../components/reusable/DataTable";
 import { useFaqListController } from "../../hooks/useFaqListController";
+import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
 import { useFaqData } from "./context/FaqDataContext";
+import { formatShortDate, parseApiUtcDateTime } from "../../utils/formatters";
 import {
   isSupportQueryOwner,
   SUPPORT_UNREAD_CHANGED_EVENT,
@@ -36,12 +38,6 @@ function statusChipColor(
     default:
       return "default";
   }
-}
-
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
 }
 
 export default function ContactSupport() {
@@ -90,8 +86,12 @@ export default function ContactSupport() {
       },
       {
         id: "createdAt",
-        label: "Created Date & Time",
-        render: (row) => formatDateTime(row.createdAt),
+        label: "Created Date",
+        render: (row) => (
+          <span data-testid="support-query-created-time" data-datetime={row.createdAt}>
+            {formatShortDate(parseApiUtcDateTime(row.createdAt), { locale: "en-IN" })}
+          </span>
+        ),
       },
     ];
 
@@ -262,6 +262,7 @@ export default function ContactSupport() {
             c.setRowsPerPage(value);
             c.setPage(0);
           }}
+          rowsPerPageOptions={[DEFAULT_LIST_ROWS_PER_PAGE]}
           columns={columns}
           data={c.paginatedQueries}
           loading={false}
@@ -275,7 +276,7 @@ export default function ContactSupport() {
           }
           stickyHeader
           size="small"
-          showPagination={c.totalRows > 0}
+          showPagination={c.totalRows > DEFAULT_LIST_ROWS_PER_PAGE}
           data-testid="table-support-queries"
         />
       </Box>
@@ -283,7 +284,7 @@ export default function ContactSupport() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Delete Query"
-        message={`Permanently delete ${deleteTarget?.id ?? ""}? This cannot be undone.`}
+        message="Are you sure you want to delete this Query?"
         confirmLabel="Delete"
         cancelLabel="Cancel"
         onConfirm={confirmDelete}

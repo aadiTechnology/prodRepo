@@ -27,6 +27,8 @@ import Grid from "@mui/material/Grid2";
 import {
   AttachFile as AttachFileIcon,
   ChatBubbleOutline as ChatIcon,
+  Check as CheckIcon,
+  Close as CloseIcon,
   EditNote as EditNoteIcon,
   Send as SendIcon,
   Shortcut as ForwardIcon,
@@ -36,7 +38,10 @@ import supportService from "../../api/services/supportService";
 import { PageHeader } from "../../components/layout";
 import { FormHeaderIconAction } from "../../components/primitives";
 import { ListPageLayout } from "../../components/reusable";
+import TableRowActions from "../../components/reusable/TableRowActions";
+import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import { colorTokens } from "../../tokens/colors";
+import { formatDateTime } from "../../utils/formatters";
 import { useFaqData } from "./context/FaqDataContext";
 import { useSupportPermissions } from "../../hooks/useSupportPermissions";
 import {
@@ -49,8 +54,19 @@ import {
   isSupportNotFoundError,
   notifySupportUnreadChanged,
   openSupportQueryAttachment,
+  type SupportQueryActorRole,
+  type SupportQueryMessage,
   type SupportQueryStatus,
 } from "./support.types";
+
+function canManageQueryMessage(
+  message: SupportQueryMessage,
+  actorRole: SupportQueryActorRole | null,
+  actorDisplayName: string
+): boolean {
+  if (!actorRole) return false;
+  return message.authorRole === actorRole && message.author === actorDisplayName;
+}
 
 function statusChipColor(
   status: SupportQueryStatus
@@ -67,12 +83,6 @@ function statusChipColor(
     default:
       return "default";
   }
-}
-
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
 }
 
 function initials(name: string): string {
@@ -96,13 +106,18 @@ export default function FaqDetail() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const perms = useSupportPermissions();
-  const { getQueryById, fetchQueryById, appendQueryMessage, forwardQueryToSuperAdmin, queriesLoading } =
+  const { queries, fetchQueryById, appendQueryMessage, updateQueryMessage, deleteQueryMessage, setQueryViewedLocal, forwardQueryToSuperAdmin, queriesLoading } =
     useFaqData();
   const [reply, setReply] = useState("");
   const [statusDraft, setStatusDraft] = useState<SupportQueryStatus | "">("");
   const [submitting, setSubmitting] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [deleteMessageTarget, setDeleteMessageTarget] = useState<SupportQueryMessage | null>(null);
+  const [messageActionLoading, setMessageActionLoading] = useState(false);
   const submittingRef = useRef(false);
   const requestedIdRef = useRef<string | null>(null);
+  const markedViewedRef = useRef<string | null>(null);
   const [detailStatus, setDetailStatus] = useState<"loading" | "ready" | "error" | "missing">(
     id ? "loading" : "missing"
   );
@@ -111,10 +126,14 @@ export default function FaqDetail() {
     null
   );
 
-  const query = useMemo(() => (id ? getQueryById(id) : undefined), [getQueryById, id]);
+  const query = useMemo(
+    () => (id ? queries.find((item) => item.id === id) : undefined),
+    [queries, id]
+  );
 
   useEffect(() => {
     requestedIdRef.current = null;
+    markedViewedRef.current = null;
   }, [id]);
 
   useEffect(() => {
@@ -157,14 +176,17 @@ export default function FaqDetail() {
 
   useEffect(() => {
     if (!id || !query || !canViewSupportQuery(query, perms.actorRole)) return;
+    if (markedViewedRef.current === id) return;
+    markedViewedRef.current = id;
+
     void supportService
       .markQueryViewed(id)
       .then(() => {
         notifySupportUnreadChanged();
-        return fetchQueryById(id);
+        setQueryViewedLocal(id);
       })
       .catch(() => undefined);
-  }, [fetchQueryById, id, query, perms.actorRole]);
+  }, [id, query?.id, perms.actorRole, setQueryViewedLocal]);
 
   if (!perms.canAccessSupport) {
     return (
@@ -263,6 +285,54 @@ export default function FaqDetail() {
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
+    }
+  };
+
+  const handleSaveMessageEdit = async (messageId: string) => {
+    const body = editDraft.trim();
+    if (!body) {
+      enqueueSnackbar("Enter a message before saving.", { variant: "warning" });
+      return;
+    }
+    if (messageActionLoading) return;
+    setMessageActionLoading(true);
+    try {
+      await updateQueryMessage(query.id, messageId, body);
+      setEditingMessageId(null);
+      setEditDraft("");
+      enqueueSnackbar("Message updated.", SUPPORT_SUCCESS_SNACKBAR_OPTIONS);
+    } catch {
+      enqueueSnackbar("Failed to update message.", { variant: "error" });
+    } finally {
+      setMessageActionLoading(false);
+    }
+  };
+
+  const startMessageEdit = (message: SupportQueryMessage) => {
+    setEditingMessageId(message.id);
+    setEditDraft(message.body);
+  };
+
+  const handleCancelMessageEdit = () => {
+    setEditingMessageId(null);
+    setEditDraft("");
+  };
+
+  const confirmDeleteMessage = async () => {
+    if (!deleteMessageTarget || messageActionLoading) return;
+    setMessageActionLoading(true);
+    try {
+      await deleteQueryMessage(query.id, deleteMessageTarget.id);
+      if (editingMessageId === deleteMessageTarget.id) {
+        setEditingMessageId(null);
+        setEditDraft("");
+      }
+      setDeleteMessageTarget(null);
+      enqueueSnackbar("Message deleted.", SUPPORT_SUCCESS_SNACKBAR_OPTIONS);
+    } catch {
+      enqueueSnackbar("Failed to delete message.", { variant: "error" });
+    } finally {
+      setMessageActionLoading(false);
     }
   };
 
@@ -468,7 +538,15 @@ export default function FaqDetail() {
             <Divider sx={{ mb: 2.5 }} />
 
             <Stack spacing={2.5} mb={3.5}>
-              {query.messages.map((message) => (
+              {query.messages.map((message) => {
+                const canManage = canManageQueryMessage(
+                  message,
+                  perms.actorRole,
+                  perms.actorDisplayName
+                );
+                const isEditing = editingMessageId === message.id;
+
+                return (
                 <Box key={message.id} data-testid={`query-message-${message.id}`}>
                   <Stack direction="row" spacing={1.25} alignItems="center" mb={1}>
                     <Avatar
@@ -493,6 +571,54 @@ export default function FaqDetail() {
                     >
                       {formatDateTime(message.createdAt)}
                     </Typography>
+                    {canManage ? (
+                      <Box sx={{ ml: "auto" }}>
+                        {isEditing ? (
+                          <Stack direction="row" spacing={0.5}>
+                            <Tooltip title="Save">
+                              <IconButton
+                                size="small"
+                                aria-label="Save message"
+                                onClick={() => handleSaveMessageEdit(message.id)}
+                                disabled={messageActionLoading}
+                                data-testid={`support-chat-edit-save-${message.id}`}
+                                sx={{
+                                  color: colorTokens.preschool.turquoise.main,
+                                  "&:hover": {
+                                    bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.1),
+                                  },
+                                }}
+                              >
+                                <CheckIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Cancel">
+                              <IconButton
+                                size="small"
+                                aria-label="Cancel edit"
+                                onClick={handleCancelMessageEdit}
+                                data-testid={`support-chat-edit-cancel-${message.id}`}
+                                sx={{
+                                  color: colorTokens.preschool.coral.main,
+                                  "&:hover": {
+                                    bgcolor: alpha(colorTokens.preschool.coral.main, 0.1),
+                                  },
+                                }}
+                              >
+                                <CloseIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        ) : (
+                          <TableRowActions
+                            onEdit={() => startMessageEdit(message)}
+                            onDelete={() => setDeleteMessageTarget(message)}
+                            editTestId={`support-chat-edit-${message.id}`}
+                            deleteTestId={`support-chat-delete-${message.id}`}
+                          />
+                        )}
+                      </Box>
+                    ) : null}
                   </Stack>
                   <Box
                     sx={{
@@ -502,12 +628,32 @@ export default function FaqDetail() {
                       bgcolor: "#F3F4F6",
                     }}
                   >
-                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                      {message.body}
-                    </Typography>
+                    {isEditing ? (
+                      <TextField
+                        value={editDraft}
+                        onChange={(e) => setEditDraft(e.target.value)}
+                        fullWidth
+                        multiline
+                        minRows={2}
+                        maxRows={8}
+                        inputProps={{ "data-testid": `input-edit-query-message-${message.id}` }}
+                        sx={{
+                          "& .MuiInputBase-root": {
+                            alignItems: "flex-start",
+                            borderRadius: 2,
+                            bgcolor: "#fff",
+                          },
+                        }}
+                      />
+                    ) : (
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                        {message.body}
+                      </Typography>
+                    )}
                   </Box>
                 </Box>
-              ))}
+              );
+              })}
             </Stack>
 
             <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
@@ -645,6 +791,18 @@ export default function FaqDetail() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteMessageTarget)}
+        title="Delete Message"
+        message="Are you sure you want to delete this message?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={confirmDeleteMessage}
+        onClose={() => setDeleteMessageTarget(null)}
+        loading={messageActionLoading}
+        data-testid="dialog-delete-query-message"
+      />
     </ListPageLayout>
   );
 }
