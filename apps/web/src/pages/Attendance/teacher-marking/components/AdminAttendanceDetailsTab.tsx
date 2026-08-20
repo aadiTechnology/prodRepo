@@ -566,6 +566,8 @@ useEffect(() => {
             data={tableData}
             emptyMessage="No attendance records match the selected filters."
             stickyHeader
+            showPagination={tableTotalRows > DEFAULT_LIST_ROWS_PER_PAGE}
+            showInfoBar={false}
             data-testid={viewMode === "list" ? "table-attendance-list" : "table-attendance-details"}
             rowTestId={(row) => `${viewMode === "list" ? "attendance-list" : "attendance-details"}-row-${row.id}`}
             emptyTestId={viewMode === "list" ? "attendance-list-empty-state" : "attendance-details-empty-state"}

@@ -35,8 +35,13 @@ def _swap_sort_order_if_taken(
         occupant.sort_order = previous_sort_order
         return
 
+    occupant.sort_order = next_sort_order(db)
+
+
+def next_sort_order(db: Session) -> int:
+    """Next unused catalog position: max(sort_order) + 1, or 1 if empty."""
     max_order = db.query(func.max(MarketingPlatform.sort_order)).scalar()
-    occupant.sort_order = int(max_order or 0) + 1
+    return int(max_order or 0) + 1
 
 
 def list_platforms(db: Session, active_only: bool = False) -> list[MarketingPlatform]:
@@ -276,7 +281,11 @@ def create_platform(
     if existing:
         raise ConflictException(f"Platform with code '{data.code}' already exists.")
 
-    _swap_sort_order_if_taken(db, desired_sort_order=data.sort_order)
+    sort_order = int(data.sort_order or 0)
+    if sort_order < 1:
+        sort_order = next_sort_order(db)
+
+    _swap_sort_order_if_taken(db, desired_sort_order=sort_order)
 
     platform = MarketingPlatform(
         name=data.name.strip(),
@@ -284,7 +293,7 @@ def create_platform(
         category=data.category.strip(),
         description=data.description.strip() if data.description else None,
         icon_url=data.icon_url.strip() if data.icon_url else None,
-        sort_order=data.sort_order,
+        sort_order=sort_order,
         is_active=data.is_active,
         created_at=datetime.utcnow(),
         created_by=user_id,

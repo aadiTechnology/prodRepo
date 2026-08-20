@@ -30,7 +30,7 @@ export default function MarketingPlatformFormPage() {
   const isEditMode = Boolean(id);
 
   const [loading, setLoading] = useState(false);
-  const [fetchLoading, setFetchLoading] = useState(isEditMode);
+  const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [linkId, setLinkId] = useState<number | null>(null);
@@ -42,6 +42,16 @@ export default function MarketingPlatformFormPage() {
       name: [{ type: "required", message: "Platform name is required." }],
       code: [{ type: "required", message: "Unique code is required." }],
       category: [{ type: "required", message: "Category is required." }],
+      sort_order: [
+        {
+          type: "custom",
+          validate: (data) => {
+            const n = Number.parseInt(String(data.sort_order), 10);
+            if (!Number.isFinite(n) || n < 1) return "Sort order must be 1 or higher.";
+            return "";
+          },
+        },
+      ],
     }),
     []
   );
@@ -64,6 +74,36 @@ export default function MarketingPlatformFormPage() {
     () => createMarketingPlatformFormConfig({ isEditMode }),
     [isEditMode]
   );
+
+  useEffect(() => {
+    if (isEditMode) return;
+
+    let cancelled = false;
+    const loadNextSortOrder = async () => {
+      setFetchLoading(true);
+      try {
+        const platforms = await marketingHubService.listPlatforms(false);
+        if (cancelled) return;
+        const maxOrder = platforms.reduce(
+          (max, platform) => Math.max(max, Number(platform.sort_order) || 0),
+          0,
+        );
+        const nextSortOrder = maxOrder + 1;
+        setFormData((prev) => ({ ...prev, sort_order: nextSortOrder }));
+      } catch {
+        if (!cancelled) {
+          setFormData((prev) => ({ ...prev, sort_order: 1 }));
+        }
+      } finally {
+        if (!cancelled) setFetchLoading(false);
+      }
+    };
+
+    void loadNextSortOrder();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditMode, setFormData]);
 
   useEffect(() => {
     if (!isEditMode || !id) return;
