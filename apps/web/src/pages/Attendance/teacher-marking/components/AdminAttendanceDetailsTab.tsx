@@ -610,7 +610,6 @@ useEffect(() => {
         onClose={closeRejectDialog}
         onConfirm={confirmReject}
         title="Reject Attendance?"
-        message="Are you sure you want to reject this attendance?"
         confirmLabel="Reject"
         confirmDisabled={rejectReason.trim().length === 0}
         data-testid="dialog-reject-reason"
