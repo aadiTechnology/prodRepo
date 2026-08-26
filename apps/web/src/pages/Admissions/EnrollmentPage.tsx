@@ -171,6 +171,8 @@ export default function EnrollmentPage() {
   const isStudentAddMode = searchParams.get("source") === "students" && !isEditMode && !isViewMode;
   const isStudentFlow = isStudentAddMode || isEditMode || isViewMode;
   const editStudentId = searchParams.get("studentId") || routeStudentId;
+  const fromLeadQueryId = searchParams.get("fromLead");
+  const prefillLeadId = leadId || fromLeadQueryId;
 
   const enrollmentPageTitle = isViewMode
     ? "Student Details"
@@ -208,7 +210,11 @@ export default function EnrollmentPage() {
 
   // Core form state
   const [error, setError] = useState<string | null>(null);
-  const [fetchLoading, setFetchLoading] = useState(Boolean(leadId) || Boolean((isEditMode || isViewMode) && editStudentId));
+  const [fetchLoading, setFetchLoading] = useState(
+    Boolean(leadId) ||
+      Boolean(fromLeadQueryId) ||
+      Boolean((isEditMode || isViewMode) && editStudentId)
+  );
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -344,17 +350,17 @@ export default function EnrollmentPage() {
     }
   }, [isEditMode, isViewMode, setFormData, tenantId]);
 
-  // Prefill from lead if leadId param exists
+  // Prefill from lead if leadId route param or fromLead query exists
   useEffect(() => {
     if (isEditMode || isViewMode) {
       setFetchLoading(false);
       return;
     }
-    if (!leadId) {
+    if (!prefillLeadId) {
       setFetchLoading(false);
       return;
     }
-    const idNum = Number(leadId);
+    const idNum = Number(prefillLeadId);
     if (!Number.isFinite(idNum)) {
       setFetchLoading(false);
       return;
@@ -362,15 +368,19 @@ export default function EnrollmentPage() {
     enrollmentService
       .prefillFromLead(idNum)
       .then((prefill) => {
-        setSelectedLead({
-          id: prefill.lead_id,
-          label: buildLeadDisplayLabel(prefill.lead_id, prefill.student_name, leadOptions),
-        });
+        // Route /from-lead/:leadId is the conversion flow and must keep lead_id bound.
+        // Query ?fromLead= is student creation from a converted lead: prefill only, do not re-convert.
+        if (leadId) {
+          setSelectedLead({
+            id: prefill.lead_id,
+            label: buildLeadDisplayLabel(prefill.lead_id, prefill.student_name, leadOptions),
+          });
+        }
         setFormData((prev) => ({
           ...prev,
           student_name: prefill.student_name ?? prev.student_name,
-          date_of_birth: prefill.date_of_birth ?? prev.date_of_birth,
-          gender: prefill.gender ?? prev.gender,
+          date_of_birth: toDateInputValue(prefill.date_of_birth) || prev.date_of_birth,
+          gender: normalizeGender(prefill.gender) || prev.gender,
           parent_name: prefill.parent_name ?? prev.parent_name,
           mobile_number: prefill.mobile_number ?? prev.mobile_number,
           email: prefill.email ?? prev.email,
@@ -379,7 +389,7 @@ export default function EnrollmentPage() {
             : prev.academic_year_id || resolveCurrentAcademicYearId(academicYears),
           class_id: prefill.class_id ? String(prefill.class_id) : prev.class_id,
           class_division_id: prefill.class_division_id ? String(prefill.class_division_id) : prev.class_division_id,
-          admission_date: prefill.expected_admission_date ?? prev.admission_date,
+          admission_date: toDateInputValue(prefill.expected_admission_date) || prev.admission_date,
           fee_structure_id: prefill.fee_structure_id ? String(prefill.fee_structure_id) : prev.fee_structure_id,
           discount_id: prefill.discount_id ? String(prefill.discount_id) : "",
           birth_certificate_url: prefill.birth_certificate_url ?? "",
@@ -390,7 +400,7 @@ export default function EnrollmentPage() {
       })
       .catch(() => { })
       .finally(() => setFetchLoading(false));
-  }, [leadId, isEditMode, isViewMode, setFormData, academicYears, leadOptions]);
+  }, [prefillLeadId, leadId, isEditMode, isViewMode, setFormData, academicYears, leadOptions]);
 
   // Keep lead dropdown label in sync once options load (e.g. enroll-from-lead route)
   useEffect(() => {
@@ -861,8 +871,8 @@ export default function EnrollmentPage() {
     setFormData((prev) => ({
       ...prev,
       student_name: prefill.student_name ?? prev.student_name,
-      date_of_birth: prefill.date_of_birth ?? prev.date_of_birth,
-      gender: prefill.gender ?? prev.gender,
+      date_of_birth: toDateInputValue(prefill.date_of_birth) || prev.date_of_birth,
+      gender: normalizeGender(prefill.gender) || prev.gender,
       parent_name: prefill.parent_name ?? prev.parent_name,
       mobile_number: prefill.mobile_number ?? prev.mobile_number,
       email: prefill.email ?? prev.email,
@@ -871,7 +881,7 @@ export default function EnrollmentPage() {
         : prev.academic_year_id || resolveCurrentAcademicYearId(academicYears),
       class_id: prefill.class_id ? String(prefill.class_id) : prev.class_id,
       class_division_id: prefill.class_division_id ? String(prefill.class_division_id) : prev.class_division_id,
-      admission_date: prefill.expected_admission_date ?? prev.admission_date,
+      admission_date: toDateInputValue(prefill.expected_admission_date) || prev.admission_date,
       fee_structure_id: prefill.fee_structure_id ? String(prefill.fee_structure_id) : prev.fee_structure_id,
       discount_id: prefill.discount_id ? String(prefill.discount_id) : "",
       birth_certificate_url: prefill.birth_certificate_url ?? "",

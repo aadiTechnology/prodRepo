@@ -374,6 +374,7 @@ export default function AddLeadPage() {
         saveTooltipEdit: "Update Lead",
       }}
       onCancelNavigate={() => navigate("/admissions/leads")}
+      hideFieldValidationDialog
       confirmMessage={(ctx) =>
         ctx.isEditMode
           ? "Are you sure you want to update this lead?"

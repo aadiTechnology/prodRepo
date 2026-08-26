@@ -10,7 +10,6 @@ import { useNavigate } from "react-router-dom";
 import {
   ListPageLayout,
   ListPageToolbar,
-  DirectoryInfoBar,
   DataTable,
   TableRowActions,
   TablePaginationBar,
@@ -121,10 +120,6 @@ const LeadManagementPage = () => {
     []
   );
 
-  const rangeStart =
-    totalLeads > 0 ? Math.min(page * rowsPerPage + 1, totalLeads) : 0;
-  const rangeEnd = Math.min((page + 1) * rowsPerPage, totalLeads);
-
   return (
     <ListPageLayout
       header={
@@ -177,15 +172,6 @@ const LeadManagementPage = () => {
         </>
       }
     >
-      {!loading && totalLeads > 0 && (
-        <DirectoryInfoBar
-          label="Leads"
-          rangeStart={rangeStart}
-          rangeEnd={rangeEnd}
-          total={totalLeads}
-        />
-      )}
-
       <DataTable<Lead & Record<string, unknown>>
         columns={columns}
         data={leads as (Lead & Record<string, unknown>)[]}
@@ -203,7 +189,7 @@ const LeadManagementPage = () => {
                   size="small"
                   onClick={() => {
                     if (!row.id) return;
-                    navigate(`/admissions/enrollment/from-lead/${row.id}`);
+                    navigate(`/admissions/enrollment/from-lead/${row.id}?source=students`);
                   }}
                   sx={{
                     color: "success.main",

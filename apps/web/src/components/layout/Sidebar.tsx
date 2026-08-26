@@ -40,6 +40,8 @@ import {
   hasMenuChildren,
   isSidebarHiddenModule,
   resolveSidebarMenuLabel,
+  applyAdmissionsSidebarStructure,
+  isMenuPathActive,
   STAFF_ATTENDANCE_MENU_LABEL,
 } from "../../utils/menuNavigation";
 import { toRoleLabel } from "../../utils/formatters";
@@ -454,7 +456,7 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
     //   });
     // }
 
-    return items;
+    return items.map(applyAdmissionsSidebarStructure);
   }, [menus, user, rbacRoles]);
 
   // Initialize expandedSections based on current path and menuItems
@@ -462,14 +464,16 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
     const initialExpanded: Record<string, boolean> = {};
     menuItems.forEach((item) => {
       if (
-        location.pathname === item.path ||
-        (item.children?.some((child) => location.pathname === child.path) ?? false)
+        isMenuPathActive(location.pathname, location.search, item.path) ||
+        (item.children?.some((child) =>
+          isMenuPathActive(location.pathname, location.search, child.path)
+        ) ?? false)
       ) {
         initialExpanded[item.id] = true;
       }
     });
     setExpandedSections(initialExpanded);
-  }, [menuItems, location.pathname]);
+  }, [menuItems, location.pathname, location.search]);
 
   // AI Assistant: expand parent section when navigating via voice/text command
   useEffect(() => {
@@ -682,7 +686,11 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
       }}>
         <List sx={{ pt: 1 }}>
           {filteredItems.map((item) => {
-            const isActive = location.pathname === item.path || (item.children?.some(child => location.pathname === child.path) ?? false);
+            const isActive =
+              isMenuPathActive(location.pathname, location.search, item.path) ||
+              (item.children?.some((child) =>
+                isMenuPathActive(location.pathname, location.search, child.path)
+              ) ?? false);
             const isSectionExpanded = !!expandedSections[item.id];
             const itemBadgeCount =
               isHomeworkMenuEntry(item.label, item.path)
@@ -778,7 +786,11 @@ export default function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggle
                   <Collapse in={isSectionExpanded && !collapsed} timeout="auto" unmountOnExit>
                     <List component="div" disablePadding>
                       {item.children!.map((child) => {
-                        const isChildActive = location.pathname === child.path;
+                        const isChildActive = isMenuPathActive(
+                          location.pathname,
+                          location.search,
+                          child.path
+                        );
                         return (
                           <SubNavItem
                             key={child.id}
