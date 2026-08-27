@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
 from pydantic import BaseModel, Field
 
@@ -15,6 +15,12 @@ class StudentDetailResponse(BaseModel):
     class_name: str
     tenant_id: int | None = None
 
+class CustomStudentFeeInstallment(BaseModel):
+    installment_no: int
+    amount: float
+    due_date: date
+
+
 class StudentFeeAssignmentCreate(BaseModel):
     student_id: int = Field(...)
     academic_year_id: int = Field(...)
@@ -22,6 +28,9 @@ class StudentFeeAssignmentCreate(BaseModel):
     discount_id: Optional[int] = None
     additional_fee: Optional[float] = None  # Added field for additional fee
     remarks: Optional[str] = None
+    custom_annual_amount: Optional[float] = None
+    custom_discount_amount: Optional[float] = None
+    custom_installments: Optional[List[CustomStudentFeeInstallment]] = None
 
 class StudentFeeDetailResponse(BaseModel):
     category: str

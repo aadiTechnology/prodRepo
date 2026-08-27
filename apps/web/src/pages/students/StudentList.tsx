@@ -72,7 +72,7 @@ const StudentList = () => {
 
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedDivision, setSelectedDivision] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("Active");
   const [filterInitialized, setFilterInitialized] = useState(false);
 
   useEffect(() => {

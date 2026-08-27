@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from math import floor
 from uuid import uuid4
 from sqlalchemy import String, and_, case, cast, func, or_
 from sqlalchemy.orm import Session
@@ -14,6 +15,79 @@ from app.core.exceptions import AppException, NotFoundException, ConflictExcepti
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+def _structure_category_ids(structure: FeeStructure) -> list[str]:
+    if structure.multi_category_ids:
+        ids = [cid.strip() for cid in str(structure.multi_category_ids).split(",") if cid.strip()]
+        if ids:
+            return ids
+    if structure.fee_category_id:
+        return [str(structure.fee_category_id)]
+    return []
+
+
+def _sum_category_amounts(db: Session, tenant_id: int, category_ids: list[str]) -> float:
+    if not category_ids:
+        return 0.0
+    rows = (
+        db.query(FeeCategory.amount)
+        .filter(FeeCategory.tenant_id == tenant_id, FeeCategory.id.in_(category_ids))
+        .all()
+    )
+    return float(sum(float(row.amount or 0) for row in rows))
+
+
+def _split_installment_amounts(total: float, count: int) -> list[float]:
+    if count <= 0 or total <= 0:
+        return []
+    per = floor((total / count) * 100) / 100
+    remainder = round((total - per * count) * 100) / 100
+    amounts = [per] * count
+    amounts[-1] = round((per + remainder) * 100) / 100
+    return amounts
+
+
+def apply_category_total_to_structure(db: Session, tenant_id: int, structure: FeeStructure) -> tuple[float, list]:
+    ids = _structure_category_ids(structure)
+    total = _sum_category_amounts(db, tenant_id, ids) if ids else float(structure.total_amount or 0)
+    if ids:
+        structure.total_amount = total
+    installments = (
+        db.query(FeeInstallment)
+        .filter(
+            FeeInstallment.fee_structure_id == structure.id,
+            FeeInstallment.is_deleted == False,  # noqa: E712
+        )
+        .order_by(FeeInstallment.installment_number, FeeInstallment.id)
+        .all()
+    )
+    amounts = _split_installment_amounts(float(total or 0), len(installments))
+    for inst, amount in zip(installments, amounts):
+        inst.amount = amount
+    return float(total or 0), installments
+
+
+def _sync_fee_structure_totals_for_category(db: Session, tenant_id: int, category_id: str) -> None:
+    category_id = str(category_id)
+    structures = (
+        db.query(FeeStructure)
+        .filter(
+            FeeStructure.tenant_id == tenant_id,
+            FeeStructure.is_deleted == False,  # noqa: E712
+            or_(
+                FeeStructure.fee_category_id == category_id,
+                FeeStructure.multi_category_ids.like(f"%{category_id}%"),
+            ),
+        )
+        .all()
+    )
+    for structure in structures:
+        ids = _structure_category_ids(structure)
+        if category_id not in ids:
+            continue
+        apply_category_total_to_structure(db, tenant_id, structure)
+        structure.updated_at = datetime.utcnow()
 
 
 def get_fee_categories(db: Session, tenant_id: int, class_id: int = None, academic_year_id: int = None, class_name: str = None) -> list[FeeCategory]:
@@ -159,6 +233,9 @@ def update_fee_category(
     db_obj.updated_at = datetime.utcnow()
     db_obj.updated_by = user_id
 
+    if "amount" in update_data:
+        _sync_fee_structure_totals_for_category(db, tenant_id, category_id)
+
     db.commit()
     db.refresh(db_obj)
     return db_obj
@@ -194,7 +271,12 @@ def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academ
     # Fetch lookup dictionaries to avoid N+1 queries
     class_ids = list({s.class_id for s in structures if s.class_id})
     div_ids = list({s.class_division_id for s in structures if s.class_division_id})
-    category_ids = list({str(s.fee_category_id) for s in structures if s.fee_category_id})
+    category_ids = set()
+    for s in structures:
+        category_ids.update(_structure_category_ids(s))
+        if s.fee_category_id:
+            category_ids.add(str(s.fee_category_id))
+    category_ids = list(category_ids)
     year_ids = list({s.academic_year_id for s in structures if s.academic_year_id})
 
     class_map = {}
@@ -213,11 +295,13 @@ def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academ
 
 
     category_map = {}
+    category_amount_map = {}
     if category_ids:
-        categories = db.query(FeeCategory.id, FeeCategory.name).filter(
+        categories = db.query(FeeCategory.id, FeeCategory.name, FeeCategory.amount).filter(
             FeeCategory.id.in_(category_ids), FeeCategory.tenant_id == tenant_id
         ).all()
         category_map = {str(c.id): c.name for c in categories}
+        category_amount_map = {str(c.id): float(c.amount or 0) for c in categories}
 
     year_map = {}
     if year_ids:
@@ -242,6 +326,9 @@ def get_fee_structures(db: Session, tenant_id: int, class_id: int = None, academ
             s.fee_category_name = category_map.get(str(s.fee_category_id))
             
         s.academic_year_name = year_map.get(s.academic_year_id)
+        linked_ids = _structure_category_ids(s)
+        if linked_ids:
+            s.total_amount = float(sum(category_amount_map.get(cid, 0.0) for cid in linked_ids))
         
     # Deduplicate by unique DB id (since we don't want to over-filter distinct setups)
     unique_structures = []

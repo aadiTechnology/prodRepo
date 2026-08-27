@@ -12,6 +12,7 @@ from app.models.student import Student
 from app.models.student_fee_assignment import StudentFeeAssignment
 from app.schemas.student_fee_assignment import StudentFeeAssignmentCreate
 from app.services import student_fee_assignment_service
+from app.core.exceptions import AppException
 from app.services.school_class_service import (
     require_active_class,
     require_active_division,
@@ -241,6 +242,9 @@ class EnrollmentService:
                 fee_structure_id=payload.fee_structure_id,
                 discount_id=payload.discount_id,
                 additional_fee=payload.additional_fee,
+                custom_annual_amount=payload.custom_annual_amount,
+                custom_discount_amount=payload.custom_discount_amount,
+                custom_installments=payload.custom_installments,
             )
             fee_result = student_fee_assignment_service.assign_fee_to_student(
                 self.db,
@@ -350,6 +354,9 @@ class EnrollmentService:
         except HTTPException:
             self.db.rollback()
             raise
+        except AppException as e:
+            self.db.rollback()
+            raise HTTPException(status_code=e.status_code, detail=e.message)
         except SQLAlchemyError:
             self.db.rollback()
             raise HTTPException(status_code=500, detail="Enrollment failed. Please try again")

@@ -84,8 +84,12 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
     if not fee_structure:
         raise AppException("Fee structure not found", status_code=400)
 
-    # Fetch installments
-    installments = db.query(FeeInstallment).filter(FeeInstallment.fee_structure_id == payload.fee_structure_id).all()
+    # Fetch installments from the master plan unless this student has a custom schedule.
+    custom_installments = list(getattr(payload, "custom_installments", None) or [])
+    has_custom_schedule = len(custom_installments) > 0
+    installments = []
+    if not has_custom_schedule:
+        installments = db.query(FeeInstallment).filter(FeeInstallment.fee_structure_id == payload.fee_structure_id).all()
 
     # Discount
     discount = None
@@ -103,12 +107,21 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
     # Calculate amounts
     total_amount = 0.0
     details = []
-    base_amount = float(sum(float(inst.amount or 0) for inst in installments))
+    if has_custom_schedule:
+        custom_sum = float(sum(float(inst.amount or 0) for inst in custom_installments))
+        if payload.custom_annual_amount is not None:
+            base_amount = float(payload.custom_annual_amount)
+        else:
+            base_amount = custom_sum
+    else:
+        base_amount = float(sum(float(inst.amount or 0) for inst in installments))
     if base_amount <= 0:
         base_amount = float(fee_structure.total_amount or 0)
 
     discount_applied = 0.0
-    if discount and base_amount > 0:
+    if has_custom_schedule and payload.custom_discount_amount is not None:
+        discount_applied = max(0.0, min(float(payload.custom_discount_amount or 0), base_amount))
+    elif discount and base_amount > 0:
         discount_type = str(discount.discount_type or "").strip().lower()
         discount_value = float(discount.discount_value or 0)
         if discount_type in {"percentage", "percent"}:
@@ -131,6 +144,16 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
     })
     total_amount = final_amount
     # additional_fee logic removed
+
+    if has_custom_schedule:
+        custom_sum = float(sum(float(inst.amount or 0) for inst in custom_installments))
+        if abs(custom_sum - float(final_amount)) > 0.05:
+            raise AppException(
+                f"Installment total ({custom_sum:.2f}) must match final payable ({float(final_amount):.2f}).",
+                status_code=400,
+            )
+        if any(not inst.due_date for inst in custom_installments):
+            raise AppException("Each customized installment needs a due date.", status_code=400)
 
     # Save in transaction
     try:
@@ -155,22 +178,32 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
                 discount_applied=d["discount_applied"],
                 final_amount=d["final_amount"],
             ))
-        # Installments
-        total_template_installment_sum = float(sum(float(inst.amount or 0) for inst in installments))
-        discount_ratio = (discount_applied / total_template_installment_sum) if total_template_installment_sum > 0 else 0.0
+        # Installments: custom rows apply only to this student; otherwise copy the master plan.
+        if has_custom_schedule:
+            for index, inst in enumerate(custom_installments):
+                db.add(StudentFeeInstallment(
+                    assignment_id=assignment.id,
+                    installment_no=int(inst.installment_no or index + 1),
+                    due_date=inst.due_date,
+                    amount=max(0.0, round(float(inst.amount or 0), 2)),
+                    status="Pending",
+                ))
+        else:
+            total_template_installment_sum = float(sum(float(inst.amount or 0) for inst in installments))
+            discount_ratio = (discount_applied / total_template_installment_sum) if total_template_installment_sum > 0 else 0.0
 
-        for inst in installments:
-            raw_amount = float(inst.amount or 0)
-            # Apply discount ratio to each installment
-            discounted_amount = max(0.0, round(raw_amount * (1.0 - discount_ratio), 2))
-            
-            db.add(StudentFeeInstallment(
-                assignment_id=assignment.id,
-                installment_no=inst.installment_number,
-                due_date=inst.due_date,
-                amount=discounted_amount,
-                status="Pending",
-            ))
+            for inst in installments:
+                raw_amount = float(inst.amount or 0)
+                # Apply discount ratio to each installment
+                discounted_amount = max(0.0, round(raw_amount * (1.0 - discount_ratio), 2))
+                
+                db.add(StudentFeeInstallment(
+                    assignment_id=assignment.id,
+                    installment_no=inst.installment_number,
+                    due_date=inst.due_date,
+                    amount=discounted_amount,
+                    status="Pending",
+                ))
         # Create FeeLedger if not exists
         from app.models.student_fee_ledger import FeeLedger
         existing_ledger = db.query(FeeLedger).filter(

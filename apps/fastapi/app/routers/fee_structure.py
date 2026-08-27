@@ -3,6 +3,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.fee import FeeStructure
+from app.services.fee_service import apply_category_total_to_structure
 
 router = APIRouter(prefix="/api/fee-structures", tags=["Fee Structures"])
 
@@ -39,9 +40,21 @@ def list_fee_structures(
     for f in fee_structures:
         # Always use fee structure name if present, otherwise fallback to 'Fee Structure #{id}'
         display_name = f.name.strip() if f.name and f.name.strip() != "" else f"Fee Structure #{f.id}"
+        total_amount, installment_rows = apply_category_total_to_structure(db, tenantId, f)
+        installments = [
+            {
+                "installment_number": int(inst.installment_number or index + 1),
+                "amount": float(inst.amount or 0),
+                "due_date": inst.due_date.isoformat() if inst.due_date else None,
+            }
+            for index, inst in enumerate(installment_rows)
+        ]
         result.append({
             "id": f.id,
             "name": display_name,
-            "total_amount": float(f.total_amount or 0),
+            "total_amount": total_amount,
+            "installment_type": f.installment_type,
+            "num_installments": len(installments) or int(f.num_installments or 0),
+            "installments": installments,
         })
     return result

@@ -18,6 +18,12 @@ export interface EnrollmentPrefill {
   photo_url?: string | null;
 }
 
+export interface CustomEnrollmentInstallment {
+  installment_no: number;
+  amount: number;
+  due_date: string;
+}
+
 export interface EnrollmentCreatePayload {
   lead_id?: number | null;
   student_name: string;
@@ -35,6 +41,9 @@ export interface EnrollmentCreatePayload {
   fee_structure_id: number;
   discount_id?: number | null;
   additional_fee?: number | null;
+  custom_annual_amount?: number | null;
+  custom_discount_amount?: number | null;
+  custom_installments?: CustomEnrollmentInstallment[];
   birth_certificate_url?: string | null;
   photo_url?: string | null;
 }

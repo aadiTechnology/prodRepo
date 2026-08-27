@@ -1,10 +1,11 @@
 from datetime import date
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.core.contact_validators import validate_contact_number
 from app.core.date_validators import validate_not_future_date
+from app.schemas.student_fee_assignment import CustomStudentFeeInstallment
 
 class NextAdmissionNoResponse(BaseModel):
     admission_no: str
@@ -50,6 +51,9 @@ class EnrollmentCreateRequest(BaseModel):
     fee_structure_id: int
     discount_id: Optional[int] = None
     additional_fee: Optional[float] = None
+    custom_annual_amount: Optional[float] = None
+    custom_discount_amount: Optional[float] = None
+    custom_installments: Optional[List[CustomStudentFeeInstallment]] = None
 
     birth_certificate_url: Optional[str] = None
     photo_url: Optional[str] = None

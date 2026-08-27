@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Alert, Autocomplete, Box, Button, TextField, Typography } from "@mui/material";
+import { Autocomplete, Box, Button, FormHelperText, TextField, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import dayjs from "dayjs";
 import ChildCareIcon from "@mui/icons-material/ChildCare";
@@ -12,11 +12,13 @@ import UploadFileIcon from "@mui/icons-material/UploadFile";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import AddIcon from "@mui/icons-material/Add";
 import { IconButton } from "@mui/material";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 
 import BaseForm from "../../components/reusable/BaseForm";
 import FormSectionLabel from "../../components/reusable/FormSectionLabel";
+import { DataTable, TableRowActions } from "../../components/reusable";
 import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { useAuth } from "../../context/AuthContext";
 import { useRBAC } from "../../context/RBACContext";
@@ -52,10 +54,19 @@ function buildLeadDisplayLabel(
   return `Lead #${leadId}`;
 }
 
+interface FeePlanInstallment {
+  installment_number: number;
+  amount: number;
+  due_date?: string | null;
+}
+
 interface FeePlanOption {
   id: number;
   name: string;
   total_amount?: number;
+  installment_type?: string | null;
+  num_installments?: number;
+  installments?: FeePlanInstallment[];
 }
 
 interface DiscountOption {
@@ -65,6 +76,31 @@ interface DiscountOption {
   discount_value: number;
   applicable_class?: string | null;
 }
+
+type StudentFeeInstallmentDraft = {
+  installment_no: number;
+  amount: string;
+  due_date: string;
+};
+
+type SavedCustomFeePlan = {
+  annual: number;
+  discount: number;
+  installments: StudentFeeInstallmentDraft[];
+};
+
+const mapPlanInstallments = (raw?: FeePlanInstallment[] | null): StudentFeeInstallmentDraft[] =>
+  (raw || [])
+    .map((item, index) => ({
+      installment_no: Number(item.installment_number || index + 1),
+      amount: Number(item.amount || 0).toFixed(2),
+      due_date: toDateInputValue(item.due_date),
+    }))
+    .sort((a, b) => a.installment_no - b.installment_no)
+    .map((item, index) => ({ ...item, installment_no: index + 1 }));
+
+const installmentDraftTotal = (rows: StudentFeeInstallmentDraft[]): number =>
+  rows.reduce((acc, row) => acc + Number(row.amount || 0), 0);
 
 type StudentViewMeta = {
   academic_year_name?: string;
@@ -229,6 +265,12 @@ export default function EnrollmentPage() {
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [divisions, setDivisions] = useState<ClassDivision[]>([]);
   const [feePlans, setFeePlans] = useState<FeePlanOption[]>([]);
+  const [feeScheduleMode, setFeeScheduleMode] = useState<"configured" | "customizing" | "customized">("configured");
+  const [customAnnualFee, setCustomAnnualFee] = useState("");
+  const [customDiscountAmount, setCustomDiscountAmount] = useState("");
+  const [customInstallments, setCustomInstallments] = useState<StudentFeeInstallmentDraft[]>([]);
+  const [savedCustomFee, setSavedCustomFee] = useState<SavedCustomFeePlan | null>(null);
+  const [customFeeError, setCustomFeeError] = useState<string | null>(null);
   const [discounts, setDiscounts] = useState<DiscountOption[]>([]);
   const [studentViewMeta, setStudentViewMeta] = useState<StudentViewMeta>({});
   const [studentRecord, setStudentRecord] = useState<StudentDetails | null>(null);
@@ -522,11 +564,28 @@ export default function EnrollmentPage() {
       .then((res) => {
         const rows = (res.data || []) as any[];
         setFeePlans(
-          rows.map((row) => ({
-            id: Number(row.id),
-            name: row.name,
-            total_amount: row.total_amount != null ? Number(row.total_amount) : undefined,
-          }))
+          rows.map((row) => {
+            const installments = Array.isArray(row.installments)
+              ? row.installments
+                  .map((item: any, index: number) => ({
+                    installment_number: Number(item.installment_number || index + 1),
+                    amount: Number(item.amount || 0),
+                    due_date: toDateInputValue(item.due_date) || null,
+                  }))
+                  .sort(
+                    (a: FeePlanInstallment, b: FeePlanInstallment) =>
+                      a.installment_number - b.installment_number
+                  )
+              : [];
+            return {
+              id: Number(row.id),
+              name: row.name,
+              total_amount: row.total_amount != null ? Number(row.total_amount) : undefined,
+              installment_type: row.installment_type || null,
+              num_installments: row.num_installments != null ? Number(row.num_installments) : installments.length,
+              installments,
+            };
+          })
         );
       })
       .catch(() => setFeePlans([]));
@@ -612,26 +671,42 @@ export default function EnrollmentPage() {
   }, [documentDeleteTarget, setFormData]);
 
   // Build submission payload
-  const buildPayload = (): EnrollmentCreatePayload => ({
-    lead_id: selectedLead?.id ?? null,
-    student_name: formData.student_name.trim(),
-    date_of_birth: formData.date_of_birth || null,
-    gender: formData.gender || null,
-    admission_no: formData.admission_no.trim() || null,
-    admission_date: formData.admission_date,
-    academic_year_id: Number(formData.academic_year_id),
-    class_id: Number(formData.class_id),
-    class_division_id: formData.class_division_id ? Number(formData.class_division_id) : null,
-    roll_no: formData.roll_no.trim() || null,
-    parent_name: formData.parent_name.trim(),
-    mobile_number: formData.mobile_number.trim(),
-    email: formData.email.trim(),
-    fee_structure_id: Number(formData.fee_structure_id),
-    discount_id: formData.discount_id ? Number(formData.discount_id) : null,
-    additional_fee: null,
-    birth_certificate_url: formData.birth_certificate_url.trim() || null,
-    photo_url: formData.photo_url.trim() || null,
-  });
+  const buildPayload = (): EnrollmentCreatePayload => {
+    const customPlan =
+      feeScheduleMode === "customized"
+        ? savedCustomFee
+        : null;
+    const payload: EnrollmentCreatePayload = {
+      lead_id: selectedLead?.id ?? null,
+      student_name: formData.student_name.trim(),
+      date_of_birth: formData.date_of_birth || null,
+      gender: formData.gender || null,
+      admission_no: formData.admission_no.trim() || null,
+      admission_date: formData.admission_date,
+      academic_year_id: Number(formData.academic_year_id),
+      class_id: Number(formData.class_id),
+      class_division_id: formData.class_division_id ? Number(formData.class_division_id) : null,
+      roll_no: formData.roll_no.trim() || null,
+      parent_name: formData.parent_name.trim(),
+      mobile_number: formData.mobile_number.trim(),
+      email: formData.email.trim(),
+      fee_structure_id: Number(formData.fee_structure_id),
+      discount_id: formData.discount_id ? Number(formData.discount_id) : null,
+      additional_fee: null,
+      birth_certificate_url: formData.birth_certificate_url.trim() || null,
+      photo_url: formData.photo_url.trim() || null,
+    };
+    if (customPlan && customPlan.installments.length > 0) {
+      payload.custom_annual_amount = Number(customPlan.annual);
+      payload.custom_discount_amount = Number(customPlan.discount);
+      payload.custom_installments = customPlan.installments.map((row, index) => ({
+        installment_no: index + 1,
+        amount: Number(row.amount || 0),
+        due_date: row.due_date,
+      }));
+    }
+    return payload;
+  };
 
   // Submit handler
   const handleConfirmSubmit = async () => {
@@ -664,6 +739,10 @@ export default function EnrollmentPage() {
         });
         setSnackbar(res?.message || "Student updated successfully");
       } else {
+        if (feeScheduleMode === "customizing") {
+          setError("Save the customized fee plan first, or click Use Configured Plan.");
+          return;
+        }
         const res = await enrollmentService.enroll(buildPayload());
         setSnackbar(res.message || "Enrollment completed successfully");
       }
@@ -819,8 +898,19 @@ export default function EnrollmentPage() {
     return `${discount.discount_name} (${discount.discount_type} ${discount.discount_value})`;
   }, [discountById, formData.discount_id]);
 
+  const selectedFeePlan = useMemo(
+    () => feePlans.find((item) => item.id === Number(formData.fee_structure_id)) || null,
+    [feePlans, formData.fee_structure_id]
+  );
+  const selectedPlanInstallments = useMemo(
+    () => selectedFeePlan?.installments || [],
+    [selectedFeePlan]
+  );
+  const selectedInstallmentCount =
+    selectedFeePlan?.num_installments || selectedPlanInstallments.length;
+
   const feePreview = useMemo(() => {
-    const feePlan = feePlans.find((item) => item.id === Number(formData.fee_structure_id));
+    const feePlan = selectedFeePlan;
     const total = Number(feePlan?.total_amount || 0);
     const discount = discountById.get(Number(formData.discount_id));
     if (!discount) {
@@ -840,7 +930,113 @@ export default function EnrollmentPage() {
       discountAmount,
       finalAmount: Math.max(0, total - discountAmount),
     };
-  }, [discountById, feePlans, formData.fee_structure_id, formData.discount_id]);
+  }, [discountById, selectedFeePlan, formData.discount_id]);
+
+  const configuredInstallments = useMemo(
+    () => mapPlanInstallments(selectedPlanInstallments),
+    [selectedPlanInstallments]
+  );
+  const displayedAnnual =
+    savedCustomFee && feeScheduleMode !== "configured" ? savedCustomFee.annual : feePreview.total;
+  const displayedDiscount =
+    savedCustomFee && feeScheduleMode !== "configured" ? savedCustomFee.discount : feePreview.discountAmount;
+  const displayedFinal =
+    savedCustomFee && feeScheduleMode !== "configured"
+      ? Math.max(0, savedCustomFee.annual - savedCustomFee.discount)
+      : feePreview.finalAmount;
+  const displayedInstallments =
+    feeScheduleMode === "customizing"
+      ? customInstallments
+      : savedCustomFee && feeScheduleMode === "customized"
+        ? savedCustomFee.installments
+        : configuredInstallments;
+  const customDraftFinal = Math.max(0, Number(customAnnualFee || 0) - Number(customDiscountAmount || 0));
+  const customDraftInstallmentTotal = installmentDraftTotal(customInstallments);
+  const canCustomizeFee = !isEditMode && !isViewMode && Boolean(formData.fee_structure_id);
+  const scheduleTitleCount =
+    feeScheduleMode === "customizing"
+      ? customInstallments.length
+      : displayedInstallments.length || selectedInstallmentCount;
+
+  const useConfiguredFeePlan = () => {
+    setFeeScheduleMode("configured");
+    setSavedCustomFee(null);
+    setCustomFeeError(null);
+    setSnackbar("Using the configured fee plan for this student.");
+  };
+
+  const startCustomizeFeePlan = () => {
+    const source =
+      savedCustomFee?.installments?.length ? savedCustomFee.installments : configuredInstallments;
+    setCustomAnnualFee((savedCustomFee?.annual ?? feePreview.total).toFixed(2));
+    setCustomDiscountAmount((savedCustomFee?.discount ?? feePreview.discountAmount).toFixed(2));
+    setCustomInstallments(
+      source.length
+        ? source.map((row, index) => ({ ...row, installment_no: index + 1 }))
+        : [{ installment_no: 1, amount: feePreview.finalAmount.toFixed(2), due_date: dayjs().format("YYYY-MM-DD") }]
+    );
+    setCustomFeeError(null);
+    setFeeScheduleMode("customizing");
+  };
+
+  const saveCustomizedFeePlan = () => {
+    if (!customInstallments.length) {
+      setCustomFeeError("At least one installment is required.");
+      return;
+    }
+    if (customInstallments.some((row) => !row.due_date || Number(row.amount) < 0 || Number.isNaN(Number(row.amount)))) {
+      setCustomFeeError("Amount and due date are required for each installment.");
+      return;
+    }
+    if (Math.abs(customDraftInstallmentTotal - customDraftFinal) > 0.05) {
+      setCustomFeeError(
+        `Installment total must match the final payable amount.`
+      );
+      return;
+    }
+    setSavedCustomFee({
+      annual: Number(customAnnualFee || 0),
+      discount: Number(customDiscountAmount || 0),
+      installments: customInstallments.map((row, index) => ({ ...row, installment_no: index + 1 })),
+    });
+    setFeeScheduleMode("customized");
+    setCustomFeeError(null);
+    setSnackbar("Customized fee plan saved for this student.");
+  };
+
+  const updateCustomInstallment = (index: number, field: "amount" | "due_date", value: string) => {
+    setCustomInstallments((prev) =>
+      prev.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row))
+    );
+  };
+
+  const addCustomInstallment = () => {
+    setCustomInstallments((prev) => [
+      ...prev,
+      {
+        installment_no: prev.length + 1,
+        amount: "0.00",
+        due_date: dayjs().format("YYYY-MM-DD"),
+      },
+    ]);
+  };
+
+  const removeCustomInstallment = (installmentNo: number) => {
+    setCustomInstallments((prev) =>
+      prev
+        .filter((row) => row.installment_no !== installmentNo)
+        .map((row, rowIndex) => ({ ...row, installment_no: rowIndex + 1 }))
+    );
+  };
+
+  useEffect(() => {
+    setFeeScheduleMode("configured");
+    setSavedCustomFee(null);
+    setCustomInstallments([]);
+    setCustomAnnualFee("");
+    setCustomDiscountAmount("");
+    setCustomFeeError(null);
+  }, [formData.fee_structure_id]);
 
   // Sync discount validity when filtered options change
   useEffect(() => {
@@ -1110,12 +1306,196 @@ export default function EnrollmentPage() {
       });
     }
 
-    // 8. Discount Preview Box
+    // 8. Installment schedule from selected fee plan, then discount preview
     const discountIdx = config.layoutRows.findIndex(
       (row) => row.kind === "fields" && row.fieldNames.includes("discount_id")
     );
     if (discountIdx >= 0) {
-      config.layoutRows.splice(discountIdx + 1, 0, {
+      const feeScheduleRows: typeof config.layoutRows = [];
+      if (formData.fee_structure_id) {
+        feeScheduleRows.push({
+          kind: "custom" as const,
+          grid: { xs: 12 },
+          render: () => (
+            <Box sx={{ mt: 1 }}>
+              {feeScheduleMode !== "configured" ? (
+                <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700 }}>
+                  Customized Fee Plan ({scheduleTitleCount} installment
+                  {scheduleTitleCount === 1 ? "" : "s"})
+                </Typography>
+              ) : null}
+              {feeScheduleMode === "customizing" ? (
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <TextField
+                      label="Total Fee"
+                      size="small"
+                      type="number"
+                      value={customAnnualFee}
+                      onChange={(e) => setCustomAnnualFee(e.target.value)}
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <TextField
+                      label="Discount / Concession"
+                      size="small"
+                      type="number"
+                      value={customDiscountAmount}
+                      onChange={(e) => setCustomDiscountAmount(e.target.value)}
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <TextField
+                      label="Final Payable"
+                      size="small"
+                      value={customDraftFinal.toFixed(2)}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                    />
+                  </Grid>
+                </Grid>
+              ) : null}
+              {(feeScheduleMode === "customizing" ? customInstallments : displayedInstallments).length > 0 ? (
+                <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.25, overflow: "hidden" }}>
+                  <DataTable
+                    columns={[
+                      {
+                        id: "num",
+                        label: "Installment",
+                        align: "left",
+                        width: feeScheduleMode === "customizing" ? "28%" : "35%",
+                        render: (row: StudentFeeInstallmentDraft) => (
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: "text.secondary" }}>
+                            Installment {row.installment_no}
+                          </Typography>
+                        ),
+                      },
+                      {
+                        id: "amt",
+                        label: "Amount",
+                        align: "right",
+                        width: "30%",
+                        render: (row: StudentFeeInstallmentDraft, idx: number) =>
+                          feeScheduleMode === "customizing" ? (
+                            <TextField
+                              size="small"
+                              type="number"
+                              value={row.amount}
+                              onChange={(e) => updateCustomInstallment(idx, "amount", e.target.value)}
+                              variant="standard"
+                              InputProps={{
+                                disableUnderline: false,
+                                sx: { fontSize: "0.875rem", "& input": { textAlign: "right" } },
+                              }}
+                              sx={{ width: "120px" }}
+                            />
+                          ) : (
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: "primary.main" }}>
+                              ₹{Number(row.amount).toLocaleString()}
+                            </Typography>
+                          ),
+                      },
+                      {
+                        id: "date",
+                        label: "Due Date",
+                        align: "center",
+                        width: "35%",
+                        render: (row: StudentFeeInstallmentDraft, idx: number) => (
+                          <TextField
+                            type="date"
+                            size="small"
+                            value={toDateInputValue(row.due_date)}
+                            onChange={(e) =>
+                              feeScheduleMode === "customizing"
+                                ? updateCustomInstallment(idx, "due_date", e.target.value)
+                                : undefined
+                            }
+                            variant="standard"
+                            InputProps={{
+                              readOnly: feeScheduleMode !== "customizing",
+                              disableUnderline: false,
+                              sx: {
+                                fontSize: "0.875rem",
+                                "& input": { textAlign: "center" },
+                              },
+                            }}
+                            sx={{ width: "160px", pointerEvents: feeScheduleMode === "customizing" ? "auto" : "none" }}
+                          />
+                        ),
+                      },
+                    ]}
+                    data={feeScheduleMode === "customizing" ? customInstallments : displayedInstallments}
+                    renderRowActions={
+                      feeScheduleMode === "customizing"
+                        ? (row: StudentFeeInstallmentDraft) => (
+                            <Box onClick={(event) => event.stopPropagation()}>
+                              <TableRowActions
+                                onDelete={() => removeCustomInstallment(row.installment_no)}
+                                disabled={customInstallments.length <= 1}
+                              />
+                            </Box>
+                          )
+                        : undefined
+                    }
+                  />
+                </Box>
+              ) : (
+                <Box
+                  sx={{
+                    p: 2,
+                    textAlign: "center",
+                    bgcolor: "grey.50",
+                    borderRadius: 1,
+                    border: "1px dashed",
+                    borderColor: "grey.300",
+                  }}
+                >
+                  <Typography variant="body2" color="textSecondary">
+                    {feeScheduleMode === "customizing"
+                      ? "Add at least one installment for this student."
+                      : "No installments are configured on this fee plan."}
+                  </Typography>
+                </Box>
+              )}
+              {customFeeError ? (
+                <FormHelperText error sx={{ mx: 0, mt: 1.5 }}>
+                  {customFeeError}
+                </FormHelperText>
+              ) : null}
+              {canCustomizeFee ? (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mt: 2 }}>
+                  <Button
+                    variant={feeScheduleMode === "configured" ? "contained" : "outlined"}
+                    onClick={useConfiguredFeePlan}
+                  >
+                    Use Configured Plan
+                  </Button>
+                  {feeScheduleMode === "customizing" ? (
+                    <>
+                      <Button variant="outlined" startIcon={<AddIcon />} onClick={addCustomInstallment}>
+                        Add Installment
+                      </Button>
+                      <Button variant="contained" onClick={saveCustomizedFeePlan}>
+                        Save Customized Plan
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant={feeScheduleMode === "customized" ? "contained" : "outlined"}
+                      onClick={startCustomizeFeePlan}
+                    >
+                      Customize Fee Plan
+                    </Button>
+                  )}
+                </Box>
+              ) : null}
+            </Box>
+          ),
+        });
+      }
+      feeScheduleRows.push({
         kind: "custom" as const,
         grid: { xs: 12 },
         render: (ctx) => (
@@ -1141,26 +1521,31 @@ export default function EnrollmentPage() {
                 <Typography variant="caption" color="text.secondary">
                   Total
                 </Typography>
-                <Typography variant="body2">Rs. {feePreview.total.toFixed(2)}</Typography>
+                <Typography variant="body2">
+                  Rs. {(feeScheduleMode === "customizing" ? Number(customAnnualFee || 0) : displayedAnnual).toFixed(2)}
+                </Typography>
               </Grid>
               <Grid size={{ xs: 6, sm: 2.5 }}>
                 <Typography variant="caption" color="text.secondary">
                   Discount
                 </Typography>
-                <Typography variant="body2">Rs. {feePreview.discountAmount.toFixed(2)}</Typography>
+                <Typography variant="body2">
+                  Rs. {(feeScheduleMode === "customizing" ? Number(customDiscountAmount || 0) : displayedDiscount).toFixed(2)}
+                </Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 2.5 }}>
                 <Typography variant="caption" color="text.secondary">
                   Final Amount
                 </Typography>
                 <Typography variant="body2" color="success.main" sx={{ fontWeight: 700 }}>
-                  Rs. {feePreview.finalAmount.toFixed(2)}
+                  Rs. {(feeScheduleMode === "customizing" ? customDraftFinal : displayedFinal).toFixed(2)}
                 </Typography>
               </Grid>
             </Grid>
           </Box>
         ),
       });
+      config.layoutRows.splice(discountIdx + 1, 0, ...feeScheduleRows);
     }
 
     // 9-10. Documents Upload: header immediately followed by upload controls
@@ -1171,8 +1556,7 @@ export default function EnrollmentPage() {
     );
     if (discountIdxForDocs >= 0) {
       docsInsertAt = discountIdxForDocs + 1;
-      // Skip discount preview custom row when present
-      if (config.layoutRows[docsInsertAt]?.kind === "custom") {
+      while (config.layoutRows[docsInsertAt]?.kind === "custom") {
         docsInsertAt += 1;
       }
     }
@@ -1327,22 +1711,44 @@ export default function EnrollmentPage() {
     return config;
   }, [
     academicYearOptions,
+    addCustomInstallment,
     birthCertName,
+    canCustomizeFee,
     classOptions,
+    customAnnualFee,
+    customDiscountAmount,
+    customDraftFinal,
+    customFeeError,
+    customInstallments,
     discountOptions,
+    displayedAnnual,
+    displayedDiscount,
+    displayedFinal,
+    displayedInstallments,
     feePlanOptions,
     feePreview,
+    feeScheduleMode,
     formData.birth_certificate_url,
+    formData.fee_structure_id,
     formData.photo_url,
     leadOptions,
     openDocumentInNewTab,
     photoName,
+    removeCustomInstallment,
     requestDocumentDelete,
+    saveCustomizedFeePlan,
+    scheduleTitleCount,
     selectedDiscountLabel,
+    selectedFeePlan,
+    selectedInstallmentCount,
     selectedLead,
+    selectedPlanInstallments,
+    startCustomizeFeePlan,
     divisionOptions,
+    updateCustomInstallment,
     uploadingBirthCert,
     uploadingPhoto,
+    useConfiguredFeePlan,
     prefillFromLead,
     discountById,
     isViewMode,
@@ -1438,6 +1844,7 @@ export default function EnrollmentPage() {
         }
         canSubmit={isViewMode ? false : canEnroll}
         hideFooterActions={isViewMode}
+        hideFieldValidationDialog
       />
     </>
   );
