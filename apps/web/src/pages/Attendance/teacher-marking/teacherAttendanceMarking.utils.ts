@@ -49,6 +49,18 @@ export function isFutureDate(iso: string): boolean {
   return d > today;
 }
 
+/** Approval queue is past attendance only — today's live check-in/out stays in list view. */
+export function isPastAttendanceDate(dateIso: string, todayIso: string): boolean {
+  return dateIso < todayIso;
+}
+
+export function isApprovalQueueRecord(
+  record: Pick<TeacherAttendanceRecord, "date" | "isSubmitted">,
+  todayIso: string
+): boolean {
+  return record.isSubmitted && isPastAttendanceDate(record.date, todayIso);
+}
+
 export function calculateWorkingHours(checkIn: string, checkOut: string): number {
   return Math.max(0, parseTimeToMinutes(checkOut) - parseTimeToMinutes(checkIn));
 }

@@ -175,8 +175,9 @@ export default function AdminAttendanceDetailsTab({
 
   const isRowSelected = (row: TeacherAttendanceRecord) => selectedRows.has(row.id);
 
-  /** Complete attendance stays in the approval list after approve or reject. */
-  const isApprovalListItem = (row: TeacherAttendanceRecord) => row.isSubmitted;
+  /** Past submitted attendance only — today's check-in/out stays in list view. */
+  const isApprovalListItem = (row: TeacherAttendanceRecord) =>
+    row.isSubmitted && row.date < today;
 
   const viewRecords = useMemo(() => {
     if (viewMode === "approval") {

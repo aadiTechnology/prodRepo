@@ -26,6 +26,7 @@ import {
   getTodayIso,
   getCurrentMonthStartIso,
   isFutureDate,
+  isApprovalQueueRecord,
   listDatesInRange,
   buildAttendanceListGrid,
   isWeekend,
@@ -472,12 +473,12 @@ export function useTeacherAttendanceMarkingController() {
   ]);
 
   const filteredDetailsRecords = useMemo(() => {
-    let items = [...detailsRecordsInRange];
+    let items = detailsRecordsInRange.filter((r) => r.date < today);
     if (detailsFilters.approvalStatus) {
       items = items.filter((r) => r.approvalStatus === detailsFilters.approvalStatus);
     }
     return items.sort((a, b) => b.date.localeCompare(a.date));
-  }, [detailsRecordsInRange, detailsFilters.approvalStatus]);
+  }, [detailsRecordsInRange, detailsFilters.approvalStatus, today]);
 
   const refreshPendingCount = useCallback(async () => {
     if (!isAdminLike) {
@@ -491,11 +492,10 @@ export function useTeacherAttendanceMarkingController() {
       });
       const count = (res.items || []).filter((row) => {
         const date = String(row.attendance_date).slice(0, 10);
-        return (
-          !!row.is_submitted &&
-          row.approval_status === "Waiting for Approval" &&
-          date < today
-        );
+        return isApprovalQueueRecord(
+          { date, isSubmitted: !!row.is_submitted },
+          today
+        ) && row.approval_status === "Waiting for Approval";
       }).length;
       setPendingApprovalCount(count);
     } catch {
