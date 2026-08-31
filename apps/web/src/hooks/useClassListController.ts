@@ -35,10 +35,11 @@ export function useClassListController() {
   const [academicYearOptions, setAcademicYearOptions] = useState<{ label: string; value: string }[]>([]);
   const [academicYearFilterReady, setAcademicYearFilterReady] = useState(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
     if (!academicYearFilterReady) return;
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const classData = await schoolClassService.getAll({
         academic_year_id: academicYearFilter ? Number(academicYearFilter) : undefined,
@@ -48,7 +49,7 @@ export function useClassListController() {
     } catch (err: any) {
       setError(err?.message || "Failed to fetch classes.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [academicYearFilter, academicYearFilterReady]);
 

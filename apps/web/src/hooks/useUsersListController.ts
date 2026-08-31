@@ -107,9 +107,10 @@ export function useUsersListController({
     writeStoredUsersFilters(listState.filters);
   }, [listState.filters]);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const [usersData, roleItems] = await Promise.all([
         userService.getAllUsers(),
@@ -121,7 +122,7 @@ export function useUsersListController({
       const errorObject = err as { message?: string; detail?: string };
       setError(errorObject.message || errorObject.detail || "Failed to fetch users.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 

@@ -43,6 +43,7 @@ export default function ClassList() {
 
     return (
         <ListPageLayout
+          onRefresh={() => controller.fetchData({ silent: true })}
             pageBackground
             contentPaddingSize="none"
             header={

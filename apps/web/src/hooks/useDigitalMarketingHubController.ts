@@ -20,8 +20,9 @@ export function useDigitalMarketingHubController() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
 
-  const fetchConfig = useCallback(async () => {
-    setLoading(true);
+  const fetchConfig = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) setLoading(true);
     try {
       const data = await marketingHubService.getMarketingConfig();
       setPlatformConfig(
@@ -34,7 +35,7 @@ export function useDigitalMarketingHubController() {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(detail || "Failed to load marketing configurations");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -162,5 +163,6 @@ export function useDigitalMarketingHubController() {
     requestDelete,
     visitUrl,
     deleteDialogMessage,
+    fetchConfig,
   };
 }

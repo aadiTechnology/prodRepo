@@ -63,9 +63,10 @@ export function useTenantListController({
     initialSearch: "",
   });
 
-  const fetchTenants = useCallback(async () => {
+  const fetchTenants = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const data = await tenantService.list({
         search: listState.search || undefined,
@@ -78,7 +79,7 @@ export function useTenantListController({
       const errorObject = err as { message?: string };
       setError(errorObject.message || "Failed to fetch tenants.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [listState.page, listState.rowsPerPage, listState.search]);
 

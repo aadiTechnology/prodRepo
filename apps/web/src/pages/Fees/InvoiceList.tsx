@@ -27,6 +27,7 @@ export default function InvoiceList() {
     <ListPageLayout
       pageBackground
       contentPaddingSize="none"
+      onRefresh={() => controller.fetchInvoices({ silent: true })}
       data-testid="page-invoice-list"
       header={
         <>

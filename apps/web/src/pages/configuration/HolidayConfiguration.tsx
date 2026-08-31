@@ -238,6 +238,12 @@ export default function HolidayConfiguration() {
 
   return (
     <ListPageLayout
+      onRefresh={async () => {
+        await Promise.all([
+          controller.holidaysQuery.refetch(),
+          controller.academicYearsQuery.refetch(),
+        ]);
+      }}
       pageBackground
       contentPaddingSize="none"
       header={

@@ -27,7 +27,7 @@ type UseStudentListControllerResult = {
   confirmDialogOpen: boolean;
   studentToDelete: Student | null;
   deleteLoading: boolean;
-  fetchStudents: () => Promise<void>;
+  fetchStudents: (opts?: { silent?: boolean }) => Promise<void>;
   openDeleteConfirm: (student: Student) => void;
   closeDeleteConfirm: () => void;
   confirmDelete: () => Promise<void>;
@@ -57,8 +57,9 @@ export function useStudentListController({
     initialRowsPerPage: DEFAULT_LIST_ROWS_PER_PAGE,
   });
 
-  const fetchStudents = useCallback(async () => {
-    setLoading(true);
+  const fetchStudents = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const params: any = {
@@ -79,7 +80,7 @@ export function useStudentListController({
     } catch (err: any) {
       setError(err?.message || "Failed to load students");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [listState.page, listState.rowsPerPage, listState.search, classFilter, divisionFilter, statusFilter]);
 

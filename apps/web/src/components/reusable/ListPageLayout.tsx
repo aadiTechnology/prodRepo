@@ -4,14 +4,17 @@
  *
  * Inner content Box: flex column + minHeight 0 for predictable scrolling. Use scrollableFormContent
  * for standard form padding + body scroll; lists stay flush with overflow hidden. Override with contentSx.
+ *
+ * Optional pull-to-refresh (Capacitor mobile only): wraps the whole page, Flipkart-style.
  */
 
 import { ReactNode } from "react";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { PageLayout } from "../layout";
-import { AppCard, Box } from "../primitives";
+import { AppCard, Box, PullToRefresh } from "../primitives";
 import type { AppCardPaddingSize } from "../primitives";
 import { colorTokens } from "../../tokens/colors";
+import { isNativePlatform } from "../../utils/capacitor";
 
 export interface ListPageLayoutProps {
   children: ReactNode;
@@ -31,6 +34,12 @@ export interface ListPageLayoutProps {
   contentSx?: SxProps<Theme>;
   /** Stable test hook for the page root container. */
   "data-testid"?: string;
+  /** When set, enables full-page pull-to-refresh on Capacitor mobile (Android/iOS). Ignored on web. */
+  onRefresh?: () => void | Promise<void>;
+  /** Controlled pull-to-refresh spinner. Prefer silent refetch (do not blank the list). */
+  refreshing?: boolean;
+  /** Disable pull-to-refresh while keeping onRefresh for future use. */
+  pullToRefreshDisabled?: boolean;
 }
 
 export default function ListPageLayout({
@@ -42,6 +51,9 @@ export default function ListPageLayout({
   scrollableFormContent = false,
   contentSx,
   "data-testid": dataTestId,
+  onRefresh,
+  refreshing,
+  pullToRefreshDisabled = false,
 }: ListPageLayoutProps) {
   const innerSx: SxProps<Theme> = scrollableFormContent
     ? {
@@ -64,7 +76,7 @@ export default function ListPageLayout({
         p: 0,
       };
 
-  return (
+  const page = (
     <PageLayout header={header} pageBackground={pageBackground} maxWidth={maxWidth} data-testid={dataTestId}>
       <AppCard
         paddingSize={contentPaddingSize}
@@ -81,5 +93,17 @@ export default function ListPageLayout({
         <Box sx={[innerSx, ...(contentSx ? [contentSx] : [])] as SxProps<Theme>}>{children}</Box>
       </AppCard>
     </PageLayout>
+  );
+
+  const enablePullToRefresh = Boolean(onRefresh) && isNativePlatform() && !pullToRefreshDisabled;
+
+  if (!enablePullToRefresh || !onRefresh) {
+    return page;
+  }
+
+  return (
+    <PullToRefresh onRefresh={onRefresh} refreshing={refreshing}>
+      {page}
+    </PullToRefresh>
   );
 }

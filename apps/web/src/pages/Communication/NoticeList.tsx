@@ -78,6 +78,7 @@ export default function NoticeList() {
 
   return (
     <ListPageLayout
+      onRefresh={() => c.fetchNotices()}
       header={
         <>
           <PageHeader

@@ -54,6 +54,7 @@ export default function SprintList() {
 
   return (
     <ListPageLayout
+      onRefresh={() => fetchSprints({ silent: true })}
       header={
         <>
           <PageHeader

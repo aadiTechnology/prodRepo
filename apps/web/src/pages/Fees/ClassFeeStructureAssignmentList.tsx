@@ -116,9 +116,10 @@ const ClassFeeStructureAssignmentList = () => {
         if (typeof value === 'string' && value.match(/^\d{4}-\d{2}$/)) return value;
         return value || "-";
     };
-    const fetchAssignments = useCallback(async () => {
+    const fetchAssignments = useCallback(async (opts?: { silent?: boolean }) => {
+        const silent = Boolean(opts?.silent);
         try {
-            setLoading(true);
+            if (!silent) setLoading(true);
             setError(null);
             const data = await classFeeStructureAssignmentService.list({
                 search: search || undefined,
@@ -155,7 +156,7 @@ const ClassFeeStructureAssignmentList = () => {
         } catch (err: any) {
             setError(err?.message || "Failed to fetch assignments.");
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [search, page, rowsPerPage, classList, academicYearList, feeStructureList]);
 
@@ -228,6 +229,7 @@ const ClassFeeStructureAssignmentList = () => {
 
     return (
         <ListPageLayout
+          onRefresh={() => fetchAssignments({ silent: true })}
             header={
                 <>
                     <PageHeader

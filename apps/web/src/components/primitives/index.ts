@@ -89,6 +89,9 @@ export type { InputAdornmentProps } from "./InputAdornment";
 export { default as CircularProgress } from "./CircularProgress";
 export type { CircularProgressProps } from "./CircularProgress";
 
+export { default as PullToRefresh } from "./PullToRefresh";
+export type { PullToRefreshProps } from "./PullToRefresh";
+
 export { FormControlLabel } from "./FormControlLabel";
 export type { FormControlLabelProps } from "./FormControlLabel";
 

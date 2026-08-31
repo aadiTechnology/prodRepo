@@ -36,9 +36,10 @@ export function useFeeCategoryListController() {
     initialSearch: "",
   });
 
-  const fetchCategories = useCallback(async () => {
+  const fetchCategories = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const [data, years, cls] = await Promise.all([
         getFeeCategories(),
@@ -63,7 +64,7 @@ export function useFeeCategoryListController() {
     } catch (err: any) {
       setError(err?.message || err?.detail || "Failed to fetch categories.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 

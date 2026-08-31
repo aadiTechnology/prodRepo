@@ -30,6 +30,7 @@ const AcademicYearList = () => {
 
   return (
     <ListPageLayout
+      onRefresh={() => controller.fetchAcademicYears({ silent: true })}
       pageBackground
       contentPaddingSize="none"
       header={

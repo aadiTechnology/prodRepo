@@ -65,6 +65,7 @@ export default function MyTasksEffortEntryPage() {
 
   return (
     <ListPageLayout
+      onRefresh={() => reloadTasks()}
       header={
         <>
           <PageHeader

@@ -498,6 +498,7 @@ function MainLayout() {
 
         <Box
           component="main"
+          data-ptr-scroll="page"
           sx={{
             display: "flex",
             flexDirection: "column",
@@ -506,6 +507,7 @@ function MainLayout() {
             overflow: "auto",
             minHeight: 0, // CRITICAL: ensures flex child doesn't overflow parent incorrectly
             WebkitOverflowScrolling: "touch",
+            overscrollBehaviorY: "contain",
           }}
         >
           <PageContainer

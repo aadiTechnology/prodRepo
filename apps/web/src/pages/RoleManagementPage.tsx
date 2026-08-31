@@ -38,6 +38,7 @@ const RoleManagementPage = () => {
 
   return (
     <ListPageLayout
+      onRefresh={() => controller.fetchRoles({ silent: true })}
       pageBackground
       contentPaddingSize="none"
       header={

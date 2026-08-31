@@ -185,9 +185,10 @@ export function useHomeworkListController() {
     };
   }, [classFilter, readOnlyAudience, isTeacherScoped]);
 
-  const fetchHomework = async () => {
+  const fetchHomework = async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       // Admin/teacher: no status => draft + published; Draft/Active => that status only.
       const statusParam = readOnlyAudience
@@ -208,7 +209,7 @@ export function useHomeworkListController() {
     } catch (err: any) {
       setError(err?.response?.data?.detail || "Unable to load homework list");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -322,6 +323,7 @@ export function useHomeworkListController() {
     handleDeleteClick,
     handleConfirmDelete,
     deleteLoading,
+    fetchHomework,
     statusOptions: [
       { label: "Draft", value: "Draft" },
       { label: "Published", value: "Active" },

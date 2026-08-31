@@ -91,9 +91,10 @@ export default function SyllabusList() {
 
   // Teacher/student class scope comes from the backend viewer context — do not pass
   // attendance-derived scoped_class_id (mismatch caused false "Unable to load syllabus").
-  const fetchList = useCallback(async () => {
+  const fetchList = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const res = await syllabusService.list({
         page,
@@ -110,7 +111,7 @@ export default function SyllabusList() {
       setItems([]);
       setTotal(0);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [
     academicYearId,
@@ -224,6 +225,7 @@ export default function SyllabusList() {
 
   return (
     <ListPageLayout
+      onRefresh={() => fetchList({ silent: true })}
       data-testid="page-syllabus-list"
       header={
         <>

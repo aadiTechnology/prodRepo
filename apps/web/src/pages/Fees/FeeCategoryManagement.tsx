@@ -30,6 +30,7 @@ const FeeCategoryManagement = () => {
 
   return (
     <ListPageLayout
+      onRefresh={() => controller.fetchCategories({ silent: true })}
       header={
         <>
           <PageHeader

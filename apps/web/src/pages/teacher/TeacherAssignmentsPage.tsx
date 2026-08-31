@@ -157,6 +157,7 @@ export default function TeacherAssignmentsPage() {
 
   return (
     <ListPageLayout
+      onRefresh={async () => { await Promise.resolve(refetch()); }}
       header={
         <>
           <PageHeader

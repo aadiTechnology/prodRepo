@@ -72,6 +72,7 @@ const TenantList = () => {
 
   return (
     <ListPageLayout
+      onRefresh={() => fetchTenants({ silent: true })}
       header={
         <>
           <PageHeader

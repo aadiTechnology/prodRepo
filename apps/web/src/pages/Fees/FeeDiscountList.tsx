@@ -45,9 +45,10 @@ const FeeDiscountList = () => {
     const [snackbar, setSnackbar] = useState<string | null>(null);
     const showSuccessToast = (message: string) => setSnackbar(message);
 
-    const fetchDiscounts = useCallback(async () => {
+    const fetchDiscounts = useCallback(async (opts?: { silent?: boolean }) => {
+        const silent = Boolean(opts?.silent);
         try {
-            setLoading(true);
+            if (!silent) setLoading(true);
             setError(null);
             const data = await feeDiscountService.list({
                 search: search || undefined,
@@ -59,7 +60,7 @@ const FeeDiscountList = () => {
         } catch (err: any) {
             setError(err?.message || "Unable to load discounts. Please try again.");
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [search, page, rowsPerPage]);
 
@@ -122,6 +123,7 @@ const FeeDiscountList = () => {
 
     return (
         <ListPageLayout
+          onRefresh={() => fetchDiscounts({ silent: true })}
             header={
                 <>
                     <PageHeader

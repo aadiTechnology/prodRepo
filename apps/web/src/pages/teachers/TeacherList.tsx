@@ -96,8 +96,9 @@ export default function TeacherList() {
     }));
   }, [classes, classFilter]);
 
-  const fetchTeachers = useCallback(async () => {
-    setLoading(true);
+  const fetchTeachers = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const response = await teacherService.list({
@@ -112,7 +113,7 @@ export default function TeacherList() {
     } catch {
       setError("Failed to load teachers.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [page, rowsPerPage, search, classFilter, divisionFilter]);
 
@@ -169,6 +170,7 @@ export default function TeacherList() {
 
   return (
     <ListPageLayout
+      onRefresh={() => fetchTeachers({ silent: true })}
       pageBackground
       contentPaddingSize="none"
       header={

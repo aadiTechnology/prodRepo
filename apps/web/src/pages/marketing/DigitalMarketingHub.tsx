@@ -52,6 +52,7 @@ export default function DigitalMarketingHub() {
 
   return (
     <ListPageLayout
+      onRefresh={() => controller.fetchConfig({ silent: true })}
       pageBackground
       contentPaddingSize="none"
       header={

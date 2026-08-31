@@ -25,6 +25,7 @@ const FeeStructureSetup = () => {
 
   return (
     <ListPageLayout
+      onRefresh={() => controller.fetchData({ silent: true })}
       pageBackground
       contentPaddingSize="none"
       header={

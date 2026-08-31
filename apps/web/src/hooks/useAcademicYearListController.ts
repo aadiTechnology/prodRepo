@@ -39,16 +39,17 @@ export function useAcademicYearListController() {
   const [sortBy, setSortBy] = useState<"name" | "start_date" | "default">("default");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  const fetchAcademicYears = useCallback(async () => {
+  const fetchAcademicYears = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const data = await academicYearService.getAll();
       setAcademicYears(data);
     } catch (err: any) {
       setError(err?.message || "Failed to fetch academic years.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 

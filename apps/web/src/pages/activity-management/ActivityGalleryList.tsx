@@ -147,6 +147,7 @@ export default function ActivityGalleryList() {
 
   return (
     <ListPageLayout
+      onRefresh={() => c.fetchGalleries()}
       pageBackground
       contentPaddingSize="none"
       header={

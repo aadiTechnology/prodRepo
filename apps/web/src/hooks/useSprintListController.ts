@@ -55,14 +55,15 @@ export function useSprintListController({ navigate }: UseSprintListControllerOpt
     fetchProjects();
   }, [fetchProjects]);
 
-  const fetchSprints = useCallback(async () => {
+  const fetchSprints = useCallback(async (opts?: { silent?: boolean }) => {
     if (projectId == null) {
       setSprints([]);
       setTotal(0);
       return;
     }
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const data = await sprintService.list(projectId, {
         search: listState.search || undefined,
@@ -74,7 +75,7 @@ export function useSprintListController({ navigate }: UseSprintListControllerOpt
     } catch (err: unknown) {
       setError((err as { message?: string })?.message || "Failed to fetch sprints.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [listState.page, listState.rowsPerPage, listState.search, projectId]);
 

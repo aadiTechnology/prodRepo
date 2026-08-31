@@ -32,6 +32,7 @@ export default function FeeDueListV2() {
 
   return (
     <ListPageLayout
+      onRefresh={async () => { await Promise.resolve(controller.refetch()); }}
       data-testid="page-fee-due-list"
       header={
         <>

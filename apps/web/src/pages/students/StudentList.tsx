@@ -167,6 +167,7 @@ const StudentList = () => {
 
   return (
     <ListPageLayout
+      onRefresh={() => fetchStudents({ silent: true })}
       header={
         <>
           <PageHeader

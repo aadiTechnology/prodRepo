@@ -134,9 +134,10 @@ export function useInvoiceListController() {
     }
   }, [classId, divisionId]);
 
-  const fetchInvoices = useCallback(async () => {
+  const fetchInvoices = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const response = await invoiceService.getInvoices({
         page,
@@ -163,7 +164,7 @@ export function useInvoiceListController() {
       setTotalRows(0);
       setError(err?.message || "Unable to load invoices. Please try again.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [
     academicYearId,

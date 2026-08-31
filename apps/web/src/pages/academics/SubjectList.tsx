@@ -46,6 +46,7 @@ export default function SubjectList() {
 
     return (
         <ListPageLayout
+          onRefresh={() => controller.fetchSubjects({ silent: true })}
             pageBackground
             contentPaddingSize="none"
             header={

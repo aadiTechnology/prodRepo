@@ -17,9 +17,10 @@ export function useFeeDiscountListController() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<string | null>(null);
 
-  const fetchFeeDiscounts = useCallback(async () => {
+  const fetchFeeDiscounts = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const data = await feeDiscountService.list({
         search: search || undefined,
@@ -31,7 +32,7 @@ export function useFeeDiscountListController() {
     } catch (err: any) {
       setError(err?.message || "Failed to fetch fee discounts.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [search, page, rowsPerPage]);
 

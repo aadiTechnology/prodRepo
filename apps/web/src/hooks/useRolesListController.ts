@@ -20,9 +20,10 @@ export function useRolesListController() {
   const [sortBy, setSortBy] = useState<'name' | 'createdAt'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  const fetchRoles = useCallback(async () => {
+  const fetchRoles = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const data = await roleService.getRoles({
         search: search || undefined,
@@ -36,7 +37,7 @@ export function useRolesListController() {
     } catch (err: any) {
       setError(err?.message || "Failed to fetch roles.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [search, page, rowsPerPage, sortBy, sortOrder]);
 

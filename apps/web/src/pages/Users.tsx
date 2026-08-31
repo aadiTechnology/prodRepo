@@ -80,6 +80,7 @@ const Users = () => {
 
   return (
     <ListPageLayout
+      onRefresh={() => fetchUsers({ silent: true })}
       header={
         <>
           <PageHeader

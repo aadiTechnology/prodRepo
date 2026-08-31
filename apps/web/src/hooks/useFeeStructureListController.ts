@@ -26,9 +26,10 @@ export function useFeeStructureListController() {
     initialSearch: "",
   });
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const res = await feeService.getFeeStructures(
         listState.page,
@@ -43,7 +44,7 @@ export function useFeeStructureListController() {
     } catch (err: any) {
       setError(err?.message || "Failed to load fee structures.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [listState.page, listState.rowsPerPage, listState.search, listState.filters.academicYearId, listState.filters.className]);
 

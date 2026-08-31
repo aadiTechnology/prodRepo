@@ -113,9 +113,10 @@ export function useSubjectListController() {
         };
     }, [academicYearFilter]);
 
-    const fetchSubjects = async () => {
+    const fetchSubjects = async (opts?: { silent?: boolean }) => {
+        const silent = Boolean(opts?.silent);
         try {
-            setLoading(true);
+            if (!silent) setLoading(true);
             setError(null);
 
             const response = await subjectService.getSubjects({
@@ -132,7 +133,7 @@ export function useSubjectListController() {
         } catch (err: any) {
             setError(err?.response?.data?.detail || "Unable to load subjects");
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -307,6 +308,7 @@ export function useSubjectListController() {
         selectedRow,
         handleDeleteClick,
         handleConfirmDelete,
+        fetchSubjects,
         deleteLoading,
         statusOptions: [
             { label: "All", value: "" },

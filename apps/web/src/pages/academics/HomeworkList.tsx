@@ -1063,6 +1063,7 @@ export default function HomeworkList() {
   // Standard Admin/Teacher Grid Table View
   return (
     <ListPageLayout
+      onRefresh={() => controller.fetchHomework({ silent: true })}
       header={
         <PageHeader
           links={[{ title: "Homework", path: "#" }]}

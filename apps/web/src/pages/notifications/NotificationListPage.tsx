@@ -91,6 +91,7 @@ export default function NotificationListPage() {
 
   return (
     <ListPageLayout
+      onRefresh={() => refresh()}
       data-testid="page-notifications"
       scrollableFormContent
       contentPaddingSize="normal"
