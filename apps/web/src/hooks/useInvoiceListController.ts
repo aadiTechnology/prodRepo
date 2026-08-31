@@ -3,14 +3,19 @@ import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import invoiceService from "../api/services/invoiceService";
 import schoolClassService, { type SchoolClass } from "../api/services/schoolClassService";
 import academicYearService, { type AcademicYear } from "../api/services/academicYearService";
+import studentService from "../api/services/studentService";
 import type { InvoiceItem, InvoiceStatus } from "../types/invoice";
-import invoiceApi from "../api/invoiceApi";
 
 const invoiceStatuses: InvoiceStatus[] = ["Paid", "Partial", "Pending", "Overdue"];
 
 type InvoiceLookupPayload = {
   years: AcademicYear[];
   classes: SchoolClass[];
+};
+
+type StudentOption = {
+  id: number;
+  name: string;
 };
 
 let invoiceLookupCache: InvoiceLookupPayload | null = null;
@@ -48,15 +53,16 @@ export function useInvoiceListController() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
-  const [sortBy, setSortBy] = useState<"invoice_no" | "due_date" | "student_name">("invoice_no");
+  const [sortBy, setSortBy] = useState<"due_date" | "student_name">("due_date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [academicYearId, setAcademicYearId] = useState("");
   const [classId, setClassId] = useState("");
-  const [installment, setInstallment] = useState("");
+  const [divisionId, setDivisionId] = useState("");
+  const [studentId, setStudentId] = useState("");
   const [status, setStatus] = useState("");
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const [installmentOptions, setInstallmentOptions] = useState<{ label: string; value: string }[]>([]);
+  const [studentOptions, setStudentOptions] = useState<StudentOption[]>([]);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<InvoiceItem | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -66,6 +72,16 @@ export function useInvoiceListController() {
     () => invoiceStatuses.map((s) => ({ label: s, value: s })),
     []
   );
+
+  const divisionOptions = useMemo(() => {
+    if (!classId) return [];
+    const selectedClass = classes.find((c) => String(c.id) === classId);
+    if (!selectedClass?.divisions?.length) return [];
+    return selectedClass.divisions.map((division) => ({
+      value: String(division.id),
+      label: division.division_name,
+    }));
+  }, [classId, classes]);
 
   const fetchLookups = useCallback(async () => {
     try {
@@ -82,6 +98,42 @@ export function useInvoiceListController() {
     }
   }, [academicYearId]);
 
+  const fetchStudents = useCallback(async () => {
+    if (!classId || !divisionId) {
+      setStudentOptions([]);
+      return;
+    }
+    try {
+      const pageSize = 100;
+      let currentPage = 1;
+      let total = 0;
+      let allItems: StudentOption[] = [];
+
+      do {
+        const { items, total: totalCount } = await studentService.list({
+          class_id: Number(classId),
+          division_id: Number(divisionId),
+          limit: pageSize,
+          page: currentPage,
+          status: "Active",
+        });
+        total = totalCount || 0;
+        const pageOptions = items
+          .map((item) => ({
+            id: Number(item.id),
+            name: String(item.name ?? ""),
+          }))
+          .filter((item) => Number.isFinite(item.id) && item.name);
+        allItems = [...allItems, ...pageOptions];
+        currentPage += 1;
+      } while (allItems.length < total);
+
+      setStudentOptions(allItems);
+    } catch {
+      setStudentOptions([]);
+    }
+  }, [classId, divisionId]);
+
   const fetchInvoices = useCallback(async () => {
     try {
       setLoading(true);
@@ -90,11 +142,10 @@ export function useInvoiceListController() {
         page,
         size: rowsPerPage,
         search: search.trim() || undefined,
-        academic_year_id: academicYearId
-          ? Number(academicYearId)
-          : undefined,
+        academic_year_id: academicYearId ? Number(academicYearId) : undefined,
         class_id: classId ? Number(classId) : undefined,
-        installment: installment || undefined,
+        division_id: divisionId ? Number(divisionId) : undefined,
+        student_id: studentId ? Number(studentId) : undefined,
         status: (status || undefined) as InvoiceStatus | undefined,
       });
       const rows = response.items ?? [];
@@ -103,10 +154,7 @@ export function useInvoiceListController() {
         if (sortBy === "due_date") {
           return (new Date(a.due_date).getTime() - new Date(b.due_date).getTime()) * dir;
         }
-        if (sortBy === "student_name") {
-          return a.student_name.localeCompare(b.student_name) * dir;
-        }
-        return a.invoice_no.localeCompare(b.invoice_no) * dir;
+        return a.student_name.localeCompare(b.student_name) * dir;
       });
       setInvoices(sorted);
       setTotalRows(response.total ?? 0);
@@ -120,45 +168,15 @@ export function useInvoiceListController() {
   }, [
     academicYearId,
     classId,
-    installment,
+    divisionId,
     page,
     rowsPerPage,
     search,
     sortBy,
     sortOrder,
     status,
+    studentId,
   ]);
-
-  const fetchInstallments = useCallback(async () => {
-    if (!academicYearId || classes.length === 0) {
-      setInstallmentOptions([]);
-      return;
-    }
-    try {
-      const targetClasses = classId
-        ? classes.filter((c) => String(c.id) === classId)
-        : classes;
-
-      const optionMap = new Map<string, { label: string; value: string }>();
-      const requests = targetClasses.flatMap((schoolClass) => {
-        const divisions = schoolClass.divisions ?? [];
-        return divisions.map((division) =>
-          invoiceApi.getInstallmentOptions({
-            academic_year_id: Number(academicYearId),
-            class_id: schoolClass.id,
-            division_id: division.id,
-          })
-        );
-      });
-      const responses = await Promise.all(requests);
-      responses.flat().forEach((option) => {
-        optionMap.set(option.value, { label: option.label, value: option.value });
-      });
-      setInstallmentOptions(Array.from(optionMap.values()));
-    } catch {
-      setInstallmentOptions([]);
-    }
-  }, [academicYearId, classId, classes]);
 
   const handleDeleteClick = useCallback((invoice: InvoiceItem) => {
     setInvoiceToDelete(invoice);
@@ -198,11 +216,19 @@ export function useInvoiceListController() {
 
   const onClassChange = useCallback((value: string) => {
     setClassId(value);
+    setDivisionId("");
+    setStudentId("");
     setPage(0);
   }, []);
 
-  const onInstallmentChange = useCallback((value: string) => {
-    setInstallment(value);
+  const onDivisionChange = useCallback((value: string) => {
+    setDivisionId(value);
+    setStudentId("");
+    setPage(0);
+  }, []);
+
+  const onStudentChange = useCallback((value: string) => {
+    setStudentId(value);
     setPage(0);
   }, []);
 
@@ -215,8 +241,8 @@ export function useInvoiceListController() {
   }, [fetchInvoices]);
 
   useEffect(() => {
-    void fetchInstallments();
-  }, [fetchInstallments]);
+    void fetchStudents();
+  }, [fetchStudents]);
 
   return {
     invoices,
@@ -238,9 +264,12 @@ export function useInvoiceListController() {
     setAcademicYearId: onAcademicYearChange,
     classId,
     setClassId: onClassChange,
-    installment,
-    setInstallment: onInstallmentChange,
-    installmentOptions,
+    divisionId,
+    setDivisionId: onDivisionChange,
+    divisionOptions,
+    studentId,
+    setStudentId: onStudentChange,
+    studentOptions,
     status,
     setStatus,
     years,

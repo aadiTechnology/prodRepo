@@ -37,6 +37,7 @@ export interface InvoiceListParams {
   academic_year_id?: number;
   class_id?: number;
   division_id?: number;
+  student_id?: number;
   installment?: string;
   status?: InvoiceStatus;
   search?: string;

@@ -1,14 +1,10 @@
 import { Fragment, useMemo } from "react";
-import Grid from "@mui/material/Grid2";
 import { Button, Link, Paper, Typography } from "@mui/material";
 import { PageHeader } from "../../components/layout";
 import { DataTable, ListPageLayout } from "../../components/reusable";
-import Section from "../../components/primitives/Section";
 import { Box } from "../../components/primitives";
 import {
   AmountSummaryBar,
-  InvoiceInfoCard,
-  StudentInfoCard,
   formatInvoiceCurrency as money,
 } from "../../components/fees/InvoiceContextPanel";
 import FeeInstallmentStatusChip from "../../components/fees/FeeInstallmentStatusChip";
@@ -147,7 +143,7 @@ export default function InvoiceDetail() {
           <>
             <PageHeader
               links={[
-                { title: "Invoice List", path: "/fees/invoices" },
+                { title: "Invoices", path: "/fees/invoices" },
                 { title: "Invoice Detail", path: "#" },
               ]}
               homePath="/"
@@ -167,16 +163,6 @@ export default function InvoiceDetail() {
         ) : (
           <Box sx={{ p: 2, display: "grid", gap: 2 }}>
             <Box sx={{ px: { xs: 0, sm: 1 } }}>
-              <Section spacing={0}>
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <StudentInfoCard invoice={detail.invoice} />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <InvoiceInfoCard invoice={detail.invoice} />
-                  </Grid>
-                </Grid>
-              </Section>
               <AmountSummaryBar invoice={detail.invoice} />
             </Box>
 

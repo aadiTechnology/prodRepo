@@ -155,12 +155,48 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
         if any(not inst.due_date for inst in custom_installments):
             raise AppException("Each customized installment needs a due date.", status_code=400)
 
+    assignment_fee_structure_id = payload.fee_structure_id
+
     # Save in transaction
     try:
+        # Persist customized schedule as its own Fee Structure so it appears on /fees/setup,
+        # without modifying the master plan used by other students.
+        if has_custom_schedule:
+            base_name = (fee_structure.name or "").strip() or f"Fee Structure #{fee_structure.id}"
+            student_label = (getattr(student, "student_name", None) or f"Student {student.id}").strip()
+            custom_structure = FeeStructure(
+                tenant_id=fee_structure.tenant_id,
+                class_id=fee_structure.class_id,
+                class_division_id=fee_structure.class_division_id,
+                fee_category_id=fee_structure.fee_category_id,
+                multi_category_ids=fee_structure.multi_category_ids,
+                academic_year_id=fee_structure.academic_year_id,
+                total_amount=final_amount,
+                installment_type=fee_structure.installment_type or "CUSTOM",
+                num_installments=len(custom_installments),
+                description=fee_structure.description,
+                name=f"{base_name} — {student_label}",
+                is_active=True,
+                created_by=getattr(student, "created_by", None),
+            )
+            db.add(custom_structure)
+            db.flush()
+            for index, inst in enumerate(custom_installments):
+                db.add(FeeInstallment(
+                    fee_structure_id=custom_structure.id,
+                    fee_category_id=fee_structure.fee_category_id,
+                    installment_number=int(inst.installment_no or index + 1),
+                    amount=max(0.0, round(float(inst.amount or 0), 2)),
+                    due_date=inst.due_date,
+                    late_fee_applicable=False,
+                    created_by=getattr(student, "created_by", None),
+                ))
+            assignment_fee_structure_id = custom_structure.id
+
         assignment = StudentFeeAssignment(
             student_id=payload.student_id,
             academic_year_id=payload.academic_year_id,
-            fee_structure_id=payload.fee_structure_id,
+            fee_structure_id=assignment_fee_structure_id,
             discount_id=payload.discount_id,
             additional_fee=payload.additional_fee,
             total_amount=total_amount,

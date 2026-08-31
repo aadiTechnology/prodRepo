@@ -8,6 +8,8 @@ import { useInvoiceListController } from "../../hooks/useInvoiceListController";
 import { useInvoicePermissions } from "../../hooks/useInvoicePermissions";
 import { createInvoiceListConfig } from "./InvoiceList.listConfig";
 
+const INVOICE_ACTIONS_COLUMN_WIDTH = 80;
+
 export default function InvoiceList() {
   const navigate = useNavigate();
   const controller = useInvoiceListController();
@@ -16,21 +18,20 @@ export default function InvoiceList() {
     () =>
       createInvoiceListConfig({
         onViewInvoice: (invoice) => navigate(`/fees/invoices/${invoice.id}/detail`),
-        onEditInvoice: perms.canEditInvoices
-          ? (invoice) => navigate(`/fees/invoices/${invoice.id}/edit`)
-          : undefined,
         showStudentName: perms.showStudentColumn,
       }),
-    [navigate, perms.canEditInvoices, perms.showStudentColumn]
+    [navigate, perms.showStudentColumn]
   );
 
   return (
     <ListPageLayout
+      pageBackground
+      contentPaddingSize="none"
       data-testid="page-invoice-list"
       header={
         <>
           <PageHeader
-            links={[{ title: "Invoice List", path: "/fees/invoices" }]}
+            links={[{ title: "Invoices", path: "/fees/invoices" }]}
             homePath="/"
             actions={
               <ListPageToolbar
@@ -60,14 +61,50 @@ export default function InvoiceList() {
                       data-testid="input-class"
                       sx={{ minWidth: { xs: "100%", sm: 140 } }}
                     >
-                      <MenuItem value="">
-                        <Typography variant="body2" color="text.secondary">
-                          Class
-                        </Typography>
-                      </MenuItem>
+                      <MenuItem value="">All Classes</MenuItem>
                       {controller.classes.map((c) => (
                         <MenuItem key={c.id} value={String(c.id)}>
                           {c.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Select
+                      value={controller.divisionId}
+                      onChange={(e) => controller.setDivisionId(e.target.value as string)}
+                      displayEmpty
+                      size="small"
+                      disabled={!controller.classId}
+                      data-testid="input-division"
+                      sx={{ minWidth: { xs: "100%", sm: 140 } }}
+                    >
+                      <MenuItem value="">
+                        <Typography variant="body2" color="text.secondary">
+                          All Divisions
+                        </Typography>
+                      </MenuItem>
+                      {controller.divisionOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Select
+                      value={controller.studentId}
+                      onChange={(e) => controller.setStudentId(e.target.value as string)}
+                      displayEmpty
+                      size="small"
+                      disabled={!controller.classId || !controller.divisionId}
+                      data-testid="input-student"
+                      sx={{ minWidth: { xs: "100%", sm: 180 } }}
+                    >
+                      <MenuItem value="">
+                        <Typography variant="body2" color="text.secondary">
+                          All Students
+                        </Typography>
+                      </MenuItem>
+                      {controller.studentOptions.map((option) => (
+                        <MenuItem key={option.id} value={String(option.id)}>
+                          {option.name}
                         </MenuItem>
                       ))}
                     </Select>
@@ -90,25 +127,6 @@ export default function InvoiceList() {
                         </MenuItem>
                       ))}
                     </Select>
-                    <Select
-                      value={controller.installment}
-                      onChange={(e) => controller.setInstallment(e.target.value as string)}
-                      displayEmpty
-                      size="small"
-                      data-testid="input-installment"
-                      sx={{ minWidth: { xs: "100%", sm: 180 } }}
-                    >
-                      <MenuItem value="">
-                        <Typography variant="body2" color="text.secondary">
-                          Installment
-                        </Typography>
-                      </MenuItem>
-                      {controller.installmentOptions.map((option) => (
-                        <MenuItem key={option.value} value={option.value}>
-                          {option.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
                   </>
                   )
                 }
@@ -124,7 +142,7 @@ export default function InvoiceList() {
       }
     >
       <EntityTableSection
-        label="Invoice Directory"
+        label=""
         data-testid="grid-invoices"
         emptyTestId="grid-invoices-empty"
         loadingTestId="grid-invoices-loading"
@@ -139,6 +157,12 @@ export default function InvoiceList() {
         loading={controller.loading}
         emptyMessage={config.uiPolicy.emptyMessage}
         rowActions={config.actions.rowActions}
+        fixedLayout
+        actionsColumnWidth={INVOICE_ACTIONS_COLUMN_WIDTH}
+        getRowKey={(invoice) => invoice.id}
+        stickyHeader
+        size="small"
+        showInfoBar={false}
       />
     </ListPageLayout>
   );

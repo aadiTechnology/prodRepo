@@ -19,25 +19,31 @@ def list_invoices(
     tenant_id: int,
     academic_year_id: int | None,
     class_id: int | None,
+    division_id: int | None,
     installment: str | None,
     status: str | None,
     search: str | None,
     page: int,
     size: int,
-    student_ids: list[int] | None = None,
+    scoped_student_ids: list[int] | None = None,
+    student_id: int | None = None,
 ) -> tuple[list[dict], int]:
     where_sql = [
         "si.tenant_id = :tenant_id",
     ]
     params: dict = {"tenant_id": tenant_id}
 
-    if student_ids is not None:
-        if not student_ids:
+    if scoped_student_ids is not None:
+        if not scoped_student_ids:
             return [], 0
-        placeholders = ", ".join(f":student_id_{idx}" for idx in range(len(student_ids)))
+        placeholders = ", ".join(f":scoped_student_id_{idx}" for idx in range(len(scoped_student_ids)))
         where_sql.append(f"si.student_id IN ({placeholders})")
-        for idx, student_id in enumerate(student_ids):
-            params[f"student_id_{idx}"] = int(student_id)
+        for idx, scoped_id in enumerate(scoped_student_ids):
+            params[f"scoped_student_id_{idx}"] = int(scoped_id)
+
+    if student_id is not None:
+        where_sql.append("si.student_id = :student_id")
+        params["student_id"] = int(student_id)
 
     if academic_year_id is not None:
         where_sql.append("si.academic_year_id = :academic_year_id")
@@ -46,6 +52,10 @@ def list_invoices(
     if class_id is not None:
         where_sql.append("si.class_id = :class_id")
         params["class_id"] = class_id
+
+    if division_id is not None:
+        where_sql.append("s.class_division_id = :division_id")
+        params["division_id"] = division_id
 
     if installment:
         where_sql.append("LTRIM(RTRIM(ISNULL(si.[Installment], ''))) = :installment")

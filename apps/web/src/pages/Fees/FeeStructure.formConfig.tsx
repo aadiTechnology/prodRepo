@@ -84,7 +84,10 @@ export function createFeeStructureFormConfig({
   installmentType: FeeStructureFormData["installment_type"];
   onInstallmentUpdate: (index: number, field: keyof FeeInstallmentPreview, value: any) => void;
 }): FormConfig<FeeStructureFormData> {
-  const installmentCount = installmentCountForType(installmentType);
+  const installmentCount =
+    Array.isArray(installments) && installments.length > 0
+      ? installments.length
+      : installmentCountForType(installmentType);
   return {
     fields: {
       name: {
@@ -275,7 +278,12 @@ export function createFeeStructureFormConfig({
           disabled: true,
           InputProps: { readOnly: true },
         },
-        helperText: installmentCountHelperText(installmentType),
+        helperText:
+          Array.isArray(installments) &&
+          installments.length > 0 &&
+          installments.length !== installmentCountForType(installmentType)
+            ? `${installments.length} installments from saved schedule`
+            : installmentCountHelperText(installmentType),
       },
       description: {
         name: "description",

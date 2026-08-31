@@ -111,6 +111,22 @@ const FeeStructureForm = () => {
 
   // Use a ref to track if we are currently fetching the structure to avoid clearing data
   const isInitialLoadRef = useRef(isEditMode);
+  const preserveLoadedScheduleRef = useRef(false);
+
+  const onFieldValueChange = useCallback(
+    (name: any, value: any) => {
+      if (
+        name === "installment_type" ||
+        name === "total_amount" ||
+        name === "num_installments" ||
+        name === "fee_category_ids"
+      ) {
+        preserveLoadedScheduleRef.current = false;
+      }
+      handleFieldValueChange(name, value);
+    },
+    [handleFieldValueChange]
+  );
 
   // Fetch Lookups
   useEffect(() => {
@@ -237,7 +253,7 @@ const FeeStructureForm = () => {
     const ids = formData.fee_category_ids as string[];
     if (!ids || ids.length === 0) return;
     
-    if (isInitialLoadRef.current) return;
+    if (isInitialLoadRef.current || preserveLoadedScheduleRef.current) return;
 
     const sum = ids.reduce((acc, id) => {
       const cat = categories.find((c) => String(c.id) === String(id));
@@ -252,6 +268,7 @@ const FeeStructureForm = () => {
     try {
       setFetchLoading(true);
       isInitialLoadRef.current = true;
+      preserveLoadedScheduleRef.current = true;
       const found = await feeService.getFeeStructure(Number(id));
       if (found) {
         const structureAcademicYearId = Number(found.academic_year_id);
@@ -272,6 +289,16 @@ const FeeStructureForm = () => {
               ? [String(found.fee_category_id)]
               : [];
 
+        const loadedInstallments = Array.isArray(found.installments)
+          ? [...found.installments]
+              .map((item: any, index: number) => ({
+                installment_number: Number(item.installment_number || index + 1),
+                amount: Number(item.amount || 0),
+                due_date: String(item.due_date || "").slice(0, 10),
+              }))
+              .sort((a, b) => a.installment_number - b.installment_number)
+          : [];
+
         resetForm({
           name: found.name || "",
           academic_year_id: found.academic_year_id || "",
@@ -281,11 +308,11 @@ const FeeStructureForm = () => {
           fee_category_ids: normalizedCategoryIds,
           total_amount: found.total_amount || "",
           installment_type: found.installment_type as any,
-          num_installments: found.num_installments,
+          num_installments: loadedInstallments.length || found.num_installments,
           description: found.description || "",
           is_active: found.is_active,
         });
-        if (found.installments) setInstallments(found.installments as any);
+        setInstallments(loadedInstallments);
       }
     } catch (err: any) {
       setError("Failed to load fee structure.");
@@ -301,7 +328,7 @@ const FeeStructureForm = () => {
 
   // Derive installment count from installment type
   useEffect(() => {
-    if (isInitialLoadRef.current) return;
+    if (isInitialLoadRef.current || preserveLoadedScheduleRef.current) return;
     const count = installmentCountForType(formData.installment_type);
     if (formData.num_installments !== count) {
       handleFieldValueChange("num_installments", count);
@@ -310,6 +337,7 @@ const FeeStructureForm = () => {
 
   // Installment preview logic (extracted, improved date logic)
   useEffect(() => {
+    if (isInitialLoadRef.current || preserveLoadedScheduleRef.current) return;
     const count = parseInt(formData.num_installments?.toString() || "0", 10);
     const total = parseFloat(formData.total_amount?.toString() || "0");
     // Use academic year start date if available, else today
@@ -476,7 +504,7 @@ const FeeStructureForm = () => {
       setFormData={setFormData}
       fieldErrors={displayFieldErrors}
       handleChange={formManager.handleChange}
-      handleFieldValueChange={handleFieldValueChange}
+      handleFieldValueChange={onFieldValueChange}
       handleSubmit={(e, onValid) => {
         setHasTriedSubmit(true);
         formManager.handleSubmit(e, onValid);

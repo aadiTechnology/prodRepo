@@ -802,6 +802,7 @@ export default function GenerateInvoice() {
 
   return (
     <BaseForm<GenerateInvoiceFormData>
+      hideFieldValidationDialog
       pageTestId={isEditMode ? "page-edit-invoice" : "page-generate-invoice"}
       formTestId={isEditMode ? "form-edit-invoice" : "form-generate-invoice"}
       confirmDialogTestId={isEditMode ? "dialog-confirm-update-invoice" : "dialog-confirm-generate-invoice"}

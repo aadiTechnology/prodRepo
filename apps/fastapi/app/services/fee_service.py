@@ -383,6 +383,20 @@ def get_fee_structure(db: Session, structure_id: int, tenant_id: int) -> FeeStru
         AcademicYear.id == obj.academic_year_id, AcademicYear.tenant_id == tenant_id
     ).scalar()
 
+    # Always return the saved installment schedule (custom or configured), not regenerated values.
+    active_installments = (
+        db.query(FeeInstallment)
+        .filter(
+            FeeInstallment.fee_structure_id == obj.id,
+            FeeInstallment.is_deleted == False,  # noqa: E712
+        )
+        .order_by(FeeInstallment.installment_number, FeeInstallment.id)
+        .all()
+    )
+    obj.installments = active_installments
+    if active_installments:
+        obj.num_installments = len(active_installments)
+
     return obj
 
 def create_fee_structure(db: Session, obj_in: FeeStructureCreate, tenant_id: int, user_id: int) -> FeeStructure:

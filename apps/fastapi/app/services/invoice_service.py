@@ -125,6 +125,8 @@ def list_invoices(
     size: int,
     academic_year_id: int | None = None,
     class_id: int | None = None,
+    division_id: int | None = None,
+    student_id: int | None = None,
     installment: str | None = None,
     status: str | None = None,
     search: str | None = None,
@@ -142,17 +144,23 @@ def list_invoices(
             legacy_role=legacy_role,
         )
 
+    if student_id is not None and scoped_student_ids is not None:
+        if int(student_id) not in scoped_student_ids:
+            return InvoiceListResponse(items=[], total=0, page=page, size=size)
+
     rows, total = invoice_repository.list_invoices(
         db,
         tenant_id=tenant_id,
         academic_year_id=academic_year_id,
         class_id=class_id,
+        division_id=division_id,
         installment=installment,
         status=status,
         search=search,
         page=page,
         size=size,
-        student_ids=scoped_student_ids,
+        scoped_student_ids=scoped_student_ids,
+        student_id=student_id,
     )
     return InvoiceListResponse(
         items=[_to_invoice_response(row) for row in rows],
