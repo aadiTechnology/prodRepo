@@ -23,6 +23,7 @@ import {
 } from "../pages/Attendance/teacher-marking/teacherAttendanceMarking.types";
 import {
   formatCurrentTime,
+  formatAttendanceTimeDisplay,
   getTodayIso,
   getCurrentMonthStartIso,
   isFutureDate,
@@ -193,7 +194,6 @@ export function useTeacherAttendanceMarkingController() {
     severity: "info",
   });
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
-  const [currentTime, setCurrentTime] = useState(formatCurrentTime);
   const [detailsFilters, setDetailsFilters] = useState<AttendanceDetailsFilters>({
     teacherId: "",
     approvalStatus: "Waiting for Approval",
@@ -206,10 +206,6 @@ export function useTeacherAttendanceMarkingController() {
     [teachers]
   );
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(formatCurrentTime()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   // Load active teachers from API
   useEffect(() => {
@@ -402,8 +398,9 @@ export function useTeacherAttendanceMarkingController() {
     return existing ?? createEmptyRecord(selfTeacherId, today);
   }, [records, selfTeacherId, today]);
 
-  const displayCheckInTime = todayRecord.checkInTime ?? currentTime;
-  const displayCheckOutTime = todayRecord.checkOutTime ?? "—";
+  const displayCheckInTime = formatAttendanceTimeDisplay(todayRecord.checkInTime);
+  const displayCheckOutTime = formatAttendanceTimeDisplay(todayRecord.checkOutTime);
+  const todayAttendanceStatus = primaryCalendarStatus(todayRecord.statuses);
 
   const showCheckInButton = !!selfTeacherId && !todayRecord.checkInTime;
   const showCheckOutButton =
@@ -803,6 +800,8 @@ export function useTeacherAttendanceMarkingController() {
     todayRecord,
     displayCheckInTime,
     displayCheckOutTime,
+    todayAttendanceStatus,
+    officeTimingConfig,
     showCheckInButton,
     showCheckOutButton,
     buttonsDisabled,

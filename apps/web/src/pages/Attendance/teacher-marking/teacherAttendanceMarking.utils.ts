@@ -31,6 +31,18 @@ export function formatCurrentTime(): string {
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
+/** 12-hour display for check-in/out fields (matches admin list view). */
+export function formatAttendanceTimeDisplay(time: string | null | undefined): string {
+  if (!time) return "—";
+  const [hour, minute] = time.split(":");
+  const h = Number(hour);
+  const m = Number(minute);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return "—";
+  const ampm = h >= 12 ? "PM" : "AM";
+  const displayHour = h % 12 || 12;
+  return `${String(displayHour).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
 export function parseTimeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;
