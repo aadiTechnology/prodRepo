@@ -54,7 +54,7 @@ export const STAFF_ATTENDANCE_MENU_PATH = "/attendance/teacher-marking";
 export const STAFF_ATTENDANCE_MENU_LABEL = "Staff Attendance";
 
 export const LEAD_MANAGEMENT_MENU_PATH = "/admissions/leads";
-export const STUDENT_MANAGEMENT_MENU_PATH = "/students";
+export const STUDENT_MANAGEMENT_MENU_PATH = "/students"; 
 
 type SidebarChildItem = {
   id: string;

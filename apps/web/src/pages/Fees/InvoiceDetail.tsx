@@ -1,5 +1,5 @@
 import { Fragment, useMemo } from "react";
-import { Button, Link, Paper, Typography } from "@mui/material";
+import { Button, Paper, Typography } from "@mui/material";
 import { PageHeader } from "../../components/layout";
 import { DataTable, ListPageLayout } from "../../components/reusable";
 import { Box } from "../../components/primitives";
@@ -10,7 +10,7 @@ import {
 import FeeInstallmentStatusChip from "../../components/fees/FeeInstallmentStatusChip";
 import { useInvoiceDetailController } from "../../hooks/useInvoiceDetailController";
 import type { InvoiceFeeBreakdownItem } from "../../types/invoice";
-import { colorTokens } from "../../tokens/colors";
+import { formatShortDate } from "../../utils/formatters";
 
 function getFeeLineStatus(
   row: InvoiceFeeBreakdownItem,
@@ -23,7 +23,6 @@ function getFeeLineStatus(
   if (pending <= 0 && (paid > 0 || amount <= 0)) return "Paid";
   if (paid > 0 && pending > 0) return "Partial";
 
-  // Pending remains the status before/after due date for unpaid lines.
   if (invoiceDueDate) {
     const due = new Date(invoiceDueDate);
     if (!Number.isNaN(due.getTime())) {
@@ -34,46 +33,59 @@ function getFeeLineStatus(
   return "Pending";
 }
 
+function feeLineLabel(row: InvoiceFeeBreakdownItem, fallbackInstallment?: string | null): string {
+  return row.fee_category_name || row.payable_for || row.installment_type || fallbackInstallment || "-";
+}
+
+function payableForLabel(row: InvoiceFeeBreakdownItem, fallbackInstallment?: string | null): string {
+  return row.payable_for || row.installment_type || fallbackInstallment || "As applicable";
+}
+
 export default function InvoiceDetail() {
   const controller = useInvoiceDetailController();
   const detail = controller.detail;
 
-  const feeBreakdownColumns = useMemo(
+  const primaryPayment = detail?.payment_history?.[0] ?? null;
+  const canPayNow = Boolean(detail?.available_actions.includes("pay_now"));
+
+  const paidItems = useMemo(
+    () => (detail?.fee_breakdown ?? []).filter((row) => Number(row.paid_amount || 0) > 0),
+    [detail?.fee_breakdown]
+  );
+
+  const pendingItems = useMemo(
+    () => (detail?.fee_breakdown ?? []).filter((row) => Number(row.pending_amount || 0) > 0),
+    [detail?.fee_breakdown]
+  );
+
+  const paidColumns = useMemo(
     () => [
       {
-        id: "component",
-        label: "Fee Type",
-        render: (row: InvoiceFeeBreakdownItem) => row.fee_category_name || "-",
+        id: "fee_name",
+        label: "Fee / Installment",
+        render: (row: InvoiceFeeBreakdownItem) => feeLineLabel(row, detail?.invoice.installment),
       },
       {
         id: "payable_for",
         label: "Payable For",
-        render: (row: InvoiceFeeBreakdownItem) =>
-          row.payable_for || row.installment_type || detail?.invoice.installment || "As applicable",
-      },
-      {
-        id: "amount",
-        label: "Amount",
-        align: "right" as const,
-        render: (row: InvoiceFeeBreakdownItem) => money(row.amount),
-      },
-      {
-        id: "discount_amount",
-        label: "Discount",
-        align: "right" as const,
-        render: (row: InvoiceFeeBreakdownItem) => money(row.discount_amount || 0),
+        render: (row: InvoiceFeeBreakdownItem) => payableForLabel(row, detail?.invoice.installment),
       },
       {
         id: "paid_amount",
-        label: "Amt. Paid",
+        label: "Paid Amount",
         align: "right" as const,
         render: (row: InvoiceFeeBreakdownItem) => money(row.paid_amount || 0),
       },
       {
-        id: "pending_amount",
-        label: "Amt. Payable",
-        align: "right" as const,
-        render: (row: InvoiceFeeBreakdownItem) => money(row.pending_amount || 0),
+        id: "payment_date",
+        label: "Payment Date",
+        render: () =>
+          primaryPayment?.payment_date ? formatShortDate(primaryPayment.payment_date) : "—",
+      },
+      {
+        id: "payment_method",
+        label: "Payment Method",
+        render: () => primaryPayment?.payment_method || "—",
       },
       {
         id: "status",
@@ -84,18 +96,11 @@ export default function InvoiceDetail() {
         ),
       },
       {
-        id: "receipt",
-        label: "Receipt",
+        id: "receipt_action",
+        label: "Action",
         align: "center" as const,
-        render: (row: InvoiceFeeBreakdownItem) => {
+        render: () => {
           const paymentId = controller.getPrimaryPaymentId();
-          if (Number(row.paid_amount || 0) <= 0) {
-            return (
-              <Typography variant="body2" color="text.secondary">
-                —
-              </Typography>
-            );
-          }
           if (!paymentId) {
             return (
               <Typography variant="body2" color="text.secondary">
@@ -104,35 +109,80 @@ export default function InvoiceDetail() {
             );
           }
           return (
-            <Link
-              component="button"
-              type="button"
-              variant="body2"
-              data-testid={`btn-receipt-${paymentId}`}
+            <Button
+              variant="outlined"
+              size="small"
+              sx={{ textTransform: "none" }}
+              data-testid={`btn-show-receipt-${paymentId}`}
               onClick={() => controller.onOpenReceiptForFeeLine(paymentId)}
-              sx={{
-                fontWeight: 700,
-                textDecoration: "none",
-                cursor: "pointer",
-                border: "none",
-                background: "none",
-                font: "inherit",
-                color: colorTokens.preschool.turquoise.dark,
-                "&:hover": { textDecoration: "underline" },
-              }}
             >
-              Receipt
-            </Link>
+              Show Receipt
+            </Button>
           );
         },
       },
     ],
     [
-      detail?.invoice.installment,
-      detail?.invoice.due_date,
       controller.getPrimaryPaymentId,
       controller.onOpenReceiptForFeeLine,
+      detail?.invoice.due_date,
+      detail?.invoice.installment,
+      primaryPayment?.payment_date,
+      primaryPayment?.payment_method,
     ]
+  );
+
+  const pendingColumns = useMemo(
+    () => [
+      {
+        id: "fee_name",
+        label: "Fee / Installment",
+        render: (row: InvoiceFeeBreakdownItem) => feeLineLabel(row, detail?.invoice.installment),
+      },
+      {
+        id: "payable_for",
+        label: "Payable For",
+        render: (row: InvoiceFeeBreakdownItem) => payableForLabel(row, detail?.invoice.installment),
+      },
+      {
+        id: "pending_amount",
+        label: "Pending Amount",
+        align: "right" as const,
+        render: (row: InvoiceFeeBreakdownItem) => money(row.pending_amount || 0),
+      },
+      {
+        id: "due_date",
+        label: "Due Date",
+        render: () =>
+          detail?.invoice.due_date ? formatShortDate(detail.invoice.due_date) : "—",
+      },
+      {
+        id: "status",
+        label: "Status",
+        align: "center" as const,
+        render: (row: InvoiceFeeBreakdownItem) => (
+          <FeeInstallmentStatusChip status={getFeeLineStatus(row, detail?.invoice.due_date)} />
+        ),
+      },
+      {
+        id: "pay_action",
+        label: "Action",
+        align: "center" as const,
+        render: (row: InvoiceFeeBreakdownItem) => (
+          <Button
+            variant="contained"
+            size="small"
+            sx={{ textTransform: "none" }}
+            data-testid={`btn-pay-now-line-${row.id}`}
+            onClick={controller.onPayNow}
+            disabled={!canPayNow}
+          >
+            Pay Now
+          </Button>
+        ),
+      },
+    ],
+    [canPayNow, controller.onPayNow, detail?.invoice.due_date, detail?.invoice.installment]
   );
 
   return (
@@ -149,7 +199,7 @@ export default function InvoiceDetail() {
               homePath="/"
             />
             {controller.error && (
-              <Paper sx={{ p: 2, m: 2, border: `1px solid ${colorTokens.preschool.coral.main}` }}>
+              <Paper sx={{ p: 2, m: 2, border: "1px solid", borderColor: "error.main" }}>
                 <Typography color="error">{controller.error}</Typography>
               </Paper>
             )}
@@ -168,21 +218,34 @@ export default function InvoiceDetail() {
 
             <Paper variant="outlined" sx={{ p: 2 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                Fee Details
+                Fee Paid Details
               </Typography>
               <DataTable<InvoiceFeeBreakdownItem>
-                data-testid="grid-fee-breakdown"
-                rowTestId={(row) => `grid-fee-breakdown-row-${row.id}`}
-                emptyTestId="grid-fee-breakdown-empty"
-                columns={feeBreakdownColumns}
-                data={detail.fee_breakdown}
-                emptyMessage="No fee breakup available"
+                data-testid="grid-fee-paid"
+                rowTestId={(row) => `grid-fee-paid-row-${row.id}`}
+                emptyTestId="grid-fee-paid-empty"
+                columns={paidColumns}
+                data={paidItems}
+                emptyMessage="No paid fee details available"
                 getRowKey={(row) => row.id}
                 size="small"
               />
-              <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
-                <Typography sx={{ fontWeight: 700 }}>Total: {money(detail.payment_summary.total_amount)}</Typography>
-              </Box>
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+                Fee Pending Details
+              </Typography>
+              <DataTable<InvoiceFeeBreakdownItem>
+                data-testid="grid-fee-pending"
+                rowTestId={(row) => `grid-fee-pending-row-${row.id}`}
+                emptyTestId="grid-fee-pending-empty"
+                columns={pendingColumns}
+                data={pendingItems}
+                emptyMessage="No pending fee details available"
+                getRowKey={(row) => row.id}
+                size="small"
+              />
             </Paper>
 
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
@@ -200,7 +263,7 @@ export default function InvoiceDetail() {
                 sx={{ textTransform: "none" }}
                 data-testid="btn-pay-now"
                 onClick={controller.onPayNow}
-                disabled={!detail.available_actions.includes("pay_now")}
+                disabled={!canPayNow}
               >
                 Pay Now
               </Button>

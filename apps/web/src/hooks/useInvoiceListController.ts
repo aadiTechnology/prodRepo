@@ -3,7 +3,6 @@ import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import invoiceService from "../api/services/invoiceService";
 import schoolClassService, { type SchoolClass } from "../api/services/schoolClassService";
 import academicYearService, { type AcademicYear } from "../api/services/academicYearService";
-import studentService from "../api/services/studentService";
 import type { InvoiceItem, InvoiceStatus } from "../types/invoice";
 
 const invoiceStatuses: InvoiceStatus[] = ["Paid", "Partial", "Pending", "Overdue"];
@@ -105,48 +104,55 @@ export function useInvoiceListController() {
     }
     try {
       const pageSize = 100;
-      let currentPage = 1;
+      let currentPage = 0;
       let total = 0;
-      let allItems: StudentOption[] = [];
+      const studentMap = new Map<number, string>();
 
       do {
-        const { items, total: totalCount } = await studentService.list({
+        const response = await invoiceService.getInvoices({
           class_id: Number(classId),
           division_id: Number(divisionId),
-          limit: pageSize,
           page: currentPage,
-          status: "Active",
+          size: pageSize,
         });
-        total = totalCount || 0;
-        const pageOptions = items
-          .map((item) => ({
-            id: Number(item.id),
-            name: String(item.name ?? ""),
-          }))
-          .filter((item) => Number.isFinite(item.id) && item.name);
-        allItems = [...allItems, ...pageOptions];
+        total = response.total ?? 0;
+        for (const invoice of response.items ?? []) {
+          const id = Number(invoice.student_id);
+          const name = String(invoice.student_name ?? "").trim();
+          if (Number.isFinite(id) && name) {
+            studentMap.set(id, name);
+          }
+        }
         currentPage += 1;
-      } while (allItems.length < total);
+      } while (currentPage * pageSize < total);
 
-      setStudentOptions(allItems);
+      setStudentOptions(
+        Array.from(studentMap.entries())
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
     } catch {
       setStudentOptions([]);
     }
   }, [classId, divisionId]);
 
-  const fetchInvoices = useCallback(async (opts?: { silent?: boolean }) => {
-    const silent = Boolean(opts?.silent);
+  const fetchInvoices = useCallback(async () => {
     try {
-      if (!silent) setLoading(true);
+      setLoading(true);
       setError(null);
+      const selectedStudentId = studentId ? Number(studentId) : undefined;
       const response = await invoiceService.getInvoices({
         page,
         size: rowsPerPage,
         search: search.trim() || undefined,
-        academic_year_id: academicYearId ? Number(academicYearId) : undefined,
-        class_id: classId ? Number(classId) : undefined,
-        division_id: divisionId ? Number(divisionId) : undefined,
-        student_id: studentId ? Number(studentId) : undefined,
+        student_id: selectedStudentId,
+        academic_year_id: selectedStudentId
+          ? undefined
+          : academicYearId
+            ? Number(academicYearId)
+            : undefined,
+        class_id: selectedStudentId ? undefined : classId ? Number(classId) : undefined,
+        division_id: selectedStudentId ? undefined : divisionId ? Number(divisionId) : undefined,
         status: (status || undefined) as InvoiceStatus | undefined,
       });
       const rows = response.items ?? [];
@@ -164,7 +170,7 @@ export function useInvoiceListController() {
       setTotalRows(0);
       setError(err?.message || "Unable to load invoices. Please try again.");
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
   }, [
     academicYearId,
@@ -191,6 +197,7 @@ export function useInvoiceListController() {
       await invoiceService.deleteInvoice(invoiceToDelete.id);
       setSnackbar("Invoice deleted successfully");
       void fetchInvoices();
+      void fetchStudents();
     } catch (err: any) {
       setSnackbar(err?.message || "Failed to delete invoice");
     } finally {
@@ -198,7 +205,7 @@ export function useInvoiceListController() {
       setConfirmDialogOpen(false);
       setInvoiceToDelete(null);
     }
-  }, [invoiceToDelete, fetchInvoices]);
+  }, [invoiceToDelete, fetchInvoices, fetchStudents]);
 
   const onSearchChange = useCallback((value: string) => {
     setSearch(value);
@@ -244,6 +251,13 @@ export function useInvoiceListController() {
   useEffect(() => {
     void fetchStudents();
   }, [fetchStudents]);
+
+  useEffect(() => {
+    if (!studentId) return;
+    if (!studentOptions.some((option) => String(option.id) === studentId)) {
+      setStudentId("");
+    }
+  }, [studentOptions, studentId]);
 
   return {
     invoices,

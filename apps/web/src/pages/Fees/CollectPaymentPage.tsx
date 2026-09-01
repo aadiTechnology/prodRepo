@@ -65,10 +65,6 @@ const tokens = {
     border: alpha(colorTokens.preschool.turquoise.main, 0.12),
     divider: alpha(colorTokens.preschool.turquoise.main, 0.2),
   },
-  header: {
-    bg: alpha(colorTokens.preschool.turquoise.main, 0.04),
-    border: colorTokens.border.subtle,
-  },
   status: {
     Paid: {
       bg: alpha(colorTokens.preschool.mint.main, 0.12),
@@ -367,31 +363,6 @@ function UpiQrPanel() {
         sx={{ display: "block", mt: 1.5, color: colorTokens.text.secondary }}
       >
         After successful payment, enter the UPI transaction ID below.
-      </Typography>
-    </AppCard>
-  );
-}
-
-/** Page-level header card with page title and invoice lock info */
-function InvoiceHeaderCard({ invoiceNo }: { invoiceNo: string }) {
-  return (
-    <AppCard
-      paddingSize="dense"
-      sx={{
-        mb: 2.5,
-        bgcolor: tokens.header.bg,
-        borderColor: tokens.header.border,
-        borderRadius: "14px",
-      }}
-    >
-      <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-        Fee Collection / Payment Entry
-      </Typography>
-      <Typography variant="body2" sx={{ color: colorTokens.text.secondary, mt: 0.5 }}>
-        Invoice is locked from Invoice Detail:{" "}
-        <Box component="span" sx={{ fontWeight: 700, color: colorTokens.text.primary }}>
-          {invoiceNo || "-"}
-        </Box>
       </Typography>
     </AppCard>
   );
@@ -729,26 +700,9 @@ export default function CollectPaymentPage() {
   // ─── Top slot: invoice context panel ──────────────────────────────────
   const topSlot = (
     <Box sx={{ px: { xs: 0, sm: 1 } }}>
-      <InvoiceHeaderCard invoiceNo={selectedInvoice?.invoice_no ?? ""} />
-
       {selectedInvoice ? (
         <>
-          {/* Info cards — student + invoice side by side */}
-          <Section spacing={0}>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <StudentInfoCard invoice={selectedInvoice} />
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <InvoiceInfoCard invoice={selectedInvoice} />
-              </Grid>
-            </Grid>
-          </Section>
-
-          {/* Amount summary bar */}
           <AmountSummaryBar invoice={selectedInvoice} />
-
-          {/* UPI QR panel (conditional) */}
           {formData.payment_method === "UPI" && <UpiQrPanel />}
         </>
       ) : (

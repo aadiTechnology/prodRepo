@@ -307,7 +307,7 @@ export default function ReceiptPage() {
       header={
         <PageHeader
           links={[
-            { title: "Invoice List", path: "/fees/invoices" },
+            { title: "Invoices", path: "/fees/invoices" },
             { title: printableTitle, path: "#" },
           ]}
           homePath="/"
@@ -414,10 +414,16 @@ export default function ReceiptPage() {
                   )}
                 </Box>
                 <Box sx={{ textAlign: "right" }}>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    Receipt Type: {isInvoiceScope ? "Full / Combined" : "Payment"}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>Invoice: {receipt.invoice_no || "N/A"}</Typography>
+                  {!isInvoiceScope ? (
+                    <>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        Receipt Type: Payment
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        Invoice: {receipt.invoice_no || "N/A"}
+                      </Typography>
+                    </>
+                  ) : null}
                 </Box>
               </Stack>
 
@@ -496,7 +502,7 @@ export default function ReceiptPage() {
                   <Stack direction="row" spacing={2}>
                     <Typography sx={{ minWidth: 160, fontStyle: "italic" }}>Remarks</Typography>
                     <Typography sx={{ flex: 1, borderBottom: `2px dotted ${colorTokens.border.strong}` }}>
-                      {receipt.notes || "Amount paid for fee invoice"}
+                      {receipt.notes || (isInvoiceScope ? "Amount paid for fee" : "Amount paid for fee invoice")}
                     </Typography>
                   </Stack>
                 </Stack>

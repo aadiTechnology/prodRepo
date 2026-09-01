@@ -413,10 +413,10 @@ export default function EnrollmentPage() {
         // Route /from-lead/:leadId is the conversion flow and must keep lead_id bound.
         // Query ?fromLead= is student creation from a converted lead: prefill only, do not re-convert.
         if (leadId) {
-          setSelectedLead({
-            id: prefill.lead_id,
-            label: buildLeadDisplayLabel(prefill.lead_id, prefill.student_name, leadOptions),
-          });
+        setSelectedLead({
+          id: prefill.lead_id,
+          label: buildLeadDisplayLabel(prefill.lead_id, prefill.student_name, leadOptions),
+        });
         }
         setFormData((prev) => ({
           ...prev,
@@ -578,9 +578,9 @@ export default function EnrollmentPage() {
                   )
               : [];
             return {
-              id: Number(row.id),
-              name: row.name,
-              total_amount: row.total_amount != null ? Number(row.total_amount) : undefined,
+            id: Number(row.id),
+            name: row.name,
+            total_amount: row.total_amount != null ? Number(row.total_amount) : undefined,
               installment_type: row.installment_type || null,
               num_installments: row.num_installments != null ? Number(row.num_installments) : installments.length,
               installments,
@@ -677,24 +677,24 @@ export default function EnrollmentPage() {
         ? savedCustomFee
         : null;
     const payload: EnrollmentCreatePayload = {
-      lead_id: selectedLead?.id ?? null,
-      student_name: formData.student_name.trim(),
-      date_of_birth: formData.date_of_birth || null,
-      gender: formData.gender || null,
-      admission_no: formData.admission_no.trim() || null,
-      admission_date: formData.admission_date,
-      academic_year_id: Number(formData.academic_year_id),
-      class_id: Number(formData.class_id),
-      class_division_id: formData.class_division_id ? Number(formData.class_division_id) : null,
-      roll_no: formData.roll_no.trim() || null,
-      parent_name: formData.parent_name.trim(),
-      mobile_number: formData.mobile_number.trim(),
-      email: formData.email.trim(),
-      fee_structure_id: Number(formData.fee_structure_id),
-      discount_id: formData.discount_id ? Number(formData.discount_id) : null,
-      additional_fee: null,
-      birth_certificate_url: formData.birth_certificate_url.trim() || null,
-      photo_url: formData.photo_url.trim() || null,
+    lead_id: selectedLead?.id ?? null,
+    student_name: formData.student_name.trim(),
+    date_of_birth: formData.date_of_birth || null,
+    gender: formData.gender || null,
+    admission_no: formData.admission_no.trim() || null,
+    admission_date: formData.admission_date,
+    academic_year_id: Number(formData.academic_year_id),
+    class_id: Number(formData.class_id),
+    class_division_id: formData.class_division_id ? Number(formData.class_division_id) : null,
+    roll_no: formData.roll_no.trim() || null,
+    parent_name: formData.parent_name.trim(),
+    mobile_number: formData.mobile_number.trim(),
+    email: formData.email.trim(),
+    fee_structure_id: Number(formData.fee_structure_id),
+    discount_id: formData.discount_id ? Number(formData.discount_id) : null,
+    additional_fee: null,
+    birth_certificate_url: formData.birth_certificate_url.trim() || null,
+    photo_url: formData.photo_url.trim() || null,
     };
     if (customPlan && customPlan.installments.length > 0) {
       payload.custom_annual_amount = Number(customPlan.annual);
