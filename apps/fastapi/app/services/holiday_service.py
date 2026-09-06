@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ValidationException
+from app.core.logging_config import get_logger
 from app.models.academic import AcademicYear, ClassDivision, SchoolClass
 from app.models.holiday import Holiday
 from app.schemas.holiday import (
@@ -33,6 +34,8 @@ _AUDIENCE_LABELS = {
 }
 # Keep aligned with typical `holidays.applicable_for` column size (e.g. NVARCHAR(150)).
 _MAX_APPLICABLE_LEN = 150
+
+logger = get_logger(__name__)
 
 
 def _integrity_hint(exc: IntegrityError) -> str:
@@ -442,6 +445,18 @@ def _emit_holiday_notification(
     else:
         body = f"{hname} holiday has been created."
         event = "created"
+    logger.info(
+        "[push-diag] holiday notification requested event=%s holiday_id=%s tenant=%s "
+        "module=%s audience=%s actor_user_id=%s class_count=%s division_count=%s",
+        event,
+        holiday_id,
+        tenant_id,
+        module,
+        (audience or "TEACHER").strip().upper() or "TEACHER",
+        actor_user_id,
+        len(class_ids or []),
+        len(division_ids or []),
+    )
     try:
         notification_service.create_notification(
             db,
@@ -457,13 +472,14 @@ def _emit_holiday_notification(
             holiday_class_ids=class_ids or [],
             holiday_division_ids=division_ids or [],
         )
-    except Exception:
-        from app.core.logging_config import get_logger
-
-        get_logger(__name__).exception(
-            "Failed to create notification after holiday %s (holiday_id=%s)",
+    except Exception as exc:
+        logger.exception(
+            "[push-diag] Failed to create notification after holiday %s "
+            "(holiday_id=%s) type=%s error=%s",
             event,
             holiday_id,
+            type(exc).__name__,
+            str(exc),
         )
 
 
@@ -675,6 +691,14 @@ def delete_holiday(
     row.is_active = False
     row.updated_at = datetime.utcnow()
     db.commit()
+
+    logger.info(
+        "[push-diag] holiday deleted holiday_id=%s tenant=%s audience=%s actor_user_id=%s",
+        holiday_id,
+        tenant_id,
+        aud,
+        actor_user_id,
+    )
 
     _emit_holiday_notification(
         db,

@@ -208,6 +208,19 @@ async def startup_event():
 
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     logger.info(f"Debug mode: {settings.DEBUG}")
+    logger.info(f"Environment: {settings.ENVIRONMENT}")
+    try:
+        from app.services import fcm_service
+
+        fcm_service.log_firebase_status(reason="startup")
+        fcm_service.initialize_firebase()
+        fcm_service.log_firebase_status(reason="startup-init")
+    except Exception as e:
+        logger.exception(
+            "[push-diag] Firebase startup probe failed type=%s error=%s",
+            type(e).__name__,
+            str(e),
+        )
 
     # create_all compares every SQLAlchemy model to the server over the network.
     # On remote Azure SQL (large erpdb) this often takes 60+ seconds and is unnecessary.

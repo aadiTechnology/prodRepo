@@ -254,6 +254,17 @@ def create_notification(
     recipient = (to or "").strip()
     subj = (subject or "").strip()
     msg = (body or "").strip()
+    logger.info(
+        "[push-diag] notification requested tenant=%s module=%s event=%s entity_id=%s "
+        "audience=%s actor_user_id=%s send_push=%s",
+        tid,
+        (module or "").strip().lower() or "(infer)",
+        event,
+        entity_id,
+        recipient,
+        created_by,
+        send_push,
+    )
 
     if not sender:
         raise ValidationException("from is required")
@@ -305,9 +316,17 @@ def create_notification(
         )
     else:
         user_ids = repo.resolve_recipient_user_ids(db, tenant_id=tid, to=recipient)
+    resolved_count = len(user_ids)
     if created_by is not None:
         actor_id = int(created_by)
         user_ids = [uid for uid in user_ids if int(uid) != actor_id]
+        logger.info(
+            "[push-diag] actor excluded from push recipients actor_user_id=%s "
+            "resolved_count=%s after_exclude_count=%s notification will not go to the deleter",
+            actor_id,
+            resolved_count,
+            len(user_ids),
+        )
 
     if filter_user_module_settings and user_ids:
         user_ids = repo.filter_user_ids_by_module_setting(
@@ -365,6 +384,16 @@ def create_notification(
         module_key,
         inbox_source_key,
     )
+    logger.info(
+        "[push-diag] inbox fan-out notification_id=%s tenant=%s recipient_user_count=%s "
+        "delivered_user_count=%s module=%s event=%s",
+        master.id,
+        tid,
+        len(user_ids),
+        len(delivered_user_ids or []),
+        module_key,
+        event,
+    )
 
     # 3) FCM push — only newly delivered recipients; never fail notification creation.
     # Holiday/Exam: honor tenant schedule Push ON/OFF for lifecycle and scheduled paths.
@@ -372,11 +401,22 @@ def create_notification(
     if should_push and module_key in ("holiday", "exam"):
         if not _module_schedule_push_enabled(db, tenant_id=tid, module=module_key):
             logger.info(
-                "FCM suppressed by schedule push_enabled=false notification_id=%s module=%s",
+                "[push-diag] FCM suppressed by schedule push_enabled=false "
+                "notification_id=%s module=%s tenant=%s",
                 master.id,
                 module_key,
+                tid,
             )
             should_push = False
+    if not should_push:
+        logger.info(
+            "[push-diag] FCM not dispatched notification_id=%s send_push=%s "
+            "delivered_user_count=%s module=%s",
+            master.id,
+            send_push,
+            len(delivered_user_ids or []),
+            module_key,
+        )
     if should_push:
         _dispatch_fcm_push(
             db,
@@ -428,6 +468,16 @@ def register_device_token(
         tid,
         platform,
     )
+    logger.info(
+        "[push-diag] device token upserted id=%s user=%s tenant=%s platform=%s "
+        "is_active=%s token_length=%s",
+        row.id,
+        user_id,
+        tid,
+        platform,
+        bool(row.is_active),
+        len(token),
+    )
     return DeviceRegisterResponse(
         id=int(row.id),
         fcm_token=row.fcm_token,
@@ -448,19 +498,45 @@ def _dispatch_fcm_push(
 ) -> None:
     """Send FCM to active tokens for resolved recipients. Errors are logged only."""
     try:
-        if not user_ids:
+        recipient_ids = [int(uid) for uid in user_ids if uid is not None]
+        if not recipient_ids:
+            logger.info(
+                "[push-diag] no recipient users for FCM notification_id=%s tenant=%s",
+                notification_id,
+                tenant_id,
+            )
             return
         token_rows = repo.list_active_tokens_for_users(
-            db, tenant_id=tenant_id, user_ids=user_ids
+            db, tenant_id=tenant_id, user_ids=recipient_ids
         )
+        users_with_tokens = sorted({int(r.user_id) for r in token_rows if r.user_id is not None})
+        users_without_tokens = sorted(set(recipient_ids) - set(users_with_tokens))
         tokens = [r.fcm_token for r in token_rows if r.fcm_token]
+        logger.info(
+            "[push-diag] device token lookup notification_id=%s tenant=%s "
+            "recipient_user_count=%s users_with_token_count=%s "
+            "users_without_token_count=%s token_count=%s users_with_tokens=%s "
+            "users_without_tokens=%s",
+            notification_id,
+            tenant_id,
+            len(recipient_ids),
+            len(users_with_tokens),
+            len(users_without_tokens),
+            len(tokens),
+            users_with_tokens,
+            users_without_tokens,
+        )
         if not tokens:
-            logger.debug(
-                "FCM skipped for notification_id=%s: no active device tokens",
+            logger.warning(
+                "[push-diag] FCM skipped for notification_id=%s: no active device tokens "
+                "tenant=%s recipient_user_count=%s",
                 notification_id,
+                tenant_id,
+                len(recipient_ids),
             )
             return
 
+        fcm_service.log_firebase_status(reason=f"dispatch notification_id={notification_id}")
         success, failure, invalid = fcm_service.send_to_tokens(
             tokens=tokens,
             title=subject[:255],
@@ -472,23 +548,29 @@ def _dispatch_fcm_push(
             },
         )
         logger.info(
-            "FCM dispatch notification_id=%s tokens=%s success=%s failure=%s",
+            "[push-diag] FCM dispatch complete notification_id=%s token_count=%s "
+            "success=%s failure=%s invalid=%s module=%s",
             notification_id,
             len(tokens),
             success,
             failure,
+            len(invalid),
+            module,
         )
         if invalid:
             deactivated = repo.deactivate_device_tokens(db, fcm_tokens=invalid)
             logger.info(
-                "Deactivated %s invalid FCM token(s) after notification_id=%s",
+                "[push-diag] Deactivated %s invalid FCM token(s) after notification_id=%s",
                 deactivated,
                 notification_id,
             )
-    except Exception:
+    except Exception as exc:
         logger.exception(
-            "FCM push failed for notification_id=%s (inbox create succeeded)",
+            "[push-diag] FCM push failed for notification_id=%s type=%s error=%s "
+            "(inbox create succeeded)",
             notification_id,
+            type(exc).__name__,
+            str(exc),
         )
 
 
