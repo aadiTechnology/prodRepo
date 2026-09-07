@@ -1,0 +1,16 @@
+node_modules
+dist
+test-results
+coverage
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+.DS_Store
+.vscode
+.idea
+android
+ios
