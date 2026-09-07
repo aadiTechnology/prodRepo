@@ -31,5 +31,9 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Cloud / Firebase credentials
+**/service-account.json
+**/service-account*.json
+
 # Product discovery screenshots
 product-discovery/sprint-01-current-state/screenshots/
