@@ -67,6 +67,12 @@ class InvoiceFeeBreakdownItem(BaseModel):
     paid_amount: float = 0
     pending_amount: float = 0
     payable_for: Optional[str] = None
+    invoice_id: Optional[int] = None
+    due_date: Optional[date] = None
+    payment_id: Optional[int] = None
+    payment_date: Optional[datetime] = None
+    payment_method: Optional[str] = None
+    status: Optional[str] = None
 
 
 class InvoicePaymentHistoryItem(BaseModel):

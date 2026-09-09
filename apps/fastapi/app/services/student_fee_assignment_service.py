@@ -285,12 +285,18 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
                 total_balance=total_amount
             )
             db.add(new_ledger)
+        db.flush()
+        assignment_installments = db.query(StudentFeeInstallment).filter(StudentFeeInstallment.assignment_id == assignment.id).all()
+        from app.services.invoice_service import create_invoices_for_enrolled_student
+        create_invoices_for_enrolled_student(
+            db,
+            student=student,
+            academic_year_id=payload.academic_year_id,
+            fee_structure_id=assignment_fee_structure_id,
+            assignment_installments=assignment_installments,
+        )
         if auto_commit:
             db.commit()
-        else:
-            db.flush()
-        # Fetch installments for the assignment
-        assignment_installments = db.query(StudentFeeInstallment).filter(StudentFeeInstallment.assignment_id == assignment.id).all()
         installments_response = [
             {
                 "installment_no": inst.installment_no,

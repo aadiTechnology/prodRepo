@@ -45,11 +45,13 @@ export default function InvoiceDetail() {
   const controller = useInvoiceDetailController();
   const detail = controller.detail;
 
-  const primaryPayment = detail?.payment_history?.[0] ?? null;
   const canPayNow = Boolean(detail?.available_actions.includes("pay_now"));
 
   const paidItems = useMemo(
-    () => (detail?.fee_breakdown ?? []).filter((row) => Number(row.paid_amount || 0) > 0),
+    () =>
+      (detail?.fee_breakdown ?? []).filter(
+        (row) => Number(row.pending_amount || 0) <= 0 && Number(row.paid_amount || 0) > 0
+      ),
     [detail?.fee_breakdown]
   );
 
@@ -79,28 +81,28 @@ export default function InvoiceDetail() {
       {
         id: "payment_date",
         label: "Payment Date",
-        render: () =>
-          primaryPayment?.payment_date ? formatShortDate(primaryPayment.payment_date) : "—",
+        render: (row: InvoiceFeeBreakdownItem) =>
+          row.payment_date ? formatShortDate(row.payment_date) : "—",
       },
       {
         id: "payment_method",
         label: "Payment Method",
-        render: () => primaryPayment?.payment_method || "—",
+        render: (row: InvoiceFeeBreakdownItem) => row.payment_method || "—",
       },
       {
         id: "status",
         label: "Status",
         align: "center" as const,
         render: (row: InvoiceFeeBreakdownItem) => (
-          <FeeInstallmentStatusChip status={getFeeLineStatus(row, detail?.invoice.due_date)} />
+          <FeeInstallmentStatusChip status={getFeeLineStatus(row, row.due_date || detail?.invoice.due_date)} />
         ),
       },
       {
         id: "receipt_action",
         label: "Action",
         align: "center" as const,
-        render: () => {
-          const paymentId = controller.getPrimaryPaymentId();
+        render: (row: InvoiceFeeBreakdownItem) => {
+          const paymentId = row.payment_id || controller.getPrimaryPaymentId();
           if (!paymentId) {
             return (
               <Typography variant="body2" color="text.secondary">
@@ -127,8 +129,6 @@ export default function InvoiceDetail() {
       controller.onOpenReceiptForFeeLine,
       detail?.invoice.due_date,
       detail?.invoice.installment,
-      primaryPayment?.payment_date,
-      primaryPayment?.payment_method,
     ]
   );
 
@@ -153,15 +153,15 @@ export default function InvoiceDetail() {
       {
         id: "due_date",
         label: "Due Date",
-        render: () =>
-          detail?.invoice.due_date ? formatShortDate(detail.invoice.due_date) : "—",
+        render: (row: InvoiceFeeBreakdownItem) =>
+          row.due_date ? formatShortDate(row.due_date) : detail?.invoice.due_date ? formatShortDate(detail.invoice.due_date) : "—",
       },
       {
         id: "status",
         label: "Status",
         align: "center" as const,
         render: (row: InvoiceFeeBreakdownItem) => (
-          <FeeInstallmentStatusChip status={getFeeLineStatus(row, detail?.invoice.due_date)} />
+          <FeeInstallmentStatusChip status={getFeeLineStatus(row, row.due_date || detail?.invoice.due_date)} />
         ),
       },
       {
@@ -174,7 +174,7 @@ export default function InvoiceDetail() {
             size="small"
             sx={{ textTransform: "none" }}
             data-testid={`btn-pay-now-line-${row.id}`}
-            onClick={controller.onPayNow}
+            onClick={() => controller.onPayNow(row.invoice_id || row.id)}
             disabled={!canPayNow}
           >
             Pay Now
@@ -194,7 +194,7 @@ export default function InvoiceDetail() {
             <PageHeader
               links={[
                 { title: "Invoices", path: "/fees/invoices" },
-                { title: "Invoice Detail", path: "#" },
+                { title: "Invoice Details", path: "#" },
               ]}
               homePath="/"
             />
@@ -262,8 +262,10 @@ export default function InvoiceDetail() {
                 variant="contained"
                 sx={{ textTransform: "none" }}
                 data-testid="btn-pay-now"
-                onClick={controller.onPayNow}
-                disabled={!canPayNow}
+                onClick={() =>
+                  controller.onPayNow(pendingItems[0]?.invoice_id || pendingItems[0]?.id)
+                }
+                disabled={!canPayNow || pendingItems.length === 0}
               >
                 Pay Now
               </Button>

@@ -61,10 +61,6 @@ def list_invoices(
         where_sql.append("LTRIM(RTRIM(ISNULL(si.[Installment], ''))) = :installment")
         params["installment"] = installment.strip()
 
-    if status:
-        where_sql.append("si.status = :status")
-        params["status"] = status
-
     if search:
         search_term = search.strip()
         normalized_search = search_term.replace("-", "").replace(" ", "")
@@ -82,36 +78,57 @@ def list_invoices(
     offset = page * size
     params["offset"] = offset
     params["size"] = size
+    status_filter_sql = ""
+    if status:
+        status_filter_sql = "WHERE grouped.status = :status"
+        params["status"] = status
 
-    list_sql = text(
-        f"""
+    grouped_sql = f"""
         SELECT
-            si.id,
+            MIN(si.id) AS id,
             si.tenant_id,
             si.student_id,
-            s.student_name,
-            s.admission_no,
+            MAX(s.student_name) AS student_name,
+            MAX(s.admission_no) AS admission_no,
             si.academic_year_id,
             si.class_id,
-            c.name AS class_name,
-            si.fee_structure_id,
-            si.invoice_no,
-            LTRIM(RTRIM(ISNULL(si.[Installment], ''))) AS installment,
-            si.fee_installment_id,
-            si.total_amount,
-            si.paid_amount,
-            si.due_amount,
-            si.due_date,
-            si.status,
-            si.created_at,
-            si.fee_installment_id,
-            fi.description AS installment_name
+            MAX(c.name) AS class_name,
+            MIN(si.fee_structure_id) AS fee_structure_id,
+            MIN(si.invoice_no) AS invoice_no,
+            CASE
+                WHEN COUNT_BIG(*) = 1 THEN MAX(LTRIM(RTRIM(ISNULL(si.[Installment], ''))))
+                ELSE 'All installments'
+            END AS installment,
+            MIN(si.fee_installment_id) AS fee_installment_id,
+            SUM(CONVERT(decimal(18, 2), si.total_amount)) AS total_amount,
+            SUM(CONVERT(decimal(18, 2), si.paid_amount)) AS paid_amount,
+            SUM(CONVERT(decimal(18, 2), si.due_amount)) AS due_amount,
+            MIN(si.due_date) AS due_date,
+            CASE
+                WHEN SUM(CONVERT(decimal(18, 2), si.due_amount)) <= 0 THEN 'Paid'
+                WHEN SUM(CASE WHEN si.status = 'Overdue' THEN 1 ELSE 0 END) > 0 THEN 'Overdue'
+                WHEN SUM(CONVERT(decimal(18, 2), si.paid_amount)) > 0
+                     AND SUM(CONVERT(decimal(18, 2), si.due_amount)) > 0 THEN 'Partial'
+                ELSE 'Pending'
+            END AS status,
+            MAX(si.created_at) AS created_at,
+            CASE
+                WHEN COUNT_BIG(*) = 1 THEN MAX(fi.description)
+                ELSE 'All installments'
+            END AS installment_name
         FROM student_invoices si
         INNER JOIN students s ON s.id = si.student_id
         INNER JOIN classes c ON c.id = si.class_id
         LEFT JOIN fee_installments fi ON fi.id = si.fee_installment_id
         WHERE {where_clause}
-        ORDER BY si.created_at DESC, si.id DESC
+        GROUP BY si.tenant_id, si.student_id, si.academic_year_id, si.class_id
+    """
+
+    list_sql = text(
+        f"""
+        SELECT * FROM ({grouped_sql}) grouped
+        {status_filter_sql}
+        ORDER BY grouped.created_at DESC, grouped.id DESC
         OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY
         """
     )
@@ -119,9 +136,8 @@ def list_invoices(
     count_sql = text(
         f"""
         SELECT COUNT(1)
-        FROM student_invoices si
-        INNER JOIN students s ON s.id = si.student_id
-        WHERE {where_clause}
+        FROM ({grouped_sql}) grouped
+        {status_filter_sql}
         """
     )
 
@@ -165,6 +181,56 @@ def get_invoice_by_id(db: Session, *, tenant_id: int, invoice_id: int) -> dict |
     return dict(row) if row else None
 
 
+def list_student_invoices_for_year(
+    db: Session,
+    *,
+    tenant_id: int,
+    student_id: int,
+    academic_year_id: int,
+) -> list[dict]:
+    sql = text(
+        """
+        SELECT
+            si.id,
+            si.tenant_id,
+            si.student_id,
+            s.student_name,
+            s.admission_no,
+            si.academic_year_id,
+            si.class_id,
+            c.name AS class_name,
+            si.fee_structure_id,
+            si.invoice_no,
+            LTRIM(RTRIM(ISNULL(si.[Installment], ''))) AS installment,
+            si.fee_installment_id,
+            si.total_amount,
+            si.paid_amount,
+            si.due_amount,
+            si.due_date,
+            si.status,
+            si.created_at,
+            fi.description AS installment_name
+        FROM student_invoices si
+        INNER JOIN students s ON s.id = si.student_id
+        INNER JOIN classes c ON c.id = si.class_id
+        LEFT JOIN fee_installments fi ON fi.id = si.fee_installment_id
+        WHERE si.tenant_id = :tenant_id
+          AND si.student_id = :student_id
+          AND si.academic_year_id = :academic_year_id
+        ORDER BY si.due_date ASC, si.id ASC
+        """
+    )
+    rows = db.execute(
+        sql,
+        {
+            "tenant_id": tenant_id,
+            "student_id": student_id,
+            "academic_year_id": academic_year_id,
+        },
+    ).mappings().all()
+    return [dict(r) for r in rows]
+
+
 def get_invoice_by_number(db: Session, *, tenant_id: int, invoice_no: str) -> dict | None:
     sql = text(
         """
@@ -192,6 +258,7 @@ def insert_invoice(
     due_date: date,
     status: str,
     fee_installment_id: int | None = None,
+    installment: str | None = None,
 ) -> int:
     entity = StudentInvoice(
         tenant_id=tenant_id,
@@ -206,6 +273,7 @@ def insert_invoice(
         due_date=due_date,
         status=status,
         fee_installment_id=fee_installment_id,
+        installment=installment,
     )
     db.add(entity)
     db.flush()
@@ -377,7 +445,8 @@ def get_invoice_payment_history(
             fp.payment_date,
             fp.total_amount AS amount,
             fp.payment_method,
-            fp.reference_no
+            fp.reference_no,
+            fp.fee_installment_id
         FROM fee_payments fp
         WHERE {where_clause}
         ORDER BY fp.payment_date DESC, fp.id DESC

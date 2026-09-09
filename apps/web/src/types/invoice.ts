@@ -53,6 +53,12 @@ export interface InvoiceFeeBreakdownItem {
   pending_amount?: number;
   payable_for?: string | null;
   installment_type?: string | null;
+  invoice_id?: number | null;
+  due_date?: string | null;
+  payment_id?: number | null;
+  payment_date?: string | null;
+  payment_method?: string | null;
+  status?: string | null;
 }
 
 export interface InvoicePaymentSummary {

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictException, NotFoundException, ValidationException
 from app.models.academic import AcademicYear, ClassDivision, SchoolClass
-from app.models.fee import FeeStructure
+from app.models.fee import FeeInstallment, FeeStructure
 from app.models.student import Student
 from app.models.student_fee_assignment import StudentFeeAssignment, StudentFeeDetail
 from app.repositories import invoice_repository
@@ -228,52 +228,43 @@ def get_invoice_detail(
     student_info_row = invoice_repository.get_invoice_student_info(
         db, tenant_id=tenant_id, invoice_id=invoice_id
     )
-    fee_breakdown_rows = invoice_repository.get_invoice_fee_breakdown(db, invoice_id=invoice_id)
-    
-    # Try to get student-specific assignment details to show discounts
-    assignment = (
-        db.query(StudentFeeAssignment)
-        .filter(
-            StudentFeeAssignment.student_id == int(invoice_row["student_id"]),
-            StudentFeeAssignment.academic_year_id == int(invoice_row["academic_year_id"]),
-            StudentFeeAssignment.fee_structure_id == int(invoice_row["fee_structure_id"])
-        )
-        .first()
-    )
-
-    if not fee_breakdown_rows and assignment and assignment.details:
-        invoice_total = float(invoice_row["total_amount"] or 0)
-        assignment_final_total = float(assignment.final_amount or 0)
-        
-        # Calculate ratio of this invoice to total assigned fee
-        ratio = (invoice_total / assignment_final_total) if assignment_final_total > 0 else 1.0
-        
-        fee_breakdown_rows = []
-        for det in assignment.details:
-            fee_breakdown_rows.append({
-                "id": det.id,
-                "fee_category_name": det.category,
-                "amount": float(det.amount) * ratio,
-                "discount_amount": float(det.discount_applied or 0) * ratio,
-                "payable_for": invoice_row.get("installment_name") or invoice_row.get("installment")
-            })
-
-    if not fee_breakdown_rows:
-        fee_breakdown_rows = invoice_repository.get_fee_structure_breakdown_for_invoice(
-            db,
-            tenant_id=tenant_id,
-            invoice_id=invoice_id,
-        )
+    sibling_invoices = invoice_repository.list_student_invoices_for_year(
+        db,
+        tenant_id=tenant_id,
+        student_id=int(invoice_row["student_id"]),
+        academic_year_id=int(invoice_row["academic_year_id"]),
+    ) or [invoice_row]
     payment_history_rows = invoice_repository.get_invoice_payment_history(
         db,
         tenant_id=tenant_id,
         student_id=int(invoice_row["student_id"]),
-        fee_installment_id=invoice_row.get("fee_installment_id"),
+        fee_installment_id=None,
     )
+    payments_by_installment: dict[int, dict] = {}
+    latest_payment = payment_history_rows[0] if payment_history_rows else None
+    for pay in payment_history_rows:
+        if pay.get("fee_installment_id") is None:
+            continue
+        inst_key = int(pay["fee_installment_id"])
+        if inst_key not in payments_by_installment:
+            payments_by_installment[inst_key] = pay
 
     invoice = _to_invoice_response(invoice_row)
-    paid_amount = float(invoice_row["paid_amount"] or 0)
-    due_amount = float(invoice_row["due_amount"] or 0)
+    total_amount = float(sum(float(row["total_amount"] or 0) for row in sibling_invoices))
+    paid_amount = float(sum(float(row["paid_amount"] or 0) for row in sibling_invoices))
+    due_amount = float(sum(float(row["due_amount"] or 0) for row in sibling_invoices))
+    invoice.total_amount = total_amount
+    invoice.paid_amount = paid_amount
+    invoice.due_amount = due_amount
+    if due_amount <= 0:
+        invoice.status = "Paid"
+    elif any(str(row.get("status")) == "Overdue" for row in sibling_invoices):
+        invoice.status = "Overdue"
+    elif paid_amount > 0:
+        invoice.status = "Partial"
+    else:
+        invoice.status = "Pending"
+
     available_actions: list[str] = ["download_invoice", "print_invoice", "back"]
     if due_amount > 0:
         if scoped_student_ids is not None:
@@ -281,37 +272,28 @@ def get_invoice_detail(
         else:
             available_actions.extend(["pay_now", "collect_payment"])
 
-    # Calculate paid ratio based on NET amount (amount - discount)
-    net_breakdown_total = sum(
-        float(item.get("amount") or 0) - float(item.get("discount_amount") or 0) 
-        for item in fee_breakdown_rows
-    )
-    paid_ratio = (paid_amount / net_breakdown_total) if net_breakdown_total > 0 else 0
-
     breakdown_items: list[InvoiceFeeBreakdownItem] = []
-    running_paid = 0.0
-    for idx, item in enumerate(fee_breakdown_rows):
-        amount = float(item.get("amount") or 0)
-        discount = float(item.get("discount_amount") or 0)
-        net_item_amount = amount - discount
-        
-        if idx == len(fee_breakdown_rows) - 1:
-            allocated_paid = max(0.0, min(net_item_amount, paid_amount - running_paid))
-        else:
-            allocated_paid = max(0.0, min(net_item_amount, round(net_item_amount * paid_ratio, 2)))
-            running_paid += allocated_paid
-        
-        pending = max(0.0, round(net_item_amount - allocated_paid, 2))
+    for row in sibling_invoices:
+        inst_id = int(row["fee_installment_id"]) if row.get("fee_installment_id") else None
+        pay = payments_by_installment.get(inst_id) if inst_id is not None else None
+        if pay is None and float(row["paid_amount"] or 0) > 0:
+            pay = latest_payment
+        label = row.get("installment_name") or row.get("installment") or "Installment"
         breakdown_items.append(
             InvoiceFeeBreakdownItem(
-                id=int(item["id"]),
-                fee_category_id=item.get("fee_category_id"),
-                fee_category_name=item.get("fee_category_name"),
-                amount=amount,
-                discount_amount=discount,
-                paid_amount=allocated_paid,
-                pending_amount=pending,
-                payable_for=item.get("payable_for"),
+                id=int(row["id"]),
+                fee_category_name=label,
+                amount=float(row["total_amount"] or 0),
+                discount_amount=0,
+                paid_amount=float(row["paid_amount"] or 0),
+                pending_amount=float(row["due_amount"] or 0),
+                payable_for=label,
+                invoice_id=int(row["id"]),
+                due_date=row.get("due_date"),
+                payment_id=int(pay["payment_id"]) if pay and pay.get("payment_id") else None,
+                payment_date=pay.get("payment_date") if pay else None,
+                payment_method=str(pay["payment_method"]) if pay and pay.get("payment_method") else None,
+                status=str(row.get("status") or ""),
             )
         )
 
@@ -329,7 +311,7 @@ def get_invoice_detail(
         ),
         fee_breakdown=breakdown_items,
         payment_summary=InvoicePaymentSummary(
-            total_amount=float(invoice_row["total_amount"] or 0),
+            total_amount=total_amount,
             paid_amount=paid_amount,
             due_amount=due_amount,
         ),
@@ -669,6 +651,66 @@ def _next_invoice_sequence(db: Session) -> int:
 
 def _format_invoice_no(sequence: int) -> str:
     return f"INV-{sequence:02d}"
+
+
+def create_invoices_for_enrolled_student(
+    db: Session,
+    *,
+    student: Student,
+    academic_year_id: int,
+    fee_structure_id: int,
+    assignment_installments: list,
+) -> None:
+    if not assignment_installments or not getattr(student, "class_id", None):
+        return
+    existing = (
+        db.query(invoice_repository.StudentInvoice.id)
+        .filter(
+            invoice_repository.StudentInvoice.tenant_id == student.tenant_id,
+            invoice_repository.StudentInvoice.student_id == student.id,
+            invoice_repository.StudentInvoice.academic_year_id == academic_year_id,
+        )
+        .first()
+    )
+    if existing:
+        return
+
+    structure_installments = (
+        db.query(FeeInstallment)
+        .filter(
+            FeeInstallment.fee_structure_id == fee_structure_id,
+            FeeInstallment.is_deleted == False,  # noqa: E712
+        )
+        .all()
+    )
+    by_number = {int(inst.installment_number): inst for inst in structure_installments}
+    next_seq = _next_invoice_sequence(db)
+    today = date.today()
+    for index, inst in enumerate(assignment_installments):
+        template = by_number.get(int(inst.installment_no or index + 1))
+        amount = float(inst.amount or 0)
+        due = inst.due_date or today
+        label = (
+            (template.description or "").strip()
+            if template
+            else f"Installment {int(inst.installment_no or index + 1)}"
+        ) or f"Installment {int(inst.installment_no or index + 1)}"
+        invoice_repository.insert_invoice(
+            db,
+            tenant_id=int(student.tenant_id),
+            student_id=int(student.id),
+            academic_year_id=academic_year_id,
+            class_id=int(student.class_id),
+            fee_structure_id=fee_structure_id,
+            invoice_no=_format_invoice_no(next_seq + index),
+            total_amount=amount,
+            paid_amount=0,
+            due_amount=amount,
+            due_date=due,
+            status="Pending",
+            fee_installment_id=int(template.id) if template else None,
+            installment=label,
+        )
 
 
 def _resolve_installment_for_generation(

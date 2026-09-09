@@ -40,12 +40,12 @@ export function useInvoiceDetailController() {
     navigate("/fees/invoices");
   }, [navigate]);
 
-  const onCollectPayment = useCallback(() => {
-    const invoice = detail?.invoice;
-    if (!invoice) return;
+  const onCollectPayment = useCallback((invoiceId?: number) => {
+    const targetId = invoiceId || detail?.invoice?.id;
+    if (!targetId) return;
     navigate("/fees/collect-payment", {
       state: {
-        invoice_id: invoice.id,
+        invoice_id: targetId,
       },
     });
   }, [detail, navigate]);

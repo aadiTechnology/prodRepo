@@ -306,10 +306,18 @@ export default function ReceiptPage() {
       data-testid="page-receipt-details"
       header={
         <PageHeader
-          links={[
-            { title: "Invoices", path: "/fees/invoices" },
-            { title: printableTitle, path: "#" },
-          ]}
+          links={
+            Number.isFinite(resolvedInvoiceId) && resolvedInvoiceId > 0
+              ? [
+                  { title: "Invoices", path: "/fees/invoices" },
+                  { title: "Invoice Details", path: `/fees/invoices/${resolvedInvoiceId}/detail` },
+                  { title: "Payment Receipt", path: "#" },
+                ]
+              : [
+                  { title: "Invoices", path: "/fees/invoices" },
+                  { title: printableTitle, path: "#" },
+                ]
+          }
           homePath="/"
           actions={
             <Box className="receipt-no-print" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
