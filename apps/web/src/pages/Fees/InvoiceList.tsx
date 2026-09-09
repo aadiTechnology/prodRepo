@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { Alert, MenuItem, Select, Typography } from "@mui/material";
-import { Add as AddIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/layout";
 import { EntityTableSection, ListPageLayout, ListPageToolbar } from "../../components/reusable";
@@ -43,14 +42,6 @@ export default function InvoiceList() {
                     ? "Search by invoice ID..."
                     : "Search by student name / invoice ID..."
                 }
-                onAddClick={
-                  perms.canCreateInvoices
-                    ? () => navigate("/fees/generate-invoice")
-                    : undefined
-                }
-                addLabel="Generate Invoice"
-                addIcon={<AddIcon sx={{ fontSize: 24 }} />}
-                addButtonTestId="btn-generate-invoice"
                 renderActions={
                   perms.readOnlyAudience ? undefined : (
                   <>

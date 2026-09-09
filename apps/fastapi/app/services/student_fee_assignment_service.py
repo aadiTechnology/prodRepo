@@ -22,6 +22,30 @@ from sqlalchemy import and_
 
 logger = get_logger(__name__)
 
+
+def _only_custom_fee_plan_name(raw: str, master_name: str | None) -> str:
+    name = (raw or "").strip()
+    master = (master_name or "").strip()
+    if not name or not master:
+        return name
+    for sep in (" — ", " – ", " - ", "—", "–", "-", " "):
+        prefix = master + sep
+        if name.lower().startswith(prefix.lower()):
+            name = name[len(prefix):].strip()
+            break
+    parts = master.split()
+    if len(parts) >= 2:
+        first, rest = parts[0], " ".join(parts[1:])
+        for sep in (" - ", " — ", " – ", "-"):
+            wrapped = f"{first}{sep}{rest}"
+            if name.lower().startswith(wrapped.lower()):
+                leftover = name[len(wrapped):].lstrip(" -—–").strip()
+                if leftover:
+                    name = leftover
+                break
+    return name.strip()
+
+
 def get_students_for_dropdown(db: Session):
     # Join students and classes
     results = (
@@ -162,8 +186,12 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
         # Persist customized schedule as its own Fee Structure so it appears on /fees/setup,
         # without modifying the master plan used by other students.
         if has_custom_schedule:
-            base_name = (fee_structure.name or "").strip() or f"Fee Structure #{fee_structure.id}"
-            student_label = (getattr(student, "student_name", None) or f"Student {student.id}").strip()
+            custom_name = _only_custom_fee_plan_name(
+                getattr(payload, "custom_fee_plan_name", None) or "",
+                fee_structure.name,
+            )
+            if not custom_name:
+                raise AppException("Custom fee plan name is required.", status_code=400)
             custom_structure = FeeStructure(
                 tenant_id=fee_structure.tenant_id,
                 class_id=fee_structure.class_id,
@@ -174,8 +202,8 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
                 total_amount=final_amount,
                 installment_type=fee_structure.installment_type or "CUSTOM",
                 num_installments=len(custom_installments),
-                description=fee_structure.description,
-                name=f"{base_name} — {student_label}",
+                description=None,
+                name=custom_name,
                 is_active=True,
                 created_by=getattr(student, "created_by", None),
             )

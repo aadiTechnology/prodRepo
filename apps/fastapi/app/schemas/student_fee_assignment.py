@@ -31,6 +31,7 @@ class StudentFeeAssignmentCreate(BaseModel):
     custom_annual_amount: Optional[float] = None
     custom_discount_amount: Optional[float] = None
     custom_installments: Optional[List[CustomStudentFeeInstallment]] = None
+    custom_fee_plan_name: Optional[str] = Field(default=None, max_length=100)
 
 class StudentFeeDetailResponse(BaseModel):
     category: str

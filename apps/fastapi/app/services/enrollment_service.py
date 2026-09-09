@@ -245,6 +245,7 @@ class EnrollmentService:
                 custom_annual_amount=payload.custom_annual_amount,
                 custom_discount_amount=payload.custom_discount_amount,
                 custom_installments=payload.custom_installments,
+                custom_fee_plan_name=payload.custom_fee_plan_name,
             )
             fee_result = student_fee_assignment_service.assign_fee_to_student(
                 self.db,

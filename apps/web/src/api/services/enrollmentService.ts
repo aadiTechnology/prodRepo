@@ -44,6 +44,7 @@ export interface EnrollmentCreatePayload {
   custom_annual_amount?: number | null;
   custom_discount_amount?: number | null;
   custom_installments?: CustomEnrollmentInstallment[];
+  custom_fee_plan_name?: string | null;
   birth_certificate_url?: string | null;
   photo_url?: string | null;
 }

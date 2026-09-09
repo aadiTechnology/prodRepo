@@ -15,6 +15,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
 import { IconButton } from "@mui/material";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
+import TextFieldInput from "../../components/semantic/TextFieldInput";
 
 import BaseForm from "../../components/reusable/BaseForm";
 import FormSectionLabel from "../../components/reusable/FormSectionLabel";
@@ -84,6 +85,7 @@ type StudentFeeInstallmentDraft = {
 };
 
 type SavedCustomFeePlan = {
+  name: string;
   annual: number;
   discount: number;
   installments: StudentFeeInstallmentDraft[];
@@ -270,6 +272,7 @@ export default function EnrollmentPage() {
   const [customDiscountAmount, setCustomDiscountAmount] = useState("");
   const [customInstallments, setCustomInstallments] = useState<StudentFeeInstallmentDraft[]>([]);
   const [savedCustomFee, setSavedCustomFee] = useState<SavedCustomFeePlan | null>(null);
+  const [customFeePlanName, setCustomFeePlanName] = useState("");
   const [customFeeError, setCustomFeeError] = useState<string | null>(null);
   const [discounts, setDiscounts] = useState<DiscountOption[]>([]);
   const [studentViewMeta, setStudentViewMeta] = useState<StudentViewMeta>({});
@@ -704,6 +707,18 @@ export default function EnrollmentPage() {
         amount: Number(row.amount || 0),
         due_date: row.due_date,
       }));
+      const configuredName = (selectedFeePlan?.name || "").trim();
+      let planName = (customFeePlanName.trim() || customPlan.name || "").trim();
+      if (configuredName && planName.toLowerCase() !== configuredName.toLowerCase()) {
+        const prefixes = [`${configuredName} — `, `${configuredName} – `, `${configuredName} - `, `${configuredName} `];
+        for (const prefix of prefixes) {
+          if (planName.toLowerCase().startsWith(prefix.toLowerCase())) {
+            planName = planName.slice(prefix.length).trim();
+            break;
+          }
+        }
+      }
+      payload.custom_fee_plan_name = planName || undefined;
     }
     return payload;
   };
@@ -961,6 +976,7 @@ export default function EnrollmentPage() {
   const useConfiguredFeePlan = () => {
     setFeeScheduleMode("configured");
     setSavedCustomFee(null);
+    setCustomFeePlanName("");
     setCustomFeeError(null);
     setSnackbar("Using the configured fee plan for this student.");
   };
@@ -968,6 +984,11 @@ export default function EnrollmentPage() {
   const startCustomizeFeePlan = () => {
     const source =
       savedCustomFee?.installments?.length ? savedCustomFee.installments : configuredInstallments;
+    setCustomFeePlanName(
+      savedCustomFee?.name && savedCustomFee.name !== selectedFeePlan?.name
+        ? savedCustomFee.name.trim()
+        : ""
+    );
     setCustomAnnualFee((savedCustomFee?.annual ?? feePreview.total).toFixed(2));
     setCustomDiscountAmount((savedCustomFee?.discount ?? feePreview.discountAmount).toFixed(2));
     setCustomInstallments(
@@ -980,6 +1001,10 @@ export default function EnrollmentPage() {
   };
 
   const saveCustomizedFeePlan = () => {
+    if (!customFeePlanName.trim()) {
+      setCustomFeeError("Enter a custom fee plan name.");
+      return;
+    }
     if (!customInstallments.length) {
       setCustomFeeError("At least one installment is required.");
       return;
@@ -995,6 +1020,7 @@ export default function EnrollmentPage() {
       return;
     }
     setSavedCustomFee({
+      name: customFeePlanName.trim(),
       annual: Number(customAnnualFee || 0),
       discount: Number(customDiscountAmount || 0),
       installments: customInstallments.map((row, index) => ({ ...row, installment_no: index + 1 })),
@@ -1032,6 +1058,7 @@ export default function EnrollmentPage() {
   useEffect(() => {
     setFeeScheduleMode("configured");
     setSavedCustomFee(null);
+    setCustomFeePlanName("");
     setCustomInstallments([]);
     setCustomAnnualFee("");
     setCustomDiscountAmount("");
@@ -1304,6 +1331,23 @@ export default function EnrollmentPage() {
         grid: { xs: 12 },
         render: (ctx) => <FormSectionLabel title="Fee Details" icon={<PaymentsIcon />} sx={sectionTitleSx} />,
       });
+      if (feeScheduleMode !== "configured") {
+        config.fields.fee_structure_id = {
+          ...config.fields.fee_structure_id,
+          type: "custom",
+          render: () => (
+            <TextFieldInput
+              label="Fee Plan"
+              placeholder=""
+              required
+              fullWidth
+              value={customFeePlanName}
+              onChange={(e) => setCustomFeePlanName(e.target.value)}
+              htmlInput={{ maxLength: 100 }}
+            />
+          ),
+        };
+      }
     }
 
     // 8. Installment schedule from selected fee plan, then discount preview
@@ -1719,6 +1763,7 @@ export default function EnrollmentPage() {
     customDiscountAmount,
     customDraftFinal,
     customFeeError,
+    customFeePlanName,
     customInstallments,
     discountOptions,
     displayedAnnual,
