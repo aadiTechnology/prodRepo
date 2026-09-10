@@ -41,6 +41,8 @@ class FeePaymentCollectResponse(BaseModel):
     total_amount: float
     payment_date: datetime
     receipt_number: Optional[str] = None
+    payment_status: str = "completed"
+    pending_approval: bool = False
 
 
 class FeeReceiptPaymentLineItem(BaseModel):
@@ -57,6 +59,38 @@ class FeeReceiptFeeDetailItem(BaseModel):
     payable_for: Optional[str] = None
     amount: float
     paid_amount: float
+
+
+class FeePaymentApprovalListItem(BaseModel):
+    id: int
+    request_date: datetime
+    student_id: int
+    student_name: str
+    class_id: Optional[int] = None
+    class_name: Optional[str] = None
+    division_id: Optional[int] = None
+    division_name: Optional[str] = None
+    amount: float
+    payment_method: str
+    transaction_id: Optional[str] = None
+    status: str
+
+
+class FeePaymentApprovalListResponse(BaseModel):
+    items: list[FeePaymentApprovalListItem]
+    total: int
+    page: int
+    size: int
+
+
+class FeePaymentApprovalActionResponse(BaseModel):
+    id: int
+    status: str
+    message: str
+
+
+class FeePaymentApprovalRejectRequest(BaseModel):
+    reason: Optional[str] = None
 
 
 class FeeReceiptDetailResponse(BaseModel):

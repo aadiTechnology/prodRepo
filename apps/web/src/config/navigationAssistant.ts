@@ -43,6 +43,7 @@ export const NAV_PAGE_HINTS: Record<string, string> = {
   "/fees/collect-payment": "Collect fee payments",
   "/fees/invoices": "View fee invoices",
   "/fees/due-list-v2": "View students with due fees",
+  "/fees/pending-approval": "Review fee payments pending approval",
   "/fees/categories": "Manage fee categories",
   "/fees/setup": "Configure fee structures",
   "/fees/discounts": "Manage fee discounts",

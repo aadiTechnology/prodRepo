@@ -14,14 +14,18 @@ from app.models.student_invoice import StudentInvoice
 from app.models.student_fee_ledger import FeeLedger
 from app.models.user import User
 from app.repositories import invoice_repository
-from app.services.invoice_access import assert_invoice_row_access
+from app.services.invoice_access import assert_invoice_row_access, get_invoice_scope_student_ids
 from app.schemas.fee_collection import (
     FeeReceiptDetailResponse,
     FeeReceiptFeeDetailItem,
     FeeReceiptPaymentLineItem,
-    FeePaymentCollectRequest, 
+    FeePaymentCollectRequest,
     FeePaymentCollectResponse,
-    InvoicePaymentCollectRequest
+    InvoicePaymentCollectRequest,
+    FeePaymentApprovalActionResponse,
+    FeePaymentApprovalListItem,
+    FeePaymentApprovalListResponse,
+    FeePaymentApprovalRejectRequest,
 )
 
 _ALLOWED_PAYMENT_METHODS = {"CASH", "UPI", "CARD", "BANK_TRANSFER"}
@@ -78,6 +82,80 @@ def _generate_receipt_number(db: Session, tenant_id: int) -> str:
         .count()
     )
     return f"{prefix}-{count + 1:04d}"
+
+
+def _requires_payment_approval(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int | None,
+    email: str | None,
+    legacy_role: object | None,
+) -> bool:
+    if user_id is None or email is None:
+        return False
+    return get_invoice_scope_student_ids(
+        db, tenant_id=tenant_id, user_id=user_id, email=email, legacy_role=legacy_role
+    ) is not None
+
+
+def _apply_invoice_payment_effects(
+    db: Session,
+    *,
+    tenant_id: int,
+    invoice: StudentInvoice,
+    payment_amount: Decimal,
+) -> None:
+    due_amount = Decimal(str(invoice.due_amount))
+    if payment_amount > due_amount:
+        raise ValidationException(
+            f"Payment amount {payment_amount} exceeds due amount {due_amount}"
+        )
+    new_paid = Decimal(str(invoice.paid_amount)) + payment_amount
+    new_due = due_amount - payment_amount
+    invoice.paid_amount = new_paid
+    invoice.due_amount = new_due
+    if new_due <= 0:
+        invoice.status = "Paid"
+        invoice.due_amount = Decimal("0.00")
+    elif new_paid > 0:
+        invoice.status = "Partial"
+    academic_year = db.query(AcademicYear).filter(AcademicYear.id == invoice.academic_year_id).first()
+    academic_year_name = academic_year.name if academic_year else None
+    ledger = None
+    if academic_year_name:
+        ledger = (
+            db.query(FeeLedger)
+            .filter(
+                FeeLedger.student_id == invoice.student_id,
+                FeeLedger.tenant_id == tenant_id,
+                FeeLedger.academic_year == academic_year_name,
+            )
+            .first()
+        )
+    if not ledger:
+        ledger = (
+            db.query(FeeLedger)
+            .filter(FeeLedger.student_id == invoice.student_id, FeeLedger.tenant_id == tenant_id)
+            .order_by(FeeLedger.id.desc())
+            .first()
+        )
+    if ledger:
+        ledger.total_paid = Decimal(str(ledger.total_paid)) + payment_amount
+        ledger.total_balance = Decimal(str(ledger.total_balance)) - payment_amount
+
+
+def _payment_collect_response(payment: FeePayment) -> FeePaymentCollectResponse:
+    status = str(payment.payment_status or "completed")
+    return FeePaymentCollectResponse(
+        payment_id=payment.id,
+        student_id=payment.student_id,
+        total_amount=float(payment.total_amount),
+        payment_date=payment.payment_date,
+        receipt_number=payment.receipt_number,
+        payment_status=status,
+        pending_approval=status == "pending_approval",
+    )
 
 
 def _to_words_below_thousand(value: int) -> str:
@@ -307,10 +385,27 @@ def collect_invoice_payment(
             f"Payment amount {payment_amount} exceeds due amount {due_amount}"
         )
 
-    # 3. Generate receipt number
-    receipt_number = _generate_receipt_number(db, tenant_id)
+    requires_approval = _requires_payment_approval(
+        db, tenant_id=tenant_id, user_id=user_id, email=email, legacy_role=legacy_role
+    )
+    if requires_approval and invoice.fee_installment_id:
+        existing_pending = (
+            db.query(FeePayment.id)
+            .filter(
+                FeePayment.tenant_id == tenant_id,
+                FeePayment.student_id == invoice.student_id,
+                FeePayment.fee_installment_id == invoice.fee_installment_id,
+                FeePayment.payment_status == "pending_approval",
+            )
+            .first()
+        )
+        if existing_pending:
+            raise ConflictException("A payment for this installment is already pending approval.")
 
-    # 4. Create FeePayment — link to installment and academic year from invoice
+    payment_status = "pending_approval" if requires_approval else "completed"
+    receipt_number = None if requires_approval else _generate_receipt_number(db, tenant_id)
+
+    # 4. Create FeePayment
     bank_account_holder_name = None
     bank_account_no = None
     ifsc_code = None
@@ -328,9 +423,8 @@ def collect_invoice_payment(
         total_amount=payment_amount,
         notes=req.notes,
         created_by=user_id,
-        payment_status="completed",
+        payment_status=payment_status,
         receipt_number=receipt_number,
-        # Link to installment and year from the invoice
         fee_installment_id=invoice.fee_installment_id,
         academic_year_id=invoice.academic_year_id,
         bank_account_holder_name=bank_account_holder_name,
@@ -352,61 +446,14 @@ def collect_invoice_payment(
             )
         )
 
-    # 6. Update Invoice amounts and status
-    new_paid = Decimal(str(invoice.paid_amount)) + payment_amount
-    new_due = due_amount - payment_amount
-
-    invoice.paid_amount = new_paid
-    invoice.due_amount = new_due
-
-    if new_due <= 0:
-        invoice.status = "Paid"
-        invoice.due_amount = Decimal("0.00")   # avoid negative due
-    elif new_paid > 0:
-        invoice.status = "Partial"
-
-    # 7. Update FeeLedger
-    academic_year = db.query(AcademicYear).filter(AcademicYear.id == invoice.academic_year_id).first()
-    academic_year_name = academic_year.name if academic_year else None
-
-    ledger = None
-    if academic_year_name:
-        ledger = (
-            db.query(FeeLedger)
-            .filter(
-                FeeLedger.student_id == invoice.student_id,
-                FeeLedger.tenant_id == tenant_id,
-                FeeLedger.academic_year == academic_year_name,
-            )
-            .first()
+    if not requires_approval:
+        _apply_invoice_payment_effects(
+            db, tenant_id=tenant_id, invoice=invoice, payment_amount=payment_amount
         )
-
-    # Fallback: find any ledger for student+tenant if year-specific not found
-    if not ledger:
-        ledger = (
-            db.query(FeeLedger)
-            .filter(
-                FeeLedger.student_id == invoice.student_id,
-                FeeLedger.tenant_id == tenant_id,
-            )
-            .order_by(FeeLedger.id.desc())
-            .first()
-        )
-
-    if ledger:
-        ledger.total_paid = Decimal(str(ledger.total_paid)) + payment_amount
-        ledger.total_balance = Decimal(str(ledger.total_balance)) - payment_amount
 
     db.commit()
     db.refresh(payment)
-
-    return FeePaymentCollectResponse(
-        payment_id=payment.id,
-        student_id=payment.student_id,
-        total_amount=float(payment.total_amount),
-        payment_date=payment.payment_date,
-        receipt_number=payment.receipt_number,
-    )
+    return _payment_collect_response(payment)
 
 
 def get_receipt_detail(
@@ -425,6 +472,8 @@ def get_receipt_detail(
     )
     if not payment:
         raise NotFoundException("Receipt", payment_id)
+    if str(payment.payment_status or "") != "completed":
+        raise ValidationException("Receipt is available only after payment approval.")
 
     if user_id is not None and email is not None:
         assert_invoice_row_access(
@@ -619,7 +668,11 @@ def get_invoice_receipt_detail(
     if invoice.fee_installment_id:
         payment_query = payment_query.filter(FeePayment.fee_installment_id == invoice.fee_installment_id)
 
-    payments = payment_query.order_by(FeePayment.payment_date.desc(), FeePayment.id.desc()).all()
+    payments = (
+        payment_query.filter(FeePayment.payment_status == "completed")
+        .order_by(FeePayment.payment_date.desc(), FeePayment.id.desc())
+        .all()
+    )
     if not payments:
         raise NotFoundException("Receipt", invoice_id)
 
@@ -681,4 +734,142 @@ def get_invoice_receipt_detail(
         created_by_name=created_by_name,
         payment_lines=payment_lines,
         fee_details=fee_details,
+    )
+
+
+def list_pending_approvals(
+    db: Session,
+    *,
+    tenant_id: int,
+    class_id: int | None,
+    division_id: int | None,
+    student_id: int | None,
+    status: str | None,
+    search: str | None,
+    page: int,
+    size: int,
+    user_id: int | None = None,
+    email: str | None = None,
+    legacy_role: object | None = None,
+) -> FeePaymentApprovalListResponse:
+    scoped = None
+    if user_id is not None and email is not None:
+        scoped = get_invoice_scope_student_ids(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            legacy_role=legacy_role,
+        )
+    rows, total = invoice_repository.list_fee_pending_approvals(
+        db,
+        tenant_id=tenant_id,
+        class_id=class_id,
+        division_id=division_id,
+        student_id=student_id,
+        status=status,
+        search=search,
+        page=page,
+        size=size,
+        scoped_student_ids=scoped,
+    )
+    return FeePaymentApprovalListResponse(
+        items=[
+            FeePaymentApprovalListItem(
+                id=int(row["id"]),
+                request_date=row["request_date"],
+                student_id=int(row["student_id"]),
+                student_name=row["student_name"],
+                class_id=row.get("class_id"),
+                class_name=row.get("class_name"),
+                division_id=row.get("division_id"),
+                division_name=row.get("division_name"),
+                amount=float(row["amount"] or 0),
+                payment_method=str(row["payment_method"] or ""),
+                transaction_id=row.get("transaction_id"),
+                status=str(row["status"] or ""),
+            )
+            for row in rows
+        ],
+        total=total,
+        page=page,
+        size=size,
+    )
+
+
+def _get_pending_payment(db: Session, *, tenant_id: int, payment_id: int) -> FeePayment:
+    payment = (
+        db.query(FeePayment)
+        .filter(FeePayment.id == payment_id, FeePayment.tenant_id == tenant_id)
+        .first()
+    )
+    if not payment:
+        raise NotFoundException("FeePayment", payment_id)
+    if str(payment.payment_status) != "pending_approval":
+        raise ConflictException("Only pending approval payments can be updated.")
+    return payment
+
+
+def approve_pending_payment(
+    db: Session,
+    *,
+    tenant_id: int,
+    payment_id: int,
+) -> FeePaymentApprovalActionResponse:
+    payment = _get_pending_payment(db, tenant_id=tenant_id, payment_id=payment_id)
+    payment_amount = Decimal(str(payment.total_amount or 0))
+    invoice = None
+    if payment.fee_installment_id:
+        invoice = (
+            db.query(StudentInvoice)
+            .filter(
+                StudentInvoice.tenant_id == tenant_id,
+                StudentInvoice.student_id == payment.student_id,
+                StudentInvoice.fee_installment_id == payment.fee_installment_id,
+            )
+            .order_by(StudentInvoice.id.desc())
+            .first()
+        )
+    if not invoice:
+        invoice = (
+            db.query(StudentInvoice)
+            .filter(
+                StudentInvoice.tenant_id == tenant_id,
+                StudentInvoice.student_id == payment.student_id,
+            )
+            .order_by(StudentInvoice.due_date.asc(), StudentInvoice.id.asc())
+            .first()
+        )
+    if invoice:
+        _apply_invoice_payment_effects(
+            db, tenant_id=tenant_id, invoice=invoice, payment_amount=payment_amount
+        )
+    payment.payment_status = "completed"
+    if not payment.receipt_number:
+        payment.receipt_number = _generate_receipt_number(db, tenant_id)
+    db.commit()
+    return FeePaymentApprovalActionResponse(
+        id=int(payment.id),
+        status="Approved",
+        message="Payment approved",
+    )
+
+
+def reject_pending_payment(
+    db: Session,
+    *,
+    tenant_id: int,
+    payment_id: int,
+    req: FeePaymentApprovalRejectRequest | None = None,
+) -> FeePaymentApprovalActionResponse:
+    payment = _get_pending_payment(db, tenant_id=tenant_id, payment_id=payment_id)
+    payment.payment_status = "rejected"
+    reason = (req.reason or "").strip() if req else ""
+    if reason:
+        payment.notes = f"{payment.notes}\nRejected: {reason}".strip() if payment.notes else f"Rejected: {reason}"
+    db.commit()
+    return FeePaymentApprovalActionResponse(
+        id=int(payment.id),
+        status="Rejected",
+        message="Payment rejected",
     )

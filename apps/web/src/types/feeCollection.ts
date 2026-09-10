@@ -20,6 +20,8 @@ export interface FeePaymentCollectResponse {
   total_amount: number;
   payment_date: string;
   receipt_number?: string;
+  payment_status?: string;
+  pending_approval?: boolean;
 }
 
 export interface InvoicePaymentCollectRequest {
@@ -72,4 +74,38 @@ export interface FeeReceiptDetailResponse {
   created_by_name?: string | null;
   payment_lines: FeeReceiptPaymentLineItem[];
   fee_details: FeeReceiptFeeDetailItem[];
+}
+
+export type FeeApprovalStatus = "Pending Approval" | "Approved" | "Rejected" | "ALL";
+
+export interface FeePaymentApprovalListItem {
+  id: number;
+  request_date: string;
+  student_id: number;
+  student_name: string;
+  class_id?: number | null;
+  class_name?: string | null;
+  division_id?: number | null;
+  division_name?: string | null;
+  amount: number;
+  payment_method: string;
+  transaction_id?: string | null;
+  status: FeeApprovalStatus;
+}
+
+export interface FeePaymentApprovalListResponse {
+  items: FeePaymentApprovalListItem[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface FeePaymentApprovalListParams {
+  page?: number;
+  size?: number;
+  class_id?: number;
+  division_id?: number;
+  student_id?: number;
+  status?: FeeApprovalStatus;
+  search?: string;
 }
