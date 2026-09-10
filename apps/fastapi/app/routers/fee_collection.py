@@ -145,6 +145,7 @@ async def approve_fee_pending_payment(
         db,
         tenant_id=current_user.tenant_id,
         payment_id=payment_id,
+        user_id=current_user.id,
     )
 
 
