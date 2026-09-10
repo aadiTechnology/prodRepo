@@ -3,9 +3,8 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 from io import BytesIO
+from types import ModuleType
 from urllib.parse import unquote, urlparse
-
-import b2sdk.v2 as b2
 
 from app.core.config import settings
 from app.core.exceptions import ValidationException
@@ -21,6 +20,24 @@ _ATTACHMENT_PREFIXES = (
     "support-release-notes/",
     "sidebar-icons/",
 )
+
+_b2_module: ModuleType | None = None
+
+
+def _b2() -> ModuleType:
+    """Lazy-import b2sdk so Azure-only reads do not crash when the package is missing."""
+    global _b2_module
+    if _b2_module is not None:
+        return _b2_module
+    try:
+        import b2sdk.v2 as b2_mod
+    except ImportError as exc:
+        raise ValidationException(
+            "Backblaze SDK (b2sdk) is not installed. "
+            "Run: pip install 'b2sdk>=2.0.0' and restart the API."
+        ) from exc
+    _b2_module = b2_mod
+    return b2_mod
 
 
 def _auth_config_error(exc: Exception) -> ValidationException:
@@ -42,8 +59,9 @@ def _auth_config_error(exc: Exception) -> ValidationException:
 
 
 @lru_cache(maxsize=1)
-def _b2_api() -> b2.B2Api:
+def _b2_api():
     """Initialize B2 API client with credentials from config."""
+    b2 = _b2()
     key_id = (settings.BACKBLAZE_KEY_ID or "").strip()
     app_key = (settings.BACKBLAZE_APP_KEY or "").strip()
 
@@ -73,6 +91,10 @@ def _bucket_name() -> str:
 
 
 def is_backblaze_configured() -> bool:
+    try:
+        _b2()
+    except ValidationException:
+        return False
     return bool(
         (settings.BACKBLAZE_KEY_ID or "").strip()
         and (settings.BACKBLAZE_APP_KEY or "").strip()
@@ -89,6 +111,7 @@ def ensure_bucket_exists() -> None:
     if not is_backblaze_configured():
         return
 
+    b2 = _b2()
     try:
         api = _b2_api()
         api.get_bucket_by_name(_bucket_name())
@@ -146,6 +169,7 @@ def _get_file_version(blob_name: str):
     if not trimmed or not is_backblaze_configured():
         return None
 
+    b2 = _b2()
     api = _b2_api()
     bucket = api.get_bucket_by_name(_bucket_name())
     try:
@@ -186,6 +210,7 @@ def download_bytes(blob_name: str) -> bytes:
     if not trimmed:
         raise ValidationException("Invalid blob name")
 
+    b2 = _b2()
     try:
         api = _b2_api()
         bucket = api.get_bucket_by_name(_bucket_name())

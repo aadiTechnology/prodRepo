@@ -20,7 +20,6 @@ from app.services.notice_access import (
 from app.services.notice_attachment_storage import (
     delete_notice_attachment_file,
     download_notice_attachment_bytes,
-    is_backblaze_hosted_attachment,
     resolve_attachment_url,
     save_notice_attachment_file,
     validate_attachment_path,
@@ -284,24 +283,12 @@ def _attachment_response(item: dict) -> NoticeAttachmentResponse:
     payload = dict(item)
     file_path = payload.get("file_path")
     if file_path:
-        # STORAGE_PROVIDER=backblaze controls new uploads only.
-        # Private B2 blobs use an authenticated proxy; legacy Azure blobs keep SAS.
-        provider = (settings.STORAGE_PROVIDER or "azure").lower()
-        notice_id = item.get("notice_id")
-        attachment_id = item.get("id")
-        stored = str(file_path)
-        if (
-            provider == "backblaze"
-            and notice_id is not None
-            and attachment_id is not None
-            and is_backblaze_hosted_attachment(stored)
-        ):
-            payload["file_path"] = (
-                f"/communications/notices/{int(notice_id)}"
-                f"/attachments/{int(attachment_id)}/content"
-            )
-        else:
-            payload["file_path"] = resolve_attachment_url(stored)
+        # Same pattern as homework/syllabus/support:
+        # Azure → SAS URL, Backblaze → time-limited authorized download URL.
+        # Do not return the /content proxy as the primary view URL — browsers cannot
+        # attach Authorization headers to a plain navigation/window.open, which breaks
+        # notice viewing on deployed environments.
+        payload["file_path"] = resolve_attachment_url(str(file_path))
     return NoticeAttachmentResponse(**payload)
 
 

@@ -42,12 +42,34 @@ function isAuthenticatedAttachmentPath(filePath: string): boolean {
 }
 
 async function openNoticeAttachment(filePath: string): Promise<void> {
+  // Private /content proxy paths need JWT via apiClient. Open a tab synchronously
+  // first so the async fetch is not blocked by popup blockers on deployed hosts.
   if (isAuthenticatedAttachmentPath(filePath)) {
-    const blob = await noticeService.fetchAttachmentContent(filePath);
-    const objectUrl = URL.createObjectURL(blob);
-    window.open(objectUrl, "_blank", "noopener,noreferrer");
-    // Revoke after the new tab has had time to load the blob URL.
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    const pendingTab = window.open("about:blank", "_blank");
+    try {
+      const blob = await noticeService.fetchAttachmentContent(filePath);
+      if (blob.type.includes("application/json") || blob.type.startsWith("text/")) {
+        const text = await blob.text();
+        throw new Error(text || "Unable to open attachment");
+      }
+      const objectUrl = URL.createObjectURL(blob);
+      if (pendingTab) {
+        pendingTab.opener = null;
+        pendingTab.location.href = objectUrl;
+      } else {
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (error) {
+      pendingTab?.close();
+      throw error;
+    }
     return;
   }
   window.open(buildAttachmentUrl(filePath), "_blank", "noopener,noreferrer");

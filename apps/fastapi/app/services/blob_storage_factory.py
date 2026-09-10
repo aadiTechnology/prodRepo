@@ -71,12 +71,19 @@ def locate_object_provider(file_path: str) -> StorageProviderName | None:
     if not blob_name:
         return None
 
-    from app.services import azure_blob_service, backblaze_blob_service
+    from app.services import azure_blob_service
 
-    on_b2 = (
-        backblaze_blob_service.is_backblaze_configured()
-        and backblaze_blob_service.blob_exists(blob_name)
-    )
+    on_b2 = False
+    try:
+        from app.services import backblaze_blob_service
+
+        on_b2 = (
+            backblaze_blob_service.is_backblaze_configured()
+            and backblaze_blob_service.blob_exists(blob_name)
+        )
+    except Exception:
+        on_b2 = False
+
     on_azure = (
         azure_blob_service.is_azure_storage_configured()
         and azure_blob_service.blob_exists(blob_name)
@@ -103,10 +110,12 @@ def resolve_mixed_download_url(file_path: str) -> str:
     if not trimmed:
         return trimmed
 
-    from app.services import azure_blob_service, backblaze_blob_service
+    from app.services import azure_blob_service
 
     provider = locate_object_provider(trimmed)
     if provider == "backblaze":
+        from app.services import backblaze_blob_service
+
         return backblaze_blob_service.resolve_download_url(trimmed)
     if provider == "azure":
         return azure_blob_service.resolve_download_url(trimmed)
@@ -128,7 +137,7 @@ def download_mixed_bytes(file_path: str) -> bytes:
     if not trimmed:
         raise ValidationException("Invalid attachment path")
 
-    from app.services import azure_blob_service, backblaze_blob_service
+    from app.services import azure_blob_service
 
     blob_name = extract_object_name(trimmed)
     if not blob_name:
@@ -136,6 +145,8 @@ def download_mixed_bytes(file_path: str) -> bytes:
 
     provider = locate_object_provider(trimmed)
     if provider == "backblaze":
+        from app.services import backblaze_blob_service
+
         return backblaze_blob_service.download_bytes(blob_name)
     if provider == "azure":
         return azure_blob_service.download_bytes(blob_name)
@@ -165,7 +176,7 @@ def delete_mixed_blob(file_path: str) -> None:
     if not trimmed:
         return
 
-    from app.services import azure_blob_service, backblaze_blob_service
+    from app.services import azure_blob_service
 
     blob_name = extract_object_name(trimmed)
     if not blob_name:
@@ -173,6 +184,8 @@ def delete_mixed_blob(file_path: str) -> None:
 
     provider = locate_object_provider(trimmed)
     if provider == "backblaze":
+        from app.services import backblaze_blob_service
+
         backblaze_blob_service.delete_blob(blob_name)
         return
     if provider == "azure":
