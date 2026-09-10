@@ -1,7 +1,7 @@
 """
 Syllabus Management API.
 
-Endpoints for tenant-scoped class syllabus records with a single Azure Blob attachment.
+Endpoints for tenant-scoped class syllabus records with a single cloud storage attachment.
 Authorization uses menu path `/academics/syllabus` (ACADEMIC_MGMT) via require_menu_path_permission.
 Teacher / student / parent list and detail access is class-scoped via homework viewer context.
 """

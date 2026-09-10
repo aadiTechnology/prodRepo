@@ -5,7 +5,15 @@ from datetime import datetime
 from uuid import uuid4
 
 from app.core.exceptions import ValidationException
-from app.services import azure_blob_service
+from app.services.blob_storage_factory import (
+    delete_mixed_blob,
+    download_mixed_bytes,
+    extract_object_name,
+    get_storage_service,
+    locate_object_provider,
+    looks_like_azure_blob_url,
+    resolve_mixed_download_url,
+)
 from app.services.image_compression_service import (
     JPEG_CONTENT_TYPE,
     MAX_ORIGINAL_IMAGE_BYTES,
@@ -101,12 +109,13 @@ def save_gallery_photo_file(
     content_type: str | None = None,
 ) -> tuple[str, str, bytes]:
     """
-    Upload a gallery photo to Azure Blob Storage.
+    Upload a gallery photo via the active storage provider.
 
     Returns (blob_name, safe_file_name, stored_bytes).
     """
-    if not azure_blob_service.is_azure_storage_configured():
-        raise ValidationException("Azure Blob Storage is not configured")
+    storage = get_storage_service()
+    if not storage.is_storage_configured():
+        raise ValidationException("File storage is not configured")
 
     validate_media_file(
         filename=original_filename,
@@ -124,7 +133,7 @@ def save_gallery_photo_file(
     )
     blob_name = f"{GALLERY_MEDIA_PREFIX}/{safe_name}"
 
-    azure_blob_service.upload_bytes(
+    storage.upload_bytes(
         blob_name=blob_name,
         content=stored_bytes,
         content_type=JPEG_CONTENT_TYPE,
@@ -145,42 +154,59 @@ def is_db_stored_media_path(file_path: str) -> bool:
     return file_path.strip().startswith("/api/activity-galleries/")
 
 
-def is_azure_gallery_media_path(file_path: str) -> bool:
-    blob_name = azure_blob_service.extract_blob_name(file_path or "")
+def is_gallery_cloud_media_path(file_path: str) -> bool:
+    blob_name = extract_object_name(file_path or "")
     return bool(blob_name and blob_name.startswith(f"{GALLERY_MEDIA_PREFIX}/"))
+
+
+# Backward-compatible alias used by activity_gallery_service.
+def is_azure_gallery_media_path(file_path: str) -> bool:
+    return is_gallery_cloud_media_path(file_path)
+
+
+def is_backblaze_hosted_gallery_media(file_path: str) -> bool:
+    """True when a gallery media object lives on private Backblaze."""
+    if looks_like_azure_blob_url(file_path):
+        return False
+    if not is_gallery_cloud_media_path(file_path):
+        return False
+    return locate_object_provider(file_path) == "backblaze"
 
 
 def resolve_media_url(file_path: str) -> str:
     """
     Return a frontend-usable URL.
 
-    - Azure blob paths -> SAS URL
+    - Cloud gallery blob paths -> Azure SAS or B2 authorized URL
     - YouTube / external https URLs -> unchanged
     - Legacy /content API paths -> unchanged (frontend fetches with auth)
+
+    Prefer gallery_media_content_path() for Backblaze-hosted photos so the
+    private bucket is accessed via the authenticated /content proxy.
     """
     trimmed = (file_path or "").strip()
     if not trimmed:
         return trimmed
     if is_db_stored_media_path(trimmed):
         return trimmed
-    if trimmed.startswith(("http://", "https://")) and not is_azure_gallery_media_path(trimmed):
+    if trimmed.startswith(("http://", "https://")) and not is_gallery_cloud_media_path(trimmed):
         # External links (YouTube, etc.) — do not rewrite.
-        if "blob.core.windows.net" not in trimmed:
+        if not looks_like_azure_blob_url(trimmed):
             return trimmed
-    return azure_blob_service.resolve_download_url(trimmed)
+    return resolve_mixed_download_url(trimmed)
 
 
 def delete_gallery_media_file(file_path: str) -> None:
-    """Delete Azure blob when path points to gallery media; ignore YouTube/legacy paths."""
+    """Delete cloud blob when path points to gallery media; ignore YouTube/legacy paths."""
     trimmed = (file_path or "").strip()
     if not trimmed or is_db_stored_media_path(trimmed):
         return
-    if trimmed.startswith(("http://", "https://")) and "blob.core.windows.net" not in trimmed:
-        return
+    if trimmed.startswith(("http://", "https://")) and not looks_like_azure_blob_url(trimmed):
+        if not is_gallery_cloud_media_path(trimmed):
+            return
 
-    blob_name = azure_blob_service.extract_blob_name(trimmed)
-    if blob_name and blob_name.startswith(f"{GALLERY_MEDIA_PREFIX}/"):
-        azure_blob_service.delete_blob(blob_name)
+    if is_gallery_cloud_media_path(trimmed):
+        delete_mixed_blob(trimmed)
 
     disk_path = legacy_disk_path(trimmed)
     if os.path.exists(disk_path):
@@ -191,13 +217,13 @@ def delete_gallery_media_file(file_path: str) -> None:
 
 
 def download_gallery_media_bytes(file_path: str) -> bytes | None:
-    """Download bytes from Azure when path is a gallery blob; otherwise None."""
-    if not is_azure_gallery_media_path(file_path):
+    """Download bytes from Azure/B2 when path is a gallery blob; otherwise None."""
+    if not is_gallery_cloud_media_path(file_path):
         return None
-    blob_name = azure_blob_service.extract_blob_name(file_path)
-    if not blob_name:
+    try:
+        return download_mixed_bytes(file_path)
+    except ValidationException:
         return None
-    return azure_blob_service.download_bytes(blob_name)
 
 
 def legacy_disk_path(file_path: str) -> str:

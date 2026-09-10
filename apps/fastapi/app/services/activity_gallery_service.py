@@ -48,7 +48,9 @@ from app.services.activity_gallery_access import (
 from app.services.activity_gallery_media_storage import (
     delete_gallery_media_file,
     download_gallery_media_bytes,
+    gallery_media_content_path,
     is_azure_gallery_media_path,
+    is_backblaze_hosted_gallery_media,
     is_db_stored_media_path,
     legacy_disk_path,
     mime_type_for_file_name,
@@ -104,13 +106,25 @@ def _assert_manage_access(
 
 
 def _to_media_response(row: dict) -> ActivityGalleryMediaResponse:
+    stored_path = str(row["file_path"])
+    gallery_id = int(row["gallery_id"])
+    media_id = int(row["id"])
+
+    # Private Backblaze photos use the authenticated /content proxy (same pattern
+    # as notice attachments). Legacy Azure photos keep SAS. YouTube/external links
+    # are returned unchanged by resolve_media_url().
+    if is_backblaze_hosted_gallery_media(stored_path):
+        file_path = gallery_media_content_path(gallery_id=gallery_id, media_id=media_id)
+    else:
+        file_path = resolve_media_url(stored_path)
+
     return ActivityGalleryMediaResponse(
-        id=int(row["id"]),
-        gallery_id=int(row["gallery_id"]),
+        id=media_id,
+        gallery_id=gallery_id,
         media_type=row["media_type"],
         file_name=str(row["file_name"]),
         original_file_name=row.get("original_file_name"),
-        file_path=resolve_media_url(str(row["file_path"])),
+        file_path=file_path,
         file_size=int(row["file_size"]) if row.get("file_size") is not None else None,
         display_order=int(row.get("display_order") or 1),
         uploaded_at=row["uploaded_at"],
@@ -675,10 +689,10 @@ def _resolve_media_bytes(
         mime = mime_type_for_file_name(str(media_row.get("file_name") or download_name))
         return bytes(file_content), mime, download_name
 
-    azure_bytes = download_gallery_media_bytes(stored_path)
-    if azure_bytes is not None:
+    cloud_bytes = download_gallery_media_bytes(stored_path)
+    if cloud_bytes is not None:
         mime = mime_type_for_file_name(str(media_row.get("file_name") or download_name))
-        return azure_bytes, mime, download_name
+        return cloud_bytes, mime, download_name
 
     if is_db_stored_media_path(stored_path):
         raise NotFoundException("Gallery media content", media_row.get("id"))
@@ -741,9 +755,9 @@ def get_media_for_download(
     if file_content is not None:
         return bytes(file_content), None, mime, download_name
 
-    azure_bytes = download_gallery_media_bytes(stored_path)
-    if azure_bytes is not None:
-        return azure_bytes, None, mime, download_name
+    cloud_bytes = download_gallery_media_bytes(stored_path)
+    if cloud_bytes is not None:
+        return cloud_bytes, None, mime, download_name
 
     if is_db_stored_media_path(stored_path):
         raise NotFoundException("Gallery media content", media_id)

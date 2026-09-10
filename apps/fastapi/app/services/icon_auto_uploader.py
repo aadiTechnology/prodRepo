@@ -112,7 +112,12 @@ def get_icon_urls() -> dict[str, str]:
     for icon_name in ICON_FILES.values():
         blob_name = f"{SIDEBAR_ICONS_PREFIX}/{icon_name}.png"
         try:
-            url = storage.get_blob_url(blob_name)
+            # Prefer secure provider URL (Azure SAS / B2 authorized). Fall back to local.
+            from app.services.blob_storage_factory import resolve_mixed_download_url
+
+            url = resolve_mixed_download_url(blob_name)
+            if not url.startswith("http://") and not url.startswith("https://"):
+                url = storage.get_blob_url(blob_name)
             urls[icon_name] = url
         except Exception as e:
             logger.error(f"Failed to get URL for {icon_name}: {e}")

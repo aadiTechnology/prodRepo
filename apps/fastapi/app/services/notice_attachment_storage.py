@@ -4,9 +4,16 @@ import os
 from datetime import datetime
 from uuid import uuid4
 
-from app.core.config import settings
 from app.core.exceptions import ValidationException
-from app.services.blob_storage_factory import get_storage_service
+from app.services.blob_storage_factory import (
+    delete_mixed_blob,
+    download_mixed_bytes,
+    extract_object_name,
+    get_storage_service,
+    locate_object_provider,
+    looks_like_azure_blob_url,
+    resolve_mixed_download_url,
+)
 from app.services.image_compression_service import prepare_file_for_storage
 
 NOTICE_ATTACHMENTS_PREFIX = "notice-attachments"
@@ -29,34 +36,6 @@ MIME_TO_EXT = {
 }
 
 
-def _looks_like_azure_blob_url(file_path: str) -> bool:
-    return "blob.core.windows.net" in (file_path or "").lower()
-
-
-def _active_provider() -> str:
-    return (settings.STORAGE_PROVIDER or "azure").lower()
-
-
-def _notice_blob_name(file_path: str) -> str | None:
-    """Normalize a stored path to a notice-attachments blob name, if applicable."""
-    trimmed = (file_path or "").strip()
-    if not trimmed:
-        return None
-
-    # Prefer Azure URL parsing when the stored value is clearly an Azure blob URL,
-    # even if STORAGE_PROVIDER is currently backblaze.
-    if _looks_like_azure_blob_url(trimmed):
-        from app.services import azure_blob_service
-
-        blob_name = azure_blob_service.extract_blob_name(trimmed)
-    else:
-        blob_name = get_storage_service().extract_blob_name(trimmed)
-
-    if blob_name and blob_name.startswith(f"{NOTICE_ATTACHMENTS_PREFIX}/"):
-        return blob_name
-    return None
-
-
 def is_backblaze_hosted_attachment(file_path: str) -> bool:
     """
     True when the attachment object exists on Backblaze.
@@ -64,26 +43,17 @@ def is_backblaze_hosted_attachment(file_path: str) -> bool:
     Used so STORAGE_PROVIDER=backblaze does not force Azure-only legacy rows
     through the private B2 content proxy.
     """
-    if _looks_like_azure_blob_url(file_path):
+    if looks_like_azure_blob_url(file_path):
         return False
-    if _active_provider() != "backblaze":
+    blob_name = extract_object_name(file_path)
+    if not blob_name or not blob_name.startswith(f"{NOTICE_ATTACHMENTS_PREFIX}/"):
         return False
-
-    from app.services import backblaze_blob_service
-
-    if not backblaze_blob_service.is_backblaze_configured():
-        return False
-
-    blob_name = _notice_blob_name(file_path)
-    if not blob_name:
-        return False
-    return backblaze_blob_service.blob_exists(blob_name)
+    return locate_object_provider(file_path) == "backblaze"
 
 
 def is_stored_attachment_path(file_path: str) -> bool:
     trimmed = file_path.strip()
-    storage = get_storage_service()
-    blob_name = storage.extract_blob_name(trimmed)
+    blob_name = extract_object_name(trimmed)
     return (
         trimmed.startswith(f"{NOTICE_ATTACHMENTS_URL_PREFIX}/")
         or trimmed.startswith(f"{NOTICE_ATTACHMENTS_PREFIX}/")
@@ -104,8 +74,7 @@ def validate_attachment_path(file_path: str) -> str:
             "Attachments must be uploaded via the file upload endpoint"
         )
 
-    storage = get_storage_service()
-    blob_name = storage.extract_blob_name(trimmed)
+    blob_name = extract_object_name(trimmed)
     if blob_name and blob_name.startswith(f"{NOTICE_ATTACHMENTS_PREFIX}/"):
         if len(blob_name) > 500:
             raise ValidationException("Invalid attachment path")
@@ -158,71 +127,23 @@ def save_notice_attachment_file(
 
 
 def resolve_attachment_url(file_path: str) -> str:
-    """
-    Return a frontend-usable download URL.
-
-    STORAGE_PROVIDER controls new uploads, not historical reads:
-    - Explicit Azure blob URLs always resolve via Azure SAS.
-    - When active provider is backblaze, prefer B2 only if the object exists there;
-      otherwise fall back to Azure SAS for pre-migration notice attachments.
-    """
-    trimmed = (file_path or "").strip()
-    if not trimmed:
-        return trimmed
-
-    from app.services import azure_blob_service
-
-    if _looks_like_azure_blob_url(trimmed):
-        return azure_blob_service.resolve_download_url(trimmed)
-
-    if _active_provider() == "backblaze":
-        from app.services import backblaze_blob_service
-
-        blob_name = _notice_blob_name(trimmed)
-        if (
-            blob_name
-            and backblaze_blob_service.is_backblaze_configured()
-            and backblaze_blob_service.blob_exists(blob_name)
-        ):
-            return backblaze_blob_service.resolve_download_url(trimmed)
-
-        if azure_blob_service.is_azure_storage_configured():
-            return azure_blob_service.resolve_download_url(trimmed)
-
-    return get_storage_service().resolve_download_url(trimmed)
+    """Return a secure frontend-usable download URL (Azure SAS or B2 authorized URL)."""
+    return resolve_mixed_download_url(file_path)
 
 
 def download_notice_attachment_bytes(file_path: str) -> bytes:
     """
-    Download notice attachment bytes.
+    Download notice attachment bytes from the provider that hosts the object.
 
-    Uses the active storage provider first. When STORAGE_PROVIDER=backblaze,
-    falls back to Azure for legacy blobs that were never migrated. Also falls
-    back to legacy on-disk files when the path is not a cloud blob.
+    Falls back to legacy on-disk files when the path is not a cloud blob.
     """
     trimmed = (file_path or "").strip()
     if not trimmed:
         raise ValidationException("Invalid attachment path")
 
-    from app.services import azure_blob_service
-
-    blob_name = _notice_blob_name(trimmed)
-    if blob_name:
-        if _looks_like_azure_blob_url(trimmed):
-            return azure_blob_service.download_bytes(blob_name)
-
-        storage = get_storage_service()
-        try:
-            return storage.download_bytes(blob_name)
-        except ValidationException as exc:
-            message = str(exc).lower()
-            if (
-                "not found" in message
-                and _active_provider() == "backblaze"
-                and azure_blob_service.is_azure_storage_configured()
-            ):
-                return azure_blob_service.download_bytes(blob_name)
-            raise
+    blob_name = extract_object_name(trimmed)
+    if blob_name and blob_name.startswith(f"{NOTICE_ATTACHMENTS_PREFIX}/"):
+        return download_mixed_bytes(trimmed)
 
     disk_path = disk_path_for_attachment(trimmed)
     if os.path.isfile(disk_path):
@@ -233,26 +154,9 @@ def download_notice_attachment_bytes(file_path: str) -> bytes:
 
 
 def delete_notice_attachment_file(file_path: str) -> None:
-    """Delete attachment from storage (and best-effort legacy local disk)."""
-    trimmed = (file_path or "").strip()
-    blob_name = _notice_blob_name(trimmed) or get_storage_service().extract_blob_name(trimmed)
+    """Delete attachment from the hosting provider (and best-effort legacy local disk)."""
+    delete_mixed_blob(file_path)
 
-    if blob_name:
-        if _looks_like_azure_blob_url(trimmed):
-            from app.services import azure_blob_service
-
-            azure_blob_service.delete_blob(blob_name)
-        else:
-            get_storage_service().delete_blob(blob_name)
-            # Legacy Azure rows share the same blob-name shape; clean up there too
-            # when the active provider is backblaze (missing blobs are ignored).
-            if _active_provider() == "backblaze":
-                from app.services import azure_blob_service
-
-                if azure_blob_service.is_azure_storage_configured():
-                    azure_blob_service.delete_blob(blob_name)
-
-    # Best-effort cleanup for legacy local files.
     disk_path = disk_path_for_attachment(file_path)
     if os.path.exists(disk_path):
         try:

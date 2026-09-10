@@ -201,7 +201,7 @@ def download_bytes(blob_name: str) -> bytes:
 
 
 def get_blob_url(blob_name: str) -> str:
-    """Generate a download URL for B2 file."""
+    """Generate the permanent (unauthorized) B2 download URL for a file name."""
     trimmed = (blob_name or "").strip()
     if not trimmed:
         raise ValidationException("Invalid blob name")
@@ -213,6 +213,42 @@ def get_blob_url(blob_name: str) -> str:
     except Exception as exc:
         logger.exception("B2 URL generation failed for %s", trimmed)
         raise ValidationException("URL generation failed") from exc
+
+
+def generate_authorized_download_url(
+    blob_name: str,
+    *,
+    expiry_seconds: int | None = None,
+) -> str:
+    """
+    Generate a time-limited authorized download URL for a private B2 object.
+
+    Equivalent to Azure SAS: no application keys are exposed to the frontend.
+    """
+    trimmed = (blob_name or "").strip()
+    if not trimmed:
+        raise ValidationException("Invalid blob name")
+
+    seconds = expiry_seconds
+    if seconds is None:
+        minutes = getattr(settings, "AZURE_BLOB_SAS_EXPIRY_MINUTES", 60) or 60
+        seconds = max(60, int(minutes) * 60)
+    if seconds < 60:
+        seconds = 60
+
+    try:
+        api = _b2_api()
+        bucket = api.get_bucket_by_name(_bucket_name())
+        auth_token = bucket.get_download_authorization(
+            file_name_prefix=trimmed,
+            valid_duration_in_seconds=seconds,
+        )
+        return f"{get_blob_url(trimmed)}?Authorization={auth_token}"
+    except ValidationException:
+        raise
+    except Exception as exc:
+        logger.exception("B2 authorized URL generation failed for %s", trimmed)
+        raise ValidationException("Unable to generate secure download URL") from exc
 
 
 def extract_blob_name(file_path: str) -> str | None:
@@ -255,8 +291,8 @@ def resolve_download_url(file_path: str) -> str:
     """
     Resolve a stored file_path to a frontend-usable download URL.
 
-    Returns a public B2 download URL when the path maps to a known attachment
-    prefix. Falls back to the original path for legacy local files.
+    Private buckets receive a time-limited authorized download URL (not a
+    public/anonymous URL). Falls back to the original path for legacy local files.
     """
     trimmed = (file_path or "").strip()
     if not trimmed:
@@ -277,7 +313,7 @@ def resolve_download_url(file_path: str) -> str:
     try:
         if not blob_exists(blob_name):
             return trimmed
-        return get_blob_url(blob_name)
+        return generate_authorized_download_url(blob_name)
     except Exception:
         logger.exception("Failed to generate B2 URL for %s", blob_name)
         return trimmed
