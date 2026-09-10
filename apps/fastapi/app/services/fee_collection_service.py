@@ -194,6 +194,60 @@ def _notify_student_fee_payment_approved(
         )
 
 
+def _notify_student_fee_payment_rejected(
+    db: Session,
+    *,
+    tenant_id: int,
+    payment: FeePayment,
+    student: Student,
+    actor_user_id: int | None,
+    actor_name: str | None,
+    reason: str,
+) -> None:
+    recipient_user_ids = _resolve_fee_approval_recipient_user_ids(
+        db,
+        tenant_id=tenant_id,
+        payment=payment,
+        student=student,
+    )
+    if not recipient_user_ids:
+        logger.warning(
+            "No recipient user found for rejected fee payment notification "
+            "payment_id=%s student_id=%s created_by=%s",
+            payment.id,
+            student.id,
+            payment.created_by,
+        )
+        return
+    try:
+        sender = (actor_name or "Admin").strip() or "Admin"
+        amount_text = _format_payment_amount(payment.total_amount)
+        reason_text = reason.strip() or "No reason provided."
+        notification_service.create_notification(
+            db,
+            tenant_id=tenant_id,
+            from_=sender,
+            to=",".join(str(uid) for uid in recipient_user_ids),
+            subject="Fee Payment Rejected",
+            body=(
+                f"Your fee payment of {amount_text} was rejected. "
+                f"Reason: {reason_text}"
+            ),
+            created_by=actor_user_id,
+            module="general",
+            entity_id=int(payment.id),
+            event="created",
+            recipient_user_ids=recipient_user_ids,
+            source_key=f"fee:rejected:{payment.id}",
+        )
+    except Exception as exc:
+        logger.exception(
+            "Failed to notify student about rejected fee payment payment_id=%s error=%s",
+            payment.id,
+            exc,
+        )
+
+
 def _validate_payment_metadata(payment_method: str, reference_no: str | None) -> tuple[str, str | None]:
     normalized_method = str(payment_method or "").strip().upper()
     if normalized_method not in _ALLOWED_PAYMENT_METHODS:
@@ -1035,6 +1089,7 @@ def reject_pending_payment(
     tenant_id: int,
     payment_id: int,
     req: FeePaymentApprovalRejectRequest | None = None,
+    user_id: int | None = None,
 ) -> FeePaymentApprovalActionResponse:
     payment = _get_pending_payment(db, tenant_id=tenant_id, payment_id=payment_id)
     payment.payment_status = "rejected"
@@ -1042,6 +1097,21 @@ def reject_pending_payment(
     if reason:
         payment.notes = f"{payment.notes}\nRejected: {reason}".strip() if payment.notes else f"Rejected: {reason}"
     db.commit()
+    student = (
+        db.query(Student)
+        .filter(Student.id == payment.student_id, Student.tenant_id == tenant_id)
+        .first()
+    )
+    if student:
+        _notify_student_fee_payment_rejected(
+            db,
+            tenant_id=tenant_id,
+            payment=payment,
+            student=student,
+            actor_user_id=user_id,
+            actor_name=_resolve_user_display_name(db, user_id),
+            reason=reason,
+        )
     return FeePaymentApprovalActionResponse(
         id=int(payment.id),
         status="Rejected",

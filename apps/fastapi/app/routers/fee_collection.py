@@ -164,5 +164,6 @@ async def reject_fee_pending_payment(
         tenant_id=current_user.tenant_id,
         payment_id=payment_id,
         req=payload,
+        user_id=current_user.id,
     )
 
