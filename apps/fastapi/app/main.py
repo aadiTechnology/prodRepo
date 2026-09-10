@@ -62,6 +62,8 @@ from app.models.pt_timesheet import (  # noqa: F401
 
 from app.routers import user, auth, role, menu, feature, rbac, tenant, profile, ai, theme_template, fee, academic, academic_year, academic_calendar, class_fee_structure_assignment, class_router,student_fee_assignment, fee_structure, reports, sprint, task_effort, teacher_router,teacher_assignment,notice, holiday, demo_video
 
+from app.routers import icons
+
 
 
 from app.routers import fee_discount, fee_category_router
@@ -170,6 +172,9 @@ from app.routers import notification_router
 app.include_router(notification_router.router)
 from app.routers import support_router
 app.include_router(support_router.router)
+
+# Icons auto-upload endpoint
+app.include_router(icons.router)
 
 
 

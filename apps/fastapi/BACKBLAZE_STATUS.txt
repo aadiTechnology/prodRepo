@@ -1,0 +1,117 @@
+BACKBLAZE B2 INTEGRATION - STATUS REPORT
+========================================
+
+STAGED FOR BACKBLAZE ONLY (Ready to Commit):
+✓ app/services/backblaze_blob_service.py - B2 SDK integration
+✓ app/services/blob_storage_factory.py - Routes to Azure or Backblaze
+✓ app/services/icon_auto_uploader.py - Auto-uploads icons on startup
+✓ app/routers/icons.py - Icons API endpoint
+✓ app/core/config.py - B2 configuration fields
+✓ app/main.py - Triggers icon auto-upload
+✓ requirements.txt - Added b2sdk
+✓ 5 sidebar PNG icons (academics, attendance, communication, dashboard, settings)
+✓ STORAGE_SETUP_PROMPT.md - Documentation
+
+HOW PHOTOS ARE ADDED:
+====================
+
+1. SIDEBAR ICONS (Auto-Upload on App Startup):
+   - App starts → icon_auto_uploader.py runs
+   - Reads 5 PNGs from: apps/web/public/assets/icons/
+   - Uploads to Backblaze: sidebar-icons/<name>.png
+   - No manual action needed
+
+2. USER UPLOADS (Homework, Notices, etc):
+   - User selects file → POST to API
+   - Router calls: storage = get_storage_service()
+   - Stores in Backblaze under: homework/, notices/, etc
+   - Returns download URL
+
+STORAGE ARCHITECTURE:
+====================
+
+blob_storage_factory.py (entry point)
+         │
+         ├─→ if STORAGE_PROVIDER == "backblaze"
+         │    └─→ backblaze_blob_service.py
+         │         └─→ B2 SDK API
+         │
+         └─→ else (default: "azure")
+              └─→ azure_blob_service.py
+                  └─→ Azure API
+
+BACKBLAZE FOLDER STRUCTURE:
+===========================
+
+aaditech-erp-test-v2/
+├── sidebar-icons/
+│   ├── academics.png
+│   ├── attendance.png
+│   ├── communication.png
+│   ├── dashboard.png
+│   └── settings.png
+│
+├── homework/
+│   └── attachment_*.pdf
+│
+├── notices/
+│   └── notice_*.pdf
+│
+└── activity-gallery/
+    └── event_*.jpg
+
+CURRENT ISSUE:
+==============
+
+B2 connection test returns: bad_auth_token
+
+Credentials in .env:
+  BACKBLAZE_KEY_ID=0033423263e4167000000003
+  BACKBLAZE_APP_KEY=K003RXarThzZ04M90vrFghMGzeWyqzc
+  BACKBLAZE_BUCKET_NAME=aaditech-erp-test-v2
+  STORAGE_PROVIDER=backblaze
+
+Possible causes:
+1. Typo in keyID or applicationKey
+2. Key not yet activated in Backblaze account
+3. Bucket configuration issue
+
+NEXT STEP:
+==========
+
+Verify exact credentials from Backblaze console:
+- Go to: Backblaze B2 → Application Keys
+- Find: aaditech-erp-test-key-v2
+- Confirm: keyID and applicationKey match exactly
+- Copy again if needed
+
+Once verified, run:
+  python test_b2_simple.py
+
+Expected output when working:
+  ✓ Authorization successful
+  ✓ Bucket found: aaditech-erp-test-v2
+  ✓ Successfully uploaded 5 icons
+
+SWITCHING PROVIDERS:
+====================
+
+To use Azure instead (while troubleshooting B2):
+  .env: STORAGE_PROVIDER=azure
+  Restart app
+
+To use Backblaze when ready:
+  .env: STORAGE_PROVIDER=backblaze
+  Restart app
+
+No code changes needed - factory pattern handles both.
+
+COST SAVINGS (when B2 works):
+=============================
+
+Azure:     $0.05/GB/month
+Backblaze: $0.006/GB/month
+Savings:   ~90%
+
+FILES STAGED: 13 files + 5 icons
+Ready to commit once B2 auth is verified.

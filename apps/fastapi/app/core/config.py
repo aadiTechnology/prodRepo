@@ -86,6 +86,24 @@ class Settings(BaseSettings):
         description="SAS token lifetime in minutes for secure attachment downloads",
     )
 
+    # Backblaze B2 Storage (alternative to Azure)
+    BACKBLAZE_KEY_ID: str = Field(
+        default="",
+        description="Backblaze B2 application key ID",
+    )
+    BACKBLAZE_APP_KEY: str = Field(
+        default="",
+        description="Backblaze B2 application key secret",
+    )
+    BACKBLAZE_BUCKET_NAME: str = Field(
+        default="attachmentserp-b2",
+        description="Backblaze B2 bucket name",
+    )
+    STORAGE_PROVIDER: str = Field(
+        default="azure",
+        description="Primary storage provider: 'azure' or 'backblaze'",
+    )
+
     # Firebase Cloud Messaging (optional; push is a no-op when unset)
     FIREBASE_CREDENTIALS_PATH: str = Field(
         default="",
