@@ -83,9 +83,8 @@ export function createActivityGalleryListConfig({
               variant="body2"
               sx={{
                 fontWeight: 700,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
+                whiteSpace: "normal",
+                wordBreak: "break-word",
               }}
             >
               {row.gallery_name}

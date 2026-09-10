@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text
+from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, Unicode, UnicodeText
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -11,9 +11,9 @@ class ActivityGallery(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     tenant_id = Column(BigInteger, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
-    gallery_name = Column(String(255), nullable=False)
+    gallery_name = Column(Unicode(255), nullable=False)
     gallery_type = Column(String(20), nullable=False)
-    description = Column(Text, nullable=True)
+    description = Column(UnicodeText, nullable=True)
     activity_date = Column(Date, nullable=False)
     created_by = Column(BigInteger, nullable=False)
     is_published = Column(Boolean, default=False, nullable=False)
@@ -45,8 +45,8 @@ class ActivityGalleryMedia(Base):
         nullable=False,
     )
     media_type = Column(String(20), nullable=False)
-    file_name = Column(String(255), nullable=False)
-    original_file_name = Column(String(255), nullable=True)
+    file_name = Column(Unicode(255), nullable=False)
+    original_file_name = Column(Unicode(255), nullable=True)
     file_path = Column(String(1000), nullable=False)
     file_content = Column(LargeBinary, nullable=True)
     file_size = Column(BigInteger, nullable=True)
