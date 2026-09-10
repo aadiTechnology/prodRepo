@@ -33,6 +33,21 @@ const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 255;
 const ALLOWED_FILE_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
 const UPLOAD_FILE_HINT = "Allowed: PDF, JPG, PNG. Maximum size 3 MB.";
+const UPLOAD_FALLBACK_HINT =
+  "Check file type (PDF, JPG, PNG) and size (max 3 MB), or storage configuration.";
+
+function getUploadErrorMessage(err: unknown): string {
+  const { message } = mapApiErrorsToFields(err);
+  const trimmed = (message || "").trim();
+  if (
+    !trimmed ||
+    trimmed === "Validation error" ||
+    trimmed.includes("Request failed with status code")
+  ) {
+    return UPLOAD_FALLBACK_HINT;
+  }
+  return trimmed;
+}
 
 type SavedAttachmentState = {
   id?: number;
@@ -546,9 +561,9 @@ export default function CreateNotice() {
           if (pendingFile) {
             try {
               await noticeService.uploadAttachment(noticeId, pendingFile);
-            } catch {
+            } catch (uploadErr) {
               setError(
-                `Notice saved, but attachment upload failed. Check file type (PDF, JPG, PNG) and size (max 3 MB).`
+                `Notice saved, but attachment upload failed. ${getUploadErrorMessage(uploadErr)}`
               );
               return;
             }
@@ -570,9 +585,9 @@ export default function CreateNotice() {
           if (pendingFile) {
             try {
               await noticeService.uploadAttachment(noticeId, pendingFile);
-            } catch {
+            } catch (uploadErr) {
               setError(
-                `Notice saved, but attachment upload failed. Check file type (PDF, JPG, PNG) and size (max 3 MB).`
+                `Notice saved, but attachment upload failed. ${getUploadErrorMessage(uploadErr)}`
               );
               return;
             }

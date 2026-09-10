@@ -85,6 +85,12 @@ const noticeService = {
   deleteAttachment: async (noticeId: number, attachmentId: number): Promise<void> => {
     await apiClient.delete(`${BASE}/${noticeId}/attachments/${attachmentId}`);
   },
+
+  /** Authenticated fetch for private-storage attachment proxy paths. */
+  fetchAttachmentContent: async (contentPath: string): Promise<Blob> => {
+    const res = await apiClient.get(contentPath, { responseType: "blob" });
+    return res.data;
+  },
 };
 
 export default noticeService;

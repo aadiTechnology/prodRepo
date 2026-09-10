@@ -2,9 +2,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, Field, computed_field
 from typing import List
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(os.getenv("ENV_FILE", ".env"))
+# Resolve env file relative to the FastAPI app root (not process cwd).
+_APP_ROOT = Path(__file__).resolve().parents[2]
+_ENV_FILE_NAME = os.getenv("ENV_FILE", ".env")
+_ENV_FILE = (
+    _ENV_FILE_NAME
+    if os.path.isabs(_ENV_FILE_NAME)
+    else str(_APP_ROOT / _ENV_FILE_NAME)
+)
+load_dotenv(_ENV_FILE, override=True)
 
 class Settings(BaseSettings):
     """
@@ -13,7 +22,7 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE,
         case_sensitive=True,
     )
 

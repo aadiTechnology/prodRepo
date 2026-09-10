@@ -29,13 +29,29 @@ import { apiBaseUrl } from "../../config";
 import { useNoticePermissions } from "../../hooks/useNoticePermissions";
 import type { Notice, NoticeStatus } from "../../types/notice";
 import { notifyNoticeCountChanged } from "../../utils/noticeCountEvents";
+import { formatShortDate } from "../../utils/formatters";
+import { isNoticeEditable, noticeStatusLabel, noticeTypeLabel } from "../../utils/noticeLabels";
 
 function buildAttachmentUrl(filePath: string): string {
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
   return `${apiBaseUrl}${filePath}`;
 }
-import { formatShortDate } from "../../utils/formatters";
-import { isNoticeEditable, noticeStatusLabel, noticeTypeLabel } from "../../utils/noticeLabels";
+
+function isAuthenticatedAttachmentPath(filePath: string): boolean {
+  return filePath.includes("/attachments/") && filePath.endsWith("/content");
+}
+
+async function openNoticeAttachment(filePath: string): Promise<void> {
+  if (isAuthenticatedAttachmentPath(filePath)) {
+    const blob = await noticeService.fetchAttachmentContent(filePath);
+    const objectUrl = URL.createObjectURL(blob);
+    window.open(objectUrl, "_blank", "noopener,noreferrer");
+    // Revoke after the new tab has had time to load the blob URL.
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    return;
+  }
+  window.open(buildAttachmentUrl(filePath), "_blank", "noopener,noreferrer");
+}
 
 function statusChipColor(status: NoticeStatus): "default" | "success" | "error" | "warning" {
   switch (status) {
@@ -411,12 +427,29 @@ export default function NoticeDetails() {
                       <AttachFileIcon color="primary" sx={{ fontSize: 20, flexShrink: 0 }} />
                       {a.file_path ? (
                         <Link
-                          href={buildAttachmentUrl(a.file_path)}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          component="button"
+                          type="button"
                           underline="hover"
                           variant="body2"
-                          sx={{ fontWeight: 700, wordBreak: "break-word", color: "primary.main" }}
+                          sx={{
+                            fontWeight: 700,
+                            wordBreak: "break-word",
+                            color: "primary.main",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            border: "none",
+                            background: "none",
+                            p: 0,
+                            font: "inherit",
+                          }}
+                          onClick={() => {
+                            void openNoticeAttachment(a.file_path!).catch(() => {
+                              setSnackbar({
+                                message: "Unable to open attachment",
+                                severity: "error",
+                              });
+                            });
+                          }}
                         >
                           {a.file_name || "Attachment"}
                         </Link>
