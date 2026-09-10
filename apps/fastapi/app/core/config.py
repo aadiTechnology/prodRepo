@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE,
         case_sensitive=True,
+        extra="ignore",
+        # Ignore .env keys that are not Settings fields (shared .env / QA vars).
+        dotenv_filtering="only_existing",
     )
 
     # Application

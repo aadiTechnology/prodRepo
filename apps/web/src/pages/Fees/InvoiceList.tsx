@@ -316,7 +316,8 @@ export function FeePendingApprovalPage() {
       }
     >
       <EntityTableSection
-        label="Pending Approval Records"
+        label=""
+        showInfoBar={false}
         data-testid="grid-fee-pending-approval"
         emptyTestId="grid-fee-pending-approval-empty"
         loadingTestId="grid-fee-pending-approval-loading"

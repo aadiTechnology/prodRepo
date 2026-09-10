@@ -533,7 +533,7 @@ def list_fee_pending_approvals(
         f"""
         SELECT
             fp.id,
-            fp.payment_date AS request_date,
+            fp.created_at AS request_date,
             fp.student_id,
             s.student_name,
             s.class_id,
@@ -553,7 +553,7 @@ def list_fee_pending_approvals(
         LEFT JOIN classes c ON c.id = s.class_id
         LEFT JOIN class_divisions cd ON cd.id = s.class_division_id
         WHERE {where_clause}
-        ORDER BY fp.payment_date DESC, fp.id DESC
+        ORDER BY fp.created_at DESC, fp.id DESC
         OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY
         """
     )

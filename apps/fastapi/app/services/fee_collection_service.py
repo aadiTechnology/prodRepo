@@ -544,6 +544,11 @@ def collect_invoice_payment(
     payment_status = "pending_approval" if requires_approval else "completed"
     receipt_number = None if requires_approval else _generate_receipt_number(db, tenant_id)
 
+    if requires_approval:
+        resolved_payment_date = datetime.utcnow()
+    else:
+        resolved_payment_date = req.payment_date or datetime.utcnow()
+
     # 4. Create FeePayment
     bank_account_holder_name = None
     bank_account_no = None
@@ -556,7 +561,7 @@ def collect_invoice_payment(
     payment = FeePayment(
         tenant_id=tenant_id,
         student_id=invoice.student_id,
-        payment_date=req.payment_date or datetime.utcnow(),
+        payment_date=resolved_payment_date,
         payment_method=payment_method,
         reference_no=reference_no,
         total_amount=payment_amount,

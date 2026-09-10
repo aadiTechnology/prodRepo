@@ -3,12 +3,9 @@ import {
   Alert,
   Box,
   Button,
-  IconButton,
   MenuItem,
   Select,
-  Tooltip,
 } from "@mui/material";
-import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useNavigate } from "react-router-dom";
 
 import { PageHeader } from "../../components/layout";
@@ -125,7 +122,8 @@ export default function FeeDueListV2() {
       )}
       <Box sx={{ mt: 3 }}>
         <EntityTableSection<FeeDueTableRow>
-          label="Fee Due Records"
+          label=""
+          showInfoBar={false}
           data-testid="grid-fee-due"
           emptyTestId="grid-fee-due-empty"
           loadingTestId="grid-fee-due-loading"
@@ -144,22 +142,17 @@ export default function FeeDueListV2() {
           data={controller.rows}
           loading={controller.loading}
           emptyMessage="No due records found"
-          renderRowActions={(row) =>
-            row.__skeleton ? null : row.invoice_row_id !== null && row.invoice_row_id !== undefined ? (
-              <Tooltip title="View Invoice Details">
-                <IconButton
-                  size="small"
-                  aria-label="view invoice details"
-                  data-testid="btn-view-row"
-                  onClick={() => navigate(`/fees/invoices/${row.invoice_row_id}/detail`)}
-                >
-                  <VisibilityIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            ) : (
-              "-"
-            )
-          }
+          rowActions={(row) => {
+            if (row.__skeleton) {
+              return undefined;
+            }
+            if (row.invoice_row_id === null || row.invoice_row_id === undefined) {
+              return undefined;
+            }
+            return {
+              onView: () => navigate(`/fees/invoices/${row.invoice_row_id}/detail`),
+            };
+          }}
           getRowKey={(row) => row.__key}
           stickyHeader
           size="small"
