@@ -29,13 +29,51 @@ import { apiBaseUrl } from "../../config";
 import { useNoticePermissions } from "../../hooks/useNoticePermissions";
 import type { Notice, NoticeStatus } from "../../types/notice";
 import { notifyNoticeCountChanged } from "../../utils/noticeCountEvents";
+import { formatShortDate } from "../../utils/formatters";
+import { isNoticeEditable, noticeStatusLabel, noticeTypeLabel } from "../../utils/noticeLabels";
 
 function buildAttachmentUrl(filePath: string): string {
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
   return `${apiBaseUrl}${filePath}`;
 }
-import { formatShortDate } from "../../utils/formatters";
-import { isNoticeEditable, noticeStatusLabel, noticeTypeLabel } from "../../utils/noticeLabels";
+
+function isAuthenticatedAttachmentPath(filePath: string): boolean {
+  return filePath.includes("/attachments/") && filePath.endsWith("/content");
+}
+
+async function openNoticeAttachment(filePath: string): Promise<void> {
+  // Private /content proxy paths need JWT via apiClient. Open a tab synchronously
+  // first so the async fetch is not blocked by popup blockers on deployed hosts.
+  if (isAuthenticatedAttachmentPath(filePath)) {
+    const pendingTab = window.open("about:blank", "_blank");
+    try {
+      const blob = await noticeService.fetchAttachmentContent(filePath);
+      if (blob.type.includes("application/json") || blob.type.startsWith("text/")) {
+        const text = await blob.text();
+        throw new Error(text || "Unable to open attachment");
+      }
+      const objectUrl = URL.createObjectURL(blob);
+      if (pendingTab) {
+        pendingTab.opener = null;
+        pendingTab.location.href = objectUrl;
+      } else {
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (error) {
+      pendingTab?.close();
+      throw error;
+    }
+    return;
+  }
+  window.open(buildAttachmentUrl(filePath), "_blank", "noopener,noreferrer");
+}
 
 function statusChipColor(status: NoticeStatus): "default" | "success" | "error" | "warning" {
   switch (status) {
@@ -411,12 +449,29 @@ export default function NoticeDetails() {
                       <AttachFileIcon color="primary" sx={{ fontSize: 20, flexShrink: 0 }} />
                       {a.file_path ? (
                         <Link
-                          href={buildAttachmentUrl(a.file_path)}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          component="button"
+                          type="button"
                           underline="hover"
                           variant="body2"
-                          sx={{ fontWeight: 700, wordBreak: "break-word", color: "primary.main" }}
+                          sx={{
+                            fontWeight: 700,
+                            wordBreak: "break-word",
+                            color: "primary.main",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            border: "none",
+                            background: "none",
+                            p: 0,
+                            font: "inherit",
+                          }}
+                          onClick={() => {
+                            void openNoticeAttachment(a.file_path!).catch(() => {
+                              setSnackbar({
+                                message: "Unable to open attachment",
+                                severity: "error",
+                              });
+                            });
+                          }}
                         >
                           {a.file_name || "Attachment"}
                         </Link>

@@ -2,7 +2,7 @@ import { Chip, alpha } from "@mui/material";
 
 import { colorTokens } from "../../tokens/colors";
 
-type FeeInstallmentStatusValue = "Paid" | "Partial" | "Pending" | "Overdue";
+type FeeInstallmentStatusValue = "Paid" | "Partial" | "Pending" | "Overdue" | "Pending Approval";
 
 const statusConfig: Record<
   FeeInstallmentStatusValue,
@@ -12,6 +12,7 @@ const statusConfig: Record<
   Partial: { label: "Partial", color: colorTokens.preschool.peach.main },
   Pending: { label: "Pending", color: colorTokens.preschool.sunshine.main },
   Overdue: { label: "Overdue", color: colorTokens.preschool.coral.dark },
+  "Pending Approval": { label: "Pending Approval", color: colorTokens.preschool.peach.main },
 };
 
 export default function FeeInstallmentStatusChip({

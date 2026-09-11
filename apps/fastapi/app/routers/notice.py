@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -268,6 +269,40 @@ async def upload_notice_attachment(
         file_name=file.filename or "attachment",
         content=content,
         content_type=content_type,
+    )
+
+
+@router.get("/{notice_id}/attachments/{attachment_id}/content")
+async def get_notice_attachment_content(
+    notice_id: int = Path(..., ge=1),
+    attachment_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_menu_path_permission(NOTICE_MENU_PATH, "view")),
+):
+    """Stream a private notice attachment for an authorized viewer."""
+    can_manage = notice_service.user_can_manage_notices(db, current_user)
+    viewer_context = notice_service.get_viewer_context(
+        db,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+        manage=can_manage,
+    )
+    content, media_type, file_name = notice_service.get_notice_attachment_content(
+        db,
+        tenant_id=current_user.tenant_id,
+        notice_id=notice_id,
+        attachment_id=attachment_id,
+        viewer_context=viewer_context,
+        current_user_id=current_user.id,
+    )
+    # Inline disposition lets images/PDFs open in the browser; other types download.
+    disposition = "inline" if media_type.startswith("image/") or media_type == "application/pdf" else "attachment"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'{disposition}; filename="{file_name}"'},
     )
 
 

@@ -59,6 +59,7 @@ export interface InvoiceFeeBreakdownItem {
   payment_date?: string | null;
   payment_method?: string | null;
   status?: string | null;
+  payment_status?: string | null;
 }
 
 export interface InvoicePaymentSummary {

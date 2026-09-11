@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -7,15 +7,21 @@ from app.core.exceptions import ValidationException
 from app.routers.installment_tracking import require_installment_tracking_access
 from app.schemas.fee_collection import (
     FeeReceiptDetailResponse,
-    FeePaymentCollectRequest, 
+    FeePaymentCollectRequest,
     FeePaymentCollectResponse,
-    InvoicePaymentCollectRequest
+    InvoicePaymentCollectRequest,
+    FeePaymentApprovalActionResponse,
+    FeePaymentApprovalListResponse,
+    FeePaymentApprovalRejectRequest,
 )
 from app.services.fee_collection_service import (
     collect_payment,
     collect_invoice_payment,
     get_receipt_detail,
     get_invoice_receipt_detail,
+    list_pending_approvals,
+    approve_pending_payment,
+    reject_pending_payment,
 )
 
 router = APIRouter(prefix="/fees/collection", tags=["Fees - Collection"])
@@ -92,5 +98,72 @@ async def get_invoice_fee_receipt_detail(
         user_id=current_user.id,
         email=str(current_user.email),
         legacy_role=current_user.role,
+    )
+
+
+pending_router = APIRouter(prefix="/fees", tags=["Fees - Pending Approval"])
+
+
+@pending_router.get("/pending-approval", response_model=FeePaymentApprovalListResponse)
+async def list_fee_pending_approval(
+    page: int = Query(0, ge=0),
+    size: int = Query(20, ge=1),
+    class_id: int | None = Query(None, ge=1),
+    division_id: int | None = Query(None, ge=1),
+    student_id: int | None = Query(None, ge=1),
+    status_filter: str | None = Query("Pending Approval", alias="status"),
+    search: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_installment_tracking_access),
+):
+    return list_pending_approvals(
+        db,
+        tenant_id=current_user.tenant_id,
+        class_id=class_id,
+        division_id=division_id,
+        student_id=student_id,
+        status=status_filter,
+        search=search,
+        page=page,
+        size=size,
+        user_id=current_user.id,
+        email=str(current_user.email),
+        legacy_role=current_user.role,
+    )
+
+
+@pending_router.post(
+    "/pending-approval/{payment_id}/approve",
+    response_model=FeePaymentApprovalActionResponse,
+)
+async def approve_fee_pending_payment(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_installment_tracking_access),
+):
+    return approve_pending_payment(
+        db,
+        tenant_id=current_user.tenant_id,
+        payment_id=payment_id,
+        user_id=current_user.id,
+    )
+
+
+@pending_router.post(
+    "/pending-approval/{payment_id}/reject",
+    response_model=FeePaymentApprovalActionResponse,
+)
+async def reject_fee_pending_payment(
+    payment_id: int,
+    payload: FeePaymentApprovalRejectRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_installment_tracking_access),
+):
+    return reject_pending_payment(
+        db,
+        tenant_id=current_user.tenant_id,
+        payment_id=payment_id,
+        req=payload,
+        user_id=current_user.id,
     )
 

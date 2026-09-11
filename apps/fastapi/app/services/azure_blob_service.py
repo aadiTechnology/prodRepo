@@ -26,6 +26,10 @@ def is_azure_storage_configured() -> bool:
     )
 
 
+def is_storage_configured() -> bool:
+    return is_azure_storage_configured()
+
+
 @lru_cache(maxsize=1)
 def _blob_service_client() -> BlobServiceClient:
     connection_string = (settings.AZURE_STORAGE_CONNECTION_STRING or "").strip()

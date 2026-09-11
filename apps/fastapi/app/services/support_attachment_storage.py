@@ -5,7 +5,11 @@ from datetime import datetime
 from uuid import uuid4
 
 from app.core.exceptions import ValidationException
-from app.services import azure_blob_service
+from app.services.blob_storage_factory import (
+    delete_mixed_blob,
+    get_storage_service,
+    resolve_mixed_download_url,
+)
 from app.services.image_compression_service import prepare_file_for_storage
 
 QUERY_ATTACHMENTS_PREFIX = "support-query-attachments"
@@ -44,8 +48,9 @@ def save_query_attachment_file(
     if len(content) > QUERY_MAX_FILE_BYTES:
         raise ValidationException("File size exceeded. Maximum allowed size is 10 MB")
 
-    if not azure_blob_service.is_azure_storage_configured():
-        raise ValidationException("Azure Blob Storage is not configured")
+    storage = get_storage_service()
+    if not storage.is_storage_configured():
+        raise ValidationException("File storage is not configured")
 
     stored_bytes, stored_type, stored_ext = prepare_file_for_storage(
         file_name=file_name,
@@ -57,7 +62,7 @@ def save_query_attachment_file(
     safe_name = f"{tenant_id}_{query_id}_{unique_suffix}{stored_ext}"
     blob_name = f"{QUERY_ATTACHMENTS_PREFIX}/{safe_name}"
 
-    stored = azure_blob_service.upload_bytes(
+    stored = storage.upload_bytes(
         blob_name=blob_name,
         content=stored_bytes,
         content_type=stored_type or content_type or "application/octet-stream",
@@ -80,14 +85,15 @@ def save_release_note_file(
     if len(content) > RELEASE_NOTE_MAX_FILE_BYTES:
         raise ValidationException("File size exceeded. Maximum allowed size is 10 MB")
 
-    if not azure_blob_service.is_azure_storage_configured():
-        raise ValidationException("Azure Blob Storage is not configured")
+    storage = get_storage_service()
+    if not storage.is_storage_configured():
+        raise ValidationException("File storage is not configured")
 
     unique_suffix = datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
     safe_name = f"note_{note_id}_{unique_suffix}{extension}"
     blob_name = f"{RELEASE_NOTES_PREFIX}/{safe_name}"
 
-    stored = azure_blob_service.upload_bytes(
+    stored = storage.upload_bytes(
         blob_name=blob_name,
         content=content,
         content_type=content_type or "application/octet-stream",
@@ -99,13 +105,11 @@ def save_release_note_file(
 def resolve_attachment_url(file_path: str | None) -> str | None:
     if not file_path:
         return None
-    return azure_blob_service.resolve_download_url(file_path)
+    return resolve_mixed_download_url(file_path)
 
 
 def delete_support_file(file_path: str, *, legacy_upload_dir: str) -> None:
-    blob_name = azure_blob_service.extract_blob_name(file_path)
-    if blob_name:
-        azure_blob_service.delete_blob(blob_name)
+    delete_mixed_blob(file_path)
 
     filename = os.path.basename(file_path.strip().lstrip("/"))
     disk_path = os.path.join(legacy_upload_dir, filename)

@@ -661,6 +661,11 @@ export default function CollectPaymentPage() {
       }
 
       const paymentResponse = await collectInvoiceFeePayment(payload);
+      if (paymentResponse.pending_approval) {
+        setSnackbar("Payment submitted for admin approval.");
+        navigate(`/fees/invoices/${selectedInvoice.id}/detail`);
+        return;
+      }
       setSnackbar("Payment recorded successfully!");
 
       const refreshedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);

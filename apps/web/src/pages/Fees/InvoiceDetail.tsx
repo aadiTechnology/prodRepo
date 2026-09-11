@@ -15,7 +15,10 @@ import { formatShortDate } from "../../utils/formatters";
 function getFeeLineStatus(
   row: InvoiceFeeBreakdownItem,
   invoiceDueDate?: string | null
-): "Paid" | "Pending" | "Partial" {
+): "Paid" | "Pending" | "Partial" | "Pending Approval" {
+  if (row.payment_status === "pending_approval" || row.status === "Pending Approval") {
+    return "Pending Approval";
+  }
   const amount = Number(row.amount || 0);
   const paid = Number(row.paid_amount || 0);
   const pending = Number(row.pending_amount || Math.max(amount - paid, 0));
@@ -103,20 +106,15 @@ export default function InvoiceDetail() {
         align: "center" as const,
         render: (row: InvoiceFeeBreakdownItem) => {
           const paymentId = row.payment_id || controller.getPrimaryPaymentId();
-          if (!paymentId) {
-            return (
-              <Typography variant="body2" color="text.secondary">
-                —
-              </Typography>
-            );
-          }
+          const receiptReady = row.payment_status === "completed";
           return (
             <Button
               variant="outlined"
               size="small"
               sx={{ textTransform: "none" }}
-              data-testid={`btn-show-receipt-${paymentId}`}
-              onClick={() => controller.onOpenReceiptForFeeLine(paymentId)}
+              data-testid={`btn-show-receipt-${paymentId || row.id}`}
+              onClick={() => paymentId && receiptReady && controller.onOpenReceiptForFeeLine(paymentId)}
+              disabled={!paymentId || !receiptReady}
             >
               Show Receipt
             </Button>
@@ -175,7 +173,7 @@ export default function InvoiceDetail() {
             sx={{ textTransform: "none" }}
             data-testid={`btn-pay-now-line-${row.id}`}
             onClick={() => controller.onPayNow(row.invoice_id || row.id)}
-            disabled={!canPayNow}
+            disabled={!canPayNow || row.payment_status === "pending_approval"}
           >
             Pay Now
           </Button>
@@ -265,7 +263,11 @@ export default function InvoiceDetail() {
                 onClick={() =>
                   controller.onPayNow(pendingItems[0]?.invoice_id || pendingItems[0]?.id)
                 }
-                disabled={!canPayNow || pendingItems.length === 0}
+                disabled={
+                  !canPayNow ||
+                  pendingItems.length === 0 ||
+                  pendingItems.some((row) => row.payment_status === "pending_approval")
+                }
               >
                 Pay Now
               </Button>

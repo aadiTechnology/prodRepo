@@ -73,6 +73,7 @@ class InvoiceFeeBreakdownItem(BaseModel):
     payment_date: Optional[datetime] = None
     payment_method: Optional[str] = None
     status: Optional[str] = None
+    payment_status: Optional[str] = None
 
 
 class InvoicePaymentHistoryItem(BaseModel):

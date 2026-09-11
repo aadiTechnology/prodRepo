@@ -446,7 +446,8 @@ def get_invoice_payment_history(
             fp.total_amount AS amount,
             fp.payment_method,
             fp.reference_no,
-            fp.fee_installment_id
+            fp.fee_installment_id,
+            fp.payment_status
         FROM fee_payments fp
         WHERE {where_clause}
         ORDER BY fp.payment_date DESC, fp.id DESC
@@ -454,3 +455,116 @@ def get_invoice_payment_history(
     )
     rows = db.execute(sql, params).mappings().all()
     return [dict(r) for r in rows]
+
+
+def get_pending_payments_for_student(
+    db: Session, *, tenant_id: int, student_id: int
+) -> list[dict]:
+    sql = text(
+        """
+        SELECT fp.id AS payment_id, fp.payment_date, fp.total_amount AS amount,
+               fp.payment_method, fp.reference_no, fp.fee_installment_id, fp.payment_status
+        FROM fee_payments fp
+        WHERE fp.tenant_id = :tenant_id AND fp.student_id = :student_id
+          AND fp.payment_status = 'pending_approval'
+        ORDER BY fp.payment_date DESC, fp.id DESC
+        """
+    )
+    rows = db.execute(sql, {"tenant_id": tenant_id, "student_id": student_id}).mappings().all()
+    return [dict(r) for r in rows]
+
+
+_STATUS_TO_DB = {
+    "Pending Approval": "pending_approval",
+    "Approved": "completed",
+    "Rejected": "rejected",
+}
+
+
+def list_fee_pending_approvals(
+    db: Session,
+    *,
+    tenant_id: int,
+    class_id: int | None,
+    division_id: int | None,
+    student_id: int | None,
+    status: str | None,
+    search: str | None,
+    page: int,
+    size: int,
+    scoped_student_ids: list[int] | None = None,
+) -> tuple[list[dict], int]:
+    where_sql = ["fp.tenant_id = :tenant_id"]
+    params: dict = {"tenant_id": tenant_id}
+
+    if scoped_student_ids is not None:
+        if not scoped_student_ids:
+            return [], 0
+        placeholders = ", ".join(f":scope_{idx}" for idx in range(len(scoped_student_ids)))
+        where_sql.append(f"fp.student_id IN ({placeholders})")
+        for idx, sid in enumerate(scoped_student_ids):
+            params[f"scope_{idx}"] = int(sid)
+
+    if class_id is not None:
+        where_sql.append("s.class_id = :class_id")
+        params["class_id"] = class_id
+    if division_id is not None:
+        where_sql.append("s.class_division_id = :division_id")
+        params["division_id"] = division_id
+    if student_id is not None:
+        where_sql.append("fp.student_id = :student_id")
+        params["student_id"] = student_id
+
+    normalized_status = (status or "Pending Approval").strip() or "Pending Approval"
+    if normalized_status != "ALL":
+        where_sql.append("fp.payment_status = :payment_status")
+        params["payment_status"] = _STATUS_TO_DB.get(normalized_status, "pending_approval")
+
+    if search:
+        term = f"%{search.strip()}%"
+        where_sql.append("(s.student_name LIKE :search OR ISNULL(fp.reference_no, '') LIKE :search)")
+        params["search"] = term
+
+    where_clause = " AND ".join(where_sql)
+    params["offset"] = page * size
+    params["size"] = size
+
+    list_sql = text(
+        f"""
+        SELECT
+            fp.id,
+            fp.created_at AS request_date,
+            fp.student_id,
+            s.student_name,
+            s.class_id,
+            c.name AS class_name,
+            s.class_division_id AS division_id,
+            cd.division_name,
+            fp.total_amount AS amount,
+            fp.payment_method,
+            fp.reference_no AS transaction_id,
+            CASE
+                WHEN fp.payment_status = 'pending_approval' THEN 'Pending Approval'
+                WHEN fp.payment_status = 'rejected' THEN 'Rejected'
+                ELSE 'Approved'
+            END AS status
+        FROM fee_payments fp
+        INNER JOIN students s ON s.id = fp.student_id
+        LEFT JOIN classes c ON c.id = s.class_id
+        LEFT JOIN class_divisions cd ON cd.id = s.class_division_id
+        WHERE {where_clause}
+        ORDER BY fp.created_at DESC, fp.id DESC
+        OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY
+        """
+    )
+    count_sql = text(
+        f"""
+        SELECT COUNT(1)
+        FROM fee_payments fp
+        INNER JOIN students s ON s.id = fp.student_id
+        WHERE {where_clause}
+        """
+    )
+    rows = db.execute(list_sql, params).mappings().all()
+    total = db.execute(count_sql, params).scalar() or 0
+    return [dict(r) for r in rows], int(total)

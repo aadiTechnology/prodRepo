@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.exceptions import NotFoundException, ValidationException
 from app.core.logging_config import get_logger
 from app.models.user import User
@@ -18,6 +19,7 @@ from app.services.notice_access import (
 )
 from app.services.notice_attachment_storage import (
     delete_notice_attachment_file,
+    download_notice_attachment_bytes,
     resolve_attachment_url,
     save_notice_attachment_file,
     validate_attachment_path,
@@ -281,6 +283,11 @@ def _attachment_response(item: dict) -> NoticeAttachmentResponse:
     payload = dict(item)
     file_path = payload.get("file_path")
     if file_path:
+        # Same pattern as homework/syllabus/support:
+        # Azure → SAS URL, Backblaze → time-limited authorized download URL.
+        # Do not return the /content proxy as the primary view URL — browsers cannot
+        # attach Authorization headers to a plain navigation/window.open, which breaks
+        # notice viewing on deployed environments.
         payload["file_path"] = resolve_attachment_url(str(file_path))
     return NoticeAttachmentResponse(**payload)
 
@@ -647,6 +654,52 @@ def upload_notice_attachment(
     if not attachments:
         raise ValidationException("File upload failed")
     return _attachment_response(attachments[-1])
+
+
+def get_notice_attachment_content(
+    db: Session,
+    *,
+    tenant_id: int,
+    notice_id: int,
+    attachment_id: int,
+    viewer_context: NoticeViewerContext | None = None,
+    current_user_id: int | None = None,
+) -> tuple[bytes, str, str]:
+    """Return (content_bytes, media_type, file_name) for an authorized notice viewer."""
+    _assert_notice_visible(
+        db,
+        tenant_id=tenant_id,
+        notice_id=notice_id,
+        viewer_context=viewer_context,
+        current_user_id=current_user_id,
+    )
+    attachment = notice_repository.get_notice_attachment(
+        db,
+        tenant_id=tenant_id,
+        notice_id=notice_id,
+        attachment_id=attachment_id,
+    )
+    if not attachment:
+        raise NotFoundException("Notice attachment", attachment_id)
+
+    stored_path = str(attachment.get("file_path") or "")
+    if not stored_path:
+        raise NotFoundException("Notice attachment", attachment_id)
+
+    content = download_notice_attachment_bytes(stored_path)
+    file_name = str(attachment.get("file_name") or "attachment")
+    media_type = str(attachment.get("file_type") or "").strip().lower()
+    if not media_type or media_type not in ALLOWED_ATTACHMENT_TYPES:
+        lower_name = file_name.lower()
+        if lower_name.endswith(".pdf"):
+            media_type = "application/pdf"
+        elif lower_name.endswith(".png"):
+            media_type = "image/png"
+        elif lower_name.endswith((".jpg", ".jpeg")):
+            media_type = "image/jpeg"
+        else:
+            media_type = "application/octet-stream"
+    return content, media_type, file_name
 
 
 def delete_notice_attachment(

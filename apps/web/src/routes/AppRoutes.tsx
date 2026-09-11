@@ -75,6 +75,9 @@ const AddLeadPage = lazy(() => import("../pages/Admissions/AddLeadPage"));
 const EnrollmentPage = lazy(() => import("../pages/Admissions/EnrollmentPage"));
 const EnrollmentPrintPage = lazy(() => import("../pages/Admissions/EnrollmentPrintPage"));
 const InvoiceList = lazy(() => import("../pages/Fees/InvoiceList"));
+const FeePendingApproval = lazy(() =>
+  import("../pages/Fees/InvoiceList").then((m) => ({ default: m.FeePendingApprovalPage }))
+);
 const InvoiceDetail = lazy(() => import("../pages/Fees/InvoiceDetail"));
 const ReceiptPage = lazy(() => import("../pages/Fees/ReceiptPage"));
 const GenerateInvoice = lazy(() => import("../pages/Fees/GenerateInvoice"));
@@ -326,6 +329,10 @@ export default function AppRoutes() {
           <Route
             path="/fees/due-list-v2"
             element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeDueListV2 /></ProtectedRoute>}
+          />
+          <Route
+            path="/fees/pending-approval"
+            element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeePendingApproval /></ProtectedRoute>}
           />
 
           {/* FEES MODULE (from user request) */}

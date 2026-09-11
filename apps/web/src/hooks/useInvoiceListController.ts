@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import invoiceService from "../api/services/invoiceService";
+import {
+  approveFeePendingPayment,
+  listFeePendingApprovals,
+  rejectFeePendingPayment,
+} from "../api/services/feeCollectionService";
 import schoolClassService, { type SchoolClass } from "../api/services/schoolClassService";
 import academicYearService, { type AcademicYear } from "../api/services/academicYearService";
 import type { InvoiceItem, InvoiceStatus } from "../types/invoice";
+import type { FeeApprovalStatus, FeePaymentApprovalListItem } from "../types/feeCollection";
 
 const invoiceStatuses: InvoiceStatus[] = ["Paid", "Partial", "Pending", "Overdue"];
 
@@ -299,5 +305,153 @@ export function useInvoiceListController() {
     handleConfirmDelete,
     snackbar,
     setSnackbar,
+  };
+}
+
+export function useFeePendingApprovalController() {
+  const [items, setItems] = useState<FeePaymentApprovalListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalRows, setTotalRows] = useState(0);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
+  const [classId, setClassId] = useState("");
+  const [divisionId, setDivisionId] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [status, setStatus] = useState<FeeApprovalStatus>("Pending Approval");
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [studentOptions, setStudentOptions] = useState<{ id: number; name: string }[]>([]);
+
+  const divisionOptions = useMemo(() => {
+    if (!classId) return [];
+    const selectedClass = classes.find((c) => String(c.id) === classId);
+    if (!selectedClass?.divisions?.length) return [];
+    return selectedClass.divisions.map((division) => ({
+      value: String(division.id),
+      label: division.division_name,
+    }));
+  }, [classId, classes]);
+
+  const fetchLookups = useCallback(async () => {
+    try {
+      const { classes: classData } = await getInvoiceLookups();
+      setClasses(classData);
+    } catch {
+      // non-blocking
+    }
+  }, []);
+
+  const fetchStudents = useCallback(async () => {
+    if (!classId || !divisionId) {
+      setStudentOptions([]);
+      return;
+    }
+    try {
+      const response = await invoiceService.getInvoices({
+        class_id: Number(classId),
+        division_id: Number(divisionId),
+        page: 0,
+        size: 100,
+      });
+      const studentMap = new Map<number, string>();
+      for (const invoice of response.items ?? []) {
+        const id = Number(invoice.student_id);
+        const name = String(invoice.student_name ?? "").trim();
+        if (Number.isFinite(id) && name) studentMap.set(id, name);
+      }
+      setStudentOptions(
+        Array.from(studentMap.entries())
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
+    } catch {
+      setStudentOptions([]);
+    }
+  }, [classId, divisionId]);
+
+  const fetchItems = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await listFeePendingApprovals({
+        page,
+        size: rowsPerPage,
+        class_id: classId ? Number(classId) : undefined,
+        division_id: divisionId ? Number(divisionId) : undefined,
+        student_id: studentId ? Number(studentId) : undefined,
+        status,
+        search: search.trim() || undefined,
+      });
+      setItems(response.items ?? []);
+      setTotalRows(response.total ?? 0);
+    } catch (err: any) {
+      setItems([]);
+      setTotalRows(0);
+      setError(err?.message || "Unable to load pending approvals.");
+    } finally {
+      setLoading(false);
+    }
+  }, [classId, divisionId, page, rowsPerPage, search, status, studentId]);
+
+  useEffect(() => {
+    void fetchLookups();
+  }, [fetchLookups]);
+
+  useEffect(() => {
+    void fetchStudents();
+  }, [fetchStudents]);
+
+  useEffect(() => {
+    void fetchItems();
+  }, [fetchItems]);
+
+  return {
+    items,
+    loading,
+    error,
+    setError,
+    totalRows,
+    search,
+    setSearch: (value: string) => {
+      setSearch(value);
+      setPage(0);
+    },
+    page,
+    setPage,
+    rowsPerPage,
+    setRowsPerPage: (value: number) => {
+      setRowsPerPage(value);
+      setPage(0);
+    },
+    classId,
+    setClassId: (value: string) => {
+      setClassId(value);
+      setDivisionId("");
+      setStudentId("");
+      setPage(0);
+    },
+    divisionId,
+    setDivisionId: (value: string) => {
+      setDivisionId(value);
+      setStudentId("");
+      setPage(0);
+    },
+    studentId,
+    setStudentId: (value: string) => {
+      setStudentId(value);
+      setPage(0);
+    },
+    status,
+    setStatus: (value: FeeApprovalStatus) => {
+      setStatus(value);
+      setPage(0);
+    },
+    classes,
+    divisionOptions,
+    studentOptions,
+    refetch: fetchItems,
+    approve: approveFeePendingPayment,
+    reject: rejectFeePendingPayment,
   };
 }

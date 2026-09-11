@@ -1,6 +1,9 @@
 import type { InvoiceItem } from "../../types/invoice";
+import type { FeePaymentApprovalListItem } from "../../types/feeCollection";
 import FeeInstallmentStatusChip from "../../components/fees/FeeInstallmentStatusChip";
 import type { ListConfig } from "../../components/reusable/listFramework.types";
+import type { DataTableColumn } from "../../components/reusable";
+import { formatClassDisplayLabel, formatDateTime } from "../../utils/formatters";
 
 function money(v: number): string {
   return `₹${Number(v || 0).toLocaleString()}`;
@@ -88,4 +91,51 @@ export function createInvoiceListConfig({
       }),
     },
   };
+}
+
+export const FEE_PENDING_APPROVAL_STATUS_OPTIONS = [
+  { label: "Pending Approval", value: "Pending Approval" },
+  { label: "Approved", value: "Approved" },
+  { label: "Rejected", value: "Rejected" },
+  { label: "All Statuses", value: "ALL" },
+] as const;
+
+export function createFeePendingApprovalColumns(): DataTableColumn<FeePaymentApprovalListItem>[] {
+  return [
+    {
+      id: "request_date",
+      label: "Date & Time",
+      render: (row) => formatDateTime(row.request_date),
+    },
+    {
+      id: "student_name",
+      label: "Student Name",
+      render: (row) => row.student_name,
+    },
+    {
+      id: "class_div",
+      label: "Class/Div",
+      render: (row) => {
+        const cls = formatClassDisplayLabel(row.class_name);
+        const div = row.division_name?.trim();
+        return div ? `${cls} / ${div}` : cls;
+      },
+    },
+    {
+      id: "amount",
+      label: "Amount",
+      align: "right",
+      render: (row) => money(row.amount),
+    },
+    {
+      id: "payment_method",
+      label: "Payment Mode",
+      render: (row) => row.payment_method || "—",
+    },
+    {
+      id: "transaction_id",
+      label: "Transaction ID",
+      render: (row) => row.transaction_id || "—",
+    },
+  ];
 }

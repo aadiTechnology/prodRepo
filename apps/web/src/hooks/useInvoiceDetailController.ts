@@ -66,10 +66,15 @@ export function useInvoiceDetailController() {
       return;
     }
 
+    const row = detail?.fee_breakdown?.find((item) => item.payment_id === paymentId);
+    if (row?.payment_status && row.payment_status !== "completed") {
+      setError("Receipt is available only after payment approval.");
+      return;
+    }
     navigate(`/fees/receipt/${paymentId}`, {
       state: { invoice_id: numericInvoiceId },
     });
-  }, [navigate, numericInvoiceId]);
+  }, [navigate, numericInvoiceId, detail?.fee_breakdown]);
 
   const getPrimaryPaymentId = useCallback(() => {
     const history = detail?.payment_history ?? [];

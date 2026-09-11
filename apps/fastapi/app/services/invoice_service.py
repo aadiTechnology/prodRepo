@@ -240,9 +240,21 @@ def get_invoice_detail(
         student_id=int(invoice_row["student_id"]),
         fee_installment_id=None,
     )
+    pending_payment_rows = invoice_repository.get_pending_payments_for_student(
+        db, tenant_id=tenant_id, student_id=int(invoice_row["student_id"])
+    )
+    pending_by_installment = {
+        int(p["fee_installment_id"]): p
+        for p in pending_payment_rows
+        if p.get("fee_installment_id") is not None
+    }
     payments_by_installment: dict[int, dict] = {}
-    latest_payment = payment_history_rows[0] if payment_history_rows else None
+    latest_payment = None
     for pay in payment_history_rows:
+        if str(pay.get("payment_status") or "completed") != "completed":
+            continue
+        if latest_payment is None:
+            latest_payment = pay
         if pay.get("fee_installment_id") is None:
             continue
         inst_key = int(pay["fee_installment_id"])
@@ -275,10 +287,25 @@ def get_invoice_detail(
     breakdown_items: list[InvoiceFeeBreakdownItem] = []
     for row in sibling_invoices:
         inst_id = int(row["fee_installment_id"]) if row.get("fee_installment_id") else None
+        pending_pay = pending_by_installment.get(inst_id) if inst_id is not None else None
         pay = payments_by_installment.get(inst_id) if inst_id is not None else None
         if pay is None and float(row["paid_amount"] or 0) > 0:
             pay = latest_payment
         label = row.get("installment_name") or row.get("installment") or "Installment"
+        line_status = str(row.get("status") or "")
+        payment_status = None
+        payment_id = payment_date = payment_method = None
+        if pending_pay:
+            line_status = "Pending Approval"
+            payment_status = "pending_approval"
+            payment_id = int(pending_pay["payment_id"])
+            payment_date = pending_pay.get("payment_date")
+            payment_method = str(pending_pay["payment_method"]) if pending_pay.get("payment_method") else None
+        elif pay:
+            payment_status = "completed"
+            payment_id = int(pay["payment_id"]) if pay.get("payment_id") else None
+            payment_date = pay.get("payment_date")
+            payment_method = str(pay["payment_method"]) if pay.get("payment_method") else None
         breakdown_items.append(
             InvoiceFeeBreakdownItem(
                 id=int(row["id"]),
@@ -290,10 +317,11 @@ def get_invoice_detail(
                 payable_for=label,
                 invoice_id=int(row["id"]),
                 due_date=row.get("due_date"),
-                payment_id=int(pay["payment_id"]) if pay and pay.get("payment_id") else None,
-                payment_date=pay.get("payment_date") if pay else None,
-                payment_method=str(pay["payment_method"]) if pay and pay.get("payment_method") else None,
-                status=str(row.get("status") or ""),
+                payment_id=payment_id,
+                payment_date=payment_date,
+                payment_method=payment_method,
+                status=line_status,
+                payment_status=payment_status,
             )
         )
 
@@ -324,6 +352,7 @@ def get_invoice_detail(
                 reference_no=item.get("reference_no"),
             )
             for item in payment_history_rows
+            if str(item.get("payment_status") or "completed") == "completed"
         ],
         available_actions=available_actions,
     )
