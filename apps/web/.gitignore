@@ -14,6 +14,10 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Contabo deploy secrets (keep the example file)
+config/contabo.env
+!config/contabo.env.example
 service-account.json
 service-account*.json
 
