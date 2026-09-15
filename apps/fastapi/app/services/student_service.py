@@ -96,7 +96,7 @@ class StudentService:
         if filters:
             query = query.filter(and_(*filters))
         total = query.count()
-        results = query.order_by(Student.id).offset((page - 1) * limit).limit(limit).all()
+        results = query.order_by(Student.created_at.desc(), Student.id.desc()).offset((page - 1) * limit).limit(limit).all()
         data = []
         for student, school_class, class_division in results:
             class_name = school_class.name if school_class else ""

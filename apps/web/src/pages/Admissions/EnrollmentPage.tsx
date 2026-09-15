@@ -758,6 +758,41 @@ export default function EnrollmentPage() {
     return payload;
   };
 
+  const buildFeeAssignmentPayload = (studentId: number) => {
+    const enrollmentPayload = buildPayload();
+    return {
+      student_id: studentId,
+      academic_year_id: enrollmentPayload.academic_year_id,
+      fee_structure_id: enrollmentPayload.fee_structure_id,
+      discount_id: enrollmentPayload.discount_id ?? undefined,
+      additional_fee: enrollmentPayload.additional_fee ?? undefined,
+      custom_annual_amount: enrollmentPayload.custom_annual_amount,
+      custom_discount_amount: enrollmentPayload.custom_discount_amount,
+      custom_installments: enrollmentPayload.custom_installments,
+      custom_fee_plan_name: enrollmentPayload.custom_fee_plan_name,
+    };
+  };
+
+  const hasEditableFeeStructureId = (): boolean => {
+    const raw = formData.fee_structure_id;
+    if (!raw || raw === VIEW_FALLBACK_VALUES.feePlan) return false;
+    const id = Number(raw);
+    return Number.isFinite(id) && id > 0;
+  };
+
+  const hasFeeChangesForEdit = (): boolean => {
+    if (!studentRecord) return false;
+    if (feeScheduleMode === "customized") return true;
+    if (!hasEditableFeeStructureId()) return false;
+    const nextFee = Number(formData.fee_structure_id);
+    const nextDiscount = formData.discount_id ? Number(formData.discount_id) : null;
+    const prevFee = studentRecord.fee_structure_id ?? null;
+    const prevDiscount = studentRecord.discount_id ?? null;
+    if (nextFee !== prevFee) return true;
+    if (nextDiscount !== prevDiscount) return true;
+    return false;
+  };
+
   // Submit handler
   const handleConfirmSubmit = async () => {
     setError(null);
@@ -766,6 +801,10 @@ export default function EnrollmentPage() {
       if (isEditMode) {
         if (!editStudentId) {
           setError("Student ID is required for edit mode.");
+          return;
+        }
+        if (feeScheduleMode === "customizing") {
+          setError("Save the customized fee plan first, or click Use Configured Plan.");
           return;
         }
         const res = await studentService.update(editStudentId, {
@@ -787,6 +826,16 @@ export default function EnrollmentPage() {
           photo_url: formData.photo_url.trim() || null,
           is_active: formData.is_active,
         });
+        if (
+          hasFeeChangesForEdit() &&
+          formData.academic_year_id &&
+          formData.academic_year_id !== VIEW_FALLBACK_VALUES.academicYear &&
+          hasEditableFeeStructureId()
+        ) {
+          await studentService.assignFeeToStudent(
+            buildFeeAssignmentPayload(Number(editStudentId))
+          );
+        }
         setSnackbar(res?.message || "Student updated successfully");
       } else {
         if (feeScheduleMode === "customizing") {
@@ -1012,7 +1061,7 @@ export default function EnrollmentPage() {
         : discountedConfiguredInstallments;
   const customDraftFinal = Math.max(0, Number(customAnnualFee || 0) - Number(customDiscountAmount || 0));
   const customDraftInstallmentTotal = installmentDraftTotal(customInstallments);
-  const canCustomizeFee = !isEditMode && !isViewMode && Boolean(formData.fee_structure_id);
+  const canCustomizeFee = !isViewMode && Boolean(formData.fee_structure_id);
   const scheduleTitleCount =
     feeScheduleMode === "customizing"
       ? customInstallments.length
@@ -1127,13 +1176,21 @@ export default function EnrollmentPage() {
   useEffect(() => {
     if (isViewMode) return;
     if (!formData.fee_structure_id) return;
+    if (formData.fee_structure_id === VIEW_FALLBACK_VALUES.feePlan) return;
     // Avoid clearing prefilled fee plan before fee plan options load.
     if (!feePlans.length) return;
+    if (
+      isEditMode &&
+      studentRecord?.fee_structure_id &&
+      String(studentRecord.fee_structure_id) === formData.fee_structure_id
+    ) {
+      return;
+    }
     const stillValid = feePlans.some((plan) => plan.id === Number(formData.fee_structure_id));
     if (!stillValid) {
       setFormData((prev) => ({ ...prev, fee_structure_id: "" }));
     }
-  }, [feePlans, formData.fee_structure_id, setFormData, isViewMode]);
+  }, [feePlans, formData.fee_structure_id, setFormData, isViewMode, isEditMode, studentRecord?.fee_structure_id]);
 
   const prefillFromLead = async (selected: LeadOption) => {
     const prefill = await enrollmentService.prefillFromLead(selected.id);

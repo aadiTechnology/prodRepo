@@ -12,7 +12,6 @@ function money(v: number): string {
 const INVOICE_LIST_COLUMN_WIDTHS = {
   student_name: 200,
   class_name: 140,
-  installment: 160,
   amount: 120,
   paid: 120,
   due: 120,
@@ -43,12 +42,6 @@ export function createInvoiceListConfig({
         label: "Class",
         width: INVOICE_LIST_COLUMN_WIDTHS.class_name,
         render: (r: InvoiceItem) => r.class_name || "-",
-      },
-      {
-        id: "installment",
-        label: "Installment",
-        width: INVOICE_LIST_COLUMN_WIDTHS.installment,
-        render: (r: InvoiceItem) => r.installment || "-",
       },
       {
         id: "total_amount",

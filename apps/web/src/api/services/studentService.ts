@@ -143,14 +143,18 @@ const studentService = {
   },
 
   async assignFeeToStudent(payload: {
-    student_id: number,
-    academic_year_id: number,
-    fee_structure_id: number,
-    discount_id?: number,
-    additional_fee?: number,
-    remarks?: string
+    student_id: number;
+    academic_year_id: number;
+    fee_structure_id: number;
+    discount_id?: number | null;
+    additional_fee?: number | null;
+    remarks?: string;
+    custom_annual_amount?: number;
+    custom_discount_amount?: number;
+    custom_installments?: { installment_no: number; amount: number; due_date: string }[];
+    custom_fee_plan_name?: string;
   }) {
-    const { data } = await axiosInstance.post("/students/assign-fee", payload);
+    const { data } = await axiosInstance.post("/api/students/assign-fee", payload);
     return data;
   },
 };
