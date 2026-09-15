@@ -104,6 +104,41 @@ const mapPlanInstallments = (raw?: FeePlanInstallment[] | null): StudentFeeInsta
 const installmentDraftTotal = (rows: StudentFeeInstallmentDraft[]): number =>
   rows.reduce((acc, row) => acc + Number(row.amount || 0), 0);
 
+/** Scale installment rows so their sum matches final payable (e.g. after discount). */
+const distributeInstallmentsForFinalAmount = (
+  rows: StudentFeeInstallmentDraft[],
+  planTotal: number,
+  finalAmount: number
+): StudentFeeInstallmentDraft[] => {
+  if (!rows.length) return rows;
+  if (Math.abs(planTotal - finalAmount) < 0.005) return rows;
+
+  if (planTotal <= 0) {
+    const each = finalAmount / rows.length;
+    let running = 0;
+    return rows.map((row, index) => {
+      if (index === rows.length - 1) {
+        return { ...row, amount: Math.max(0, finalAmount - running).toFixed(2) };
+      }
+      const amt = Math.round(each * 100) / 100;
+      running += amt;
+      return { ...row, amount: amt.toFixed(2) };
+    });
+  }
+
+  const ratio = finalAmount / planTotal;
+  let running = 0;
+  return rows.map((row, index) => {
+    if (index === rows.length - 1) {
+      const last = Math.max(0, Math.round((finalAmount - running) * 100) / 100);
+      return { ...row, amount: last.toFixed(2) };
+    }
+    const amt = Math.round(Number(row.amount || 0) * ratio * 100) / 100;
+    running += amt;
+    return { ...row, amount: amt.toFixed(2) };
+  });
+};
+
 type StudentViewMeta = {
   academic_year_name?: string;
   class_name?: string;
@@ -951,6 +986,16 @@ export default function EnrollmentPage() {
     () => mapPlanInstallments(selectedPlanInstallments),
     [selectedPlanInstallments]
   );
+  const discountedConfiguredInstallments = useMemo(() => {
+    if (!configuredInstallments.length) return configuredInstallments;
+    const planTotal =
+      installmentDraftTotal(configuredInstallments) || feePreview.total || 0;
+    return distributeInstallmentsForFinalAmount(
+      configuredInstallments,
+      planTotal,
+      feePreview.finalAmount
+    );
+  }, [configuredInstallments, feePreview.finalAmount, feePreview.total]);
   const displayedAnnual =
     savedCustomFee && feeScheduleMode !== "configured" ? savedCustomFee.annual : feePreview.total;
   const displayedDiscount =
@@ -964,7 +1009,7 @@ export default function EnrollmentPage() {
       ? customInstallments
       : savedCustomFee && feeScheduleMode === "customized"
         ? savedCustomFee.installments
-        : configuredInstallments;
+        : discountedConfiguredInstallments;
   const customDraftFinal = Math.max(0, Number(customAnnualFee || 0) - Number(customDiscountAmount || 0));
   const customDraftInstallmentTotal = installmentDraftTotal(customInstallments);
   const canCustomizeFee = !isEditMode && !isViewMode && Boolean(formData.fee_structure_id);
@@ -982,8 +1027,9 @@ export default function EnrollmentPage() {
   };
 
   const startCustomizeFeePlan = () => {
-    const source =
-      savedCustomFee?.installments?.length ? savedCustomFee.installments : configuredInstallments;
+    const source = savedCustomFee?.installments?.length
+      ? savedCustomFee.installments
+      : discountedConfiguredInstallments;
     setCustomFeePlanName(
       savedCustomFee?.name && savedCustomFee.name !== selectedFeePlan?.name
         ? savedCustomFee.name.trim()
