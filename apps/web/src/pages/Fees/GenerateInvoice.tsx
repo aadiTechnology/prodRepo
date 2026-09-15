@@ -25,6 +25,10 @@ import {
 } from "../../formConfig/generateInvoiceFormConfig";
 import type { FormValidationConfig } from "../../utils/formValidation";
 import { colorTokens } from "../../tokens/colors";
+import {
+  FEE_LIST_MENU_LABEL,
+  FEE_LIST_MENU_PATH,
+} from "../../utils/menuNavigation";
 
 const toDateInputValue = (raw: unknown): string => {
   if (!raw) return "";
@@ -824,7 +828,7 @@ export default function GenerateInvoice() {
       onSnackbarClose={() => setSnackbar(null)}
       headerConfig={{
         links: [
-          { title: "Invoice List", path: "/fees/invoices" },
+          { title: FEE_LIST_MENU_LABEL, path: FEE_LIST_MENU_PATH },
           { title: isEditMode ? "Edit Invoice" : "Generate Invoice", path: "#" },
         ],
         homePath: "/",

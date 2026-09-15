@@ -41,7 +41,7 @@ export const NAV_PAGE_HINTS: Record<string, string> = {
   "/attendance/mark": "Mark student attendance",
   "/attendance/report": "View attendance reports",
   "/fees/collect-payment": "Collect fee payments",
-  "/fees/invoices": "View fee invoices",
+  "/fees/invoices": "View fee list",
   "/fees/due-list-v2": "View students with due fees",
   "/fees/pending-approval": "Review fee payments pending approval",
   "/fees/categories": "Manage fee categories",

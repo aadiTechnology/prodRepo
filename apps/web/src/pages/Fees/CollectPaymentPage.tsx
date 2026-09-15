@@ -43,6 +43,11 @@ import {
   type CollectPaymentFormData,
 } from "./CollectPaymentPage.formConfig";
 import { mapApiErrorsToFields } from "../../utils/formValidation";
+import {
+  FEE_DETAILS_PAGE_LABEL,
+  FEE_LIST_MENU_LABEL,
+  FEE_LIST_MENU_PATH,
+} from "../../utils/menuNavigation";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DESIGN TOKENS (page-level constants referencing the token system)
@@ -607,15 +612,15 @@ export default function CollectPaymentPage() {
   const breadcrumbLinks = useMemo(() => {
     const invoiceId = selectedInvoice?.id ?? selectedInvoiceId;
     const links: { title: string; path: string }[] = [
-      { title: "Invoice List", path: "/fees/invoices" },
+      { title: FEE_LIST_MENU_LABEL, path: FEE_LIST_MENU_PATH },
     ];
     if (invoiceId) {
       links.push({
-        title: "Invoice Detail",
+        title: FEE_DETAILS_PAGE_LABEL,
         path: `/fees/invoices/${invoiceId}/detail`,
       });
     } else {
-      links.push({ title: "Invoice Detail", path: "#" });
+      links.push({ title: FEE_DETAILS_PAGE_LABEL, path: "#" });
     }
     links.push({ title: "Collection", path: "#" });
     return links;

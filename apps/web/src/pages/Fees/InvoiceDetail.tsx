@@ -11,6 +11,11 @@ import FeeInstallmentStatusChip from "../../components/fees/FeeInstallmentStatus
 import { useInvoiceDetailController } from "../../hooks/useInvoiceDetailController";
 import type { InvoiceFeeBreakdownItem } from "../../types/invoice";
 import { formatShortDate } from "../../utils/formatters";
+import {
+  FEE_DETAILS_PAGE_LABEL,
+  FEE_LIST_MENU_LABEL,
+  FEE_LIST_MENU_PATH,
+} from "../../utils/menuNavigation";
 
 function getFeeLineStatus(
   row: InvoiceFeeBreakdownItem,
@@ -191,8 +196,8 @@ export default function InvoiceDetail() {
           <>
             <PageHeader
               links={[
-                { title: "Invoices", path: "/fees/invoices" },
-                { title: "Invoice Details", path: "#" },
+                { title: FEE_LIST_MENU_LABEL, path: FEE_LIST_MENU_PATH },
+                { title: FEE_DETAILS_PAGE_LABEL, path: "#" },
               ]}
               homePath="/"
             />

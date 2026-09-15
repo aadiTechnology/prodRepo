@@ -30,6 +30,11 @@ import {
   getInvoiceReceiptDetail,
 } from "../../api/services/feeCollectionService";
 import type { FeeReceiptDetailResponse, FeeReceiptFeeDetailItem } from "../../types/feeCollection";
+import {
+  FEE_DETAILS_PAGE_LABEL,
+  FEE_LIST_MENU_LABEL,
+  FEE_LIST_MENU_PATH,
+} from "../../utils/menuNavigation";
 
 function tenantAddressLines(tenant: {
   address_line1?: string | null;
@@ -309,12 +314,12 @@ export default function ReceiptPage() {
           links={
             Number.isFinite(resolvedInvoiceId) && resolvedInvoiceId > 0
               ? [
-                  { title: "Invoices", path: "/fees/invoices" },
-                  { title: "Invoice Details", path: `/fees/invoices/${resolvedInvoiceId}/detail` },
+                  { title: FEE_LIST_MENU_LABEL, path: FEE_LIST_MENU_PATH },
+                  { title: FEE_DETAILS_PAGE_LABEL, path: `/fees/invoices/${resolvedInvoiceId}/detail` },
                   { title: "Payment Receipt", path: "#" },
                 ]
               : [
-                  { title: "Invoices", path: "/fees/invoices" },
+                  { title: FEE_LIST_MENU_LABEL, path: FEE_LIST_MENU_PATH },
                   { title: printableTitle, path: "#" },
                 ]
           }
@@ -423,14 +428,9 @@ export default function ReceiptPage() {
                 </Box>
                 <Box sx={{ textAlign: "right" }}>
                   {!isInvoiceScope ? (
-                    <>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                        Receipt Type: Payment
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                        Invoice: {receipt.invoice_no || "N/A"}
-                      </Typography>
-                    </>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      Receipt Type: Payment
+                    </Typography>
                   ) : null}
                 </Box>
               </Stack>

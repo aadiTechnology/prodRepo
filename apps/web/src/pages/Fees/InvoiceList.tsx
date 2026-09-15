@@ -24,6 +24,7 @@ import { useFeePendingApprovalController, useInvoiceListController } from "../..
 import { useInvoicePermissions } from "../../hooks/useInvoicePermissions";
 import type { FeePaymentApprovalListItem } from "../../types/feeCollection";
 import { formatDateTime } from "../../utils/formatters";
+import { FEE_LIST_MENU_LABEL, FEE_LIST_MENU_PATH } from "../../utils/menuNavigation";
 import {
   createFeePendingApprovalColumns,
   createInvoiceListConfig,
@@ -54,7 +55,7 @@ export default function InvoiceList() {
       header={
         <>
           <PageHeader
-            links={[{ title: "Invoices", path: "/fees/invoices" }]}
+            links={[{ title: FEE_LIST_MENU_LABEL, path: FEE_LIST_MENU_PATH }]}
             homePath="/"
             actions={
               <ListPageToolbar

@@ -146,7 +146,7 @@ def seed_rbac_data():
             {
                 "name": "Fees", "level": 1, "icon": "feesIcon", "sort_order": 5,
                 "children": [
-                    {"name": "Invoice List", "path": "/fees/invoices", "feature": "FEE_MGMT"},
+                    {"name": "Fee List", "path": "/fees/invoices", "feature": "FEE_MGMT"},
                     {"name": "Fee Due List", "path": "/fees/due-list-v2", "feature": "FEE_MGMT"},
                     {"name": "Fee Collection", "path": "/fees/collect-payment", "feature": "FEE_MGMT"},
                     {"name": "Fee Category", "path": "/fees/categories", "feature": "FEE_MGMT"},
@@ -211,7 +211,13 @@ def seed_rbac_data():
             # Check for children
             if "children" in p_data:
                 for c_data in p_data["children"]:
-                    child = db.query(Menu).filter(Menu.name == c_data["name"], Menu.parent_id == parent.id).first()
+                    child = (
+                        db.query(Menu)
+                        .filter(Menu.parent_id == parent.id, Menu.path == c_data["path"])
+                        .first()
+                    )
+                    if not child:
+                        child = db.query(Menu).filter(Menu.name == c_data["name"], Menu.parent_id == parent.id).first()
                     fid = feature_map.get(c_data["feature"])
                     if not child:
                         child = Menu(
@@ -226,6 +232,7 @@ def seed_rbac_data():
                         print(f"[SEED] Created Child: {c_data['name']} under {p_data['name']}")
                     else:
                         child.path = c_data["path"]  # type: ignore
+                        child.name = c_data["name"]  # type: ignore
                         if fid is not None:
                             child.feature_id = fid  # type: ignore
                         print(f"[SEED] Updated Child: {c_data['name']}")

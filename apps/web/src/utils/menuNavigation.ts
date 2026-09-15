@@ -53,6 +53,10 @@ export function isAiAssistantPermissionPath(path: string | null | undefined): bo
 export const STAFF_ATTENDANCE_MENU_PATH = "/attendance/teacher-marking";
 export const STAFF_ATTENDANCE_MENU_LABEL = "Staff Attendance";
 
+export const FEE_LIST_MENU_PATH = "/fees/invoices";
+export const FEE_LIST_MENU_LABEL = "Fee List";
+export const FEE_DETAILS_PAGE_LABEL = "Fee Details";
+
 export const LEAD_MANAGEMENT_MENU_PATH = "/admissions/leads";
 export const STUDENT_MANAGEMENT_MENU_PATH = "/students"; 
 
@@ -151,6 +155,9 @@ export function resolveSidebarMenuLabel(
   const normalized = normalizeMenuPath(path);
   if (normalized === STAFF_ATTENDANCE_MENU_PATH) {
     return STAFF_ATTENDANCE_MENU_LABEL;
+  }
+  if (normalized === FEE_LIST_MENU_PATH) {
+    return FEE_LIST_MENU_LABEL;
   }
   if (name === "Teacher Attendance") {
     return STAFF_ATTENDANCE_MENU_LABEL;
