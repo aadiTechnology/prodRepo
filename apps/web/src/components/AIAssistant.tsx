@@ -99,6 +99,78 @@ interface SaveChatMessageBody {
 const SILENCE_MS = 1800;
 const MAX_TYPEAHEAD = 6;
 const FAB_TOOLTIP_KEY = "campus_buddy_fab_tooltip_dismissed";
+const FAB_POSITION_KEY = "campus_buddy_fab_position";
+const FAB_SIZE = 68;
+const FAB_MARGIN = 16;
+const FAB_PANEL_WIDTH = 400;
+const FAB_PANEL_HEIGHT = 480;
+const FAB_PANEL_GAP = 12;
+
+type FabPosition = { x: number; y: number };
+
+function readStoredFabPosition(): FabPosition | null {
+  try {
+    const raw = localStorage.getItem(FAB_POSITION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as FabPosition;
+    if (typeof parsed?.x === "number" && typeof parsed?.y === "number") {
+      return parsed;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function defaultFabPosition(viewportWidth: number, viewportHeight: number): FabPosition {
+  return {
+    x: viewportWidth - FAB_MARGIN - FAB_SIZE,
+    y: viewportHeight - FAB_MARGIN - FAB_SIZE,
+  };
+}
+
+function clampFabPosition(
+  pos: FabPosition,
+  viewportWidth: number,
+  viewportHeight: number
+): FabPosition {
+  const maxX = Math.max(FAB_MARGIN, viewportWidth - FAB_MARGIN - FAB_SIZE);
+  const maxY = Math.max(FAB_MARGIN, viewportHeight - FAB_MARGIN - FAB_SIZE);
+  return {
+    x: Math.min(Math.max(FAB_MARGIN, pos.x), maxX),
+    y: Math.min(Math.max(FAB_MARGIN, pos.y), maxY),
+  };
+}
+
+function panelPositionForFab(
+  fab: FabPosition,
+  viewportWidth: number,
+  viewportHeight: number
+): FabPosition {
+  const panelMaxWidth = Math.min(FAB_PANEL_WIDTH, viewportWidth - 32);
+  let left = fab.x + FAB_SIZE - panelMaxWidth;
+  left = Math.min(Math.max(16, left), viewportWidth - panelMaxWidth - 16);
+
+  let top = fab.y - FAB_PANEL_HEIGHT - FAB_PANEL_GAP;
+  if (top < 16) {
+    top = fab.y + FAB_SIZE + FAB_PANEL_GAP;
+  }
+  top = Math.min(Math.max(16, top), viewportHeight - FAB_PANEL_HEIGHT - 16);
+  return { x: left, y: top };
+}
+
+function fabTooltipPositionForFab(
+  fab: FabPosition,
+  viewportWidth: number
+): FabPosition {
+  const tooltipWidth = 260;
+  const left = Math.min(
+    Math.max(16, fab.x + FAB_SIZE / 2 - tooltipWidth / 2),
+    viewportWidth - tooltipWidth - 16
+  );
+  const top = Math.max(16, fab.y - 96);
+  return { x: left, y: top };
+}
 
 const GREETING_RE =
   /^(hi|hello|hey|hiya|howdy|good\s*(morning|afternoon|evening)|namaste)\b/i;
@@ -738,6 +810,25 @@ export default function AIAssistant() {
   const [menuListOpen, setMenuListOpen] = useState(false);
   const [showFabTooltip, setShowFabTooltip] = useState(false);
   const [highlightHeaderIcon, setHighlightHeaderIcon] = useState(false);
+  const [viewportSize, setViewportSize] = useState(() => ({
+    w: typeof window !== "undefined" ? window.innerWidth : 1280,
+    h: typeof window !== "undefined" ? window.innerHeight : 800,
+  }));
+  const [fabPos, setFabPos] = useState<FabPosition>(() => {
+    const w = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const h = typeof window !== "undefined" ? window.innerHeight : 800;
+    const stored = typeof window !== "undefined" ? readStoredFabPosition() : null;
+    return clampFabPosition(stored ?? defaultFabPosition(w, h), w, h);
+  });
+  const [fabDragging, setFabDragging] = useState(false);
+  const fabDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    moved: boolean;
+  } | null>(null);
   const listEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const transcriptRef = useRef("");
@@ -966,6 +1057,94 @@ export default function AIAssistant() {
       return next;
     });
   }, [dismissFabTooltip, location.pathname]);
+
+  useEffect(() => {
+    const onResize = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      setViewportSize({ w, h });
+      setFabPos((prev) => clampFabPosition(prev, w, h));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const panelPos = useMemo(
+    () => panelPositionForFab(fabPos, viewportSize.w, viewportSize.h),
+    [fabPos, viewportSize.h, viewportSize.w]
+  );
+
+  const fabTooltipPos = useMemo(
+    () => fabTooltipPositionForFab(fabPos, viewportSize.w),
+    [fabPos, viewportSize.w]
+  );
+
+  const onFabPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      fabDragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: fabPos.x,
+        originY: fabPos.y,
+        moved: false,
+      };
+    },
+    [fabPos.x, fabPos.y]
+  );
+
+  const onFabPointerMove = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      const drag = fabDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const dx = event.clientX - drag.startX;
+      const dy = event.clientY - drag.startY;
+      if (!drag.moved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+        drag.moved = true;
+        setFabDragging(true);
+      }
+      if (!drag.moved) return;
+      event.preventDefault();
+      setFabPos(
+        clampFabPosition(
+          { x: drag.originX + dx, y: drag.originY + dy },
+          viewportSize.w,
+          viewportSize.h
+        )
+      );
+    },
+    [viewportSize.h, viewportSize.w]
+  );
+
+  const finishFabPointer = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      const drag = fabDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      fabDragRef.current = null;
+      setFabDragging(false);
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {
+        /* ignore */
+      }
+      if (drag.moved) {
+        setFabPos((prev) => {
+          const clamped = clampFabPosition(prev, viewportSize.w, viewportSize.h);
+          try {
+            localStorage.setItem(FAB_POSITION_KEY, JSON.stringify(clamped));
+          } catch {
+            /* ignore */
+          }
+          return clamped;
+        });
+        return;
+      }
+      handleFabToggle();
+    },
+    [handleFabToggle, viewportSize.h, viewportSize.w]
+  );
 
   useEffect(() => {
     if (!open) {
@@ -1375,7 +1554,15 @@ export default function AIAssistant() {
   return (
     <>
       {showFabTooltip && !open && (
-        <FabTooltipCard elevation={0}>
+        <FabTooltipCard
+          elevation={0}
+          sx={{
+            bottom: "auto",
+            right: "auto",
+            left: fabTooltipPos.x,
+            top: fabTooltipPos.y,
+          }}
+        >
           <Typography variant="subtitle2" fontWeight={700} gutterBottom>
             Campus Buddy
           </Typography>
@@ -1404,10 +1591,25 @@ export default function AIAssistant() {
       )}
 
       <FabButton
-        onClick={handleFabToggle}
-        sx={{ position: "fixed", bottom: 24, right: 24, zIndex: 1300 }}
+        onPointerDown={onFabPointerDown}
+        onPointerMove={onFabPointerMove}
+        onPointerUp={finishFabPointer}
+        onPointerCancel={finishFabPointer}
+        sx={{
+          position: "fixed",
+          left: fabPos.x,
+          top: fabPos.y,
+          zIndex: 1300,
+          cursor: fabDragging ? "grabbing" : "grab",
+          touchAction: "none",
+          transform: fabDragging ? "scale(1)" : undefined,
+          "&:hover": {
+            transform: fabDragging ? "scale(1)" : "scale(1.08)",
+          },
+        }}
         aria-label={open ? "Close Campus Buddy" : "Open Campus Buddy"}
         aria-expanded={open}
+        title="Drag to move · Click to open"
       >
         {open ? (
           <Box
@@ -1432,9 +1634,24 @@ export default function AIAssistant() {
 
       <Collapse
         in={open}
-        sx={{ position: "fixed", bottom: 0, right: 0, zIndex: 1299, transformOrigin: "bottom right" }}
+        sx={{
+          position: "fixed",
+          left: panelPos.x,
+          top: panelPos.y,
+          zIndex: 1299,
+          transformOrigin: "bottom right",
+        }}
       >
-        <PanelRoot elevation={0}>
+        <PanelRoot
+          elevation={0}
+          sx={{
+            position: "relative",
+            bottom: "auto",
+            right: "auto",
+            left: 0,
+            top: 0,
+          }}
+        >
           <PanelHeader>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, position: "relative", zIndex: 1 }}>
               <IconButton
