@@ -14,6 +14,13 @@ def is_weekend(check_date: date) -> bool:
     return check_date.weekday() >= 5
 
 
+def _is_exam_holiday(holiday: Holiday) -> bool:
+    """Check if holiday is actually an exam period by looking at holiday_type or description."""
+    _, _, _, _, type_label, _ = unpack_holiday_description(holiday.description)
+    text = f"{holiday.holiday_type or ''} {holiday.holiday_name or ''} {type_label or ''}".upper()
+    return "EXAM" in text
+
+
 def _holiday_blocks_attendance(
     *,
     audience_type: str | None,
@@ -67,6 +74,11 @@ def get_attendance_block_reason(
     for row in holidays:
         if not _holiday_overlaps_date(row, check_date):
             continue
+        
+        # Allow attendance marking during exams, only block regular holidays
+        if _is_exam_holiday(row):
+            continue
+            
         aud, class_ids, division_ids, _, _, _ = unpack_holiday_description(
             getattr(row, "description", None)
         )
@@ -136,3 +148,41 @@ def collect_non_working_dates(
             blocked[current.isoformat()] = reason
         current += timedelta(days=1)
     return blocked
+
+
+def collect_exam_dates(
+    db: Session,
+    *,
+    tenant_id: int,
+    academic_year_id: int,
+    class_id: int,
+    division_id: int,
+    from_date: date,
+    to_date: date,
+) -> dict[str, str]:
+    """Collect exam period dates within range (exams allow attendance marking)."""
+    if to_date < from_date:
+        return {}
+
+    exams: dict[str, str] = {}
+    current = from_date
+    while current <= to_date:
+        holidays = (
+            db.query(Holiday)
+            .filter(
+                Holiday.tenant_id == tenant_id,
+                Holiday.academic_year_id == academic_year_id,
+                Holiday.is_active == True,  # noqa: E712
+                Holiday.start_date <= current,
+            )
+            .all()
+        )
+        
+        for row in holidays:
+            if not _holiday_overlaps_date(row, current):
+                continue
+            if _is_exam_holiday(row):
+                exams[current.isoformat()] = f"Exam: {row.holiday_name}"
+        
+        current += timedelta(days=1)
+    return exams

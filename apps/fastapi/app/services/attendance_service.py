@@ -17,7 +17,7 @@ from app.schemas.attendance_schema import (
     AttendanceScopeDivision,
 )
 from app.services import teacher_service
-from app.utils.attendance_working_days import assert_attendance_working_day, collect_non_working_dates, is_weekend
+from app.utils.attendance_working_days import assert_attendance_working_day, collect_non_working_dates, collect_exam_dates, is_weekend
 
 ALLOWED_STUDENT_ATTENDANCE_STATUSES = frozenset({"Present", "Absent"})
 
@@ -365,6 +365,26 @@ class AttendanceService:
         to_date: date,
     ) -> dict[str, str]:
         return collect_non_working_dates(
+            self.db,
+            tenant_id=tenant_id,
+            academic_year_id=academic_year_id,
+            class_id=class_id,
+            division_id=division_id,
+            from_date=from_date,
+            to_date=to_date,
+        )
+
+    def get_exam_dates(
+        self,
+        *,
+        tenant_id: int,
+        academic_year_id: int,
+        class_id: int,
+        division_id: int,
+        from_date: date,
+        to_date: date,
+    ) -> dict[str, str]:
+        return collect_exam_dates(
             self.db,
             tenant_id=tenant_id,
             academic_year_id=academic_year_id,

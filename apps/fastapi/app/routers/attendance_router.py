@@ -176,6 +176,45 @@ def get_non_working_dates(
         raise HTTPException(status_code=500, detail="Failed to load non-working dates")
 
 
+@router.get("/exam-dates", response_model=AttendanceNonWorkingDatesResponse)
+def get_exam_dates(
+    academic_year_id: int = Query(..., ge=1),
+    class_id: int = Query(..., ge=1),
+    division_id: int = Query(..., ge=1),
+    from_date: date = Query(...),
+    to_date: date = Query(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get exam period dates within range (allows attendance marking)."""
+    try:
+        assert_teacher_class_division_access(
+            db, current_user, class_id, division_id, academic_year_id
+        )
+        service = AttendanceService(db)
+        exams = service.get_exam_dates(
+            tenant_id=current_user.tenant_id,
+            academic_year_id=academic_year_id,
+            class_id=class_id,
+            division_id=division_id,
+            from_date=from_date,
+            to_date=to_date,
+        )
+        return AttendanceNonWorkingDatesResponse(
+            dates=[
+                AttendanceNonWorkingDateItem(date=date.fromisoformat(iso), reason=reason)
+                for iso, reason in sorted(exams.items())
+            ]
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to load exam dates")
+
+
 @router.get("", response_model=AttendanceListResponse)
 def get_attendance(
     attendance_date: date,
