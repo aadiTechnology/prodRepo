@@ -22,6 +22,7 @@ export function useFaqListController() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [tenantFilter, setTenantFilter] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
 
@@ -48,11 +49,14 @@ export function useFaqListController() {
     if (statusFilter) {
       result = result.filter((q) => q.status === statusFilter);
     }
+    if (tenantFilter) {
+      result = result.filter((q) => String(q.tenantId ?? "") === tenantFilter);
+    }
     if (search.trim()) {
       result = result.filter((q) => matchesSearch(q, search.trim()));
     }
     return result;
-  }, [visibleQueries, categoryFilter, statusFilter, search, matchesSearch]);
+  }, [visibleQueries, categoryFilter, statusFilter, tenantFilter, search, matchesSearch]);
 
   const suggestions = useMemo(() => {
     const q = search.trim();
@@ -76,6 +80,30 @@ export function useFaqListController() {
   }, [filteredQueries.length, page, rowsPerPage]);
 
   const categoryOptions = categoryFilterOptions;
+
+  const tenantOptions = useMemo(() => {
+    if (!perms.viewAllTenants) return [];
+    const byId = new Map<number, string>();
+    for (const q of visibleQueries) {
+      if (q.tenantId != null && q.tenantName) {
+        byId.set(q.tenantId, q.tenantName);
+      }
+    }
+    return [
+      {
+        label: "All Tenants",
+        value: SUPPORT_ALL_FILTER_VALUE,
+        testId: "support-query-tenant-filter-option-all",
+      },
+      ...Array.from(byId.entries())
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([id, name]) => ({
+          label: name,
+          value: String(id),
+          testId: `support-query-tenant-filter-option-${id}`,
+        })),
+    ];
+  }, [visibleQueries, perms.viewAllTenants]);
 
   const statusOptions = useMemo(
     () => [
@@ -109,6 +137,12 @@ export function useFaqListController() {
       setStatusFilter(value === SUPPORT_ALL_FILTER_VALUE ? "" : value);
       setPage(0);
     },
+    tenantFilter,
+    setTenantFilter: (value: string) => {
+      setTenantFilter(value === SUPPORT_ALL_FILTER_VALUE ? "" : value);
+      setPage(0);
+    },
+    tenantOptions,
     page,
     setPage,
     rowsPerPage,

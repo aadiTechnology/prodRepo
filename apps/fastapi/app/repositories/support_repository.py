@@ -6,7 +6,15 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.support import SupportQuery, SupportQueryMessage, SupportQueryRead, SupportReleaseNote
+from app.models.tenant import Tenant
 from app.models.user import User
+
+
+def get_tenant_name(db: Session, tenant_id: int | None) -> str | None:
+    if tenant_id is None:
+        return None
+    row = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    return row.name if row else None
 
 
 def get_user_display_name(db: Session, user_id: int | None) -> str | None:

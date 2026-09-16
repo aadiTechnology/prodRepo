@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -98,8 +99,15 @@ def get_user(db: Session, user_id: int) -> User:
 get_user_by_id = get_user
 
 def get_user_by_email(db: Session, email: str) -> User | None:
-    """Get a user by email (excluding soft-deleted)."""
-    return db.query(User).filter(User.email == email, User.is_deleted == False).first()  # noqa: E712
+    """Get a user by email (excluding soft-deleted). Match is case-insensitive."""
+    normalized = email.strip().lower()
+    if not normalized:
+        return None
+    return (
+        db.query(User)
+        .filter(func.lower(User.email) == normalized, User.is_deleted == False)  # noqa: E712
+        .first()
+    )
 
 
 def update_user(

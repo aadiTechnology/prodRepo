@@ -223,6 +223,8 @@ export type SupportQueryMessage = {
 
 export type SupportQueryItem = {
   id: string;
+  tenantId?: number;
+  tenantName?: string;
   category: string;
   subject: string;
   description: string;

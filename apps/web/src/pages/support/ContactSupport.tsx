@@ -18,6 +18,7 @@ import { useFaqData } from "./context/FaqDataContext";
 import { formatShortDate, parseApiUtcDateTime } from "../../utils/formatters";
 import {
   isSupportQueryOwner,
+  SUPPORT_ALL_FILTER_VALUE,
   SUPPORT_UNREAD_CHANGED_EVENT,
   type SupportQueryItem,
   type SupportQueryStatus,
@@ -153,6 +154,17 @@ export default function ContactSupport() {
 
   const toolbarFilters = useMemo(
     () => [
+      ...(c.perms.viewAllTenants
+        ? [
+            {
+              label: "Tenant",
+              value: c.tenantFilter || SUPPORT_ALL_FILTER_VALUE,
+              onChange: c.setTenantFilter,
+              options: c.tenantOptions,
+              testId: "support-query-tenant-filter",
+            },
+          ]
+        : []),
       {
         label: "Category",
         value: c.categoryFilter,
@@ -169,10 +181,14 @@ export default function ContactSupport() {
     [
       c.categoryFilter,
       c.categoryOptions,
+      c.perms.viewAllTenants,
       c.setCategoryFilter,
       c.setStatusFilter,
+      c.setTenantFilter,
       c.statusFilter,
       c.statusOptions,
+      c.tenantFilter,
+      c.tenantOptions,
     ]
   );
 

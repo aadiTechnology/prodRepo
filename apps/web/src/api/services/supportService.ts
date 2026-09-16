@@ -26,6 +26,8 @@ interface SupportQueryMessageApi {
 
 interface SupportQueryApi {
   id: string;
+  tenant_id: number;
+  tenant_name: string;
   category: string;
   subject: string;
   description: string;
@@ -129,6 +131,8 @@ function mapMessage(api: SupportQueryMessageApi): SupportQueryMessage {
 export function mapSupportQuery(api: SupportQueryApi): SupportQueryItem {
   return {
     id: api.id,
+    tenantId: api.tenant_id,
+    tenantName: api.tenant_name,
     category: api.category,
     subject: api.subject,
     description: api.description,

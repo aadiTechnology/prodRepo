@@ -53,6 +53,8 @@ class SupportQueryMessageUpdateRequest(BaseModel):
 
 class SupportQueryResponse(BaseModel):
     id: str
+    tenant_id: int
+    tenant_name: str
     category: str
     subject: str
     description: str

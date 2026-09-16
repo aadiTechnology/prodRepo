@@ -80,6 +80,8 @@ def _build_query_response(db: Session, row, *, is_viewed: bool = False) -> Suppo
 
     return SupportQueryResponse(
         id=row.query_ref,
+        tenant_id=row.tenant_id,
+        tenant_name=support_repository.get_tenant_name(db, row.tenant_id) or "Unknown",
         category=row.category,
         subject=row.subject,
         description=row.description,
