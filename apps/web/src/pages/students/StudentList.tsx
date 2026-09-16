@@ -19,6 +19,10 @@ import { useStudentListController } from "../../hooks/useStudentListController";
 import { useTeacherStudentListScope } from "../../hooks/useTeacherStudentListScope";
 import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { createStudentListConfig, renderStudentRowActions } from "./StudentList.listConfig";
+import {
+  LIST_ROWS_PER_PAGE_OPTIONS,
+  shouldShowStandardListPagination,
+} from "../../utils/listPagination";
 
 const StudentList = () => {
   const navigate = useNavigate();
@@ -288,6 +292,8 @@ const StudentList = () => {
         }
         stickyHeader
         size="small"
+        showPagination={shouldShowStandardListPagination(totalStudents)}
+        rowsPerPageOptions={LIST_ROWS_PER_PAGE_OPTIONS}
       />
 
       <ConfirmDialog
