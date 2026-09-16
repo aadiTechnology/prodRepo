@@ -18,6 +18,10 @@ import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { useLeadListController } from "../../hooks/useLeadListController";
 import type { Lead } from "../../types/lead";
+import {
+  LIST_ROWS_PER_PAGE_OPTIONS,
+  shouldShowStandardListPagination,
+} from "../../utils/listPagination";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Lead Management Page Component
@@ -212,7 +216,7 @@ const LeadManagementPage = () => {
         size="small"
       />
 
-      {!loading && totalLeads > 0 && (
+      {!loading && shouldShowStandardListPagination(totalLeads) && (
         <TablePaginationBar
           page={page}
           rowsPerPage={rowsPerPage}
@@ -222,6 +226,7 @@ const LeadManagementPage = () => {
             setRowsPerPage(v);
             setPage(0);
           }}
+          rowsPerPageOptions={LIST_ROWS_PER_PAGE_OPTIONS}
         />
       )}
 

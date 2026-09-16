@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { DEFAULT_LIST_ROWS_PER_PAGE } from "../../utils/listPagination";
+import { DEFAULT_LIST_ROWS_PER_PAGE, LIST_ROWS_PER_PAGE_OPTIONS, shouldShowStandardListPagination } from "../../utils/listPagination";
 import {
     Box,
     Alert,
@@ -154,7 +154,7 @@ const FeeDiscountsPage = () => {
                 </>
             }
         >
-            {!loading && totalDiscounts > 0 && (
+            {!loading && shouldShowStandardListPagination(totalDiscounts) && (
                 <DirectoryInfoBar
                     label="Tenant Scope"
                     rangeStart={rangeStart}
@@ -178,7 +178,7 @@ const FeeDiscountsPage = () => {
                 stickyHeader
                 size="small"
             />
-            {!loading && totalDiscounts > 0 && (
+            {!loading && shouldShowStandardListPagination(totalDiscounts) && (
                 <TablePaginationBar
                     page={page}
                     rowsPerPage={rowsPerPage}
@@ -188,6 +188,7 @@ const FeeDiscountsPage = () => {
                         setRowsPerPage(v);
                         setPage(0);
                     }}
+                    rowsPerPageOptions={LIST_ROWS_PER_PAGE_OPTIONS}
                 />
             )}
 

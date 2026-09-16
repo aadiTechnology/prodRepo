@@ -11,6 +11,10 @@ import type { FeeStructure } from "../../types/fee";
 import { useFeeStructureListController } from "../../hooks/useFeeStructureListController";
 import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
 import { createFeeStructureListConfig } from "./FeeStructureList.listConfig";
+import {
+  LIST_ROWS_PER_PAGE_OPTIONS,
+  shouldShowStandardListPagination,
+} from "../../utils/listPagination";
 
 const FeeStructureSetup = () => {
   const controller = useFeeStructureListController();
@@ -130,6 +134,8 @@ const FeeStructureSetup = () => {
         })}
         stickyHeader
         size="small"
+        showPagination={shouldShowStandardListPagination(controller.totalRecords)}
+        rowsPerPageOptions={LIST_ROWS_PER_PAGE_OPTIONS}
       />
 
       <ConfirmDialog

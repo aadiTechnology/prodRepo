@@ -26,6 +26,7 @@ import {
   GALLERY_LIST_ROWS_PER_PAGE_OPTIONS,
   useActivityGalleryListController,
 } from "../../hooks/useActivityGalleryListController";
+import { shouldShowStandardListPagination } from "../../utils/listPagination";
 import { useActivityGalleryPermissions } from "../../hooks/useActivityGalleryPermissions";
 import activityGalleryService from "../../api/services/activityGalleryService";
 import type { ActivityGalleryListItem, GalleryType } from "../../types/activityGallery";
@@ -266,7 +267,7 @@ export default function ActivityGalleryList() {
         }}
         stickyHeader
         size="small"
-        showPagination={c.totalRows > 20}
+        showPagination={shouldShowStandardListPagination(c.totalRows)}
         showInfoBar={false}
       />
 

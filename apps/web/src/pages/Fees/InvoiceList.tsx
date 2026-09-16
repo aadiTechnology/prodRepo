@@ -30,6 +30,10 @@ import {
   createInvoiceListConfig,
   FEE_PENDING_APPROVAL_STATUS_OPTIONS,
 } from "./InvoiceList.listConfig";
+import {
+  LIST_ROWS_PER_PAGE_OPTIONS,
+  shouldShowStandardListPagination,
+} from "../../utils/listPagination";
 
 const INVOICE_ACTIONS_COLUMN_WIDTH = 80;
 
@@ -179,6 +183,8 @@ export default function InvoiceList() {
         stickyHeader
         size="small"
         showInfoBar={false}
+        showPagination={shouldShowStandardListPagination(controller.totalRows)}
+        rowsPerPageOptions={LIST_ROWS_PER_PAGE_OPTIONS}
       />
     </ListPageLayout>
   );
@@ -336,6 +342,8 @@ export function FeePendingApprovalPage() {
         getRowKey={(row) => row.id}
         stickyHeader
         size="small"
+        showPagination={shouldShowStandardListPagination(controller.totalRows)}
+        rowsPerPageOptions={LIST_ROWS_PER_PAGE_OPTIONS}
         renderRowActions={(row) => (
           <Stack direction="row" spacing={0.5} justifyContent="center">
             <Tooltip title="View">

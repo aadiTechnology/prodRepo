@@ -20,6 +20,10 @@ import {
   createFeeDueListV2Columns,
   FEE_DUE_STATUS_OPTIONS,
 } from "./FeeDueListV2.listConfig";
+import {
+  LIST_ROWS_PER_PAGE_OPTIONS,
+  shouldShowStandardListPagination,
+} from "../../utils/listPagination";
 
 export default function FeeDueListV2() {
   const navigate = useNavigate();
@@ -156,6 +160,8 @@ export default function FeeDueListV2() {
           getRowKey={(row) => row.__key}
           stickyHeader
           size="small"
+          showPagination={shouldShowStandardListPagination(controller.total)}
+          rowsPerPageOptions={LIST_ROWS_PER_PAGE_OPTIONS}
         />
       </Box>
     </ListPageLayout>
