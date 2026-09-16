@@ -167,16 +167,6 @@ export function createCollectPaymentFormConfig({
           htmlInput: { "data-testid": "input-notes" },
         },
       },
-
-      allocation_mode: {
-        name: "allocation_mode",
-        label: "Allocation Mode",
-        type: "switch" as const,
-        helperText: "Toggle to collect full balance or custom amount",
-        props: {
-          inputTestId: "input-allocation-mode",
-        },
-      },
     },
 
     layoutRows: [
@@ -219,11 +209,6 @@ export function createCollectPaymentFormConfig({
         kind: "fields" as const,
         grid: { xs: 12 } as any,
         fieldNames: ["notes"] as any,
-      },
-      {
-        kind: "fields" as const,
-        grid: { xs: 12 } as any,
-        fieldNames: ["allocation_mode"] as any,
       },
     ],
   };
