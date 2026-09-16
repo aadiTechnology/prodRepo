@@ -139,6 +139,31 @@ const distributeInstallmentsForFinalAmount = (
   });
 };
 
+const computeDiscountForBase = (
+  baseTotal: number,
+  discountId: string,
+  discounts: Map<number, DiscountOption>
+): { discountAmount: number; finalAmount: number } => {
+  const total = Math.max(0, Number(baseTotal) || 0);
+  const discount = discountId ? discounts.get(Number(discountId)) : undefined;
+  if (!discount || total <= 0) {
+    return { discountAmount: 0, finalAmount: total };
+  }
+
+  const type = String(discount.discount_type || "").toLowerCase();
+  let discountAmount = 0;
+  if (type.includes("percent")) {
+    discountAmount = (total * Number(discount.discount_value || 0)) / 100;
+  } else {
+    discountAmount = Number(discount.discount_value || 0);
+  }
+  discountAmount = Math.max(0, Math.min(discountAmount, total));
+  return {
+    discountAmount,
+    finalAmount: Math.max(0, total - discountAmount),
+  };
+};
+
 type StudentViewMeta = {
   academic_year_name?: string;
   class_name?: string;
@@ -1009,26 +1034,13 @@ export default function EnrollmentPage() {
     selectedFeePlan?.num_installments || selectedPlanInstallments.length;
 
   const feePreview = useMemo(() => {
-    const feePlan = selectedFeePlan;
-    const total = Number(feePlan?.total_amount || 0);
-    const discount = discountById.get(Number(formData.discount_id));
-    if (!discount) {
-      return { total, discountAmount: 0, finalAmount: total };
-    }
-
-    const type = String(discount.discount_type || "").toLowerCase();
-    let discountAmount = 0;
-    if (type.includes("percent")) {
-      discountAmount = (total * Number(discount.discount_value || 0)) / 100;
-    } else {
-      discountAmount = Number(discount.discount_value || 0);
-    }
-    discountAmount = Math.max(0, Math.min(discountAmount, total));
-    return {
+    const total = Number(selectedFeePlan?.total_amount || 0);
+    const { discountAmount, finalAmount } = computeDiscountForBase(
       total,
-      discountAmount,
-      finalAmount: Math.max(0, total - discountAmount),
-    };
+      formData.discount_id,
+      discountById
+    );
+    return { total, discountAmount, finalAmount };
   }, [discountById, selectedFeePlan, formData.discount_id]);
 
   const configuredInstallments = useMemo(
@@ -1149,6 +1161,61 @@ export default function EnrollmentPage() {
         .map((row, rowIndex) => ({ ...row, installment_no: rowIndex + 1 }))
     );
   };
+
+  // In customize mode, selected discount applies like configured plan: update concession + redistribute installments.
+  useEffect(() => {
+    if (feeScheduleMode !== "customizing") return;
+
+    const base =
+      Number(customAnnualFee) > 0 ? Number(customAnnualFee) : Number(feePreview.total || 0);
+    if (base <= 0) return;
+
+    const { discountAmount, finalAmount } = computeDiscountForBase(
+      base,
+      formData.discount_id,
+      discountById
+    );
+
+    setCustomDiscountAmount(discountAmount.toFixed(2));
+    setCustomInstallments((prev) => {
+      if (!prev.length) return prev;
+      const planTotal = installmentDraftTotal(prev) || base;
+      return distributeInstallmentsForFinalAmount(prev, planTotal, finalAmount);
+    });
+  }, [
+    feeScheduleMode,
+    formData.discount_id,
+    customAnnualFee,
+    feePreview.total,
+    discountById,
+  ]);
+
+  useEffect(() => {
+    if (feeScheduleMode !== "customized" || !savedCustomFee) return;
+
+    const { discountAmount, finalAmount } = computeDiscountForBase(
+      savedCustomFee.annual,
+      formData.discount_id,
+      discountById
+    );
+
+    setSavedCustomFee((prev) => {
+      if (!prev) return prev;
+      const planTotal = installmentDraftTotal(prev.installments) || prev.annual;
+      const installments = distributeInstallmentsForFinalAmount(
+        prev.installments,
+        planTotal,
+        finalAmount
+      );
+      if (
+        Math.abs(prev.discount - discountAmount) < 0.005 &&
+        Math.abs(installmentDraftTotal(installments) - installmentDraftTotal(prev.installments)) < 0.005
+      ) {
+        return prev;
+      }
+      return { ...prev, discount: discountAmount, installments };
+    });
+  }, [feeScheduleMode, formData.discount_id, savedCustomFee?.annual, discountById]);
 
   useEffect(() => {
     setFeeScheduleMode("configured");
@@ -1491,6 +1558,12 @@ export default function EnrollmentPage() {
                       value={customDiscountAmount}
                       onChange={(e) => setCustomDiscountAmount(e.target.value)}
                       fullWidth
+                      InputProps={{ readOnly: Boolean(formData.discount_id) }}
+                      helperText={
+                        formData.discount_id
+                          ? "From selected discount (same as configured plan)"
+                          : undefined
+                      }
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 4 }}>
