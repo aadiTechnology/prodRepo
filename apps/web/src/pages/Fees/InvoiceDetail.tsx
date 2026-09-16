@@ -250,33 +250,6 @@ export default function InvoiceDetail() {
                 size="small"
               />
             </Paper>
-
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-              <Button
-                variant="outlined"
-                sx={{ textTransform: "none" }}
-                data-testid="btn-full-receipt"
-                onClick={controller.onOpenFullReceipt}
-                disabled={Number(detail.payment_summary.paid_amount || 0) <= 0}
-              >
-                Full Receipt
-              </Button>
-              <Button
-                variant="contained"
-                sx={{ textTransform: "none" }}
-                data-testid="btn-pay-now"
-                onClick={() =>
-                  controller.onPayNow(pendingItems[0]?.invoice_id || pendingItems[0]?.id)
-                }
-                disabled={
-                  !canPayNow ||
-                  pendingItems.length === 0 ||
-                  pendingItems.some((row) => row.payment_status === "pending_approval")
-                }
-              >
-                Pay Now
-              </Button>
-            </Box>
           </Box>
         )}
       </ListPageLayout>
