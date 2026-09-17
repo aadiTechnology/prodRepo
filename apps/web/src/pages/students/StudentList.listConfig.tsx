@@ -12,9 +12,6 @@ import type { Student } from "../../types/student";
 import type { ListConfig } from "../../components/reusable";
 import StatusChip from "../../components/roles/StatusChip";
 
-const STUDENT_DELETE_BLOCKED_MESSAGE =
-  "Student cannot be deleted because they are assigned to a class for an academic year.";
-
 function isInactiveStudent(row: Student): boolean {
   return row.status?.toLowerCase() === "inactive";
 }
@@ -98,9 +95,7 @@ export function renderStudentRowActions({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const canDelete =
-    row.can_delete !== false && (row.class_id == null || row.class_id === undefined);
-  const deleteTooltip = canDelete ? "Delete" : STUDENT_DELETE_BLOCKED_MESSAGE;
+  const showDelete = isInactiveStudent(row);
 
   return (
     <Box sx={{ display: "flex", gap: 1, justifyContent: "center", alignItems: "center" }}>
@@ -128,22 +123,20 @@ export function renderStudentRowActions({
           <EditIcon fontSize="small" />
         </IconButton>
       </Tooltip>
-      <Tooltip title={deleteTooltip}>
-        <span>
+      {showDelete ? (
+        <Tooltip title="Delete">
           <IconButton
             size="small"
             onClick={(event) => {
               event.stopPropagation();
-              if (!canDelete) return;
               onDelete();
             }}
             color="error"
-            disabled={!canDelete}
           >
             <DeleteIcon fontSize="small" />
           </IconButton>
-        </span>
-      </Tooltip>
+        </Tooltip>
+      ) : null}
     </Box>
   );
 }

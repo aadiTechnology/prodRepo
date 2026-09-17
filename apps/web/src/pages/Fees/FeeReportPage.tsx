@@ -72,7 +72,6 @@ function exportToCsv(rows: FeeReportRow[]) {
     "Admission No",
     "Class",
     "Division",
-    "Invoice No",
     "Installment",
     "Invoiced (₹)",
     "Paid (₹)",
@@ -88,7 +87,6 @@ function exportToCsv(rows: FeeReportRow[]) {
         r.admission_no ?? "",
         `"${r.class_name ?? ""}"`,
         r.division_name ?? "",
-        r.invoice_no,
         r.installment_label ?? "",
         r.invoiced_amount,
         r.paid_amount,
@@ -121,20 +119,6 @@ export default function FeeReportPage() {
     classes: c.filterOptions.classes.map(cl => ({ label: cl.name, value: String(cl.id) })),
     installments: c.filterOptions.installments.map(inst => ({ label: inst, value: inst })),
   }), [c.filterOptions]);
-
-  const normalizedSearch = c.search.trim().toLowerCase();
-  const visibleRows = useMemo(() => {
-    if (!normalizedSearch) return c.rows;
-    return c.rows.filter((row) => {
-      const fields = [
-        row.student_name,
-        row.admission_no ?? "",
-        row.invoice_no,
-        row.student_code ?? "",
-      ];
-      return fields.some((value) => value.toLowerCase().includes(normalizedSearch));
-    });
-  }, [c.rows, normalizedSearch]);
 
   // ── Header Actions (Row 1) ──
   const headerActions = (
@@ -291,14 +275,14 @@ export default function FeeReportPage() {
           }}
         >
           <EntityTableSection<FeeReportRow>
-            label="Institutional Fee Ledger"
-            totalRows={normalizedSearch ? visibleRows.length : c.totalRows}
+            label=""
+            totalRows={c.totalRows}
             page={c.page}
             rowsPerPage={c.rowsPerPage}
             onPageChange={c.setPage}
             onRowsPerPageChange={c.setRowsPerPage}
             columns={feeReportListConfig.columns}
-            data={visibleRows}
+            data={c.rows}
             loading={c.loading}
             emptyMessage={
               hasFilters

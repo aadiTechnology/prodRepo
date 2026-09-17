@@ -111,7 +111,10 @@ class StudentService:
                 class_display = class_name
             else:
                 class_display = f"Class {student.class_id}" if student.class_id else "Unknown"
-            can_delete = not self._is_student_assigned_to_class_for_academic_year(student)
+            can_delete = (
+                not student.is_active
+                or not self._is_student_assigned_to_class_for_academic_year(student)
+            )
             data.append(
                 StudentListItem(
                     id=str(student.id),
@@ -416,6 +419,11 @@ class StudentService:
             
         if not student:
             raise StudentService.NotFound()
+
+        if not student.is_active:
+            self.db.delete(student)
+            self.db.commit()
+            return {"success": True}
 
         if self._is_student_assigned_to_class_for_academic_year(student):
             raise StudentService.DeleteNotAllowed(

@@ -147,12 +147,11 @@ export const FeeReportFilters: React.FC<FeeReportFiltersProps> = ({
 
         {/* Search Field After Filters */}
         <TextField
-          placeholder="Search student or invoice..."
+          placeholder="Search student name..."
           value={localSearch}
           onChange={(e) => setLocalSearch(e.target.value)}
           variant="outlined"
           size="small"
-          fullWidth
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -161,7 +160,8 @@ export const FeeReportFilters: React.FC<FeeReportFiltersProps> = ({
             ),
           }}
           sx={{
-            flex: 1,
+            width: { xs: "100%", sm: 200 },
+            maxWidth: { sm: 220 },
             "& .MuiOutlinedInput-root": {
               bgcolor: "#ffffff",
               borderRadius: "15px",

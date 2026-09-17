@@ -94,14 +94,7 @@ def get_fee_report(
         params["installment"] = installment
 
     if search and search.strip():
-        filters.append(
-            "("
-            "LOWER(s.student_name) LIKE :search "
-            "OR LOWER(ISNULL(s.admission_no, '')) LIKE :search "
-            "OR LOWER(ISNULL(s.student_code, '')) LIKE :search "
-            "OR LOWER(si.invoice_no) LIKE :search"
-            ")"
-        )
+        filters.append("LOWER(s.student_name) LIKE :search")
         params["search"] = f"%{search.strip().lower()}%"
 
     if start_date:

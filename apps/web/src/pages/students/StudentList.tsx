@@ -299,7 +299,13 @@ const StudentList = () => {
       <ConfirmDialog
         open={confirmDialogOpen}
         title="Please Confirm"
-        message={`Are you sure you want to delete student ${studentToDelete?.name}?`}
+        message={
+          studentToDelete &&
+          (studentToDelete.class_id != null ||
+            (studentToDelete.class && studentToDelete.class !== "Unknown"))
+            ? "Assigned class for this student. Are you sure you want to delete this student?"
+            : `Are you sure you want to delete student ${studentToDelete?.name}?`
+        }
         confirmLabel={deleteLoading ? "Deleting..." : "Confirm"}
         onConfirm={confirmDelete}
         onClose={closeDeleteConfirm}

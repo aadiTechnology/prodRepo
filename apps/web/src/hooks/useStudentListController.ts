@@ -90,18 +90,7 @@ export function useStudentListController({
   }, [fetchStudents, ready]);
 
   const openDeleteConfirm = (student: Student) => {
-    if (
-      student.can_delete === false ||
-      (student.class_id != null && student.class_id !== undefined)
-    ) {
-      enqueueSnackbar(
-        "Student cannot be deleted because they are assigned to a class for an academic year.",
-        {
-          variant: "warning",
-          autoHideDuration: 4000,
-          anchorOrigin: SNACKBAR_ANCHOR,
-        }
-      );
+    if (student.status?.toLowerCase() !== "inactive") {
       return;
     }
     setStudentToDelete(student);

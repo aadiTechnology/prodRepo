@@ -85,7 +85,6 @@ export function createCollectPaymentFormConfig({
           options: [
             { label: "Cash", value: "CASH" },
             { label: "UPI", value: "UPI" },
-            { label: "Bank Transfer", value: "BANK_TRANSFER" },
           ],
           "data-testid": "input-payment-method",
         },

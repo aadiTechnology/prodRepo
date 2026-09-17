@@ -30,7 +30,6 @@ export const feeReportListConfig: ListConfig<FeeReportRow, any> = {
     { id: "admission_no", label: "Admission No", width: 120 },
     { id: "class_name", label: "Class", width: 100 },
     { id: "division_name", label: "Division", width: 90 },
-    { id: "invoice_no", label: "Invoice No", width: 130 },
     { id: "installment_label", label: "Installment", width: 130 },
     {
       id: "invoiced_amount",
