@@ -23,6 +23,8 @@ export const NAV_ACTION_PAGES: NavActionPage[] = [
   { name: "Create Notice", path: "/communication/notices/new", hint: "Create a new notice here", permission: "COMMUNICATION_MGMT:create" },
   { name: "Add Syllabus", path: "/academics/syllabus/new", hint: "Upload a class syllabus attachment here", permission: "ACADEMIC_MGMT:create" },
   { name: "Assign Class Teacher", path: "/teacher-assignments/assign", hint: "Assign a teacher to a class here", permission: "ADMIN_MGMT:create" },
+  { name: "Add Homework", path: "/homework/new", hint: "Create and assign homework here", permission: "HOMEWORK_MGMT:create" },
+  { name: "Mark Attendance", path: "/attendance/mark", hint: "Mark student attendance here", permission: "ACADEMIC_MGMT:view" },
 ];
 
 /** Friendly one-line descriptions for list/main pages (shown instead of raw paths). */

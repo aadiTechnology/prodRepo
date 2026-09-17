@@ -98,9 +98,17 @@ app.add_middleware(
 
 # CORS configuration - use FastAPI's built-in CORSMiddleware
 from fastapi.middleware.cors import CORSMiddleware
+
+# Vite uses the next free port when 5173 is taken (often 5174). Allow local
+# http(s) origins in non-production so login is not blocked by a port mismatch.
+_cors_origin_regex = None
+if settings.ENVIRONMENT.lower() not in {"production", "prod", "staging"}:
+    _cors_origin_regex = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,  # Defined in config.py / .env CORS_ORIGINS
+    allow_origin_regex=_cors_origin_regex,
     allow_credentials=settings.CORS_CREDENTIALS,
     allow_methods=settings.CORS_METHODS,
     allow_headers=settings.CORS_HEADERS,
@@ -156,7 +164,9 @@ app.include_router(subject_router.router)
 app.include_router(holiday.router)
 app.include_router(academic_calendar.router)
 from app.routers import homework_router
+from app.routers import chatbot_actions
 app.include_router(homework_router.router)
+app.include_router(chatbot_actions.router)
 app.include_router(holiday.configuration_router)
 app.include_router(demo_video.router)
 from app.routers import marketing_hub

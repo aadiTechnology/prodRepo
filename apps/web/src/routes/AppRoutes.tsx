@@ -554,6 +554,7 @@ export default function AppRoutes() {
           {/* Homework Management */}
           <Route path="/homework" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:view"><HomeworkList /></ProtectedRoute>} />
           <Route path="/homework/new" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:create"><AddHomework /></ProtectedRoute>} />
+          <Route path="/homework/assign" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:create"><AddHomework /></ProtectedRoute>} />
           <Route path="/homework/:id/edit" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:edit"><AddHomework /></ProtectedRoute>} />
           <Route path="/homework/:id" element={<ProtectedRoute requiredPermissions="HOMEWORK_MGMT:view"><HomeworkDetails /></ProtectedRoute>} />
 

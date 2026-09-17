@@ -66,6 +66,7 @@ interface InterpretResponse {
   requires_confirmation: boolean;
   error_type?: "SAFE_ERROR" | "NEED_CLARIFICATION" | null;
   error_message?: string | null;
+  assistant_message?: string | null;
   options?: InterpretOption[];
 }
 
@@ -1180,7 +1181,9 @@ export default function AIAssistant() {
               : (ROUTE_TO_SIDEBAR_PARENT[targetPath] ?? "");
         dispatchSidebarExpand(parentId);
         navigate(targetPath);
-        closeAssistant();
+        if (!data.assistant_message) {
+          closeAssistant();
+        }
         return "navigated";
       }
       return "none";

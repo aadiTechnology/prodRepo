@@ -17,6 +17,7 @@ from app.services.ai_permission_sync_service import (
     user_has_ai_assistant_access,
     ensure_ai_tenant_plan_synced,
 )
+from app.services.campus_buddy_writes import try_write_from_chat
 
 logger = get_logger(__name__)
 
@@ -37,6 +38,8 @@ NAV_ACTION_PAGES: list[dict[str, str]] = [
     {"menu_name": "Add Fee Structure", "route": "/fees/setup/add", "permission": "FEE_MGMT:create"},
     {"menu_name": "Create Notice", "route": "/communication/notices/new", "permission": "COMMUNICATION_MGMT:create"},
     {"menu_name": "Assign Class Teacher", "route": "/teacher-assignments/assign", "permission": "ADMIN_MGMT:create"},
+    {"menu_name": "Add Homework", "route": "/homework/new", "permission": "HOMEWORK_MGMT:create"},
+    {"menu_name": "Mark Attendance", "route": "/attendance/mark", "permission": "ACADEMIC_MGMT:view"},
 ]
 
 _SAFE_ERROR_NOT_CONFIGURED = {
@@ -187,6 +190,9 @@ _SYNONYMS = {
     "new": "add",
     "register": "add",
     "make": "add",
+    "assign": "add",
+    "assing": "add",
+    "mark": "add",
 }
 
 
@@ -229,6 +235,10 @@ def _local_match(user_text: str, allowed_menus: list[dict]) -> dict | None:
         if len(by_path) == 1:
             return _success_from_menu(by_path[0])
 
+    create_match = _match_create_action(query, navigable)
+    if create_match:
+        return create_match
+
     partial = [
         m
         for m in navigable
@@ -267,6 +277,28 @@ def _local_match(user_text: str, allowed_menus: list[dict]) -> dict | None:
     # menu name or shares >=2 content words, AND clearly beats the runner-up.
     if (fully_covers_name or best_overlap >= 2) and best_score > runner_score:
         return _success_from_menu(best_menu)
+    return None
+
+
+def _match_create_action(query: str, navigable: list[dict]) -> dict | None:
+    """Prefer add/assign pages when the user is clearly trying to create a record."""
+    tokens = _content_tokens(query)
+    if "add" not in tokens:
+        return None
+    preferred_routes = []
+    if "homework" in tokens:
+        preferred_routes = ["/homework/new", "/homework/assign"]
+    elif "attendance" in tokens:
+        preferred_routes = ["/attendance/mark"]
+    if not preferred_routes:
+        return None
+    for route in preferred_routes:
+        match = next(
+            (m for m in navigable if _normalize_route(m.get("route")) == route),
+            None,
+        )
+        if match:
+            return _success_from_menu(match)
     return None
 
 
@@ -584,6 +616,20 @@ def _to_interpret_response(data: dict) -> InterpretResponse:
 
 
 _LOCAL_USAGE = {"provider": "local", "prompt": 0, "completion": 0, "total": 0}
+_DEV_ENVS = frozenset({"development", "dev", "local", "test"})
+
+
+def _llm_provider_configured() -> bool:
+    return bool(
+        (settings.NVIDIA_API_KEY or "").strip()
+        or (settings.OPENAI_API_KEY or "").strip()
+    )
+
+
+def _llm_key_unlocks_basic_plan() -> bool:
+    """Use a configured API key in local/dev even when the tenant is on Basic."""
+    env = (settings.ENVIRONMENT or "").strip().lower()
+    return env in _DEV_ENVS and _llm_provider_configured()
 
 
 def _relevant_options(
@@ -708,13 +754,17 @@ def interpret(db: Session, user: User, user_text: str) -> tuple[InterpretRespons
 
     plan = get_ai_tenant_plan(db, user.tenant_id)
 
+    write_result = try_write_from_chat(db, user, user_text)
+    if write_result is not None:
+        return write_result
+
     local = _local_match(user_text, allowed_menus)
     if local:
         logger.info("[AI-NAV] local match menu_id=%s (0 tokens)", local.get("menu_id"))
         data = _validate_response(local, allowed_menus)
         return _to_interpret_response(data), dict(_LOCAL_USAGE)
 
-    llm_allowed = resolve_effective_llm_enabled(db, user, plan)
+    llm_allowed = resolve_effective_llm_enabled(db, user, plan) or _llm_key_unlocks_basic_plan()
     if not llm_allowed:
         logger.info(
             "[AI-NAV] basic plan tenant_id=%s user_id=%s — LLM blocked (0 tokens)",

@@ -194,6 +194,11 @@ def clear_chat(
 
 
 def _assistant_text_from_interpret(response: InterpretResponse) -> tuple[str, bool]:
+    if response.assistant_message:
+        return response.assistant_message, bool(response.error_type)
+    payload_message = (response.payload or {}).get("result_message")
+    if isinstance(payload_message, str) and payload_message.strip():
+        return payload_message, bool(response.error_type)
     if response.error_type and response.error_message:
         return response.error_message, True
     if response.action == "CALL_API":

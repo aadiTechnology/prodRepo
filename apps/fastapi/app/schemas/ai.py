@@ -126,6 +126,7 @@ class InterpretResponse(BaseModel):
     requires_confirmation: bool = False
     error_type: Literal["SAFE_ERROR", "NEED_CLARIFICATION"] | None = None
     error_message: str | None = None
+    assistant_message: str | None = None
     options: list[InterpretOption] = Field(default_factory=list)
 
 

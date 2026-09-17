@@ -289,8 +289,12 @@ export default function Login() {
         );
       } else if (status === 403) {
         setError(msg || "You do not have permission to sign in.");
-      } else {
+      } else if (!status) {
+        setError("Cannot reach the server. Confirm the API is running and this page origin is allowed.");
+      } else if (status === 401) {
         setError("Invalid credentials.");
+      } else {
+        setError(msg || "Sign in failed. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
