@@ -378,7 +378,7 @@ export default function Login() {
                 Sign in to your account
               </Typography>
               <Typography variant="body1" sx={{ color: "#6b7a99", lineHeight: 1.6, fontWeight: 500 }}>
-                Enter your credentials to access the platform.
+                Enter your credentials to access the platform.1
               </Typography>
             </Box>
 
