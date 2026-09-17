@@ -195,8 +195,16 @@ const viewModeFieldSx = {
 
 const sectionTitleSx = { mt: 1.25 } as const;
 
-const MAX_ENROLLMENT_DOCUMENT_BYTES = 5 * 1024 * 1024;
-const ENROLLMENT_DOCUMENT_SIZE_HINT = "Document should be 5MB or less.";
+const MAX_ENROLLMENT_DOCUMENT_BYTES = 10 * 1024 * 1024;
+const ENROLLMENT_DOCUMENT_SIZE_HINT = "File should be 10MB or less.";
+const PHOTO_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
+const BIRTH_CERTIFICATE_EXTENSIONS = [...PHOTO_EXTENSIONS, ".pdf"];
+
+const fileExtension = (file: File): string => {
+  const name = file.name || "";
+  const idx = name.lastIndexOf(".");
+  return idx >= 0 ? name.slice(idx).toLowerCase() : "";
+};
 
 const emptyForm = (): EnrollmentFormData => ({
   student_name: "",
@@ -665,10 +673,8 @@ export default function EnrollmentPage() {
     }
 
     const isPhoto = documentType === "photo";
-    const allowedPhotoTypes = ["image/jpeg", "image/png", "image/webp"];
-    const allowedBirthTypes = [...allowedPhotoTypes, "application/pdf"];
-    const allowed = isPhoto ? allowedPhotoTypes : allowedBirthTypes;
-    if (!allowed.includes(file.type)) {
+    const allowedExts = isPhoto ? PHOTO_EXTENSIONS : BIRTH_CERTIFICATE_EXTENSIONS;
+    if (!allowedExts.includes(fileExtension(file))) {
       setError(isPhoto ? "Photo must be JPG/PNG/WEBP" : "Birth certificate must be PDF/JPG/PNG/WEBP");
       return;
     }

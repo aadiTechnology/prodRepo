@@ -11,6 +11,10 @@ from app.services.school_class_service import (
     require_active_division,
     require_class_division_capacity,
 )
+from app.services.enrollment_document_storage import (
+    persistable_document_path,
+    resolve_document_url,
+)
 from typing import Optional
 
 class StudentService:
@@ -208,8 +212,8 @@ class StudentService:
             parent_name=parent_name,
             parent_mobile=parent_mobile,
             admission_no=student.admission_no,
-            birth_certificate_url=student.birth_certificate_url,
-            photo_url=student.photo_url,
+            birth_certificate_url=resolve_document_url(student.birth_certificate_url),
+            photo_url=resolve_document_url(student.photo_url),
             created_at=student.created_at.isoformat() if student.created_at else None,
             updated_at=student.updated_at.isoformat() if student.updated_at else None
         )
@@ -276,8 +280,10 @@ class StudentService:
                 parent_id=parent.id,
                 student_code=gen_code("STU"),
                 admission_no=gen_code("ADM"),
-                birth_certificate_url=getattr(req, 'birth_certificate_url', None),
-                photo_url=getattr(req, 'photo_url', None)
+                birth_certificate_url=persistable_document_path(
+                    getattr(req, "birth_certificate_url", None)
+                ),
+                photo_url=persistable_document_path(getattr(req, "photo_url", None)),
             )
             self.db.add(student)
             self.db.commit()
@@ -353,6 +359,12 @@ class StudentService:
         update_data = req.dict(exclude_unset=True)
         photo_url_provided = "photo_url" in update_data
         photo_url_value = update_data.pop("photo_url", None) if photo_url_provided else None
+        if photo_url_provided:
+            photo_url_value = persistable_document_path(photo_url_value)
+        if "birth_certificate_url" in update_data:
+            update_data["birth_certificate_url"] = persistable_document_path(
+                update_data.get("birth_certificate_url")
+            )
 
         next_class_id = update_data.get("class_id", student.class_id)
         next_division_id = update_data.get("class_division_id", student.class_division_id)

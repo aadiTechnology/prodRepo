@@ -19,6 +19,8 @@ _ATTACHMENT_PREFIXES = (
     "support-query-attachments/",
     "support-release-notes/",
     "sidebar-icons/",
+    "enrollment-documents/",
+    "student-photos/",
 )
 
 _b2_module: ModuleType | None = None

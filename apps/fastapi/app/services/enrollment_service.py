@@ -18,6 +18,12 @@ from app.services.school_class_service import (
     require_active_division,
     require_class_division_capacity,
 )
+from app.services.enrollment_document_storage import (
+    persistable_document_path,
+    resolve_document_url,
+    resolve_uploaded_document_url,
+    save_enrollment_document_file,
+)
 
 
 class EnrollmentService:
@@ -75,8 +81,37 @@ class EnrollmentService:
             "fee_structure_id": latest_fee_assignment.fee_structure_id if latest_fee_assignment else None,
             "discount_id": latest_fee_assignment.discount_id if latest_fee_assignment else None,
             "expected_admission_date": lead.expected_admission_date,
-            "birth_certificate_url": converted_student.birth_certificate_url if converted_student else None,
-            "photo_url": converted_student.photo_url if converted_student else None,
+            "birth_certificate_url": resolve_document_url(
+                converted_student.birth_certificate_url if converted_student else None
+            ),
+            "photo_url": resolve_document_url(
+                converted_student.photo_url if converted_student else None
+            ),
+        }
+
+    def upload_document(
+        self,
+        *,
+        tenant_id: int,
+        user_id: int,
+        document_type: str,
+        file_name: str,
+        content: bytes,
+        content_type: str | None,
+    ) -> dict:
+        stored_path = save_enrollment_document_file(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            document_type=document_type,
+            file_name=file_name,
+            content=content,
+            content_type=content_type,
+        )
+        return {
+            "message": "File uploaded successfully",
+            "file_url": resolve_uploaded_document_url(stored_path) or stored_path,
+            "file_name": file_name,
+            "document_type": document_type,
         }
 
     def _get_or_create_parent(
@@ -229,8 +264,8 @@ class EnrollmentService:
                 city=parent.city,
                 state=parent.state,
                 pincode=parent.pin_code,
-                birth_certificate_url=payload.birth_certificate_url,
-                photo_url=payload.photo_url,
+                birth_certificate_url=persistable_document_path(payload.birth_certificate_url),
+                photo_url=persistable_document_path(payload.photo_url),
                 is_active=True,
             )
             self.db.add(student)
@@ -313,7 +348,7 @@ class EnrollmentService:
                 import logging
                 logging.getLogger(__name__).error(f"Failed to create user for enrolled student {student.id}: {e}")
 
-            if payload.photo_url:
+            if student.photo_url:
                 from app.services import profile_image_service
 
                 login_user = created_user or profile_image_service._resolve_user_for_student(self.db, student)
@@ -321,7 +356,7 @@ class EnrollmentService:
                     profile_image_service.save_user_profile_image(
                         self.db,
                         login_user.id,
-                        payload.photo_url,
+                        student.photo_url,
                     )
                 else:
                     import logging

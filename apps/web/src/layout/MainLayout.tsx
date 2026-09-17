@@ -14,12 +14,12 @@ import { useRBAC } from "../context/RBACContext";
 import Sidebar from "../components/layout/Sidebar";
 import AIAssistant from "../components/AIAssistant";
 import profileService from "../api/services/profileService";
-import { apiBaseUrl } from "../config";
 import { colorTokens } from "../tokens/colors";
 import { toRoleLabel } from "../utils/formatters";
 import { getTimeGreeting, getFirstName } from "../utils/greeting";
 import { isNativePlatform } from "../utils/capacitor";
 import { hasAiAssistantAccess } from "../utils/menuNavigation";
+import { toMediaUrl } from "../utils/mediaUrl";
 import { NotificationProvider } from "../pages/notifications/NotificationContext";
 import NotificationBell from "../pages/notifications/components/NotificationBell";
 
@@ -43,34 +43,7 @@ function MainLayout() {
     setLogoError(false);
   }, [user?.tenant?.id, user?.tenant?.logo_url]);
 
-  /** SECURITY: Convert stored path like "/profile-images/7.jpg" → full URL with validation */
-  const toFullUrl = (path: string | null | undefined): string | undefined => {
-    if (!path || typeof path !== 'string') return undefined;
-
-    // SECURITY: Reject absolute URLs that don't match our domain
-    if (path.startsWith("http")) {
-      try {
-        const url = new URL(path);
-        const baseUrl = new URL(apiBaseUrl);
-        // Only allow URLs from the same origin
-        if (url.origin !== baseUrl.origin) {
-          return undefined;
-        }
-        return path;
-      } catch {
-        return undefined; // Invalid URL
-      }
-    }
-
-    // SECURITY: Only allow paths starting with /
-    if (!path.startsWith("/")) return undefined;
-
-    // SECURITY: Block path traversal attempts
-    if (path.includes("..") || path.includes("//")) return undefined;
-
-    const root = apiBaseUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
-    return `${root}${path}`;
-  };
+  const toFullUrl = (path: string | null | undefined): string | undefined => toMediaUrl(path);
 
   /** Fetch profile image and update avatar */
   const refreshAvatar = useCallback(async () => {

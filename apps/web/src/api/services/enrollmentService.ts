@@ -90,7 +90,7 @@ const enrollmentService = {
     formData.append("file", file);
     const res = await apiClient.post(`${BASE}/upload-document`, formData, {
       params: { document_type: documentType },
-      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 120000,
     });
     return res.data;
   },

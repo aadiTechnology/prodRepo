@@ -84,10 +84,18 @@ def locate_object_provider(file_path: str) -> StorageProviderName | None:
     except Exception:
         on_b2 = False
 
-    on_azure = (
-        azure_blob_service.is_azure_storage_configured()
-        and azure_blob_service.blob_exists(blob_name)
-    )
+    # Fresh Backblaze uploads must not wait on a secondary Azure existence check.
+    if on_b2 and get_active_provider_name() == "backblaze":
+        return "backblaze"
+
+    on_azure = False
+    try:
+        on_azure = (
+            azure_blob_service.is_azure_storage_configured()
+            and azure_blob_service.blob_exists(blob_name)
+        )
+    except Exception:
+        on_azure = False
 
     if on_b2 and on_azure:
         return get_active_provider_name()

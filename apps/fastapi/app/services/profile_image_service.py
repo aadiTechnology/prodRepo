@@ -1,7 +1,6 @@
 import base64
 import os
 import re
-import shutil
 import time
 
 from sqlalchemy.orm import Session
@@ -127,11 +126,34 @@ def _is_served_static_path(path: str) -> bool:
     return path.startswith("/profile-images/") or path.startswith("/enrollment-documents/")
 
 
+def _copy_enrollment_bytes_to_profile(user_id: int, content: bytes, source_name: str) -> str:
+    stored, _, _ = prepare_file_for_storage(
+        file_name=source_name or "photo.jpg",
+        content=content,
+        content_type="image/jpeg",
+        max_bytes=MAX_ORIGINAL_IMAGE_BYTES,
+    )
+    dest_name = f"{user_id}.jpg"
+    dest_path = os.path.join(UPLOAD_DIR, dest_name)
+    with open(dest_path, "wb") as file_handle:
+        file_handle.write(stored)
+    return f"/profile-images/{dest_name}?v={int(time.time())}"
+
+
 def _normalize_profile_image_source(user_id: int, photo_source: str) -> str:
-    """Store profile images under /profile-images/, copying enrollment uploads when needed."""
+    """Keep cloud student photos on Backblaze/Azure; copy only legacy local enrollment files."""
     path_only = photo_source.split("?", 1)[0].strip()
     if path_only.startswith("/profile-images/"):
         return photo_source
+
+    from app.services.enrollment_document_storage import (
+        is_enrollment_document_path,
+        persistable_document_path,
+    )
+
+    if is_enrollment_document_path(photo_source):
+        stored = persistable_document_path(photo_source)
+        return stored or photo_source
 
     if not path_only.startswith("/enrollment-documents/"):
         return photo_source
@@ -141,11 +163,9 @@ def _normalize_profile_image_source(user_id: int, photo_source: str) -> str:
     if not os.path.isfile(source_path):
         return photo_source
 
-    ext = os.path.splitext(filename)[1] or ".jpg"
-    dest_name = f"{user_id}{ext}"
-    dest_path = os.path.join(UPLOAD_DIR, dest_name)
-    shutil.copy2(source_path, dest_path)
-    return f"/profile-images/{dest_name}?v={int(time.time())}"
+    with open(source_path, "rb") as source_handle:
+        content = source_handle.read()
+    return _copy_enrollment_bytes_to_profile(user_id, content, filename)
 
 
 def save_user_profile_image(db: Session, user_id: int, photo_source: str | None) -> str | None:
@@ -159,11 +179,15 @@ def save_user_profile_image(db: Session, user_id: int, photo_source: str | None)
 
     photo_source = str(photo_source).strip()
 
-    if _is_served_static_path(photo_source):
+    from app.services.enrollment_document_storage import is_enrollment_document_path
+
+    if _is_served_static_path(photo_source) or is_enrollment_document_path(photo_source):
         public_path = _normalize_profile_image_source(user_id, photo_source)
         _upsert_user_profile(db, user_id, public_path)
         _sync_teacher_photo_url(db, user_id, public_path)
-        _sync_student_photo_url(db, user_id, public_path)
+        # Keep the student admission document path; avatars use UserProfile.
+        if not is_enrollment_document_path(photo_source):
+            _sync_student_photo_url(db, user_id, public_path)
         db.commit()
         return public_path
 
@@ -227,25 +251,36 @@ def save_uploaded_profile_image_file(
 
 def resolve_user_profile_image_path(db: Session, user_id: int) -> str | None:
     profile = db.query(UserProfile).filter(UserProfile.UserId == user_id).first()
+    stored = None
     if profile and profile.ProfileImagePath:
-        return profile.ProfileImagePath
-
-    teacher = (
-        db.query(Teacher)
-        .filter(
-            Teacher.user_id == user_id,
-            Teacher.is_deleted == False,  # noqa: E712
+        stored = profile.ProfileImagePath
+    else:
+        teacher = (
+            db.query(Teacher)
+            .filter(
+                Teacher.user_id == user_id,
+                Teacher.is_deleted == False,  # noqa: E712
+            )
+            .first()
         )
-        .first()
+        if teacher and teacher.photo_url:
+            stored = teacher.photo_url
+        else:
+            student = _resolve_student_for_user(db, user_id)
+            if student and student.photo_url:
+                stored = student.photo_url
+
+    if not stored:
+        return None
+
+    from app.services.enrollment_document_storage import (
+        is_enrollment_document_path,
+        resolve_document_url,
     )
-    if teacher and teacher.photo_url:
-        return teacher.photo_url
 
-    student = _resolve_student_for_user(db, user_id)
-    if student and student.photo_url:
-        return student.photo_url
-
-    return None
+    if is_enrollment_document_path(stored):
+        return resolve_document_url(stored) or stored
+    return stored
 
 
 def sync_teacher_photo_from_profile_path(db: Session, user_id: int, public_path: str | None) -> None:

@@ -17,7 +17,8 @@ from app.models.student_invoice import StudentInvoice
 from app.models.holiday import Holiday
 from app.repositories import notice_repository
 from app.services.notice_access import NoticeViewerContext
-from app.services import notice_service
+from app.services import notice_service, profile_image_service
+from app.services.enrollment_document_storage import resolve_document_url
 from app.models.homework import Homework
 from app.repositories.homework_repository import _build_class_division_scope_filter
 from app.services.homework_access import resolve_teacher_assignment_scopes
@@ -991,7 +992,12 @@ def _build_student_dashboard(
         admission_no=str(student.admission_no) if student.admission_no is not None else None,
         class_name=str(c_name) if c_name is not None else None,
         division_name=str(d_name) if d_name is not None else None,
-        photo_url=str(student.photo_url) if student.photo_url is not None else None,
+        photo_url=profile_image_service.ensure_user_profile_image_from_student(
+            db, current_user.id
+        )
+        or resolve_document_url(
+            str(student.photo_url) if student.photo_url is not None else None
+        ),
         parent_name=str(student.parent_name) if student.parent_name is not None else None,
         parent_phone=parent_phone,
         admission_date=admission_date_str,
