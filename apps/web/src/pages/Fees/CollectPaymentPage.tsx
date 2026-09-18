@@ -119,7 +119,7 @@ const NON_CASH_PAYMENT_METHODS = new Set<CollectPaymentFormData["payment_method"
   "UPI",
   "BANK_TRANSFER",
 ]);
-const UPI_QR_CODE_SRC = "/upi-qr-code.jpg";
+const UPI_QR_CODE_SRC = "/upi-qr-code.png";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SUB-COMPONENTS
