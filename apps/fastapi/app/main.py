@@ -275,6 +275,14 @@ async def startup_event():
         conn_info = DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL
         logger.info(f"    4. Current connection target: {conn_info}")
 
+    try:
+        from app.repositories.activity_gallery_repository import ensure_unicode_columns
+
+        ensure_unicode_columns(engine)
+        logger.info("[OK] Activity gallery Unicode columns verified")
+    except Exception as e:
+        logger.error(f"Error ensuring gallery Unicode columns: {str(e)}")
+
     # In-process holiday/exam scheduled notification processor (no Celery/Redis)
     try:
         from app.services.notification_scheduler import start_notification_scheduler

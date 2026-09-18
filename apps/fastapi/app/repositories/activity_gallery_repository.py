@@ -3,10 +3,47 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.mssql import NVARCHAR
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session
 
 from app.services.activity_gallery_access import GalleryViewerContext, is_gallery_consumer
+
+_GALLERY_UNICODE_COLUMNS = (
+    ("activity_gallery", "gallery_name", "NVARCHAR(255) NOT NULL"),
+    ("activity_gallery", "description", "NVARCHAR(MAX)"),
+    ("activity_gallery_media", "file_name", "NVARCHAR(255) NOT NULL"),
+    ("activity_gallery_media", "original_file_name", "NVARCHAR(255)"),
+)
+
+
+def ensure_unicode_columns(bind: Engine | Connection) -> None:
+    """Convert gallery text columns from VARCHAR to NVARCHAR when needed."""
+    def _apply(conn: Connection) -> None:
+        for table_name, column_name, column_ddl in _GALLERY_UNICODE_COLUMNS:
+            data_type = conn.execute(
+                text(
+                    """
+                    SELECT DATA_TYPE
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = :table_name
+                      AND COLUMN_NAME = :column_name
+                    """
+                ),
+                {"table_name": table_name, "column_name": column_name},
+            ).scalar()
+            if not data_type or str(data_type).lower() in {"nvarchar", "ntext"}:
+                continue
+            conn.execute(
+                text(f"ALTER TABLE {table_name} ALTER COLUMN {column_name} {column_ddl}")
+            )
+
+    if isinstance(bind, Engine):
+        with bind.begin() as conn:
+            _apply(conn)
+    else:
+        _apply(bind)
 
 
 def _apply_scope_visibility(
@@ -137,6 +174,9 @@ def list_galleries(
         WHERE {where_clause}
         """
     )
+    if "search" in params:
+        list_sql = list_sql.bindparams(bindparam("search", type_=NVARCHAR(255)))
+        count_sql = count_sql.bindparams(bindparam("search", type_=NVARCHAR(255)))
 
     rows = db.execute(list_sql, params).mappings().all()
     total = db.execute(count_sql, params).scalar() or 0
@@ -286,6 +326,9 @@ def insert_gallery(
             :activity_date, :created_by, 0, 1, :created_at, :updated_at
         )
         """
+    ).bindparams(
+        bindparam("gallery_name", type_=NVARCHAR(255)),
+        bindparam("description", type_=NVARCHAR(length=None)),
     )
     gallery_id = db.execute(
         sql,
@@ -351,6 +394,13 @@ def update_gallery(
         WHERE id = :gallery_id AND tenant_id = :tenant_id AND status = 1
         """
     )
+    unicode_binds = []
+    if "gallery_name" in updates:
+        unicode_binds.append(bindparam("gallery_name", type_=NVARCHAR(255)))
+    if "description" in updates:
+        unicode_binds.append(bindparam("description", type_=NVARCHAR(length=None)))
+    if unicode_binds:
+        sql = sql.bindparams(*unicode_binds)
     db.execute(sql, params)
     db.commit()
 
@@ -415,6 +465,9 @@ def insert_media(
             :file_path, :file_content, :file_size, :display_order, :uploaded_at, 1
         )
         """
+    ).bindparams(
+        bindparam("file_name", type_=NVARCHAR(255)),
+        bindparam("original_file_name", type_=NVARCHAR(255)),
     )
     media_id = db.execute(
         sql,
