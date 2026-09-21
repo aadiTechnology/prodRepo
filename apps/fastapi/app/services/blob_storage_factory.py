@@ -50,6 +50,7 @@ def extract_object_name(file_path: str) -> str | None:
     return get_storage_service().extract_blob_name(trimmed)
 
 
+
 def locate_object_provider(file_path: str) -> StorageProviderName | None:
     """
     Decide which provider hosts a stored object without trusting STORAGE_PROVIDER.
