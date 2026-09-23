@@ -426,6 +426,7 @@ def create_notification(
             body=msg,
             notification_id=int(master.id),
             module=module_key,
+            source_key=inbox_source_key,
         )
 
     return NotificationCreateResponse(
@@ -495,6 +496,7 @@ def _dispatch_fcm_push(
     body: str,
     notification_id: int,
     module: str,
+    source_key: Optional[str] = None,
 ) -> None:
     """Send FCM to active tokens for resolved recipients. Errors are logged only."""
     try:
@@ -537,6 +539,7 @@ def _dispatch_fcm_push(
             return
 
         fcm_service.log_firebase_status(reason=f"dispatch notification_id={notification_id}")
+        sk = (source_key or "").strip()
         success, failure, invalid = fcm_service.send_to_tokens(
             tokens=tokens,
             title=subject[:255],
@@ -545,6 +548,8 @@ def _dispatch_fcm_push(
                 "notification_id": str(notification_id),
                 "module": module or "general",
                 "type": "app_notification",
+                "source_key": sk[:120] if sk else "",
+                "path": "/fees/invoices" if sk.startswith("fee:") else "",
             },
         )
         logger.info(
@@ -617,6 +622,7 @@ def _to_response(row: UserNotification) -> NotificationResponse:
         is_read=bool(row.is_read),
         kind=kind,  # type: ignore[arg-type]
         entity_id=row.entity_id,
+        source_key=(row.source_key or None),
     )
 
 
@@ -1004,19 +1010,28 @@ def _build_fee_due_copy(
     due_date: date,
     event: str,
     days_before: int,
+    as_of: date | None = None,
 ) -> tuple[str, str]:
-    """Title/body for fee.reminder and fee.day."""
+    """Title/body for fee.reminder and fee.day (including overdue)."""
     amount_text = f"₹{due_amount:,.2f}"
     installment_label = (installment or "installment").strip() or "installment"
     name = (student_name or "Student").strip() or "Student"
     on_date = due_date.isoformat()
+    today = as_of or date.today()
 
     if event == "day":
-        title = f"Fee due today — {name}"
-        message = (
-            f"Fee of {amount_text} for {installment_label} is due today ({on_date}). "
-            "Please complete the payment to avoid overdue status."
-        )
+        if due_date < today:
+            title = f"Fee overdue — {name}"
+            message = (
+                f"Fee of {amount_text} for {installment_label} was due on {on_date} "
+                "and is still outstanding. Please complete the payment."
+            )
+        else:
+            title = f"Fee due today — {name}"
+            message = (
+                f"Fee of {amount_text} for {installment_label} is due today ({on_date}). "
+                "Please complete the payment to avoid overdue status."
+            )
         return title, message
 
     if days_before == 1:
@@ -1039,6 +1054,57 @@ def _fee_source_key(*, installment_id: int, event: str, event_day: date) -> str:
     return f"fee:{int(installment_id)}:{ev}:{event_day.isoformat()}"
 
 
+def _resolve_fee_reminder_recipient_user_ids(
+    db: Session,
+    *,
+    tenant_id: int,
+    student,
+) -> list[int]:
+    """Student login + linked parent login (by LeadParent email/phone)."""
+    from app.models.lead import LeadParent
+    from app.models.user import User
+    from app.services.homework_access import resolve_user_id_for_student
+    from sqlalchemy import or_
+
+    recipient_ids: set[int] = set()
+    student_user_id = resolve_user_id_for_student(db, student)
+    if student_user_id is not None:
+        recipient_ids.add(int(student_user_id))
+
+    parent_id = getattr(student, "parent_id", None)
+    if parent_id:
+        parent = (
+            db.query(LeadParent)
+            .filter(
+                LeadParent.id == int(parent_id),
+                LeadParent.tenant_id == tenant_id,
+                LeadParent.is_deleted == False,  # noqa: E712
+            )
+            .first()
+        )
+        if parent is not None:
+            identity_filters = []
+            if parent.email:
+                identity_filters.append(User.email.ilike(str(parent.email).strip()))
+            if parent.mobile_number:
+                identity_filters.append(User.phone_number == str(parent.mobile_number).strip())
+            if identity_filters:
+                parent_users = (
+                    db.query(User)
+                    .filter(
+                        User.tenant_id == tenant_id,
+                        User.is_deleted == False,  # noqa: E712
+                        User.is_active == True,  # noqa: E712
+                        or_(*identity_filters),
+                    )
+                    .all()
+                )
+                for u in parent_users:
+                    recipient_ids.add(int(u.id))
+
+    return sorted(recipient_ids)
+
+
 def _emit_scheduled_fee_due_event(
     db: Session,
     *,
@@ -1050,22 +1116,23 @@ def _emit_scheduled_fee_due_event(
     send_push: bool,
 ) -> int:
     """
-    Create one fee due reminder/day notification for the student login user.
+    Create fee due reminder/day notification for student (+ parent) login users.
 
     Returns number of newly created inbox rows (0 on skip/error).
     """
     from app.models.student import Student
-    from app.services.homework_access import resolve_user_id_for_student
 
     student_id = int(row["student_id"])
     installment_id = int(row["student_installment_id"])
+    actual_due = row.get("due_date") or event_day
     title, message = _build_fee_due_copy(
         student_name=str(row.get("student_name") or ""),
         installment=str(row.get("installment") or ""),
         due_amount=float(row.get("due_amount") or 0),
-        due_date=event_day,
+        due_date=actual_due,
         event=event,
         days_before=days_before,
+        as_of=event_day,
     )
     source_key = _fee_source_key(
         installment_id=installment_id, event=event, event_day=event_day
@@ -1083,25 +1150,33 @@ def _emit_scheduled_fee_due_event(
         if student is None:
             return 0
 
-        user_id = resolve_user_id_for_student(db, student)
-        if user_id is None:
+        eligible = _resolve_fee_reminder_recipient_user_ids(
+            db, tenant_id=tenant_id, student=student
+        )
+        if not eligible:
+            logger.info(
+                "Fee %s skipped — no student/parent login tenant=%s student_id=%s",
+                event,
+                tenant_id,
+                student_id,
+            )
             return 0
 
-        eligible = [int(user_id)]
         existing_before = repo.user_ids_already_having_source_key(
             db,
             tenant_id=tenant_id,
             user_ids=eligible,
             source_key=source_key,
         )
-        if int(user_id) in existing_before:
+        eligible = [u for u in eligible if int(u) not in existing_before]
+        if not eligible:
             return 0
 
         create_notification(
             db,
             tenant_id=tenant_id,
             from_="System",
-            to=str(user_id),
+            to=",".join(str(uid) for uid in eligible),
             subject=title,
             body=message,
             created_by=None,
@@ -1120,9 +1195,7 @@ def _emit_scheduled_fee_due_event(
             user_ids=eligible,
             source_key=source_key,
         )
-        created = len(
-            [u for u in eligible if int(u) in existing_after and int(u) not in existing_before]
-        )
+        created = len([u for u in eligible if int(u) in existing_after])
         return max(created, 0)
     except Exception:
         logger.exception(
@@ -1145,7 +1218,8 @@ def process_scheduled_fee_notifications(
     """
     Process due fee reminder and day events for active tenants.
 
-    Uses create_notification + fee:installment:event:date source_key for exactly-once.
+    Day: outstanding with due_date <= today (due today + overdue), once per day.
+    Reminder: outstanding with due_date == today + days_before.
     """
     from app.services import fee_service
     from app.services.homework_service import resolve_current_academic_year_id
@@ -1180,40 +1254,57 @@ def process_scheduled_fee_notifications(
             continue
 
         tenants_processed += 1
-        targets: list[tuple[str, date, int]] = []
-        if day_enabled:
-            targets.append(("day", today, 0))
-        if reminder_enabled:
-            targets.append(("reminder", today + timedelta(days=days_before), days_before))
 
-        for event, event_day, event_days_before in targets:
+        if day_enabled:
             try:
                 dues = fee_service.list_fee_dues_for_due_date(
                     db,
                     tenant_id=tid,
                     academic_year_id=int(academic_year_id),
-                    due_date=event_day,
+                    due_on_or_before=today,
                 )
             except Exception:
-                logger.exception(
-                    "Failed to list fee dues tenant=%s day=%s event=%s",
-                    tid,
-                    event_day,
-                    event,
-                )
-                continue
-
+                logger.exception("Failed to list fee day dues tenant=%s", tid)
+                dues = []
             for row in dues:
                 events_processed += 1
                 notifications_created += _emit_scheduled_fee_due_event(
                     db,
                     tenant_id=tid,
                     row=row,
-                    event=event,
-                    event_day=event_day,
-                    days_before=event_days_before,
+                    event="day",
+                    event_day=today,
+                    days_before=0,
                     send_push=push_enabled,
                 )
+
+        if reminder_enabled:
+            target = today + timedelta(days=days_before)
+            # Avoid double-sending when days_before=0 (same day as day event)
+            if not (day_enabled and target == today):
+                try:
+                    dues = fee_service.list_fee_dues_for_due_date(
+                        db,
+                        tenant_id=tid,
+                        academic_year_id=int(academic_year_id),
+                        due_date=target,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to list fee reminder dues tenant=%s day=%s", tid, target
+                    )
+                    dues = []
+                for row in dues:
+                    events_processed += 1
+                    notifications_created += _emit_scheduled_fee_due_event(
+                        db,
+                        tenant_id=tid,
+                        row=row,
+                        event="reminder",
+                        event_day=target,
+                        days_before=days_before,
+                        send_push=push_enabled,
+                    )
 
     logger.info(
         "Scheduled fee process as_of=%s tenants=%s events=%s created=%s",
@@ -1247,6 +1338,180 @@ def process_scheduled_notifications(
         notifications_created=holiday.notifications_created + fee.notifications_created,
         message="Scheduled notifications processed",
     )
+
+
+def _students_for_fee_materialize(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    email: str,
+    viewer_context: HomeworkViewerContext | None,
+) -> list:
+    """Students linked to the inbox viewer (student self or parent children)."""
+    from app.models.student import Student
+    from app.services.homework_access import (
+        _resolve_parent_students,
+        _resolve_student_record,
+    )
+
+    if viewer_context is None:
+        return []
+    if viewer_context.kind == "student":
+        student = _resolve_student_record(
+            db, tenant_id=tenant_id, user_id=user_id, email=email or ""
+        )
+        return [student] if student is not None else []
+    if viewer_context.kind == "parent":
+        return _resolve_parent_students(
+            db, tenant_id=tenant_id, user_id=user_id, email=email or ""
+        )
+    return []
+
+
+def _materialize_fee_due_events(
+    db: Session,
+    *,
+    tenant_id: int,
+    user_id: int,
+    today: date,
+    viewer_context: HomeworkViewerContext | None = None,
+    email: str = "",
+) -> None:
+    """
+    Lazy inbox materialization for fee due/reminder (student/parent viewers).
+
+    Does not send FCM — scheduler handles push. source_key prevents duplicates.
+    """
+    if viewer_context is None or viewer_context.kind not in ("student", "parent"):
+        return
+
+    from app.services import fee_service
+    from app.services.homework_service import resolve_current_academic_year_id
+
+    config = repo.get_or_create_schedule_config(db, tenant_id=tenant_id)
+    reminder_enabled = bool(getattr(config, "fee_reminder_enabled", True))
+    day_enabled = bool(getattr(config, "fee_day_enabled", True))
+    if not reminder_enabled and not day_enabled:
+        return
+
+    students = _students_for_fee_materialize(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        email=email,
+        viewer_context=viewer_context,
+    )
+    if not students:
+        return
+
+    academic_year_id = resolve_current_academic_year_id(db, tenant_id)
+    if academic_year_id is None:
+        return
+
+    student_ids = [int(s.id) for s in students if getattr(s, "id", None) is not None]
+    if not student_ids:
+        return
+
+    days_before = _clamp_days_before(getattr(config, "fee_reminder_days_before", 1))
+    candidates: List[UserNotification] = []
+    source_keys: List[str] = []
+
+    if day_enabled:
+        dues = fee_service.list_fee_dues_for_due_date(
+            db,
+            tenant_id=tenant_id,
+            academic_year_id=int(academic_year_id),
+            due_on_or_before=today,
+            student_ids=student_ids,
+        )
+        for row in dues:
+            installment_id = int(row["student_installment_id"])
+            key = _fee_source_key(
+                installment_id=installment_id, event="day", event_day=today
+            )
+            source_keys.append(key)
+            title, message = _build_fee_due_copy(
+                student_name=str(row.get("student_name") or ""),
+                installment=str(row.get("installment") or ""),
+                due_amount=float(row.get("due_amount") or 0),
+                due_date=row.get("due_date") or today,
+                event="day",
+                days_before=0,
+                as_of=today,
+            )
+            candidates.append(
+                UserNotification(
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    module="general",
+                    title=title,
+                    message=message,
+                    kind="day",
+                    is_read=False,
+                    source_key=key,
+                    entity_id=installment_id,
+                    created_at=datetime.utcnow(),
+                    created_by=None,
+                )
+            )
+
+    if reminder_enabled:
+        target = today + timedelta(days=days_before)
+        if not (day_enabled and target == today):
+            dues = fee_service.list_fee_dues_for_due_date(
+                db,
+                tenant_id=tenant_id,
+                academic_year_id=int(academic_year_id),
+                due_date=target,
+                student_ids=student_ids,
+            )
+            for row in dues:
+                installment_id = int(row["student_installment_id"])
+                key = _fee_source_key(
+                    installment_id=installment_id, event="reminder", event_day=target
+                )
+                source_keys.append(key)
+                title, message = _build_fee_due_copy(
+                    student_name=str(row.get("student_name") or ""),
+                    installment=str(row.get("installment") or ""),
+                    due_amount=float(row.get("due_amount") or 0),
+                    due_date=row.get("due_date") or target,
+                    event="reminder",
+                    days_before=days_before,
+                    as_of=today,
+                )
+                candidates.append(
+                    UserNotification(
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        module="general",
+                        title=title,
+                        message=message,
+                        kind="reminder",
+                        is_read=False,
+                        source_key=key,
+                        entity_id=installment_id,
+                        created_at=datetime.utcnow(),
+                        created_by=None,
+                    )
+                )
+
+    if not candidates:
+        return
+
+    existing = repo.existing_source_keys(
+        db, tenant_id=tenant_id, user_id=user_id, source_keys=source_keys
+    )
+    to_create = [c for c in candidates if c.source_key not in existing]
+    if to_create:
+        created, _ = repo.bulk_insert_notifications(db, rows=to_create)
+        logger.info(
+            "Materialized %s fee due notification(s) for user %s tenant %s",
+            created,
+            user_id,
+            tenant_id,
+        )
 
 
 def _materialize_holiday_exam_events(
@@ -1534,10 +1799,11 @@ def materialize_notifications(
     tenant_id: int,
     user_id: int,
     viewer_context: HomeworkViewerContext | None = None,
+    email: str = "",
 ) -> None:
     """
     Idempotently create inbox rows from real module data, scoped to the viewer's class.
-    Holiday/Exam: day + configurable reminder. Notice/Syllabus: recent published/created rows.
+    Holiday/Exam/Fee: day + configurable reminder. Notice/Syllabus: recent published/created rows.
     """
     today = date.today()
     try:
@@ -1545,6 +1811,21 @@ def materialize_notifications(
     except Exception:
         logger.exception(
             "Holiday/exam notification materialization failed for tenant=%s user=%s",
+            tenant_id,
+            user_id,
+        )
+    try:
+        _materialize_fee_due_events(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            today=today,
+            viewer_context=viewer_context,
+            email=email,
+        )
+    except Exception:
+        logger.exception(
+            "Fee due notification materialization failed for tenant=%s user=%s",
             tenant_id,
             user_id,
         )
@@ -1638,7 +1919,11 @@ def list_notifications(
         legacy_role=legacy_role,
     )
     materialize_notifications(
-        db, tenant_id=tid, user_id=user_id, viewer_context=viewer_context
+        db,
+        tenant_id=tid,
+        user_id=user_id,
+        viewer_context=viewer_context,
+        email=email,
     )
     enabled = _enabled_modules_from_settings(settings_row)
     rows, total = repo.list_notifications(
@@ -1676,7 +1961,11 @@ def get_unread_count(
         legacy_role=legacy_role,
     )
     materialize_notifications(
-        db, tenant_id=tid, user_id=user_id, viewer_context=viewer_context
+        db,
+        tenant_id=tid,
+        user_id=user_id,
+        viewer_context=viewer_context,
+        email=email,
     )
     enabled = _enabled_modules_from_settings(settings_row)
     count = repo.count_unread(

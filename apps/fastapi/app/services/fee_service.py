@@ -736,14 +736,19 @@ def list_fee_dues_for_due_date(
     *,
     tenant_id: int,
     academic_year_id: int,
-    due_date: date,
+    due_date: date | None = None,
+    due_on_or_before: date | None = None,
+    student_ids: list[int] | None = None,
 ) -> list[dict]:
     """
-    Outstanding installment rows whose due_date matches the given day.
+    Outstanding installment rows for reminder scheduling / materialization.
 
     Same due predicates as get_fee_due_list_v2 (invoice PARTIAL/PENDING, amount > 0).
-    Used by scheduled fee reminder / day notifications.
+    Pass either due_date (exact) or due_on_or_before (<= day, for due+overdue).
     """
+    if due_date is None and due_on_or_before is None:
+        return []
+
     payment_agg_sq = (
         db.query(
             FeePayment.tenant_id.label("tenant_id"),
@@ -765,7 +770,7 @@ def list_fee_dues_for_due_date(
         - func.coalesce(payment_agg_sq.c.paid_amount, 0)
     )
 
-    rows = (
+    query = (
         db.query(
             Student.id.label("student_id"),
             Student.student_name.label("student_name"),
@@ -825,14 +830,20 @@ def list_fee_dues_for_due_date(
             SchoolClass.tenant_id == tenant_id,
             Student.academic_year_id == academic_year_id,
             StudentFeeAssignment.academic_year_id == academic_year_id,
-            StudentFeeInstallment.due_date == due_date,
             StudentInvoice.id.isnot(None),
             func.upper(StudentInvoice.status).in_(["PARTIAL", "PENDING"]),
             due_amount_expr > 0,
         )
-        .order_by(Student.student_name.asc(), Student.id.asc())
-        .all()
     )
+
+    if due_date is not None:
+        query = query.filter(StudentFeeInstallment.due_date == due_date)
+    if due_on_or_before is not None:
+        query = query.filter(StudentFeeInstallment.due_date <= due_on_or_before)
+    if student_ids:
+        query = query.filter(Student.id.in_([int(s) for s in student_ids]))
+
+    rows = query.order_by(Student.student_name.asc(), Student.id.asc()).all()
 
     return [
         {

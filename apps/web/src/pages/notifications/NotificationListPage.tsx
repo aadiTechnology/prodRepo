@@ -8,7 +8,7 @@ import { ListPageLayout } from "../../components/reusable";
 import { IconButton } from "../../components/primitives";
 import { useNotifications } from "./NotificationContext";
 import {
-  NOTIFICATION_MODULE_PATHS,
+  resolveNotificationDeepLink,
 } from "./notifications.mock";
 import type { AppNotification } from "./notification.types";
 import NotificationItem from "./components/NotificationItem";
@@ -86,7 +86,7 @@ export default function NotificationListPage() {
     } else {
       await markAsRead(notification.id);
     }
-    navigate(NOTIFICATION_MODULE_PATHS[notification.module]);
+    navigate(resolveNotificationDeepLink(notification));
   };
 
   return (

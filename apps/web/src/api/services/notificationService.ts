@@ -20,6 +20,7 @@ export type NotificationApiItem = {
   is_read: boolean;
   kind: "reminder" | "day" | "general";
   entity_id?: number | null;
+  source_key?: string | null;
 };
 
 export type NotificationListApiResponse = {
@@ -48,6 +49,8 @@ function mapNotification(item: NotificationApiItem): AppNotification {
         : new Date(item.created_at as unknown as string).toISOString(),
     isRead: Boolean(item.is_read),
     kind: item.kind || "general",
+    entityId: item.entity_id ?? null,
+    sourceKey: item.source_key ?? null,
   };
 }
 

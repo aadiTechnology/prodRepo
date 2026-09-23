@@ -13,6 +13,8 @@ export type AppNotification = {
   createdAt: string;
   isRead: boolean;
   kind: NotificationKind;
+  entityId?: number | null;
+  sourceKey?: string | null;
 };
 
 export type NotificationModuleSettings = Record<NotificationModule, boolean>;

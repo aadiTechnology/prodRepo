@@ -18,7 +18,10 @@
  */
 import { isNativePlatform, getCapacitorPlatform } from "../utils/capacitor";
 import type { NotificationModule } from "../pages/notifications/notification.types";
-import { NOTIFICATION_MODULE_PATHS } from "../pages/notifications/notifications.mock";
+import {
+  NOTIFICATION_MODULE_PATHS,
+  resolveNotificationDeepLink,
+} from "../pages/notifications/notifications.mock";
 
 /** Time to wait for FCM/APNs registration before giving up. */
 const REGISTRATION_TIMEOUT_MS = 30_000;
@@ -143,20 +146,48 @@ export type PushNavigationClient = {
 };
 
 /**
- * Map FCM `data.module` to an in-app route using existing NOTIFICATION_MODULE_PATHS.
- * Unknown / missing module → `/notifications` (general).
+ * Map FCM `data` to an in-app route.
+ * Prefer explicit `path`, then fee source_key / title heuristics, then module map.
  */
-export function resolveNotificationModulePath(module: unknown): string {
+export function resolveNotificationModulePath(
+  module: unknown,
+  data?: Record<string, unknown> | null,
+): string {
+  const explicitPath =
+    typeof data?.path === "string" ? data.path.trim() : "";
+  if (explicitPath.startsWith("/")) {
+    return explicitPath;
+  }
+
+  const sourceKey =
+    typeof data?.source_key === "string"
+      ? data.source_key
+      : typeof data?.sourceKey === "string"
+        ? data.sourceKey
+        : "";
+  const title =
+    typeof data?.title === "string"
+      ? data.title
+      : typeof data?.subject === "string"
+        ? data.subject
+        : "";
+
   const raw =
     typeof module === "string"
       ? module.trim().toLowerCase()
       : module != null
         ? String(module).trim().toLowerCase()
         : "";
-  if (raw && Object.prototype.hasOwnProperty.call(NOTIFICATION_MODULE_PATHS, raw)) {
-    return NOTIFICATION_MODULE_PATHS[raw as NotificationModule];
-  }
-  return NOTIFICATION_MODULE_PATHS.general;
+  const mod: NotificationModule =
+    raw && Object.prototype.hasOwnProperty.call(NOTIFICATION_MODULE_PATHS, raw)
+      ? (raw as NotificationModule)
+      : "general";
+
+  return resolveNotificationDeepLink({
+    module: mod,
+    title,
+    sourceKey,
+  });
 }
 
 /**
@@ -310,7 +341,7 @@ export function requestNotificationNavigation(path: string): void {
 function handleNotificationActionPerformed(action: ActionPerformed): void {
   const data = normalizeNotificationData(action.notification?.data);
   const module = extractModuleFromNotificationData(data);
-  const path = resolveNotificationModulePath(module);
+  const path = resolveNotificationModulePath(module, data);
 
   console.log("[PushNotifications] Notification action performed:", {
     actionId: action.actionId,

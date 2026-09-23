@@ -57,6 +57,7 @@ class NotificationResponse(BaseModel):
     is_read: bool
     kind: NotificationKind = "general"
     entity_id: Optional[int] = None
+    source_key: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
