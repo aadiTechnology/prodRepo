@@ -1,6 +1,6 @@
 /**
- * Tenant-admin configuration for Holiday / Exam reminder and day notifications.
- * Both modules share one card component rendered from MODULE_SECTIONS JSON config.
+ * Tenant-admin configuration for Holiday / Exam / Fee reminder and day notifications.
+ * Modules share one card component rendered from MODULE_SECTIONS JSON config.
  * UI layout only; data/API behavior unchanged.
  */
 import { useCallback, useEffect, useState, type ElementType, type ReactNode } from "react";
@@ -8,6 +8,7 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import BeachAccessIcon from "@mui/icons-material/BeachAccess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import {
   Accordion,
@@ -42,6 +43,7 @@ const DEFAULT_MODULE: ScheduleModuleConfig = {
 const DEFAULT_CONFIG: NotificationScheduleConfig = {
   holiday: { ...DEFAULT_MODULE },
   exam: { ...DEFAULT_MODULE },
+  fee: { ...DEFAULT_MODULE },
 };
 
 const DAYS_OPTIONS = Array.from({ length: 31 }, (_, i) => i);
@@ -53,7 +55,7 @@ const SWITCH_SX = {
   minWidth: 100,
 } as const;
 
-type ModuleKey = "holiday" | "exam";
+type ModuleKey = "holiday" | "exam" | "fee";
 
 /** Shared panel metadata (JSON-style schema for both modules). */
 type PanelDef = {
@@ -88,7 +90,7 @@ type ModuleSectionDef = {
 };
 
 /**
- * Single source of truth for Holiday + Exam cards.
+ * Single source of truth for Holiday + Exam + Fee cards.
  * Page maps this array — no duplicated card markup per module.
  */
 const MODULE_SECTIONS: ModuleSectionDef[] = [
@@ -135,6 +137,32 @@ const MODULE_SECTIONS: ModuleSectionDef[] = [
         id: "push",
         primary: "Push notification",
         secondary: "Send to user's device",
+      },
+      {
+        id: "inApp",
+        primary: "In-app notification",
+        secondary: "Store in the in-app inbox",
+        alwaysOn: true,
+      },
+    ],
+  },
+  {
+    key: "fee",
+    title: "Fee due notifications",
+    description: "Remind students about upcoming and due fee installments.",
+    headerIcon: PaymentsOutlinedIcon,
+    headerIconBg: (t) => alpha(t.palette.warning.main, 0.12),
+    headerIconColor: (t) => t.palette.warning.dark,
+    reminderSecondary: "Fee due reminder",
+    dayPrimary: "On due date",
+    daySecondary: "Fee due day notification",
+    dayHelper: "On the fee due date",
+    panels: SHARED_PANELS,
+    deliveryRows: [
+      {
+        id: "push",
+        primary: "Push notification",
+        secondary: "Send to student's device",
       },
       {
         id: "inApp",
@@ -594,7 +622,7 @@ export default function NotificationScheduleConfigPage() {
           links={[
             { title: "Basic Configuration", path: "/configuration" },
             {
-              title: "Holiday / Exam reminders",
+              title: "Notification schedule",
               path: "/academics/configuration/notification-schedule",
             },
           ]}

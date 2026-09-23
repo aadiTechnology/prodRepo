@@ -1,4 +1,4 @@
-"""In-process scheduler for holiday/exam reminder and day notifications.
+"""In-process scheduler for holiday/exam/fee reminder and day notifications.
 
 Uses asyncio only (no Celery/Redis). Started from FastAPI startup when enabled.
 """
@@ -17,7 +17,7 @@ _scheduler_task: Optional[asyncio.Task] = None
 
 
 async def _run_once() -> None:
-    """Open a DB session and process due holiday/exam scheduled notifications."""
+    """Open a DB session and process due holiday/exam/fee scheduled notifications."""
     from app.core.database import SessionLocal
     from app.services import notification_service
 
@@ -25,7 +25,7 @@ async def _run_once() -> None:
     try:
         result = await asyncio.get_event_loop().run_in_executor(
             None,
-            lambda: notification_service.process_scheduled_holiday_exam_notifications(db),
+            lambda: notification_service.process_scheduled_notifications(db),
         )
         logger.info(
             "Notification scheduler run complete tenants=%s events=%s created=%s",

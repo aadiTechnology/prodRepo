@@ -99,7 +99,7 @@ class NotificationSettingsUpdateRequest(BaseModel):
 
 
 class ScheduleModuleConfig(BaseModel):
-    """Admin config for one of Holiday / Exam scheduled notifications."""
+    """Admin config for one of Holiday / Exam / Fee scheduled notifications."""
 
     reminder_enabled: bool = True
     reminder_days_before: int = Field(default=1, ge=0, le=30)
@@ -108,15 +108,17 @@ class ScheduleModuleConfig(BaseModel):
 
 
 class NotificationScheduleConfigResponse(BaseModel):
-    """Tenant admin schedule configuration (holiday.reminder|day, exam.reminder|day)."""
+    """Tenant admin schedule configuration (holiday/exam/fee reminder|day)."""
 
     holiday: ScheduleModuleConfig = Field(default_factory=ScheduleModuleConfig)
     exam: ScheduleModuleConfig = Field(default_factory=ScheduleModuleConfig)
+    fee: ScheduleModuleConfig = Field(default_factory=ScheduleModuleConfig)
 
 
 class NotificationScheduleConfigUpdateRequest(BaseModel):
     holiday: Optional[ScheduleModuleConfig] = None
     exam: Optional[ScheduleModuleConfig] = None
+    fee: Optional[ScheduleModuleConfig] = None
 
 
 class NotificationScheduleProcessResponse(BaseModel):

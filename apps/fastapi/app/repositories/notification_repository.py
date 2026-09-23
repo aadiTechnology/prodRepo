@@ -605,6 +605,10 @@ def get_or_create_schedule_config(
         exam_reminder_days_before=1,
         exam_day_enabled=True,
         exam_push_enabled=True,
+        fee_reminder_enabled=True,
+        fee_reminder_days_before=1,
+        fee_day_enabled=True,
+        fee_push_enabled=True,
         created_at=datetime.utcnow(),
         created_by=created_by,
     )
@@ -633,6 +637,10 @@ def update_schedule_config(
     exam_reminder_days_before: Optional[int] = None,
     exam_day_enabled: Optional[bool] = None,
     exam_push_enabled: Optional[bool] = None,
+    fee_reminder_enabled: Optional[bool] = None,
+    fee_reminder_days_before: Optional[int] = None,
+    fee_day_enabled: Optional[bool] = None,
+    fee_push_enabled: Optional[bool] = None,
     updated_by: Optional[int] = None,
 ) -> TenantNotificationScheduleConfig:
     if holiday_reminder_enabled is not None:
@@ -651,6 +659,14 @@ def update_schedule_config(
         row.exam_day_enabled = exam_day_enabled
     if exam_push_enabled is not None:
         row.exam_push_enabled = exam_push_enabled
+    if fee_reminder_enabled is not None:
+        row.fee_reminder_enabled = fee_reminder_enabled
+    if fee_reminder_days_before is not None:
+        row.fee_reminder_days_before = int(fee_reminder_days_before)
+    if fee_day_enabled is not None:
+        row.fee_day_enabled = fee_day_enabled
+    if fee_push_enabled is not None:
+        row.fee_push_enabled = fee_push_enabled
     row.updated_at = datetime.utcnow()
     row.updated_by = updated_by
     db.commit()

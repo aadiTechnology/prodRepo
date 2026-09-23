@@ -129,7 +129,7 @@ const notificationService = {
     return res.data;
   },
 
-  /** Tenant admin: holiday/exam reminder + day schedule configuration. */
+  /** Tenant admin: holiday/exam/fee reminder + day schedule configuration. */
   getScheduleConfig: async (): Promise<NotificationScheduleConfig> => {
     const res = await apiClient.get<NotificationScheduleConfigApi>(`${BASE}/admin/schedule-config`);
     return mapScheduleConfig(res.data);
@@ -145,7 +145,7 @@ const notificationService = {
     return mapScheduleConfig(res.data);
   },
 
-  /** Tenant admin: run scheduled holiday/exam processing now (idempotent). */
+  /** Tenant admin: run scheduled holiday/exam/fee processing now (idempotent). */
   processScheduled: async (): Promise<{
     tenantsProcessed: number;
     eventsProcessed: number;
@@ -178,11 +178,13 @@ export type ScheduleModuleConfig = {
 export type NotificationScheduleConfig = {
   holiday: ScheduleModuleConfig;
   exam: ScheduleModuleConfig;
+  fee: ScheduleModuleConfig;
 };
 
 type NotificationScheduleConfigApi = {
   holiday: ScheduleModuleConfig;
   exam: ScheduleModuleConfig;
+  fee?: ScheduleModuleConfig;
 };
 
 function mapScheduleConfig(data: NotificationScheduleConfigApi): NotificationScheduleConfig {
@@ -198,6 +200,7 @@ function mapScheduleConfig(data: NotificationScheduleConfigApi): NotificationSch
   return {
     holiday: mapModule(data?.holiday),
     exam: mapModule(data?.exam),
+    fee: mapModule(data?.fee),
   };
 }
 

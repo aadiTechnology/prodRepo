@@ -156,7 +156,7 @@ def get_schedule_config(
     db: Session = Depends(get_db),
     current_user: Any = Depends(require_admin),
 ):
-    """Tenant admin: Holiday/Exam reminder and day notification configuration."""
+    """Tenant admin: Holiday/Exam/Fee reminder and day notification configuration."""
     return notification_service.get_schedule_config(
         db,
         tenant_id=current_user.tenant_id,
@@ -172,7 +172,7 @@ def update_schedule_config(
     db: Session = Depends(get_db),
     current_user: Any = Depends(require_admin),
 ):
-    """Tenant admin: update Holiday/Exam scheduled notification configuration."""
+    """Tenant admin: update Holiday/Exam/Fee scheduled notification configuration."""
     return notification_service.update_schedule_config(
         db,
         tenant_id=current_user.tenant_id,
@@ -190,7 +190,7 @@ def process_scheduled_notifications(
     current_user: Any = Depends(require_admin),
 ):
     """
-    Manually run holiday/exam scheduled processing for the current tenant.
+    Manually run holiday/exam/fee scheduled processing for the current tenant.
 
     Idempotent via source_key. Useful for validation without waiting for the loop.
     """
@@ -202,7 +202,7 @@ def process_scheduled_notifications(
             notifications_created=0,
             message="Tenant context required",
         )
-    return notification_service.process_scheduled_holiday_exam_notifications(
+    return notification_service.process_scheduled_notifications(
         db,
         tenant_ids=[int(tid)],
     )

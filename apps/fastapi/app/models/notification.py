@@ -98,10 +98,11 @@ class UserNotificationSettings(Base):
 
 class TenantNotificationScheduleConfig(Base):
     """
-    Per-tenant admin config for scheduled Holiday/Exam reminder and day notifications.
+    Per-tenant admin config for scheduled Holiday/Exam/Fee reminder and day notifications.
 
-    Supported events only:
-      holiday.reminder, holiday.day, exam.reminder, exam.day
+    Supported events:
+      holiday.reminder, holiday.day, exam.reminder, exam.day,
+      fee.reminder, fee.day
     """
 
     __tablename__ = "tenant_notification_schedule_config"
@@ -115,6 +116,10 @@ class TenantNotificationScheduleConfig(Base):
     exam_reminder_days_before = Column(Integer, nullable=False, default=1)
     exam_day_enabled = Column(Boolean, nullable=False, default=True)
     exam_push_enabled = Column(Boolean, nullable=False, default=True)
+    fee_reminder_enabled = Column(Boolean, nullable=False, default=True)
+    fee_reminder_days_before = Column(Integer, nullable=False, default=1)
+    fee_day_enabled = Column(Boolean, nullable=False, default=True)
+    fee_push_enabled = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_by = Column(Integer, nullable=True)
     updated_at = Column(DateTime, nullable=True)

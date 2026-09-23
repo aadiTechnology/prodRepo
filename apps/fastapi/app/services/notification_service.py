@@ -628,10 +628,13 @@ def _is_exam_holiday(holiday: Holiday) -> bool:
 
 
 def _module_schedule_push_enabled(db: Session, *, tenant_id: int, module: str) -> bool:
-    """Tenant admin schedule Push toggle for holiday/exam (in-app is independent)."""
+    """Tenant admin schedule Push toggle for holiday/exam/fee (in-app is independent)."""
     config = repo.get_or_create_schedule_config(db, tenant_id=tenant_id)
-    if (module or "").strip().lower() == "exam":
+    mod = (module or "").strip().lower()
+    if mod == "exam":
         return bool(config.exam_push_enabled)
+    if mod == "fee":
+        return bool(getattr(config, "fee_push_enabled", True))
     return bool(config.holiday_push_enabled)
 
 
@@ -689,6 +692,14 @@ def _schedule_config_to_response(row) -> NotificationScheduleConfigResponse:
             day_enabled=bool(row.exam_day_enabled),
             push_enabled=bool(row.exam_push_enabled),
         ),
+        fee=ScheduleModuleConfig(
+            reminder_enabled=bool(getattr(row, "fee_reminder_enabled", True)),
+            reminder_days_before=_clamp_days_before(
+                getattr(row, "fee_reminder_days_before", 1)
+            ),
+            day_enabled=bool(getattr(row, "fee_day_enabled", True)),
+            push_enabled=bool(getattr(row, "fee_push_enabled", True)),
+        ),
     )
 
 
@@ -710,8 +721,8 @@ def update_schedule_config(
     updated_by: Optional[int] = None,
 ) -> NotificationScheduleConfigResponse:
     tid = _require_tenant(tenant_id)
-    if payload.holiday is None and payload.exam is None:
-        raise ValidationException("At least one of holiday or exam config is required")
+    if payload.holiday is None and payload.exam is None and payload.fee is None:
+        raise ValidationException("At least one of holiday, exam, or fee config is required")
 
     row = repo.get_or_create_schedule_config(db, tenant_id=tid, created_by=updated_by)
     kwargs: dict = {"updated_by": updated_by}
@@ -730,6 +741,13 @@ def update_schedule_config(
             exam_reminder_days_before=_clamp_days_before(payload.exam.reminder_days_before),
             exam_day_enabled=payload.exam.day_enabled,
             exam_push_enabled=payload.exam.push_enabled,
+        )
+    if payload.fee is not None:
+        kwargs.update(
+            fee_reminder_enabled=payload.fee.reminder_enabled,
+            fee_reminder_days_before=_clamp_days_before(payload.fee.reminder_days_before),
+            fee_day_enabled=payload.fee.day_enabled,
+            fee_push_enabled=payload.fee.push_enabled,
         )
     updated = repo.update_schedule_config(db, row=row, **kwargs)
     return _schedule_config_to_response(updated)
@@ -974,6 +992,259 @@ def process_scheduled_holiday_exam_notifications(
         tenants_processed=tenants_processed,
         events_processed=events_processed,
         notifications_created=notifications_created,
+        message="Scheduled notifications processed",
+    )
+
+
+def _build_fee_due_copy(
+    *,
+    student_name: str,
+    installment: str,
+    due_amount: float,
+    due_date: date,
+    event: str,
+    days_before: int,
+) -> tuple[str, str]:
+    """Title/body for fee.reminder and fee.day."""
+    amount_text = f"₹{due_amount:,.2f}"
+    installment_label = (installment or "installment").strip() or "installment"
+    name = (student_name or "Student").strip() or "Student"
+    on_date = due_date.isoformat()
+
+    if event == "day":
+        title = f"Fee due today — {name}"
+        message = (
+            f"Fee of {amount_text} for {installment_label} is due today ({on_date}). "
+            "Please complete the payment to avoid overdue status."
+        )
+        return title, message
+
+    if days_before == 1:
+        when = "tomorrow"
+    else:
+        when = f"in {days_before} day{'s' if days_before != 1 else ''}"
+    title = f"Fee reminder — {name}"
+    message = (
+        f"Fee of {amount_text} for {installment_label} is due on {on_date} ({when}). "
+        "Please arrange payment before the due date."
+    )
+    return title, message
+
+
+def _fee_source_key(*, installment_id: int, event: str, event_day: date) -> str:
+    """Stable fee schedule source_key (module stays general for inbox settings)."""
+    ev = (event or "reminder").strip().lower()
+    if ev not in ("day", "reminder"):
+        ev = "reminder"
+    return f"fee:{int(installment_id)}:{ev}:{event_day.isoformat()}"
+
+
+def _emit_scheduled_fee_due_event(
+    db: Session,
+    *,
+    tenant_id: int,
+    row: dict,
+    event: str,
+    event_day: date,
+    days_before: int,
+    send_push: bool,
+) -> int:
+    """
+    Create one fee due reminder/day notification for the student login user.
+
+    Returns number of newly created inbox rows (0 on skip/error).
+    """
+    from app.models.student import Student
+    from app.services.homework_access import resolve_user_id_for_student
+
+    student_id = int(row["student_id"])
+    installment_id = int(row["student_installment_id"])
+    title, message = _build_fee_due_copy(
+        student_name=str(row.get("student_name") or ""),
+        installment=str(row.get("installment") or ""),
+        due_amount=float(row.get("due_amount") or 0),
+        due_date=event_day,
+        event=event,
+        days_before=days_before,
+    )
+    source_key = _fee_source_key(
+        installment_id=installment_id, event=event, event_day=event_day
+    )
+
+    try:
+        student = (
+            db.query(Student)
+            .filter(
+                Student.id == student_id,
+                Student.tenant_id == tenant_id,
+            )
+            .first()
+        )
+        if student is None:
+            return 0
+
+        user_id = resolve_user_id_for_student(db, student)
+        if user_id is None:
+            return 0
+
+        eligible = [int(user_id)]
+        existing_before = repo.user_ids_already_having_source_key(
+            db,
+            tenant_id=tenant_id,
+            user_ids=eligible,
+            source_key=source_key,
+        )
+        if int(user_id) in existing_before:
+            return 0
+
+        create_notification(
+            db,
+            tenant_id=tenant_id,
+            from_="System",
+            to=str(user_id),
+            subject=title,
+            body=message,
+            created_by=None,
+            module="general",
+            entity_id=installment_id,
+            source_key=source_key,
+            event=event,
+            kind=event,
+            send_push=send_push,
+            recipient_user_ids=eligible,
+            filter_user_module_settings=False,
+        )
+        existing_after = repo.user_ids_already_having_source_key(
+            db,
+            tenant_id=tenant_id,
+            user_ids=eligible,
+            source_key=source_key,
+        )
+        created = len(
+            [u for u in eligible if int(u) in existing_after and int(u) not in existing_before]
+        )
+        return max(created, 0)
+    except Exception:
+        logger.exception(
+            "Scheduled fee.%s failed tenant=%s student_id=%s installment_id=%s day=%s",
+            event,
+            tenant_id,
+            student_id,
+            installment_id,
+            event_day,
+        )
+        return 0
+
+
+def process_scheduled_fee_notifications(
+    db: Session,
+    *,
+    as_of: Optional[date] = None,
+    tenant_ids: Optional[Sequence[int]] = None,
+) -> NotificationScheduleProcessResponse:
+    """
+    Process due fee reminder and day events for active tenants.
+
+    Uses create_notification + fee:installment:event:date source_key for exactly-once.
+    """
+    from app.services import fee_service
+    from app.services.homework_service import resolve_current_academic_year_id
+
+    today = as_of or date.today()
+    ids = list(tenant_ids) if tenant_ids is not None else repo.list_active_tenant_ids(db)
+    tenants_processed = 0
+    events_processed = 0
+    notifications_created = 0
+
+    for tenant_id in ids:
+        tid = int(tenant_id)
+        try:
+            config = repo.get_or_create_schedule_config(db, tenant_id=tid)
+        except Exception:
+            logger.exception("Failed to load schedule config for tenant=%s", tid)
+            continue
+
+        reminder_enabled = bool(getattr(config, "fee_reminder_enabled", True))
+        day_enabled = bool(getattr(config, "fee_day_enabled", True))
+        push_enabled = bool(getattr(config, "fee_push_enabled", True))
+        days_before = _clamp_days_before(getattr(config, "fee_reminder_days_before", 1))
+
+        if not reminder_enabled and not day_enabled:
+            tenants_processed += 1
+            continue
+
+        academic_year_id = resolve_current_academic_year_id(db, tid)
+        if academic_year_id is None:
+            logger.warning("Skipping fee schedule for tenant=%s — no academic year", tid)
+            tenants_processed += 1
+            continue
+
+        tenants_processed += 1
+        targets: list[tuple[str, date, int]] = []
+        if day_enabled:
+            targets.append(("day", today, 0))
+        if reminder_enabled:
+            targets.append(("reminder", today + timedelta(days=days_before), days_before))
+
+        for event, event_day, event_days_before in targets:
+            try:
+                dues = fee_service.list_fee_dues_for_due_date(
+                    db,
+                    tenant_id=tid,
+                    academic_year_id=int(academic_year_id),
+                    due_date=event_day,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to list fee dues tenant=%s day=%s event=%s",
+                    tid,
+                    event_day,
+                    event,
+                )
+                continue
+
+            for row in dues:
+                events_processed += 1
+                notifications_created += _emit_scheduled_fee_due_event(
+                    db,
+                    tenant_id=tid,
+                    row=row,
+                    event=event,
+                    event_day=event_day,
+                    days_before=event_days_before,
+                    send_push=push_enabled,
+                )
+
+    logger.info(
+        "Scheduled fee process as_of=%s tenants=%s events=%s created=%s",
+        today.isoformat(),
+        tenants_processed,
+        events_processed,
+        notifications_created,
+    )
+    return NotificationScheduleProcessResponse(
+        tenants_processed=tenants_processed,
+        events_processed=events_processed,
+        notifications_created=notifications_created,
+        message="Scheduled fee notifications processed",
+    )
+
+
+def process_scheduled_notifications(
+    db: Session,
+    *,
+    as_of: Optional[date] = None,
+    tenant_ids: Optional[Sequence[int]] = None,
+) -> NotificationScheduleProcessResponse:
+    """Run holiday/exam and fee scheduled processors; aggregate counts."""
+    holiday = process_scheduled_holiday_exam_notifications(
+        db, as_of=as_of, tenant_ids=tenant_ids
+    )
+    fee = process_scheduled_fee_notifications(db, as_of=as_of, tenant_ids=tenant_ids)
+    return NotificationScheduleProcessResponse(
+        tenants_processed=max(holiday.tenants_processed, fee.tenants_processed),
+        events_processed=holiday.events_processed + fee.events_processed,
+        notifications_created=holiday.notifications_created + fee.notifications_created,
         message="Scheduled notifications processed",
     )
 
