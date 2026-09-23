@@ -327,6 +327,10 @@ class EnrollmentService:
                     student.admission_no or student.student_code or str(student.id),
                     taken,
                 )
+                if user_email and normalize_email(student.email or "") != normalize_email(user_email):
+                    student.email = user_email
+                    self.db.commit()
+                    self.db.refresh(student)
                 user_create = UserCreate(
                     email=user_email,
                     full_name=student.student_name,

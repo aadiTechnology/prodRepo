@@ -947,14 +947,8 @@ def _build_student_dashboard(
     current_user: CurrentUser,
     role_str: str,
 ) -> DashboardResponse:
-    student = (
-        db.query(Student)
-        .filter(Student.tenant_id == tenant_id)
-        .filter(Student.email == current_user.email)
-        .filter(Student.is_active == True)
-        .first()
-    )
-    if not student:
+    student = profile_image_service._resolve_student_for_user(db, current_user.id)
+    if not student or student.tenant_id != tenant_id or not student.is_active:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Active student profile not found for this account.",
