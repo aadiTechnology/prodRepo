@@ -9,6 +9,12 @@ export interface StudentDropdownItem {
 }
 
 
+export interface StudentFeeInstallmentDetail {
+  installment_no: number;
+  amount: number;
+  due_date?: string | null;
+}
+
 export interface StudentDetails {
   id: string;
   name: string;
@@ -32,6 +38,9 @@ export interface StudentDetails {
   fee_structure_name?: string;
   discount_id?: number;
   discount_name?: string;
+  fee_final_amount?: number;
+  fee_total_amount?: number;
+  fee_installments?: StudentFeeInstallmentDetail[];
   is_active?: boolean;
   parent_name?: string;
   parent_mobile?: string;
@@ -127,6 +136,17 @@ const studentService = {
       fee_structure_name: d.fee_structure_name,
       discount_id: d.discount_id,
       discount_name: d.discount_name,
+      fee_final_amount:
+        d.fee_final_amount != null ? Number(d.fee_final_amount) : undefined,
+      fee_total_amount:
+        d.fee_total_amount != null ? Number(d.fee_total_amount) : undefined,
+      fee_installments: Array.isArray(d.fee_installments)
+        ? d.fee_installments.map((row: any, index: number) => ({
+            installment_no: Number(row.installment_no || index + 1),
+            amount: Number(row.amount || 0),
+            due_date: row.due_date ?? null,
+          }))
+        : undefined,
       is_active: d.is_active,
       parent_name: d.parent_name,
       parent_mobile: d.parent_mobile,

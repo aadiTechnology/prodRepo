@@ -1,8 +1,13 @@
-from typing import Optional
-from pydantic import EmailStr
-from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 # --- StudentDetailResponse for GET by ID ---
+class StudentFeeInstallmentDetail(BaseModel):
+    installment_no: int
+    amount: float
+    due_date: Optional[str] = None
+
+
 class StudentDetailResponse(BaseModel):
     id: str
     name: str
@@ -26,6 +31,9 @@ class StudentDetailResponse(BaseModel):
     fee_structure_name: Optional[str] = None
     discount_id: Optional[int] = None
     discount_name: Optional[str] = None
+    fee_final_amount: Optional[float] = None
+    fee_total_amount: Optional[float] = None
+    fee_installments: Optional[List[StudentFeeInstallmentDetail]] = None
     is_active: Optional[bool] = None
     parent_id: Optional[int] = None
     parent_name: Optional[str] = None
@@ -36,9 +44,6 @@ class StudentDetailResponse(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
-
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
-from typing import Optional, List, Dict, Any
 
 # --- Add ParentCreateRequest before StudentUpdateRequest ---
 class ParentCreateRequest(BaseModel):

@@ -48,11 +48,11 @@ def _split_installment_amounts(total: float, count: int) -> list[float]:
     return amounts
 
 
+def _is_custom_fee_structure(structure: FeeStructure) -> bool:
+    return str(getattr(structure, "installment_type", None) or "").strip().upper() == "CUSTOM"
+
+
 def apply_category_total_to_structure(db: Session, tenant_id: int, structure: FeeStructure) -> tuple[float, list]:
-    ids = _structure_category_ids(structure)
-    total = _sum_category_amounts(db, tenant_id, ids) if ids else float(structure.total_amount or 0)
-    if ids:
-        structure.total_amount = total
     installments = (
         db.query(FeeInstallment)
         .filter(
@@ -62,10 +62,46 @@ def apply_category_total_to_structure(db: Session, tenant_id: int, structure: Fe
         .order_by(FeeInstallment.installment_number, FeeInstallment.id)
         .all()
     )
+    # Student-customized plans store their own totals/installments — never overwrite
+    # them with the academic-year fee category amount.
+    if _is_custom_fee_structure(structure):
+        return float(structure.total_amount or 0), installments
+
+    ids = _structure_category_ids(structure)
+    total = _sum_category_amounts(db, tenant_id, ids) if ids else float(structure.total_amount or 0)
+    if ids:
+        structure.total_amount = total
     amounts = _split_installment_amounts(float(total or 0), len(installments))
     for inst, amount in zip(installments, amounts):
         inst.amount = amount
     return float(total or 0), installments
+
+
+def resolve_fee_structure_display_amounts(
+    db: Session, tenant_id: int, structure: FeeStructure
+) -> tuple[float, list]:
+    """Amounts for API list/detail. Preserves student-custom plans (incl. legacy rows)."""
+    installments = (
+        db.query(FeeInstallment)
+        .filter(
+            FeeInstallment.fee_structure_id == structure.id,
+            FeeInstallment.is_deleted == False,  # noqa: E712
+        )
+        .order_by(FeeInstallment.installment_number, FeeInstallment.id)
+        .all()
+    )
+    if _is_custom_fee_structure(structure):
+        return float(structure.total_amount or 0), installments
+
+    ids = _structure_category_ids(structure)
+    if ids:
+        category_total = _sum_category_amounts(db, tenant_id, ids)
+        stored_total = float(structure.total_amount or 0)
+        # Legacy customize-fee plans copied category FKs but kept a different total.
+        if abs(stored_total - category_total) > 0.05:
+            return stored_total, installments
+
+    return apply_category_total_to_structure(db, tenant_id, structure)
 
 
 def _sync_fee_structure_totals_for_category(db: Session, tenant_id: int, category_id: str) -> None:
@@ -83,8 +119,17 @@ def _sync_fee_structure_totals_for_category(db: Session, tenant_id: int, categor
         .all()
     )
     for structure in structures:
+        if _is_custom_fee_structure(structure):
+            continue
         ids = _structure_category_ids(structure)
         if category_id not in ids:
+            continue
+        category_total = _sum_category_amounts(db, tenant_id, ids)
+        stored_total = float(structure.total_amount or 0)
+        # Legacy student-custom plans diverge from category totals — protect them.
+        if abs(stored_total - category_total) > 0.05:
+            structure.installment_type = "CUSTOM"
+            structure.updated_at = datetime.utcnow()
             continue
         apply_category_total_to_structure(db, tenant_id, structure)
         structure.updated_at = datetime.utcnow()
@@ -516,6 +561,16 @@ def get_fee_due_list_v2(
 
         today = date.today()
 
+        latest_assignment_sq = (
+            db.query(
+                StudentFeeAssignment.student_id.label("sid"),
+                func.max(StudentFeeAssignment.id).label("latest_id"),
+            )
+            .filter(StudentFeeAssignment.academic_year_id == academic_year_id)
+            .group_by(StudentFeeAssignment.student_id)
+            .subquery()
+        )
+
         payment_agg_sq = (
             db.query(
                 FeePayment.tenant_id.label("tenant_id"),
@@ -549,6 +604,13 @@ def get_fee_due_list_v2(
             .join(
                 StudentFeeAssignment,
                 StudentFeeAssignment.student_id == Student.id,
+            )
+            .join(
+                latest_assignment_sq,
+                and_(
+                    latest_assignment_sq.c.sid == Student.id,
+                    StudentFeeAssignment.id == latest_assignment_sq.c.latest_id,
+                ),
             )
             .join(
                 StudentFeeInstallment,
@@ -628,6 +690,13 @@ def get_fee_due_list_v2(
             )
             .select_from(Student)
             .join(StudentFeeAssignment, StudentFeeAssignment.student_id == Student.id)
+            .join(
+                latest_assignment_sq,
+                and_(
+                    latest_assignment_sq.c.sid == Student.id,
+                    StudentFeeAssignment.id == latest_assignment_sq.c.latest_id,
+                ),
+            )
             .join(StudentFeeInstallment, StudentFeeInstallment.assignment_id == StudentFeeAssignment.id)
             .outerjoin(
                 FeeInstallment,
@@ -770,6 +839,16 @@ def list_fee_dues_for_due_date(
         - func.coalesce(payment_agg_sq.c.paid_amount, 0)
     )
 
+    latest_assignment_sq = (
+        db.query(
+            StudentFeeAssignment.student_id.label("sid"),
+            func.max(StudentFeeAssignment.id).label("latest_id"),
+        )
+        .filter(StudentFeeAssignment.academic_year_id == academic_year_id)
+        .group_by(StudentFeeAssignment.student_id)
+        .subquery()
+    )
+
     query = (
         db.query(
             Student.id.label("student_id"),
@@ -786,6 +865,13 @@ def list_fee_dues_for_due_date(
         .join(
             StudentFeeAssignment,
             StudentFeeAssignment.student_id == Student.id,
+        )
+        .join(
+            latest_assignment_sq,
+            and_(
+                latest_assignment_sq.c.sid == Student.id,
+                StudentFeeAssignment.id == latest_assignment_sq.c.latest_id,
+            ),
         )
         .join(
             StudentFeeInstallment,

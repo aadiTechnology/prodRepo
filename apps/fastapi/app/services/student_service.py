@@ -1,5 +1,5 @@
 from app.models.student import Student
-from app.models.student_fee_assignment import StudentFeeAssignment
+from app.models.student_fee_assignment import StudentFeeAssignment, StudentFeeInstallment
 from app.models.academic import AcademicYear, SchoolClass, ClassDivision
 from app.models.fee import FeeStructure
 from app.models.fee_discount import FeeDiscount
@@ -196,8 +196,18 @@ class StudentService:
             .order_by(StudentFeeAssignment.id.desc())
             .first()
         )
-        effective_academic_year_id = student.academic_year_id or (latest_assignment.academic_year_id if latest_assignment else None)
-        effective_fee_structure_id = student.fee_structure_id or (latest_assignment.fee_structure_id if latest_assignment else None)
+        # Prefer the latest fee assignment so Customize Fee edits (new assignment /
+        # custom structure) show up on reload instead of the original enroll plan.
+        effective_academic_year_id = (
+            latest_assignment.academic_year_id
+            if latest_assignment and latest_assignment.academic_year_id
+            else student.academic_year_id
+        )
+        effective_fee_structure_id = (
+            latest_assignment.fee_structure_id
+            if latest_assignment and latest_assignment.fee_structure_id
+            else student.fee_structure_id
+        )
         effective_discount_id = latest_assignment.discount_id if latest_assignment else None
 
         academic_year_name = None
@@ -223,6 +233,26 @@ class StudentService:
         if effective_discount_id:
             disc = self.db.query(FeeDiscount).filter(FeeDiscount.id == effective_discount_id).first()
             discount_name = disc.discount_name if disc else None
+        fee_final_amount = None
+        fee_total_amount = None
+        fee_installments = None
+        if latest_assignment:
+            fee_final_amount = float(latest_assignment.final_amount or 0)
+            fee_total_amount = float(latest_assignment.total_amount or fee_final_amount or 0)
+            assignment_rows = (
+                self.db.query(StudentFeeInstallment)
+                .filter(StudentFeeInstallment.assignment_id == latest_assignment.id)
+                .order_by(StudentFeeInstallment.installment_no, StudentFeeInstallment.id)
+                .all()
+            )
+            fee_installments = [
+                {
+                    "installment_no": int(row.installment_no or index + 1),
+                    "amount": float(row.amount or 0),
+                    "due_date": row.due_date.isoformat() if getattr(row, "due_date", None) else None,
+                }
+                for index, row in enumerate(assignment_rows)
+            ]
         dob = student.date_of_birth
         if dob is not None and not isinstance(dob, str):
             dob = dob.isoformat()
@@ -257,6 +287,9 @@ class StudentService:
             fee_structure_name=fee_structure_name,
             discount_id=effective_discount_id,
             discount_name=discount_name,
+            fee_final_amount=fee_final_amount,
+            fee_total_amount=fee_total_amount,
+            fee_installments=fee_installments,
             is_active=student.is_active,
             parent_id=student.parent_id,
             parent_name=parent_name,

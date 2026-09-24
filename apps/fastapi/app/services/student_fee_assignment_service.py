@@ -200,7 +200,9 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
                 multi_category_ids=fee_structure.multi_category_ids,
                 academic_year_id=fee_structure.academic_year_id,
                 total_amount=final_amount,
-                installment_type=fee_structure.installment_type or "CUSTOM",
+                # Always CUSTOM so category-total sync never overwrites this student's amounts
+                # with the academic-year fee category total.
+                installment_type="CUSTOM",
                 num_installments=len(custom_installments),
                 description=None,
                 name=custom_name,
@@ -232,6 +234,11 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
             status="Pending",
         )
         db.add(assignment)
+        # Keep student record aligned with the active assignment so edit/view
+        # reload shows the customized (or newly selected) fee plan amounts.
+        student.fee_structure_id = assignment_fee_structure_id
+        if payload.academic_year_id:
+            student.academic_year_id = payload.academic_year_id
         db.flush()
         # Details
         for d in details:
@@ -268,7 +275,7 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
                     amount=discounted_amount,
                     status="Pending",
                 ))
-        # Create FeeLedger if not exists
+        # Create or refresh FeeLedger for this academic year
         from app.models.student_fee_ledger import FeeLedger
         existing_ledger = db.query(FeeLedger).filter(
             FeeLedger.student_id == payload.student_id,
@@ -285,6 +292,10 @@ def assign_fee_to_student(db: Session, payload: StudentFeeAssignmentCreate, auto
                 total_balance=total_amount
             )
             db.add(new_ledger)
+        else:
+            paid = float(existing_ledger.total_paid or 0)
+            existing_ledger.total_fee = total_amount
+            existing_ledger.total_balance = max(0.0, float(total_amount) - paid)
         db.flush()
         assignment_installments = db.query(StudentFeeInstallment).filter(StudentFeeInstallment.assignment_id == assignment.id).all()
         from app.services.invoice_service import create_invoices_for_enrolled_student

@@ -5,12 +5,13 @@ from decimal import Decimal
 import re
 
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.core.exceptions import ConflictException, NotFoundException, ValidationException
 from app.models.academic import AcademicYear, ClassDivision, SchoolClass
 from app.models.fee import FeeInstallment, FeeStructure
 from app.models.student import Student
-from app.models.student_fee_assignment import StudentFeeAssignment, StudentFeeDetail
+from app.models.student_fee_assignment import StudentFeeAssignment, StudentFeeDetail, StudentFeeInstallment
 from app.repositories import invoice_repository
 from app.services.invoice_access import (
     assert_invoice_row_access,
@@ -45,6 +46,109 @@ def _calc_status(*, total_amount: Decimal, paid_amount: Decimal, due_date: date)
     if due_date < today:
         return "Overdue"
     return "Pending"
+
+
+def sync_invoices_from_latest_assignment(
+    db: Session,
+    *,
+    student_id: int,
+    tenant_id: int | None = None,
+) -> bool:
+    """
+    Align student_invoices with the latest fee assignment installments.
+    Used after Customize Fee and to repair Fee List / Fee Details drift.
+    """
+    student_q = db.query(Student).filter(Student.id == int(student_id))
+    if tenant_id is not None:
+        student_q = student_q.filter(Student.tenant_id == int(tenant_id))
+    student = student_q.first()
+    if not student:
+        return False
+
+    latest = (
+        db.query(StudentFeeAssignment)
+        .filter(StudentFeeAssignment.student_id == student.id)
+        .order_by(StudentFeeAssignment.id.desc())
+        .first()
+    )
+    if not latest or not latest.fee_structure_id or not latest.academic_year_id:
+        return False
+
+    installments = (
+        db.query(StudentFeeInstallment)
+        .filter(StudentFeeInstallment.assignment_id == latest.id)
+        .order_by(StudentFeeInstallment.installment_no, StudentFeeInstallment.id)
+        .all()
+    )
+    if not installments:
+        return False
+
+    invoice_sum = (
+        db.query(func.coalesce(func.sum(invoice_repository.StudentInvoice.total_amount), 0))
+        .filter(
+            invoice_repository.StudentInvoice.tenant_id == student.tenant_id,
+            invoice_repository.StudentInvoice.student_id == student.id,
+            invoice_repository.StudentInvoice.academic_year_id == latest.academic_year_id,
+        )
+        .scalar()
+    )
+    target = float(latest.final_amount or 0)
+    if abs(float(invoice_sum or 0) - target) < 0.05:
+        # Also repair when installment count differs even if totals match.
+        invoice_count = (
+            db.query(func.count(invoice_repository.StudentInvoice.id))
+            .filter(
+                invoice_repository.StudentInvoice.tenant_id == student.tenant_id,
+                invoice_repository.StudentInvoice.student_id == student.id,
+                invoice_repository.StudentInvoice.academic_year_id == latest.academic_year_id,
+                invoice_repository.StudentInvoice.total_amount > 0,
+            )
+            .scalar()
+        )
+        if int(invoice_count or 0) == len(installments):
+            return False
+
+    create_invoices_for_enrolled_student(
+        db,
+        student=student,
+        academic_year_id=int(latest.academic_year_id),
+        fee_structure_id=int(latest.fee_structure_id),
+        assignment_installments=installments,
+    )
+    return True
+
+
+def repair_stale_fee_list_invoices(
+    db: Session,
+    *,
+    tenant_id: int,
+    academic_year_id: int | None = None,
+    student_id: int | None = None,
+) -> int:
+    """Sync invoices for students whose Fee List totals drifted from latest assignment."""
+    q = (
+        db.query(StudentFeeAssignment.student_id, StudentFeeAssignment.id)
+        .join(Student, Student.id == StudentFeeAssignment.student_id)
+        .filter(Student.tenant_id == tenant_id)
+    )
+    if academic_year_id is not None:
+        q = q.filter(StudentFeeAssignment.academic_year_id == academic_year_id)
+    if student_id is not None:
+        q = q.filter(StudentFeeAssignment.student_id == int(student_id))
+
+    latest_by_student: dict[int, int] = {}
+    for sid, aid in q.order_by(StudentFeeAssignment.id.desc()).all():
+        sid_i = int(sid)
+        if sid_i not in latest_by_student:
+            latest_by_student[sid_i] = int(aid)
+
+    repaired = 0
+    for sid in latest_by_student:
+        if sync_invoices_from_latest_assignment(db, student_id=sid, tenant_id=tenant_id):
+            repaired += 1
+    if repaired:
+        db.commit()
+    return repaired
 
 
 def _to_invoice_response(row: dict) -> InvoiceResponse:
@@ -148,6 +252,14 @@ def list_invoices(
         if int(student_id) not in scoped_student_ids:
             return InvoiceListResponse(items=[], total=0, page=page, size=size)
 
+    # Repair Fee List totals that still show old amounts after Customize Fee.
+    repair_stale_fee_list_invoices(
+        db,
+        tenant_id=tenant_id,
+        academic_year_id=academic_year_id,
+        student_id=int(student_id) if student_id is not None else None,
+    )
+
     rows, total = invoice_repository.list_invoices(
         db,
         tenant_id=tenant_id,
@@ -206,6 +318,17 @@ def get_invoice_detail(
     invoice_row = invoice_repository.get_invoice_by_id(db, tenant_id=tenant_id, invoice_id=invoice_id)
     if not invoice_row:
         raise NotFoundException("StudentInvoice", invoice_id)
+
+    # Keep Fee Details aligned with the student's latest customized / assigned fee.
+    if sync_invoices_from_latest_assignment(
+        db,
+        student_id=int(invoice_row["student_id"]),
+        tenant_id=tenant_id,
+    ):
+        db.commit()
+        invoice_row = invoice_repository.get_invoice_by_id(db, tenant_id=tenant_id, invoice_id=invoice_id)
+        if not invoice_row:
+            raise NotFoundException("StudentInvoice", invoice_id)
 
     scoped_student_ids = None
     if user_id is not None and email is not None:
@@ -692,17 +815,6 @@ def create_invoices_for_enrolled_student(
 ) -> None:
     if not assignment_installments or not getattr(student, "class_id", None):
         return
-    existing = (
-        db.query(invoice_repository.StudentInvoice.id)
-        .filter(
-            invoice_repository.StudentInvoice.tenant_id == student.tenant_id,
-            invoice_repository.StudentInvoice.student_id == student.id,
-            invoice_repository.StudentInvoice.academic_year_id == academic_year_id,
-        )
-        .first()
-    )
-    if existing:
-        return
 
     structure_installments = (
         db.query(FeeInstallment)
@@ -713,17 +825,115 @@ def create_invoices_for_enrolled_student(
         .all()
     )
     by_number = {int(inst.installment_number): inst for inst in structure_installments}
-    next_seq = _next_invoice_sequence(db)
     today = date.today()
-    for index, inst in enumerate(assignment_installments):
-        template = by_number.get(int(inst.installment_no or index + 1))
-        amount = float(inst.amount or 0)
-        due = inst.due_date or today
+
+    existing_invoices = (
+        db.query(invoice_repository.StudentInvoice)
+        .filter(
+            invoice_repository.StudentInvoice.tenant_id == student.tenant_id,
+            invoice_repository.StudentInvoice.student_id == student.id,
+            invoice_repository.StudentInvoice.academic_year_id == academic_year_id,
+        )
+        .order_by(
+            invoice_repository.StudentInvoice.due_date.asc(),
+            invoice_repository.StudentInvoice.id.asc(),
+        )
+        .all()
+    )
+
+    def _label_for(index: int, installment_no: int, template: FeeInstallment | None) -> str:
         label = (
             (template.description or "").strip()
             if template
-            else f"Installment {int(inst.installment_no or index + 1)}"
-        ) or f"Installment {int(inst.installment_no or index + 1)}"
+            else f"Installment {installment_no}"
+        )
+        return label or f"Installment {installment_no}"
+
+    def _status_for(total: float, paid: float, due: date) -> str:
+        return _calc_status(
+            total_amount=Decimal(str(total)),
+            paid_amount=Decimal(str(paid)),
+            due_date=due if isinstance(due, date) else today,
+        )
+
+    if existing_invoices:
+        # Reassign / Customize Fee: refresh invoice amounts so Fee List shows new totals.
+        used_invoice_ids: set[int] = set()
+        for index, inst in enumerate(assignment_installments):
+            installment_no = int(getattr(inst, "installment_no", None) or index + 1)
+            template = by_number.get(installment_no)
+            amount = max(0.0, round(float(getattr(inst, "amount", 0) or 0), 2))
+            due = getattr(inst, "due_date", None) or today
+            label = _label_for(index, installment_no, template)
+            fee_installment_id = int(template.id) if template else None
+
+            matched = None
+            for inv in existing_invoices:
+                if inv.id in used_invoice_ids:
+                    continue
+                inv_label = str(inv.installment or "").strip().lower()
+                if inv_label == label.lower() or inv_label == f"installment {installment_no}":
+                    matched = inv
+                    break
+            if matched is None:
+                for inv in existing_invoices:
+                    if inv.id not in used_invoice_ids:
+                        matched = inv
+                        break
+
+            if matched is not None:
+                used_invoice_ids.add(int(matched.id))
+                paid = float(matched.paid_amount or 0)
+                # Never reduce total below already-paid amount.
+                new_total = max(amount, paid)
+                matched.fee_structure_id = fee_structure_id
+                matched.fee_installment_id = fee_installment_id
+                matched.total_amount = new_total
+                matched.due_amount = max(0.0, round(new_total - paid, 2))
+                matched.due_date = due
+                matched.installment = label
+                if getattr(student, "class_id", None):
+                    matched.class_id = int(student.class_id)
+                matched.status = _status_for(new_total, paid, due)
+            else:
+                next_seq = _next_invoice_sequence(db)
+                invoice_repository.insert_invoice(
+                    db,
+                    tenant_id=int(student.tenant_id),
+                    student_id=int(student.id),
+                    academic_year_id=academic_year_id,
+                    class_id=int(student.class_id),
+                    fee_structure_id=fee_structure_id,
+                    invoice_no=_format_invoice_no(next_seq),
+                    total_amount=amount,
+                    paid_amount=0,
+                    due_amount=amount,
+                    due_date=due,
+                    status=_status_for(amount, 0.0, due),
+                    fee_installment_id=fee_installment_id,
+                    installment=label,
+                )
+
+        # Unpaid invoices that no longer map to an installment should not keep old dues.
+        for inv in existing_invoices:
+            if inv.id in used_invoice_ids:
+                continue
+            paid = float(inv.paid_amount or 0)
+            if paid > 0:
+                continue
+            inv.total_amount = 0
+            inv.due_amount = 0
+            inv.status = "Paid"
+            inv.fee_structure_id = fee_structure_id
+        return
+
+    next_seq = _next_invoice_sequence(db)
+    for index, inst in enumerate(assignment_installments):
+        installment_no = int(getattr(inst, "installment_no", None) or index + 1)
+        template = by_number.get(installment_no)
+        amount = max(0.0, round(float(getattr(inst, "amount", 0) or 0), 2))
+        due = getattr(inst, "due_date", None) or today
+        label = _label_for(index, installment_no, template)
         invoice_repository.insert_invoice(
             db,
             tenant_id=int(student.tenant_id),
@@ -736,7 +946,7 @@ def create_invoices_for_enrolled_student(
             paid_amount=0,
             due_amount=amount,
             due_date=due,
-            status="Pending",
+            status=_status_for(amount, 0.0, due),
             fee_installment_id=int(template.id) if template else None,
             installment=label,
         )

@@ -139,7 +139,9 @@ app.include_router(academic.router)
 app.include_router(academic_year.router)
 app.include_router(class_router.router)
 app.include_router(class_fee_structure_assignment.router)
-app.include_router(student_fee_assignment.router)
+# Mount under /api before student CRUD so /assign-fee and /dropdown are not
+# captured as /api/students/{student_id} (which only allows GET/PUT/DELETE).
+app.include_router(student_fee_assignment.router, prefix="/api")
 from app.routers import student
 app.include_router(student.router, prefix="/api")
 app.include_router(teacher_router.router, prefix="/api")

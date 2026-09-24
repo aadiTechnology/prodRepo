@@ -797,10 +797,10 @@ export default function EnrollmentPage() {
       fee_structure_id: enrollmentPayload.fee_structure_id,
       discount_id: enrollmentPayload.discount_id ?? undefined,
       additional_fee: enrollmentPayload.additional_fee ?? undefined,
-      custom_annual_amount: enrollmentPayload.custom_annual_amount,
-      custom_discount_amount: enrollmentPayload.custom_discount_amount,
+      custom_annual_amount: enrollmentPayload.custom_annual_amount ?? undefined,
+      custom_discount_amount: enrollmentPayload.custom_discount_amount ?? undefined,
       custom_installments: enrollmentPayload.custom_installments,
-      custom_fee_plan_name: enrollmentPayload.custom_fee_plan_name,
+      custom_fee_plan_name: enrollmentPayload.custom_fee_plan_name ?? undefined,
     };
   };
 
@@ -858,7 +858,7 @@ export default function EnrollmentPage() {
           is_active: formData.is_active,
         });
         if (
-          hasFeeChangesForEdit() &&
+          (hasFeeChangesForEdit() || feeScheduleMode === "customized") &&
           formData.academic_year_id &&
           formData.academic_year_id !== VIEW_FALLBACK_VALUES.academicYear &&
           hasEditableFeeStructureId()
@@ -1032,14 +1032,54 @@ export default function EnrollmentPage() {
     () => feePlans.find((item) => item.id === Number(formData.fee_structure_id)) || null,
     [feePlans, formData.fee_structure_id]
   );
-  const selectedPlanInstallments = useMemo(
-    () => selectedFeePlan?.installments || [],
-    [selectedFeePlan]
-  );
+
+  // Prefer the student's saved fee assignment amounts over the year fee-plan list.
+  // Customize Fee creates a student schedule whose totals can differ from category totals.
+  const assignmentFeeOverride = useMemo(() => {
+    if ((!isEditMode && !isViewMode) || !studentRecord) return null;
+    if (!studentRecord.fee_structure_id) return null;
+    if (Number(formData.fee_structure_id) !== Number(studentRecord.fee_structure_id)) return null;
+    const rows = studentRecord.fee_installments || [];
+    const finalAmount =
+      studentRecord.fee_final_amount != null
+        ? Number(studentRecord.fee_final_amount)
+        : rows.length
+          ? rows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+          : null;
+    if (finalAmount == null || !Number.isFinite(finalAmount)) return null;
+    const totalAmount =
+      studentRecord.fee_total_amount != null
+        ? Number(studentRecord.fee_total_amount)
+        : finalAmount;
+    return {
+      total: totalAmount,
+      finalAmount,
+      installments: rows.map((row, index) => ({
+        installment_number: Number(row.installment_no || index + 1),
+        amount: Number(row.amount || 0),
+        due_date: row.due_date ?? null,
+      })),
+    };
+  }, [isEditMode, isViewMode, studentRecord, formData.fee_structure_id]);
+
+  const selectedPlanInstallments = useMemo(() => {
+    if (assignmentFeeOverride?.installments?.length) {
+      return assignmentFeeOverride.installments;
+    }
+    return selectedFeePlan?.installments || [];
+  }, [assignmentFeeOverride, selectedFeePlan]);
   const selectedInstallmentCount =
     selectedFeePlan?.num_installments || selectedPlanInstallments.length;
 
   const feePreview = useMemo(() => {
+    if (assignmentFeeOverride) {
+      // Assignment amounts are already the student's payable schedule.
+      return {
+        total: assignmentFeeOverride.finalAmount,
+        discountAmount: 0,
+        finalAmount: assignmentFeeOverride.finalAmount,
+      };
+    }
     const total = Number(selectedFeePlan?.total_amount || 0);
     const { discountAmount, finalAmount } = computeDiscountForBase(
       total,
@@ -1047,13 +1087,16 @@ export default function EnrollmentPage() {
       discountById
     );
     return { total, discountAmount, finalAmount };
-  }, [discountById, selectedFeePlan, formData.discount_id]);
+  }, [assignmentFeeOverride, discountById, selectedFeePlan, formData.discount_id]);
 
   const configuredInstallments = useMemo(
     () => mapPlanInstallments(selectedPlanInstallments),
     [selectedPlanInstallments]
   );
   const discountedConfiguredInstallments = useMemo(() => {
+    if (assignmentFeeOverride?.installments?.length) {
+      return configuredInstallments;
+    }
     if (!configuredInstallments.length) return configuredInstallments;
     const planTotal =
       installmentDraftTotal(configuredInstallments) || feePreview.total || 0;
@@ -1062,7 +1105,12 @@ export default function EnrollmentPage() {
       planTotal,
       feePreview.finalAmount
     );
-  }, [configuredInstallments, feePreview.finalAmount, feePreview.total]);
+  }, [
+    assignmentFeeOverride,
+    configuredInstallments,
+    feePreview.finalAmount,
+    feePreview.total,
+  ]);
   const displayedAnnual =
     savedCustomFee && feeScheduleMode !== "configured" ? savedCustomFee.annual : feePreview.total;
   const displayedDiscount =
@@ -1508,9 +1556,16 @@ export default function EnrollmentPage() {
         render: (ctx) => <FormSectionLabel title="Fee Details" icon={<PaymentsIcon />} sx={sectionTitleSx} />,
       });
       if (feeScheduleMode !== "configured") {
+        const feePlanField = config.fields.fee_structure_id;
         config.fields.fee_structure_id = {
-          ...config.fields.fee_structure_id,
+          name: "fee_structure_id",
+          label: feePlanField?.label || "Fee Plan",
           type: "custom",
+          required: feePlanField?.required,
+          placeholder: feePlanField?.placeholder,
+          props: feePlanField?.props,
+          helperText: feePlanField?.helperText,
+          conditionalRender: feePlanField?.conditionalRender,
           render: () => (
             <TextFieldInput
               label="Fee Plan"
@@ -1693,6 +1748,7 @@ export default function EnrollmentPage() {
               {canCustomizeFee ? (
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mt: 2 }}>
                   <Button
+                    type="button"
                     variant={feeScheduleMode === "configured" ? "contained" : "outlined"}
                     onClick={useConfiguredFeePlan}
                   >
@@ -1700,15 +1756,16 @@ export default function EnrollmentPage() {
                   </Button>
                   {feeScheduleMode === "customizing" ? (
                     <>
-                      <Button variant="outlined" startIcon={<AddIcon />} onClick={addCustomInstallment}>
+                      <Button type="button" variant="outlined" startIcon={<AddIcon />} onClick={addCustomInstallment}>
                         Add Installment
                       </Button>
-                      <Button variant="contained" onClick={saveCustomizedFeePlan}>
+                      <Button type="button" variant="contained" onClick={saveCustomizedFeePlan}>
                         Save Customized Plan
                       </Button>
                     </>
                   ) : (
                     <Button
+                      type="button"
                       variant={feeScheduleMode === "customized" ? "contained" : "outlined"}
                       onClick={startCustomizeFeePlan}
                     >
