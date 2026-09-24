@@ -1,5 +1,5 @@
 import { alpha } from "@mui/material";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -21,10 +21,22 @@ import {
 import DownloadIcon from "@mui/icons-material/Download";
 import ShareIcon from "@mui/icons-material/Share";
 import PrintIcon from "@mui/icons-material/Print";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
+import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
+import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
+import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import { PageHeader } from "../../components/layout";
 import { HeaderIconAction, ListPageLayout } from "../../components/reusable";
 import { useAuth } from "../../context/AuthContext";
 import { colorTokens } from "../../tokens/colors";
+import { radiusTokens } from "../../tokens/radius";
+import { elevationSemantic } from "../../tokens/elevation";
+import { typographyTokens } from "../../tokens/typography";
 import {
   getFeeReceiptDetail,
   getInvoiceReceiptDetail,
@@ -52,6 +64,113 @@ function tenantAddressLines(tenant: {
   const last = [cityState, pin].filter(Boolean).join(" ");
   if (last) lines.push(last);
   return lines;
+}
+
+function SectionIcon({
+  icon,
+  color = colorTokens.preschool.turquoise.main,
+  bg,
+}: {
+  icon: ReactNode;
+  color?: string;
+  bg?: string;
+}) {
+  return (
+    <Box
+      sx={{
+        width: 32,
+        height: 32,
+        borderRadius: "50%",
+        display: "grid",
+        placeItems: "center",
+        flexShrink: 0,
+        bgcolor: bg ?? alpha(color, 0.14),
+        color,
+      }}
+    >
+      {icon}
+    </Box>
+  );
+}
+
+function DetailRow({ label, value, valueSx }: { label: string; value: ReactNode; valueSx?: object }) {
+  return (
+    <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ py: 0.55 }}>
+      <Typography
+        sx={{
+          minWidth: { xs: 118, sm: 148 },
+          color: colorTokens.text.secondary,
+          fontSize: typographyTokens.fontSize.sm,
+          fontWeight: typographyTokens.fontWeight.medium,
+          pt: 0.15,
+        }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          color: colorTokens.gray[500],
+          fontSize: typographyTokens.fontSize.sm,
+          pt: 0.15,
+        }}
+      >
+        :
+      </Typography>
+      <Box sx={{ flex: 1, minWidth: 0, ...valueSx }}>{value}</Box>
+    </Stack>
+  );
+}
+
+function MetaRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <Stack
+      direction="row"
+      spacing={1.5}
+      alignItems="center"
+      sx={{
+        px: 1.75,
+        py: 1.35,
+        borderRadius: `${radiusTokens.xl}px`,
+        bgcolor: alpha(colorTokens.preschool.turquoise.light, 0.12),
+        border: `1px solid ${alpha(colorTokens.preschool.turquoise.main, 0.16)}`,
+      }}
+    >
+      <SectionIcon icon={icon} />
+      <Box sx={{ minWidth: 0 }}>
+        <Typography
+          sx={{
+            fontSize: typographyTokens.fontSize.xs,
+            color: colorTokens.text.secondary,
+            fontWeight: typographyTokens.fontWeight.medium,
+            letterSpacing: typographyTokens.letterSpacing.wide,
+            textTransform: "uppercase",
+            mb: 0.15,
+          }}
+        >
+          {label}
+        </Typography>
+        <Typography
+          sx={{
+            fontWeight: typographyTokens.fontWeight.bold,
+            color: colorTokens.gray[800],
+            fontSize: typographyTokens.fontSize.base,
+            lineHeight: typographyTokens.lineHeight.snug,
+            wordBreak: "break-word",
+          }}
+        >
+          {value}
+        </Typography>
+      </Box>
+    </Stack>
+  );
 }
 
 export default function ReceiptPage() {
@@ -134,7 +253,8 @@ export default function ReceiptPage() {
     return Number.isNaN(parsed.getTime()) ? "N/A" : parsed.toLocaleDateString("en-GB");
   }, [receipt?.payment_date]);
   const tenantLogo = user?.tenant?.logo_url || null;
-  const printableTitle = isInvoiceScope ? "Payment Receipt (Full)" : "Payment Receipt";
+  const schoolName = user?.tenant?.name || "School";
+  const printableTitle = isInvoiceScope ? "Payment Receipt (Full)" : "Fee Receipt";
   const receiptActionButtonSx = {
     background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
     color: colorTokens.primary.contrast,
@@ -148,6 +268,9 @@ export default function ReceiptPage() {
       boxShadow: `0 12px 20px ${alpha(colorTokens.preschool.turquoise.main, 0.35)}`,
     },
   };
+
+  const tableBorder = `1px solid ${colorTokens.border.default}`;
+  const tableHeadBorder = `1px solid ${alpha(colorTokens.preschool.turquoise.main, 0.22)}`;
 
   const clearSelectionForPrint = useCallback(() => {
     try {
@@ -358,31 +481,106 @@ export default function ReceiptPage() {
       <GlobalStyles
         styles={{
           "@media print": {
+            "@page": {
+              size: "A4",
+              margin: "8mm",
+            },
+            html: {
+              background: `${colorTokens.surface.card} !important`,
+            },
+            body: {
+              background: `${colorTokens.surface.card} !important`,
+              margin: "0 !important",
+              padding: "0 !important",
+              WebkitPrintColorAdjust: "exact",
+              printColorAdjust: "exact",
+            },
             "body *": { visibility: "hidden" },
-            ".receipt-print-area, .receipt-print-area *": { visibility: "visible" },
+            ".receipt-print-area, .receipt-print-area *": {
+              visibility: "visible",
+              WebkitPrintColorAdjust: "exact !important",
+              printColorAdjust: "exact !important",
+            },
             ".receipt-print-area": {
-              position: "absolute",
-              left: 0,
-              top: 0,
-              width: "100%",
-              padding: 0,
-              margin: 0,
+              position: "absolute !important",
+              left: "0 !important",
+              top: "0 !important",
+              right: "0 !important",
+              width: "100% !important",
+              maxWidth: "none !important",
+              margin: "0 !important",
+              padding: "28px !important",
+              boxShadow: "none !important",
+              borderRadius: `${radiusTokens["2xl"]}px !important`,
+              border: `1px solid ${colorTokens.border.default} !important`,
+              backgroundColor: `${colorTokens.surface.card} !important`,
+              overflow: "visible !important",
+            },
+            ".receipt-print-area *": {
+              boxShadow: "none !important",
+            },
+            /* Lock desktop layout — print page width is below MUI md breakpoint */
+            ".receipt-print-header": {
+              flexDirection: "row !important",
+              alignItems: "flex-start !important",
+            },
+            ".receipt-print-title": {
+              textAlign: "center !important",
+              alignSelf: "center !important",
+            },
+            ".receipt-print-title > .MuiTypography-root:first-of-type": {
+              fontSize: `${typographyTokens.fontSize["3xl"]}px !important`,
+            },
+            ".receipt-print-title-row": {
+              justifyContent: "center !important",
+            },
+            ".receipt-print-admit-wrap": {
+              justifyContent: "flex-end !important",
+            },
+            ".receipt-print-student-meta": {
+              display: "grid !important",
+              gridTemplateColumns: "1.45fr 1fr !important",
+            },
+            ".receipt-print-footer": {
+              display: "grid !important",
+              gridTemplateColumns: "1.2fr 1fr 1fr !important",
+            },
+            ".receipt-print-thanks": {
+              textAlign: "right !important",
             },
             ".receipt-no-print": { display: "none !important" },
           },
         }}
       />
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: { xs: 1.5, md: 2.5 }, bgcolor: colorTokens.background.default }}>
         <Paper
           ref={receiptRef}
           component="div"
           className="receipt-print-area"
+          elevation={0}
           sx={{
             bgcolor: colorTokens.surface.card,
             color: colorTokens.text.primary,
-            borderRadius: 0.5,
-            p: { xs: 1.25, md: 2 },
-            border: `1px solid ${colorTokens.border.strong}`,
+            borderRadius: `${radiusTokens["2xl"]}px`,
+            p: { xs: 2, sm: 2.5, md: 3.5 },
+            border: `1px solid ${colorTokens.border.default}`,
+            boxShadow: elevationSemantic.card,
+            width: "100%",
+            overflow: "hidden",
+            position: "relative",
+            WebkitPrintColorAdjust: "exact",
+            printColorAdjust: "exact",
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 4,
+              background: `linear-gradient(90deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.preschool.mint.main} 50%, ${colorTokens.preschool.peach.main} 100%)`,
+              WebkitPrintColorAdjust: "exact",
+              printColorAdjust: "exact",
+            },
           }}
         >
           {loading ? (
@@ -395,164 +593,431 @@ export default function ReceiptPage() {
             </Box>
           ) : receipt ? (
             <Box>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    Regd. No.: {receipt.admission_no || "N/A"}
-                  </Typography>
-                </Box>
-                <Box sx={{ textAlign: "center", flex: 1, px: 1 }}>
+              {/* ── Header ─────────────────────────────────────────── */}
+              <Stack
+                className="receipt-print-header"
+                direction={{ xs: "column", md: "row" }}
+                justifyContent="space-between"
+                alignItems={{ xs: "flex-start", md: "flex-start" }}
+                spacing={2}
+                sx={{ mb: 2.75, pt: 0.5 }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
                   {!!tenantLogo && (
-                    <Box sx={{ mb: 0.5 }}>
-                      <Box
-                        component="img"
-                        src={tenantLogo}
-                        alt="Tenant logo"
-                        crossOrigin="anonymous"
-                        sx={{ width: 64, height: 64, objectFit: "contain", mx: "auto" }}
-                      />
-                    </Box>
+                    <Box
+                      component="img"
+                      src={tenantLogo}
+                      alt={`${schoolName} logo`}
+                      crossOrigin="anonymous"
+                      sx={{
+                        width: 64,
+                        height: 64,
+                        objectFit: "contain",
+                        flexShrink: 0,
+                        borderRadius: `${radiusTokens.lg}px`,
+                      }}
+                    />
                   )}
-                  <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                    {user?.tenant?.name || "School"}
-                  </Typography>
-                  {organizationAddress.length > 0 ? (
-                    organizationAddress.map((line) => (
-                      <Typography key={line} variant="body2">
-                        {line}
-                      </Typography>
-                    ))
-                  ) : (
-                    <Typography variant="body2">Pune, Pune - 411057</Typography>
-                  )}
-                </Box>
-                <Box sx={{ textAlign: "right" }}>
-                  {!isInvoiceScope ? (
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      Receipt Type: Payment
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography
+                      sx={{
+                        fontWeight: typographyTokens.fontWeight.bold,
+                        fontSize: { xs: typographyTokens.fontSize.lg, md: typographyTokens.fontSize.xl },
+                        color: colorTokens.gray[800],
+                        lineHeight: typographyTokens.lineHeight.tight,
+                        letterSpacing: typographyTokens.letterSpacing.tight,
+                      }}
+                    >
+                      {schoolName}
                     </Typography>
+                    {organizationAddress.length > 0 ? (
+                      <Stack direction="row" spacing={0.75} alignItems="flex-start" sx={{ mt: 0.75 }}>
+                        <LocationOnOutlinedIcon
+                          sx={{ fontSize: 16, color: colorTokens.preschool.turquoise.dark, mt: 0.15 }}
+                        />
+                        <Box>
+                          {organizationAddress.map((line) => (
+                            <Typography
+                              key={line}
+                              sx={{
+                                fontSize: typographyTokens.fontSize.sm,
+                                color: colorTokens.text.secondary,
+                                lineHeight: typographyTokens.lineHeight.snug,
+                              }}
+                            >
+                              {line}
+                            </Typography>
+                          ))}
+                        </Box>
+                      </Stack>
+                    ) : null}
+                  </Box>
+                </Stack>
+
+                <Box
+                  className="receipt-print-title"
+                  sx={{
+                    textAlign: { xs: "left", md: "center" },
+                    flex: 1,
+                    alignSelf: { xs: "stretch", md: "center" },
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontWeight: typographyTokens.fontWeight.bold,
+                      fontSize: { xs: typographyTokens.fontSize["2xl"], md: typographyTokens.fontSize["3xl"] },
+                      color: colorTokens.gray[800],
+                      letterSpacing: typographyTokens.letterSpacing.tight,
+                      lineHeight: typographyTokens.lineHeight.tight,
+                    }}
+                  >
+                    Fee Receipt
+                  </Typography>
+                  <Stack
+                    className="receipt-print-title-row"
+                    direction="row"
+                    alignItems="center"
+                    justifyContent={{ xs: "flex-start", md: "center" }}
+                    spacing={1.25}
+                    sx={{ mt: 0.75 }}
+                  >
+                    <Box
+                      sx={{
+                        width: 36,
+                        height: 1,
+                        bgcolor: colorTokens.border.strong,
+                      }}
+                    />
+                    <Typography
+                      sx={{
+                        fontSize: typographyTokens.fontSize.sm,
+                        color: colorTokens.text.secondary,
+                        fontStyle: "italic",
+                        letterSpacing: typographyTokens.letterSpacing.wide,
+                      }}
+                    >
+                      Official Payment Confirmation
+                    </Typography>
+                    <Box
+                      sx={{
+                        width: 36,
+                        height: 1,
+                        bgcolor: colorTokens.border.strong,
+                      }}
+                    />
+                  </Stack>
+                </Box>
+
+                <Box
+                  className="receipt-print-admit-wrap"
+                  sx={{
+                    flex: 1,
+                    display: "flex",
+                    justifyContent: { xs: "flex-start", md: "flex-end" },
+                    minWidth: 0,
+                  }}
+                >
+                  {receipt.admission_no ? (
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      sx={{
+                        px: 1.5,
+                        py: 1,
+                        borderRadius: `${radiusTokens.xl}px`,
+                        bgcolor: alpha(colorTokens.preschool.peach.main, 0.12),
+                        border: `1px solid ${alpha(colorTokens.preschool.peach.main, 0.28)}`,
+                      }}
+                    >
+                      <SectionIcon
+                        icon={<BadgeOutlinedIcon sx={{ fontSize: 18 }} />}
+                        color={colorTokens.preschool.peach.dark}
+                      />
+                      <Box>
+                        <Typography
+                          sx={{
+                            fontSize: typographyTokens.fontSize.xs,
+                            color: colorTokens.text.secondary,
+                            textTransform: "uppercase",
+                            letterSpacing: typographyTokens.letterSpacing.wide,
+                            fontWeight: typographyTokens.fontWeight.medium,
+                          }}
+                        >
+                          Admission No.
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontWeight: typographyTokens.fontWeight.bold,
+                            fontSize: typographyTokens.fontSize.sm,
+                            color: colorTokens.gray[800],
+                          }}
+                        >
+                          {receipt.admission_no}
+                        </Typography>
+                      </Box>
+                    </Stack>
                   ) : null}
                 </Box>
               </Stack>
 
+              {/* ── Student + Meta ─────────────────────────────────── */}
               <Box
+                className="receipt-print-student-meta"
                 sx={{
-                  border: `1px solid ${colorTokens.border.default}`,
-                  p: 1.5,
-                  mb: 1.5,
-                  bgcolor: alpha(colorTokens.preschool.turquoise.light, 0.08),
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", md: "1.45fr 1fr" },
+                  gap: 2,
+                  mb: 2.5,
                 }}
               >
-                <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-                  <Typography variant="body1" sx={{ fontWeight: 700, fontStyle: "italic" }}>
-                    Receipt Number :
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                    {receipt.receipt_number || "N/A"}
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 700, fontStyle: "italic" }}>
-                    Academic Year :
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                    {receipt.academic_year || "N/A"}
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 700, fontStyle: "italic" }}>
-                    Date :
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                    {paymentDate}
-                  </Typography>
-                </Stack>
+                <Box
+                  sx={{
+                    borderRadius: `${radiusTokens.xl}px`,
+                    bgcolor: alpha(colorTokens.preschool.turquoise.light, 0.1),
+                    border: `1px solid ${alpha(colorTokens.preschool.turquoise.main, 0.18)}`,
+                    p: { xs: 1.75, md: 2 },
+                  }}
+                >
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                    <SectionIcon icon={<PersonOutlineIcon sx={{ fontSize: 18 }} />} />
+                    <Typography
+                      sx={{
+                        fontWeight: typographyTokens.fontWeight.bold,
+                        fontSize: typographyTokens.fontSize.md,
+                        color: colorTokens.gray[800],
+                      }}
+                    >
+                      Student Details
+                    </Typography>
+                  </Stack>
 
-                <Stack spacing={0.75}>
-                  <Stack direction="row" spacing={2}>
-                    <Typography sx={{ minWidth: 160, fontStyle: "italic" }}>Master / Miss</Typography>
-                    <Typography sx={{ flex: 1, borderBottom: `2px dotted ${colorTokens.border.strong}` }}>
-                      {receipt.student_name}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={2}>
-                    <Typography sx={{ minWidth: 160, fontStyle: "italic" }}>Class</Typography>
-                    <Typography sx={{ flex: 1, borderBottom: `2px dotted ${colorTokens.border.strong}` }}>
-                      {displayClass}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={2}>
-                    <Typography sx={{ minWidth: 160, fontStyle: "italic" }}>Sum of Rs. (In Words)</Typography>
-                    <Typography sx={{ flex: 1, borderBottom: `2px dotted ${colorTokens.border.strong}` }}>
-                      {receipt.amount_in_words}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={2}>
-                    <Typography sx={{ minWidth: 160, fontStyle: "italic" }}>Paid For</Typography>
-                    <Typography sx={{ flex: 1, borderBottom: `2px dotted ${colorTokens.border.strong}` }}>
-                      {receipt.paid_for || receipt.installment || "Fee installment"}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={2}>
-                    <Typography sx={{ minWidth: 160, fontStyle: "italic" }}>Amount (Rs.)</Typography>
-                    <Stack direction="row" alignItems="center" spacing={1} sx={{ flex: 1 }}>
-                      <Typography
+                  <DetailRow
+                    label="Master / Miss"
+                    value={
+                      <Typography sx={{ fontWeight: typographyTokens.fontWeight.semibold, fontSize: typographyTokens.fontSize.base }}>
+                        {receipt.student_name}
+                      </Typography>
+                    }
+                  />
+                  <DetailRow
+                    label="Class"
+                    value={
+                      <Typography sx={{ fontWeight: typographyTokens.fontWeight.medium, fontSize: typographyTokens.fontSize.base }}>
+                        {displayClass}
+                      </Typography>
+                    }
+                  />
+                  <DetailRow
+                    label="Sum of Rs. (In Words)"
+                    value={
+                      <Typography sx={{ fontSize: typographyTokens.fontSize.sm, lineHeight: typographyTokens.lineHeight.snug }}>
+                        {receipt.amount_in_words}
+                      </Typography>
+                    }
+                  />
+                  <DetailRow
+                    label="Paid For"
+                    value={
+                      <Typography sx={{ fontSize: typographyTokens.fontSize.base }}>
+                        {receipt.paid_for || receipt.installment || "Fee installment"}
+                      </Typography>
+                    }
+                  />
+                  <DetailRow
+                    label="Amount (Rs.)"
+                    value={
+                      <Box
+                        component="span"
                         sx={{
-                          px: 1.5,
-                          border: `2px solid ${colorTokens.gray[700]}`,
-                          fontWeight: 800,
                           display: "inline-flex",
+                          alignItems: "center",
+                          px: 1.25,
+                          py: 0.35,
+                          borderRadius: `${radiusTokens.lg}px`,
+                          bgcolor: alpha(colorTokens.preschool.mint.main, 0.16),
+                          color: colorTokens.preschool.mint.dark,
+                          fontWeight: typographyTokens.fontWeight.bold,
+                          fontSize: typographyTokens.fontSize.md,
+                          border: `1px solid ${alpha(colorTokens.preschool.mint.main, 0.35)}`,
                         }}
                       >
-                        {Number(receipt.total_amount || 0).toLocaleString("en-IN")} /-
+                        ₹ {Number(receipt.total_amount || 0).toLocaleString("en-IN")} /-
+                      </Box>
+                    }
+                  />
+                  <DetailRow
+                    label="Remarks"
+                    value={
+                      <Typography sx={{ fontSize: typographyTokens.fontSize.sm, color: colorTokens.text.secondary }}>
+                        {receipt.notes || (isInvoiceScope ? "Amount paid for fee" : "Amount paid for fee invoice")}
                       </Typography>
-                      <Typography sx={{ borderBottom: `2px dotted ${colorTokens.border.strong}`, flex: 1 }}>
-                        By {receipt.payment_method || "N/A"}
-                      </Typography>
-                    </Stack>
-                  </Stack>
-                  <Stack direction="row" spacing={2}>
-                    <Typography sx={{ minWidth: 160, fontStyle: "italic" }}>Remarks</Typography>
-                    <Typography sx={{ flex: 1, borderBottom: `2px dotted ${colorTokens.border.strong}` }}>
-                      {receipt.notes || (isInvoiceScope ? "Amount paid for fee" : "Amount paid for fee invoice")}
-                    </Typography>
-                  </Stack>
+                    }
+                  />
+                </Box>
+
+                <Stack spacing={1.25} justifyContent="stretch">
+                  <MetaRow
+                    icon={<ReceiptLongOutlinedIcon sx={{ fontSize: 18 }} />}
+                    label="Receipt No."
+                    value={receipt.receipt_number || "N/A"}
+                  />
+                  <MetaRow
+                    icon={<CalendarTodayOutlinedIcon sx={{ fontSize: 17 }} />}
+                    label="Date"
+                    value={paymentDate}
+                  />
+                  <MetaRow
+                    icon={<SchoolOutlinedIcon sx={{ fontSize: 18 }} />}
+                    label="Academic Year"
+                    value={receipt.academic_year || "N/A"}
+                  />
                 </Stack>
               </Box>
 
-              {/* ── Fee Details ─────────────────────────────────────────── */}
+              {/* ── Fee Details ────────────────────────────────────── */}
               {receipt.fee_details.length > 0 && (
-                <>
+                <Box sx={{ mb: 2.5 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.25 }}>
+                    <SectionIcon icon={<AccountBalanceWalletOutlinedIcon sx={{ fontSize: 18 }} />} />
+                    <Typography
+                      sx={{
+                        fontWeight: typographyTokens.fontWeight.bold,
+                        fontSize: typographyTokens.fontSize.md,
+                        color: colorTokens.gray[800],
+                      }}
+                    >
+                      Fee Details
+                    </Typography>
+                  </Stack>
+                  <Box
+                    sx={{
+                      borderRadius: `${radiusTokens.xl}px`,
+                      border: `1px solid ${alpha(colorTokens.preschool.turquoise.main, 0.2)}`,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Table size="small" data-testid="grid-receipt-fee-details">
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.12) }}>
+                          {["No.", "Fee Type", "Installment", "Amount (Rs.)", "Amount Paid (Rs.)"].map((h) => (
+                            <TableCell
+                              key={h}
+                              sx={{
+                                fontWeight: typographyTokens.fontWeight.bold,
+                                borderBottom: tableHeadBorder,
+                                textAlign: h === "No." ? "center" : h.startsWith("Amount") ? "right" : "left",
+                                fontSize: typographyTokens.fontSize.sm,
+                                color: colorTokens.gray[800],
+                                py: 1.15,
+                              }}
+                            >
+                              {h}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {receipt.fee_details.map((item: FeeReceiptFeeDetailItem) => (
+                          <TableRow
+                            key={item.sr_no}
+                            sx={{
+                              "&:nth-of-type(even)": { bgcolor: alpha(colorTokens.background.subtle, 0.55) },
+                            }}
+                          >
+                            <TableCell sx={{ borderBottom: tableBorder, textAlign: "center", py: 1 }}>
+                              {item.sr_no}
+                            </TableCell>
+                            <TableCell sx={{ borderBottom: tableBorder, py: 1 }}>
+                              {item.fee_category_name || "Fee"}
+                            </TableCell>
+                            <TableCell sx={{ borderBottom: tableBorder, py: 1 }}>
+                              {item.payable_for || receipt.installment || "—"}
+                            </TableCell>
+                            <TableCell sx={{ borderBottom: tableBorder, textAlign: "right", py: 1 }}>
+                              {Number(item.amount || 0).toLocaleString("en-IN")}
+                            </TableCell>
+                            <TableCell
+                              sx={{
+                                borderBottom: tableBorder,
+                                textAlign: "right",
+                                fontWeight: typographyTokens.fontWeight.bold,
+                                color: colorTokens.preschool.mint.dark,
+                                py: 1,
+                              }}
+                            >
+                              {Number(item.paid_amount || 0).toLocaleString("en-IN")}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow sx={{ bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.07) }}>
+                          <TableCell
+                            colSpan={4}
+                            sx={{
+                              borderBottom: "none",
+                              textAlign: "right",
+                              fontWeight: typographyTokens.fontWeight.bold,
+                              py: 1.15,
+                            }}
+                          >
+                            Total Paid
+                          </TableCell>
+                          <TableCell
+                            sx={{
+                              borderBottom: "none",
+                              textAlign: "right",
+                              fontWeight: typographyTokens.fontWeight.bold,
+                              color: colorTokens.preschool.mint.dark,
+                              py: 1.15,
+                            }}
+                          >
+                            {Number(receipt.total_amount || 0).toLocaleString("en-IN")}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </Box>
+                </Box>
+              )}
+
+              {/* ── Payment Details ────────────────────────────────── */}
+              <Box sx={{ mb: 2.75 }}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.25 }}>
+                  <SectionIcon
+                    icon={<CreditCardOutlinedIcon sx={{ fontSize: 18 }} />}
+                    color={colorTokens.preschool.mint.dark}
+                  />
                   <Typography
-                    variant="subtitle1"
                     sx={{
-                      textAlign: "center",
-                      fontWeight: 800,
-                      mb: 0.75,
-                      mt: 1.5,
-                      color: colorTokens.preschool.turquoise.dark,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      fontSize: "0.78rem",
+                      fontWeight: typographyTokens.fontWeight.bold,
+                      fontSize: typographyTokens.fontSize.md,
+                      color: colorTokens.gray[800],
                     }}
                   >
-                    Fee Details
+                    Payment Details
                   </Typography>
-                  <Table
-                    size="small"
-                    data-testid="grid-receipt-fee-details"
-                    sx={{
-                      mb: 2,
-                      border: `1px solid ${colorTokens.border.default}`,
-                    }}
-                  >
+                </Stack>
+                <Box
+                  sx={{
+                    borderRadius: `${radiusTokens.xl}px`,
+                    border: `1px solid ${alpha(colorTokens.preschool.mint.main, 0.28)}`,
+                    bgcolor: alpha(colorTokens.preschool.mint.main, 0.05),
+                    overflow: "hidden",
+                  }}
+                >
+                  <Table size="small" data-testid="grid-receipt-payment-details">
                     <TableHead>
-                      <TableRow sx={{ bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.12) }}>
-                        {["No.", "Fee Type", "Installment", "Amount (Rs.)", "Amount Paid (Rs.)"].map((h) => (
+                      <TableRow sx={{ bgcolor: alpha(colorTokens.preschool.mint.main, 0.14) }}>
+                        {["No.", "Txn Number", "Type", "Bank Name", "Amount (Rs.)"].map((h) => (
                           <TableCell
                             key={h}
                             sx={{
-                              fontWeight: 800,
-                              border: `1px solid ${colorTokens.border.strong}`,
-                              textAlign: h === "No." ? "center" : h.startsWith("Amount") ? "right" : "left",
-                              fontSize: "0.78rem",
-                              color: colorTokens.text.primary,
+                              fontWeight: typographyTokens.fontWeight.bold,
+                              borderBottom: `1px solid ${alpha(colorTokens.preschool.mint.main, 0.28)}`,
+                              textAlign: h === "No." ? "center" : h === "Amount (Rs.)" ? "right" : "left",
+                              fontSize: typographyTokens.fontSize.sm,
+                              color: colorTokens.gray[800],
+                              py: 1.15,
                             }}
                           >
                             {h}
@@ -561,128 +1026,160 @@ export default function ReceiptPage() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {receipt.fee_details.map((item: FeeReceiptFeeDetailItem) => (
-                        <TableRow key={item.sr_no} sx={{ "&:nth-of-type(even)": { bgcolor: alpha(colorTokens.background.subtle, 0.4) } }}>
-                          <TableCell sx={{ border: `1px solid ${colorTokens.border.default}`, textAlign: "center" }}>
-                            {item.sr_no}
+                      {receipt.payment_lines.map((line) => (
+                        <TableRow key={`${line.sr_no}-${line.amount}`}>
+                          <TableCell sx={{ borderBottom: tableBorder, textAlign: "center", py: 1 }}>
+                            {line.sr_no}
                           </TableCell>
-                          <TableCell sx={{ border: `1px solid ${colorTokens.border.default}` }}>
-                            {item.fee_category_name || "Fee"}
+                          <TableCell sx={{ borderBottom: tableBorder, py: 1 }}>
+                            {line.txn_number || receipt.transaction_number || "N/A"}
                           </TableCell>
-                          <TableCell sx={{ border: `1px solid ${colorTokens.border.default}` }}>
-                            {item.payable_for || receipt.installment || "—"}
+                          <TableCell sx={{ borderBottom: tableBorder, py: 1 }}>
+                            {line.payment_type || "N/A"}
                           </TableCell>
-                          <TableCell sx={{ border: `1px solid ${colorTokens.border.default}`, textAlign: "right" }}>
-                            {Number(item.amount || 0).toLocaleString("en-IN")}
+                          <TableCell sx={{ borderBottom: tableBorder, py: 1 }}>
+                            {line.bank_name || "—"}
                           </TableCell>
-                          <TableCell sx={{ border: `1px solid ${colorTokens.border.default}`, textAlign: "right", fontWeight: 700, color: colorTokens.preschool.mint.dark }}>
-                            {Number(item.paid_amount || 0).toLocaleString("en-IN")}
+                          <TableCell
+                            sx={{
+                              borderBottom: tableBorder,
+                              textAlign: "right",
+                              fontWeight: typographyTokens.fontWeight.bold,
+                              py: 1,
+                            }}
+                          >
+                            {Number(line.amount || 0).toLocaleString("en-IN")}
                           </TableCell>
                         </TableRow>
                       ))}
-                      <TableRow sx={{ bgcolor: alpha(colorTokens.preschool.turquoise.main, 0.06) }}>
+                      <TableRow sx={{ bgcolor: alpha(colorTokens.preschool.mint.main, 0.1) }}>
                         <TableCell
                           colSpan={4}
-                          sx={{ border: `1px solid ${colorTokens.border.strong}`, textAlign: "right", fontWeight: 800 }}
+                          sx={{
+                            borderBottom: "none",
+                            textAlign: "right",
+                            fontWeight: typographyTokens.fontWeight.bold,
+                            py: 1.15,
+                          }}
                         >
                           Total Paid
                         </TableCell>
                         <TableCell
-                          sx={{ border: `1px solid ${colorTokens.border.strong}`, textAlign: "right", fontWeight: 900, color: colorTokens.preschool.mint.dark }}
+                          sx={{
+                            borderBottom: "none",
+                            textAlign: "right",
+                            fontWeight: typographyTokens.fontWeight.bold,
+                            py: 1.15,
+                          }}
                         >
                           {Number(receipt.total_amount || 0).toLocaleString("en-IN")}
                         </TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
-                </>
-              )}
+                </Box>
+              </Box>
 
-              {/* ── Payment Details ──────────────────────────────────────── */}
-              <Typography
-                variant="subtitle1"
+              {/* ── Footer ─────────────────────────────────────────── */}
+              <Box
+                className="receipt-print-footer"
                 sx={{
-                  textAlign: "center",
-                  fontWeight: 800,
-                  mb: 0.75,
-                  color: colorTokens.preschool.coral.dark,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  fontSize: "0.78rem",
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "1.2fr 1fr 1fr" },
+                  gap: 2,
+                  alignItems: "end",
+                  pt: 1,
+                  borderTop: `1px solid ${colorTokens.border.subtle}`,
                 }}
               >
-                Payment Details
-              </Typography>
-              <Table
-                size="small"
-                data-testid="grid-receipt-payment-details"
-                sx={{
-                  border: `1px solid ${colorTokens.border.default}`,
-                }}
-              >
-                <TableHead>
-                  <TableRow sx={{ bgcolor: alpha(colorTokens.preschool.coral.main, 0.1) }}>
-                    {["No.", "Txn Number", "Type", "Bank Name", "Amount (Rs.)"].map((h) => (
-                      <TableCell
-                        key={h}
-                        sx={{
-                          fontWeight: 800,
-                          border: `1px solid ${colorTokens.border.strong}`,
-                          textAlign: h === "No." || h === "Amount (Rs.)" ? "center" : "left",
-                          fontSize: "0.78rem",
-                          color: colorTokens.text.primary,
-                        }}
-                      >
-                        {h}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {receipt.payment_lines.map((line) => (
-                    <TableRow key={`${line.sr_no}-${line.amount}`}>
-                      <TableCell sx={{ border: `1px solid ${colorTokens.border.default}`, textAlign: "center" }}>{line.sr_no}</TableCell>
-                      <TableCell sx={{ border: `1px solid ${colorTokens.border.default}` }}>
-                        {line.txn_number || receipt.transaction_number || "N/A"}
-                      </TableCell>
-                      <TableCell sx={{ border: `1px solid ${colorTokens.border.default}` }}>{line.payment_type || "N/A"}</TableCell>
-                      <TableCell sx={{ border: `1px solid ${colorTokens.border.default}` }}>{line.bank_name || "—"}</TableCell>
-                      <TableCell sx={{ border: `1px solid ${colorTokens.border.default}`, textAlign: "right", fontWeight: 700 }}>
-                        {Number(line.amount || 0).toLocaleString("en-IN")}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow sx={{ bgcolor: alpha(colorTokens.preschool.coral.main, 0.06) }}>
-                    <TableCell
-                      colSpan={4}
-                      sx={{ border: `1px solid ${colorTokens.border.strong}`, textAlign: "right", fontWeight: 800 }}
+                <Box
+                  sx={{
+                    borderRadius: `${radiusTokens.xl}px`,
+                    bgcolor: alpha(colorTokens.preschool.turquoise.light, 0.1),
+                    border: `1px solid ${alpha(colorTokens.preschool.turquoise.main, 0.16)}`,
+                    p: 1.5,
+                  }}
+                >
+                  <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.75 }}>
+                    <InfoOutlinedIcon sx={{ fontSize: 16, color: colorTokens.preschool.turquoise.dark }} />
+                    <Typography
+                      sx={{
+                        fontWeight: typographyTokens.fontWeight.bold,
+                        fontSize: typographyTokens.fontSize.sm,
+                        color: colorTokens.gray[800],
+                      }}
                     >
-                      Total Paid
-                    </TableCell>
-                    <TableCell
-                      sx={{ border: `1px solid ${colorTokens.border.strong}`, textAlign: "right", fontWeight: 900 }}
+                      Note
+                    </Typography>
+                  </Stack>
+                  <Box
+                    component="ul"
+                    sx={{
+                      m: 0,
+                      pl: 2,
+                      "& li": {
+                        fontSize: typographyTokens.fontSize.xs,
+                        color: colorTokens.text.secondary,
+                        lineHeight: typographyTokens.lineHeight.relaxed,
+                        mb: 0.35,
+                      },
+                    }}
+                  >
+                    <li>This is a system generated receipt and does not require a physical signature.</li>
+                    <li>Kindly keep this receipt for your records.</li>
+                    <li>Fees once paid are non-refundable unless stated otherwise by school policy.</li>
+                  </Box>
+                </Box>
+
+                <Stack spacing={0.75} sx={{ px: { sm: 1 } }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <SectionIcon icon={<PersonOutlineIcon sx={{ fontSize: 16 }} />} />
+                    <Typography
+                      sx={{
+                        fontWeight: typographyTokens.fontWeight.bold,
+                        fontSize: typographyTokens.fontSize.base,
+                        color: colorTokens.gray[800],
+                      }}
                     >
-                      {Number(receipt.total_amount || 0).toLocaleString("en-IN")}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+                      Accounts Officer
+                    </Typography>
+                  </Stack>
+                  <Typography
+                    sx={{
+                      fontSize: typographyTokens.fontSize.xs,
+                      color: colorTokens.text.secondary,
+                      pl: 5,
+                      lineHeight: typographyTokens.lineHeight.relaxed,
+                    }}
+                  >
+                    Creator: {receipt.created_by_name || "N/A"}
+                    <br />
+                    Generated: {generatedAt}
+                  </Typography>
+                </Stack>
 
-              <Stack direction="row" justifyContent="space-between" sx={{ mt: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Accounts Officer
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  * Non Refundable
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Sr. Clerk/Clerk
-                </Typography>
-              </Stack>
-
-              <Typography variant="caption" sx={{ mt: 1, display: "block" }}>
-                Creator: {receipt.created_by_name || "N/A"} | Generated: {generatedAt}
-              </Typography>
+                <Box className="receipt-print-thanks" sx={{ textAlign: { xs: "left", sm: "right" }, pb: 0.5 }}>
+                  <Typography
+                    sx={{
+                      fontSize: typographyTokens.fontSize.sm,
+                      color: colorTokens.preschool.turquoise.dark,
+                      fontWeight: typographyTokens.fontWeight.medium,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    Thank you for being a part of our journey
+                  </Typography>
+                  <Typography
+                    sx={{
+                      mt: 0.5,
+                      fontSize: typographyTokens.fontSize.xs,
+                      color: colorTokens.text.secondary,
+                    }}
+                  >
+                    * Non Refundable
+                  </Typography>
+                </Box>
+              </Box>
             </Box>
           ) : null}
         </Paper>
