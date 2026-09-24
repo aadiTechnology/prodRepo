@@ -846,14 +846,6 @@ export default function ReceiptPage() {
                       </Box>
                     }
                   />
-                  <DetailRow
-                    label="Remarks"
-                    value={
-                      <Typography sx={{ fontSize: typographyTokens.fontSize.sm, color: colorTokens.text.secondary }}>
-                        {receipt.notes || (isInvoiceScope ? "Amount paid for fee" : "Amount paid for fee invoice")}
-                      </Typography>
-                    }
-                  />
                 </Box>
 
                 <Stack spacing={1.25} justifyContent="stretch">
