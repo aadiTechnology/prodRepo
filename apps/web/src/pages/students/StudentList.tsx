@@ -15,6 +15,7 @@ import {
 import { PageHeader } from "../../components/layout";
 import ConfirmDialog from "../../components/semantic/ConfirmDialog";
 import type { SchoolClass } from "../../api/services/schoolClassService";
+import academicYearService from "../../api/services/academicYearService";
 import { useStudentListController } from "../../hooks/useStudentListController";
 import { useTeacherStudentListScope } from "../../hooks/useTeacherStudentListScope";
 import { useConfigHubNavigation } from "../../hooks/useConfigHubNavigation";
@@ -23,6 +24,7 @@ import {
   LIST_ROWS_PER_PAGE_OPTIONS,
   shouldShowStandardListPagination,
 } from "../../utils/listPagination";
+import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
 
 const StudentList = () => {
   const navigate = useNavigate();
@@ -38,35 +40,43 @@ const StudentList = () => {
     teacherClasses,
   } = useTeacherStudentListScope();
 
-  const [classOptions, setClassOptions] = useState([{ value: "", label: "All" }]);
+  const [academicYearOptions, setAcademicYearOptions] = useState([{ value: "", label: "All Academic Years" }]);
   const [adminClasses, setAdminClasses] = useState<SchoolClass[]>([]);
+  const [academicYearReady, setAcademicYearReady] = useState(false);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
 
   useEffect(() => {
-    if (isTeacherScoped) {
-      if (!scopeReady) return;
-      setClassOptions([
-        { value: "", label: "All Classes" },
-        ...teacherClassOptions,
-      ]);
-      return;
-    }
+    academicYearService
+      .listActive()
+      .then((years) => {
+        setAcademicYearOptions([
+          { value: "", label: "All Academic Years" },
+          ...years.map((y) => ({ value: String(y.id), label: y.name })),
+        ]);
+        const currentYearId = resolveCurrentAcademicYearId(years);
+        setSelectedAcademicYear((prev) => prev || currentYearId);
+        setAcademicYearReady(true);
+      })
+      .catch(() => {
+        setAcademicYearOptions([{ value: "", label: "All Academic Years" }]);
+        setAcademicYearReady(true);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (isTeacherScoped) return;
 
     async function fetchClasses() {
       try {
         const schoolClassService = (await import("../../api/services/schoolClassService")).default;
         const classes = await schoolClassService.getAll();
         setAdminClasses(classes);
-        setClassOptions([
-          { value: "", label: "All Classes" },
-          ...classes.map((c: SchoolClass) => ({ value: String(c.id), label: String(c.name) })),
-        ]);
       } catch {
         setAdminClasses([]);
-        setClassOptions([{ value: "", label: "All Classes" }]);
       }
     }
     void fetchClasses();
-  }, [isTeacherScoped, scopeReady, teacherClassOptions]);
+  }, [isTeacherScoped]);
 
   const statusOptions = [
     { value: "", label: "All" },
@@ -92,15 +102,39 @@ const StudentList = () => {
 
   const classesWithDivisions = isTeacherScoped ? teacherClasses : adminClasses;
 
+  const classesForAcademicYear = useMemo(() => {
+    if (!selectedAcademicYear) return classesWithDivisions;
+    return classesWithDivisions.filter(
+      (c) => c.academic_year_id != null && String(c.academic_year_id) === selectedAcademicYear
+    );
+  }, [classesWithDivisions, selectedAcademicYear]);
+
+  const classOptions = useMemo(
+    () => [
+      { value: "", label: "All Classes" },
+      ...classesForAcademicYear.map((c) => ({ value: String(c.id), label: String(c.name) })),
+    ],
+    [classesForAcademicYear]
+  );
+
   const divisionOptions = useMemo(() => {
     if (!selectedClass) return [];
-    const selected = classesWithDivisions.find((c) => String(c.id) === selectedClass);
+    const selected = classesForAcademicYear.find((c) => String(c.id) === selectedClass);
     if (!selected?.divisions?.length) return [];
     return selected.divisions.map((d) => ({
       value: String(d.id),
       label: d.division_name,
     }));
-  }, [classesWithDivisions, selectedClass]);
+  }, [classesForAcademicYear, selectedClass]);
+
+  useEffect(() => {
+    if (!selectedClass || !selectedAcademicYear) return;
+    const match = classesForAcademicYear.some((c) => String(c.id) === selectedClass);
+    if (!match) {
+      setSelectedClass("");
+      setSelectedDivision("");
+    }
+  }, [selectedAcademicYear, selectedClass, classesForAcademicYear]);
 
   useEffect(() => {
     if (!filterInitialized || !selectedDivision) return;
@@ -114,7 +148,7 @@ const StudentList = () => {
     }
   }, [selectedClass, selectedDivision, divisionOptions, filterInitialized]);
 
-  const listReady = scopeReady && filterInitialized;
+  const listReady = scopeReady && filterInitialized && academicYearReady;
   const {
     listState: {
       search,
@@ -140,6 +174,7 @@ const StudentList = () => {
     classFilter: selectedClass,
     divisionFilter: selectedDivision,
     statusFilter: selectedStatus,
+    academicYearFilter: selectedAcademicYear,
     ready: listReady,
   });
 
@@ -179,6 +214,26 @@ const StudentList = () => {
             homePath="/"
             actions={
               <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                <Box>
+                  <Select
+                    size="small"
+                    value={selectedAcademicYear}
+                    onChange={(e) => {
+                      setSelectedAcademicYear(e.target.value);
+                      setSelectedClass("");
+                      setSelectedDivision("");
+                      setPage(0);
+                    }}
+                    sx={{ minWidth: 150 }}
+                    displayEmpty
+                  >
+                    {academicYearOptions.map((opt) => (
+                      <MenuItem key={opt.value || "all-ay"} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </Box>
                 <Box>
                   <Select
                     size="small"

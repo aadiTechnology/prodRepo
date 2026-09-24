@@ -13,6 +13,7 @@ type UseStudentListControllerOptions = {
   classFilter?: string;
   divisionFilter?: string;
   statusFilter?: string;
+  academicYearFilter?: string;
   /** When false, defers the initial fetch until filters are ready (e.g. teacher class scope). */
   ready?: boolean;
 };
@@ -40,6 +41,7 @@ export function useStudentListController({
   classFilter,
   divisionFilter,
   statusFilter,
+  academicYearFilter,
   ready = true,
 }: UseStudentListControllerOptions): UseStudentListControllerResult {
   const [students, setStudents] = useState<Student[]>([]);
@@ -74,6 +76,9 @@ export function useStudentListController({
       if (divisionFilter) {
         params.division_id = divisionFilter;
       }
+      if (academicYearFilter) {
+        params.academic_year_id = Number(academicYearFilter);
+      }
       const { items, total } = await studentService.list(params);
       setStudents(items);
       setTotalStudents(total);
@@ -82,7 +87,15 @@ export function useStudentListController({
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [listState.page, listState.rowsPerPage, listState.search, classFilter, divisionFilter, statusFilter]);
+  }, [
+    listState.page,
+    listState.rowsPerPage,
+    listState.search,
+    classFilter,
+    divisionFilter,
+    statusFilter,
+    academicYearFilter,
+  ]);
 
   useEffect(() => {
     if (!ready) return;

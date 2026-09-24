@@ -44,6 +44,9 @@ const LeadManagementPage = () => {
     setStatusFilter,
     sourceFilter,
     setSourceFilter,
+    academicYearFilter,
+    setAcademicYearFilter,
+    academicYearFilterOptions,
     statusFilterOptions,
     sourceFilterOptions,
     snackbar,
@@ -139,6 +142,15 @@ const LeadManagementPage = () => {
                 onAddClick={() => navigate("/admissions/leads/add")}
                 addLabel="Add Lead"
                 filters={[
+                  {
+                    label: "Academic Year",
+                    value: academicYearFilter,
+                    onChange: (value) => {
+                      setAcademicYearFilter(value);
+                      setPage(0);
+                    },
+                    options: academicYearFilterOptions,
+                  },
                   {
                     label: "Status",
                     value: statusFilter,

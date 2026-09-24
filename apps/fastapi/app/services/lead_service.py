@@ -3,10 +3,11 @@ import string
 from datetime import datetime, date
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import or_
+from sqlalchemy import or_, and_, cast, Date
 from fastapi import HTTPException
 
 from app.models.lead import Lead, LeadFollowup, LeadSource, LeadStatus, LeadParent
+from app.models.academic import SchoolClass, AcademicYear
 from app.schemas.lead import LeadCreate, LeadUpdate, LeadFollowupCreate
 
 
@@ -114,6 +115,7 @@ def get_leads(
     status_id: int = None,
     source_id: int = None,
     assigned_to: int = None,
+    academic_year_id: int = None,
     page: int = 1,
     page_size: int = 10,
 ):
@@ -140,6 +142,31 @@ def get_leads(
 
     if assigned_to:
         query = query.filter(Lead.assigned_to == assigned_to)
+
+    if academic_year_id:
+        academic_year = (
+            db.query(AcademicYear)
+            .filter(AcademicYear.id == academic_year_id, AcademicYear.tenant_id == tenant_id)
+            .first()
+        )
+        query = query.outerjoin(SchoolClass, Lead.preferred_class_id == SchoolClass.id)
+        year_filters = [Lead.preferred_academic_year_id == academic_year_id]
+        year_filters.append(
+            and_(
+                Lead.preferred_academic_year_id.is_(None),
+                SchoolClass.academic_year_id == academic_year_id,
+            )
+        )
+        if academic_year:
+            year_filters.append(
+                and_(
+                    Lead.preferred_academic_year_id.is_(None),
+                    Lead.preferred_class_id.is_(None),
+                    cast(Lead.created_at, Date) >= academic_year.start_date,
+                    cast(Lead.created_at, Date) <= academic_year.end_date,
+                )
+            )
+        query = query.filter(or_(*year_filters)).distinct()
 
     total = query.count()
     leads = (

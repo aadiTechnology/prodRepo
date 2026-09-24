@@ -68,6 +68,7 @@ class StudentUpdateRequest(BaseModel):
 
 class StudentListItem(BaseModel):
     id: str
+    academic_year_name: Optional[str] = None
     name: str
     gender: Optional[str]
     mobile: Optional[str]

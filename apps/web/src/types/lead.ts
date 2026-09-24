@@ -47,6 +47,7 @@ export interface LeadFollowup {
 
 export interface Lead {
   id: number;
+  academic_year_name?: string | null;
   lead_code: string;
   child_name: string;
   child_gender?: string | null;

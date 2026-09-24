@@ -4,7 +4,7 @@ from app.models.academic import AcademicYear, SchoolClass, ClassDivision
 from app.models.fee import FeeStructure
 from app.models.fee_discount import FeeDiscount
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, exists
 from app.schemas.student_schema import StudentListResponse, StudentUpdateRequest, StudentDetailResponse
 from app.services.school_class_service import (
     require_active_class,
@@ -58,7 +58,18 @@ class StudentService:
             return True
         return self._get_student_effective_academic_year_id(student) is not None
 
-    def get_students(self, page=1, limit=10, search=None, class_id=None, class_=None, status=None, tenant_id=None, division_id=None):
+    def get_students(
+        self,
+        page=1,
+        limit=10,
+        search=None,
+        class_id=None,
+        class_=None,
+        status=None,
+        tenant_id=None,
+        division_id=None,
+        academic_year_id=None,
+    ):
         from app.schemas.student_schema import StudentListItem, Pagination, StudentListResponse
         query = (
             self.db.query(Student, SchoolClass, ClassDivision)
@@ -81,6 +92,29 @@ class StudentService:
         if status is not None and isinstance(status, str) and status.strip() != "":
             is_active = status.lower() == "active"
             filters.append(Student.is_active == is_active)
+        if academic_year_id is not None:
+            assignment_for_year = exists().where(
+                and_(
+                    StudentFeeAssignment.student_id == Student.id,
+                    StudentFeeAssignment.academic_year_id == academic_year_id,
+                )
+            )
+            any_assignment = exists().where(StudentFeeAssignment.student_id == Student.id)
+            filters.append(
+                or_(
+                    Student.academic_year_id == academic_year_id,
+                    and_(
+                        Student.academic_year_id.is_(None),
+                        or_(
+                            assignment_for_year,
+                            and_(
+                                ~any_assignment,
+                                SchoolClass.academic_year_id == academic_year_id,
+                            ),
+                        ),
+                    ),
+                )
+            )
         # Inactive class/division data is not operable — keep those students out of lists
         filters.append(
             or_(
@@ -101,6 +135,17 @@ class StudentService:
             query = query.filter(and_(*filters))
         total = query.count()
         results = query.order_by(Student.created_at.desc(), Student.id.desc()).offset((page - 1) * limit).limit(limit).all()
+        ay_ids: set[int] = set()
+        effective_ay_by_student: dict[int, int | None] = {}
+        for student, _school_class, _class_division in results:
+            ay_id = self._get_student_effective_academic_year_id(student)
+            effective_ay_by_student[int(student.id)] = ay_id
+            if ay_id is not None:
+                ay_ids.add(int(ay_id))
+        ay_name_map: dict[int, str] = {}
+        if ay_ids:
+            for ay in self.db.query(AcademicYear).filter(AcademicYear.id.in_(ay_ids)).all():
+                ay_name_map[int(ay.id)] = str(ay.name)
         data = []
         for student, school_class, class_division in results:
             class_name = school_class.name if school_class else ""
@@ -115,9 +160,11 @@ class StudentService:
                 not student.is_active
                 or not self._is_student_assigned_to_class_for_academic_year(student)
             )
+            effective_ay_id = effective_ay_by_student.get(int(student.id))
             data.append(
                 StudentListItem(
                     id=str(student.id),
+                    academic_year_name=ay_name_map.get(effective_ay_id) if effective_ay_id else None,
                     name=student.student_name,
                     gender=student.gender,
                     mobile=student.mobile_number,

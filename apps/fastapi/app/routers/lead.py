@@ -65,14 +65,36 @@ def list_leads(
     status_id: Optional[int] = Query(None),
     source_id: Optional[int] = Query(None),
     assigned_to: Optional[int] = Query(None),
+    academic_year_id: Optional[int] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
 ):
     try:
         leads, total = lead_service.get_leads(
-            db, current_user.tenant_id, search, status_id, source_id, assigned_to, page, page_size
+            db,
+            current_user.tenant_id,
+            search,
+            status_id,
+            source_id,
+            assigned_to,
+            academic_year_id,
+            page,
+            page_size,
         )
-        data = [_build_list_item(lead) for lead in leads]
+        from app.models.academic import AcademicYear
+
+        ay_ids = {lead.preferred_academic_year_id for lead in leads if lead.preferred_academic_year_id}
+        ay_map: dict[int, str] = {}
+        if ay_ids:
+            for ay in db.query(AcademicYear).filter(AcademicYear.id.in_(ay_ids)).all():
+                ay_map[int(ay.id)] = str(ay.name)
+        data = [
+            _build_list_item(
+                lead,
+                ay_map.get(int(lead.preferred_academic_year_id)) if lead.preferred_academic_year_id else None,
+            )
+            for lead in leads
+        ]
         return {"data": data, "total": total}
     except Exception as e:
         import traceback; traceback.print_exc()
@@ -171,9 +193,10 @@ def complete_followup(
 # Internal helpers to build response dicts
 # ──────────────────────────────────────────────────────────────
 
-def _build_list_item(lead) -> dict:
+def _build_list_item(lead, academic_year_name: Optional[str] = None) -> dict:
     return {
         "id": lead.id,
+        "academic_year_name": academic_year_name,
         "lead_code": lead.lead_code,
         "child_name": lead.child_name,
         "child_gender": lead.child_gender,

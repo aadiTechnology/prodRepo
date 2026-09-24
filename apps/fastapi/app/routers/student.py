@@ -37,6 +37,7 @@ def get_students(
     division_id: Optional[int] = None,
     class_: Optional[str] = Query(None, alias="class"),
     status: Optional[str] = None,
+    academic_year_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ):
@@ -50,6 +51,7 @@ def get_students(
             status,
             tenant_id=current_user.tenant_id,
             division_id=division_id,
+            academic_year_id=academic_year_id,
         )
         return result.dict(by_alias=True)
     except Exception as e:

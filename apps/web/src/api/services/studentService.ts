@@ -77,6 +77,7 @@ const studentService = {
     class_division_id?: number;
     class?: string;
     status?: string;
+    academic_year_id?: number;
   }) {
     const { data } = await axiosInstance.get("/api/students", { params });
     // Support both { data, pagination } and { items, total }

@@ -223,6 +223,7 @@ class LeadUpdate(BaseModel):
 
 class LeadListItem(BaseModel):
     id: int
+    academic_year_name: Optional[str] = None
     lead_code: str
     child_name: str
     child_gender: Optional[str] = None

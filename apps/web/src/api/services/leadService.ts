@@ -31,6 +31,7 @@ const leadService = {
     status_id?: number;
     source_id?: number;
     assigned_to?: number;
+    academic_year_id?: number;
     page?: number;
     page_size?: number;
   }): Promise<LeadListResponse> => {
