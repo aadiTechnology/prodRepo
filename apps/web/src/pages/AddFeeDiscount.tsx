@@ -1,13 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Autocomplete, TextField } from "../components/primitives";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import feeDiscountService from "../api/services/feeDiscountService";
+import academicYearService from "../api/services/academicYearService";
+import schoolClassService from "../api/services/schoolClassService";
+import { resolveCurrentAcademicYearId } from "../utils/academicYear";
 import { useFormManager } from "../hooks/useFormManager";
 import { useConfigHubNavigation } from "../hooks/useConfigHubNavigation";
 import BaseForm from "../components/reusable/BaseForm";
 import { createAddFeeDiscountFormConfig, type AddFeeDiscountFormData } from "./AddFeeDiscount.formConfig";
 
 const emptyForm = (): AddFeeDiscountFormData => ({
+  academic_year_id: "",
   discountName: "",
   discountType: "PERCENTAGE",
   discountAmount: "",
@@ -18,8 +22,11 @@ const emptyForm = (): AddFeeDiscountFormData => ({
 });
 
 export default function AddFeeDiscount() {
-  const navigate = useNavigate();
-  const { buildFormBreadcrumbs, navigateWithConfigHub, navigateToList } = useConfigHubNavigation();
+  const location = useLocation();
+  const academicYearFromList = (
+    location.state as { academic_year_id?: string } | null
+  )?.academic_year_id;
+  const { buildFormBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
   const listPath = "/fees/discounts";
   const { id: routeDiscountId } = useParams<{ id?: string }>();
   const discountId = routeDiscountId ?? null;
@@ -28,31 +35,64 @@ export default function AddFeeDiscount() {
   const [fetchLoading, setFetchLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
-  const [feeCategoryOptions, setFeeCategoryOptions] = useState<string[]>([]);
-  const [classOptions, setClassOptions] = useState<string[]>([]);
+  const [academicYears, setAcademicYears] = useState<{ id: number; name: string }[]>([]);
+  const [allCategories, setAllCategories] = useState<
+    {
+      name: string;
+      academic_year_id?: number | null;
+      class_id?: number | null;
+      class_name?: string | null;
+    }[]
+  >([]);
+  const [allClasses, setAllClasses] = useState<
+    { id: number; name: string; academic_year_id?: number | null }[]
+  >([]);
   const [discountNameOptions, setDiscountNameOptions] = useState<string[]>([]);
-  const [discountNamesLoading, setDiscountNamesLoading] = useState(true);
+  const [discountNamesLoading, setDiscountNamesLoading] = useState(false);
 
   useEffect(() => {
-    setDiscountNamesLoading(true);
-    feeDiscountService
-      .listAllNames()
-      .then((names) => setDiscountNameOptions(names))
-      .catch(() => setDiscountNameOptions([]))
-      .finally(() => setDiscountNamesLoading(false));
-  }, []);
-
-  // Fetch options for selects
-  useEffect(() => {
-    import("../api/services/classFeeCategoryService").then(({ feeCategoryService, classService }) => {
-      feeCategoryService.list().then((res: any[]) => setFeeCategoryOptions((res || []).map((cat: any) => cat.name)));
-      classService.list().then((res: any[]) => setClassOptions((res || []).map((cls: any) => cls.name)));
-    });
-  }, []);
+    const load = async () => {
+      const { feeCategoryService } = await import("../api/services/classFeeCategoryService");
+      const [years, cats, classes] = await Promise.all([
+        academicYearService.listActive(),
+        feeCategoryService.list(),
+        schoolClassService.getAll(),
+      ]);
+      setAcademicYears(years.map((y) => ({ id: y.id, name: y.name })));
+      setAllCategories(
+        (cats || []).map(
+          (cat: {
+            name: string;
+            academic_year_id?: number | null;
+            class_id?: number | null;
+            class_name?: string | null;
+          }) => ({
+            name: cat.name,
+            academic_year_id: cat.academic_year_id,
+            class_id: cat.class_id,
+            class_name: cat.class_name,
+          })
+        )
+      );
+      setAllClasses(
+        (classes || []).map(
+          (cls: { id: number; name: string; academic_year_id?: number | null }) => ({
+            id: cls.id,
+            name: cls.name,
+            academic_year_id: cls.academic_year_id,
+          })
+        )
+      );
+    };
+    void load();
+  }, [isEditMode]);
 
   const initialValues = useMemo(() => emptyForm(), []);
 
   const validationConfig = useMemo(() => ({
+    academic_year_id: [
+      { type: "required" as const, message: "Academic Year is required." },
+    ],
     discountName: [
       { type: "required" as const, message: "Discount Name is required." },
       { type: "minLength" as const, value: 2, message: "Min 2 characters." },
@@ -60,6 +100,9 @@ export default function AddFeeDiscount() {
     discountAmount: [
       { type: "required" as const, message: "Discount Amount is required." },
       // No "min" in ValidationRule, so skip or use custom if needed
+    ],
+    feeCategory: [
+      { type: "required" as const, message: "Fee Category is required." },
     ],
   }), []);
 
@@ -77,13 +120,93 @@ export default function AddFeeDiscount() {
     onClearError: () => setError(null),
   });
 
+  useEffect(() => {
+    if (isEditMode || academicYears.length === 0) return;
+    const defaultId = academicYearFromList || resolveCurrentAcademicYearId(academicYears);
+    if (!defaultId) return;
+    setFormData((prev) =>
+      prev.academic_year_id ? prev : { ...prev, academic_year_id: Number(defaultId) }
+    );
+  }, [isEditMode, academicYearFromList, academicYears, setFormData]);
+
+  const selectedAcademicYearId =
+    formData.academic_year_id !== "" ? String(formData.academic_year_id) : "";
+
+  useEffect(() => {
+    if (!selectedAcademicYearId) {
+      setDiscountNameOptions([]);
+      setDiscountNamesLoading(false);
+      return;
+    }
+    setDiscountNamesLoading(true);
+    feeDiscountService
+      .listAllNames(Number(selectedAcademicYearId))
+      .then((names) => setDiscountNameOptions(names))
+      .catch(() => setDiscountNameOptions([]))
+      .finally(() => setDiscountNamesLoading(false));
+  }, [selectedAcademicYearId]);
+
+  const feeCategoryOptions = useMemo(() => {
+    let pool = !selectedAcademicYearId
+      ? allCategories
+      : allCategories.filter(
+          (c) =>
+            c.academic_year_id != null &&
+            String(c.academic_year_id) === selectedAcademicYearId
+        );
+    const selectedClass = formData.applicableClass?.trim();
+    if (selectedClass) {
+      const classRow = allClasses.find((c) => c.name === selectedClass);
+      pool = pool.filter((cat) => {
+        if (cat.class_name && cat.class_name === selectedClass) return true;
+        if (classRow?.id != null && cat.class_id != null) {
+          return Number(cat.class_id) === Number(classRow.id);
+        }
+        return false;
+      });
+    }
+    return pool.map((c) => c.name);
+  }, [allCategories, allClasses, selectedAcademicYearId, formData.applicableClass]);
+
+  const classOptions = useMemo(() => {
+    const pool = !selectedAcademicYearId
+      ? allClasses
+      : allClasses.filter(
+          (c) =>
+            c.academic_year_id != null &&
+            String(c.academic_year_id) === selectedAcademicYearId
+        );
+    return pool.map((c) => c.name);
+  }, [allClasses, selectedAcademicYearId]);
+
+  useEffect(() => {
+    if (formData.feeCategory && !feeCategoryOptions.includes(formData.feeCategory)) {
+      setFormData((prev) => ({ ...prev, feeCategory: "" }));
+    }
+    if (formData.applicableClass && !classOptions.includes(formData.applicableClass)) {
+      setFormData((prev) => ({ ...prev, applicableClass: "" }));
+    }
+  }, [
+    selectedAcademicYearId,
+    feeCategoryOptions,
+    classOptions,
+    formData.feeCategory,
+    formData.applicableClass,
+    setFormData,
+  ]);
+
   // Fetch entity for edit mode
   const fetchDiscount = useCallback(async () => {
     if (!discountId) return;
     try {
       setFetchLoading(true);
       const data = await feeDiscountService.getById(Number(discountId));
+      const matchedCat = allCategories.find((c) => c.name === data.fee_category);
+      const matchedClass = allClasses.find((c) => c.name === data.applicable_class);
+      const yearId =
+        matchedCat?.academic_year_id ?? matchedClass?.academic_year_id ?? "";
       setFormData({
+        academic_year_id: yearId !== "" ? Number(yearId) : "",
         discountName: data.discount_name || "",
         discountType: data.discount_type || "PERCENTAGE",
         discountAmount: data.discount_value ?? "",
@@ -97,7 +220,7 @@ export default function AddFeeDiscount() {
     } finally {
       setFetchLoading(false);
     }
-  }, [discountId, setFormData]);
+  }, [discountId, setFormData, allCategories, allClasses]);
 
   useEffect(() => {
     if (isEditMode) fetchDiscount();
@@ -119,12 +242,19 @@ export default function AddFeeDiscount() {
         return;
       }
 
+      const feeCategory = String(formData.feeCategory ?? "").trim();
+      if (!feeCategory) {
+        setError("Fee Category is required.");
+        setLoading(false);
+        return;
+      }
+
       const payload = {
-        discount_name: formData.discountName,
+        discount_name: String(formData.discountName).trim(),
         discount_type: formData.discountType,
         discount_value: discountValue,
-        fee_category: formData.feeCategory,
-        applicable_class: formData.applicableClass,
+        fee_category: feeCategory,
+        applicable_class: String(formData.applicableClass ?? "").trim(),
         description: formData.description,
         status: formData.is_active,
       };
@@ -135,7 +265,18 @@ export default function AddFeeDiscount() {
         await feeDiscountService.create(payload);
         setSnackbar("Discount created successfully.");
       }
-      setTimeout(() => navigateWithConfigHub(listPath), 1000);
+      setTimeout(
+        () =>
+          navigateWithConfigHub(listPath, {
+            state: {
+              academic_year_id:
+                formData.academic_year_id !== ""
+                  ? String(formData.academic_year_id)
+                  : undefined,
+            },
+          }),
+        1000
+      );
     } catch (err: any) {
       setError(
         err?.response?.data?.detail ||
@@ -151,6 +292,7 @@ export default function AddFeeDiscount() {
   const formConfig = useMemo(() => {
     const config = createAddFeeDiscountFormConfig({
       isEditMode,
+      academicYears,
       feeCategoryOptions,
       classOptions,
     });
@@ -177,7 +319,11 @@ export default function AddFeeDiscount() {
               return options.filter((o) => o.toLowerCase().includes(q));
             }}
             noOptionsText={
-              discountNamesLoading ? "Loading…" : "No existing discounts"
+              discountNamesLoading
+                ? "Loading…"
+                : !selectedAcademicYearId
+                  ? "Select academic year first"
+                  : "No existing discounts for this year"
             }
             value={name || null}
             onChange={(_event, newValue) => {
@@ -225,10 +371,12 @@ export default function AddFeeDiscount() {
     return config;
   }, [
     isEditMode,
+    academicYears,
     feeCategoryOptions,
     classOptions,
     discountNameOptions,
     discountNamesLoading,
+    selectedAcademicYearId,
   ]);
 
   return (
@@ -259,12 +407,23 @@ export default function AddFeeDiscount() {
         saveTooltipCreate: "Save",
         saveTooltipEdit: "Update",
       }}
-      onCancelNavigate={() => navigateToList(listPath)}
+      gridSpacing={3}
+      onCancelNavigate={() =>
+        navigateWithConfigHub(listPath, {
+          state: {
+            academic_year_id:
+              formData.academic_year_id !== ""
+                ? String(formData.academic_year_id)
+                : academicYearFromList,
+          },
+        })
+      }
       confirmMessage={(ctx) =>
         ctx.isEditMode
           ? "Are you sure you want to update this discount?"
           : "Are you sure you want to save this discount?"
       }
+      hideFieldValidationDialog
     />
   );
 }

@@ -44,9 +44,12 @@ def list_discounts(
         False,
         description="Include inactive discounts (status=0); used for name dropdowns",
     ),
+    academic_year_id: Optional[int] = Query(None),
 ):
     if names_only:
-        names = fee_discount_service.get_all_discount_names(db, tenant_id)
+        names = fee_discount_service.get_all_discount_names(
+            db, tenant_id, academic_year_id=academic_year_id
+        )
         return {"names": names}
     try:
         discounts, total = fee_discount_service.get_discounts(
@@ -56,6 +59,7 @@ def list_discounts(
             page,
             page_size,
             active_only=not include_inactive,
+            academic_year_id=academic_year_id,
         )
         response_data = [FeeDiscountResponse.from_orm(d).dict() for d in discounts]
         return {

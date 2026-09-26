@@ -6,11 +6,16 @@ const feeDiscountService = {
       const response = await apiClient.get(`/api/fees/discounts/${id}`);
       return response.data;
     },
-  list: async (params?: { page?: number; page_size?: number; search?: string }) => {
+  list: async (params?: {
+    page?: number;
+    page_size?: number;
+    search?: string;
+    academic_year_id?: number;
+  }) => {
     const response = await apiClient.get("/api/fees/discounts", { params });
     return response.data;
   },
-  listAllNames: async (): Promise<string[]> => {
+  listAllNames: async (academicYearId?: number): Promise<string[]> => {
     const collectNames = (items: Array<{ discount_name?: string }> | undefined) => {
       const names = new Set<string>();
       for (const row of items ?? []) {
@@ -25,7 +30,10 @@ const feeDiscountService = {
       data?: Array<{ discount_name?: string }>;
       total?: number;
     }>("/api/fees/discounts", {
-      params: { names_only: true },
+      params: {
+        names_only: true,
+        ...(academicYearId != null ? { academic_year_id: academicYearId } : {}),
+      },
     });
 
     const body = first.data;
@@ -38,7 +46,12 @@ const feeDiscountService = {
       data?: Array<{ discount_name?: string }>;
       total?: number;
     }>("/api/fees/discounts", {
-      params: { page: 1, page_size: 100, include_inactive: true },
+      params: {
+        page: 1,
+        page_size: 100,
+        include_inactive: true,
+        ...(academicYearId != null ? { academic_year_id: academicYearId } : {}),
+      },
     });
     const inactiveBody = inactiveRes.data;
     const allNames = collectNames(inactiveBody?.data);
@@ -51,7 +64,12 @@ const feeDiscountService = {
         data?: Array<{ discount_name?: string }>;
         total?: number;
       }>("/api/fees/discounts", {
-        params: { page, page_size: pageSize, include_inactive: true },
+        params: {
+          page,
+          page_size: pageSize,
+          include_inactive: true,
+          ...(academicYearId != null ? { academic_year_id: academicYearId } : {}),
+        },
       });
       const pageBody = res.data;
       const before = allNames.size;

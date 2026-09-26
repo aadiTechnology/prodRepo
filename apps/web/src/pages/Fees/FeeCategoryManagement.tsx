@@ -99,7 +99,13 @@ const FeeCategoryManagement = () => {
                   </>
                 }
                 searchPlaceholder="Search Category"
-                onAddClick={() => navigateWithConfigHub("/fees/categories/add")}
+                onAddClick={() =>
+                  navigateWithConfigHub("/fees/categories/add", {
+                    state: {
+                      academic_year_id: controller.listState.filters.academicYearId || undefined,
+                    },
+                  })
+                }
                 addLabel="Add Category"
               />
             }

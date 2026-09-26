@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import { DEFAULT_LIST_ROWS_PER_PAGE } from "../utils/listPagination";
 import { getFeeCategories, deleteFeeCategory, getAcademicYears } from "../api/services/feeService";
 import schoolClassService from "../api/services/schoolClassService";
@@ -14,6 +15,7 @@ const resolveCurrentAcademicYearId = (
 };
 
 export function useFeeCategoryListController() {
+  const location = useLocation();
   const [categories, setCategories] = useState<FeeCategoryResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +27,9 @@ export function useFeeCategoryListController() {
   const [academicYears, setAcademicYears] = useState<
     { id: number; name: string; is_current?: boolean | number }[]
   >([]);
-  const [uniqueClasses, setUniqueClasses] = useState<{ id: number; name: string }[]>([]);
+  const [allClasses, setAllClasses] = useState<
+    { id: number; name: string; academic_year_id?: number | null }[]
+  >([]);
 
   const listState = useListManager<{ className: string; academicYearId: string }, "name">({
     initialFilters: { className: "", academicYearId: "" },
@@ -55,7 +59,13 @@ export function useFeeCategoryListController() {
         })
       );
       setAcademicYears(yearOptions);
-      setUniqueClasses((cls || []).map((c: any) => ({ id: c.id, name: c.name })));
+      setAllClasses(
+        (cls || []).map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          academic_year_id: c.academic_year_id,
+        }))
+      );
 
       const currentYearId = resolveCurrentAcademicYearId(yearOptions);
       if (currentYearId && listState.filters.academicYearId === "") {
@@ -71,6 +81,30 @@ export function useFeeCategoryListController() {
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
+
+  useEffect(() => {
+    const ayId = (location.state as { academic_year_id?: string } | null)?.academic_year_id;
+    if (ayId) {
+      listState.setFilter("academicYearId", ayId);
+    }
+  }, [location.key, location.state, listState]);
+
+  const uniqueClasses = useMemo(() => {
+    const ayId = listState.filters.academicYearId;
+    const pool = !ayId
+      ? allClasses
+      : allClasses.filter(
+          (c) => c.academic_year_id != null && String(c.academic_year_id) === ayId
+        );
+    return pool.map((c) => ({ id: c.id, name: c.name }));
+  }, [allClasses, listState.filters.academicYearId]);
+
+  useEffect(() => {
+    if (!listState.filters.className) return;
+    if (!uniqueClasses.some((c) => c.name === listState.filters.className)) {
+      listState.setFilter("className", "");
+    }
+  }, [listState.filters.academicYearId, listState.filters.className, uniqueClasses, listState]);
 
   const handleDeleteClick = (category: FeeCategoryResponse) => {
     setCategoryToDelete(category);

@@ -10,8 +10,13 @@ import {
     Box,
     Alert,
     Snackbar,
+    Select,
+    MenuItem,
+    Typography,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import academicYearService from "../../api/services/academicYearService";
+import { resolveCurrentAcademicYearId } from "../../utils/academicYear";
 import {
     ListPageLayout,
     ListPageToolbar,
@@ -33,6 +38,7 @@ import CreateDiscountDialog from "./CreateDiscountDialog";
 // ═══════════════════════════════════════════════════════════════════════════
 const FeeDiscountsPage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { buildListBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
     const [discounts, setDiscounts] = useState<FeeDiscount[]>([]);
     const [loading, setLoading] = useState(true);
@@ -53,6 +59,27 @@ const FeeDiscountsPage = () => {
     const showSuccessToast = (message: string) => setSnackbar(message);
 
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [academicYears, setAcademicYears] = useState<{ id: number; name: string }[]>([]);
+    const [academicYearId, setAcademicYearId] = useState("");
+    const [academicYearReady, setAcademicYearReady] = useState(false);
+
+    useEffect(() => {
+        academicYearService
+            .listActive()
+            .then((years) => {
+                setAcademicYears(years.map((y) => ({ id: y.id, name: y.name })));
+                const fromNav = (location.state as { academic_year_id?: string } | null)?.academic_year_id;
+                const defaultId = fromNav || resolveCurrentAcademicYearId(years);
+                setAcademicYearId((prev) => prev || defaultId);
+                setAcademicYearReady(true);
+            })
+            .catch(() => setAcademicYearReady(true));
+    }, [location.key, location.state]);
+
+    useEffect(() => {
+        const ayId = (location.state as { academic_year_id?: string } | null)?.academic_year_id;
+        if (ayId) setAcademicYearId(ayId);
+    }, [location.key, location.state]);
     // Remove editDiscount state, not needed for page-based edit
 
     const fetchDiscounts = useCallback(async () => {
@@ -63,6 +90,7 @@ const FeeDiscountsPage = () => {
                 search: search || undefined,
                 page: page + 1,
                 page_size: rowsPerPage,
+                academic_year_id: academicYearId ? Number(academicYearId) : undefined,
             });
             setDiscounts(data.data || data.items || []);
             setTotalDiscounts(data.total);
@@ -71,14 +99,15 @@ const FeeDiscountsPage = () => {
         } finally {
             setLoading(false);
         }
-    }, [search, page, rowsPerPage]);
+    }, [search, page, rowsPerPage, academicYearId]);
 
     useEffect(() => {
+        if (!academicYearReady) return;
         const timer = setTimeout(() => {
             fetchDiscounts();
         }, 500);
         return () => clearTimeout(timer);
-    }, [fetchDiscounts]);
+    }, [fetchDiscounts, academicYearReady]);
 
     const handleDeleteClick = (discount: FeeDiscount) => {
         setDiscountToDelete(discount);
@@ -106,7 +135,9 @@ const FeeDiscountsPage = () => {
     };
 
     const handleCreateClick = () => {
-        navigateWithConfigHub("/fees/discounts/add");
+        navigateWithConfigHub("/fees/discounts/add", {
+            state: { academic_year_id: academicYearId || undefined },
+        });
     };
 
     const handleDialogClose = (refresh = false) => {
@@ -143,6 +174,36 @@ const FeeDiscountsPage = () => {
                                 searchPlaceholder="Search discounts by name"
                                 onAddClick={handleCreateClick}
                                 addLabel="Create Discount"
+                                renderActions={
+                                    <Select
+                                        value={academicYearId}
+                                        onChange={(e) => {
+                                            setAcademicYearId(e.target.value);
+                                            setPage(0);
+                                        }}
+                                        displayEmpty
+                                        size="small"
+                                        sx={{
+                                            minWidth: { xs: "100%", sm: 180 },
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "15px",
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                            },
+                                        }}
+                                    >
+                                        <MenuItem value="">
+                                            <Typography variant="body2" color="text.secondary">
+                                                Academic Year
+                                            </Typography>
+                                        </MenuItem>
+                                        {academicYears.map((ay) => (
+                                            <MenuItem key={ay.id} value={String(ay.id)}>
+                                                {ay.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                }
                             />
                         }
                     />

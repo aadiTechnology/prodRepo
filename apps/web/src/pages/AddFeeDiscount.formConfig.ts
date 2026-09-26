@@ -1,6 +1,7 @@
 import { type FormConfig } from "../components/reusable/formFramework.types";
 
 export type AddFeeDiscountFormData = {
+  academic_year_id: number | "";
   discountName: string;
   discountType: "PERCENTAGE" | "FIXED";
   discountAmount: number | "";
@@ -12,17 +13,28 @@ export type AddFeeDiscountFormData = {
 
 type AddFeeDiscountFormConfigArgs = {
   isEditMode: boolean;
+  academicYears: { id: number; name: string }[];
   feeCategoryOptions: string[];
   classOptions: string[];
 };
 
 export function createAddFeeDiscountFormConfig({
   isEditMode,
+  academicYears,
   feeCategoryOptions,
   classOptions,
 }: AddFeeDiscountFormConfigArgs): FormConfig<AddFeeDiscountFormData> {
   return {
     fields: {
+      academic_year_id: {
+        name: "academic_year_id",
+        label: "Academic Year",
+        type: "select",
+        required: true,
+        props: {
+          options: academicYears.map((ay) => ({ value: ay.id, label: ay.name })),
+        },
+      },
       discountName: {
         name: "discountName",
         label: "Discount Name",
@@ -61,7 +73,7 @@ export function createAddFeeDiscountFormConfig({
         name: "feeCategory",
         label: "Fee Category",
         type: "select",
-        required: false,
+        required: true,
         props: {
           options: [
             { id: "", label: "", value: "" },
@@ -113,17 +125,32 @@ export function createAddFeeDiscountFormConfig({
       {
         kind: "fields",
         grid: { xs: 12, sm: 6 },
-        fieldNames: ["discountName", "discountType"],
+        fieldNames: ["academic_year_id"],
       },
       {
         kind: "fields",
         grid: { xs: 12, sm: 6 },
-        fieldNames: ["discountAmount", "feeCategory"],
+        fieldNames: ["applicableClass"],
       },
       {
         kind: "fields",
-        grid: { xs: 12 },
-        fieldNames: ["applicableClass"],
+        grid: { xs: 12, sm: 6 },
+        fieldNames: ["discountName"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 6 },
+        fieldNames: ["discountAmount"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 6 },
+        fieldNames: ["discountType"],
+      },
+      {
+        kind: "fields",
+        grid: { xs: 12, sm: 6 },
+        fieldNames: ["feeCategory"],
       },
       {
         kind: "fields",

@@ -18,7 +18,7 @@ class FeeDiscountBase(BaseModel):
     def name_required(cls, v):
         if not v or not v.strip():
             raise ValueError("Discount name is required")
-        return v
+        return v.strip()
 
     @validator("discount_value")
     def value_required(cls, v, values):
@@ -31,7 +31,14 @@ class FeeDiscountBase(BaseModel):
         return v
 
 class FeeDiscountCreate(FeeDiscountBase):
-    pass
+    fee_category: str = Field(..., min_length=1, max_length=120)
+
+    @validator("fee_category")
+    def fee_category_strip(cls, v):
+        s = str(v).strip()
+        if not s:
+            raise ValueError("Fee category is required")
+        return s
 
 
 class FeeDiscountUpdate(FeeDiscountBase):

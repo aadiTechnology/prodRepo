@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { mapApiErrorsToFields } from "../../utils/formValidation";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   createFeeCategory,
   updateFeeCategory,
@@ -26,8 +26,12 @@ const resolveCurrentAcademicYearId = (
 
 const AddEditFeeCategory = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id?: string }>();
-  const { buildFormBreadcrumbs, navigateWithConfigHub, navigateToList } = useConfigHubNavigation();
+  const academicYearFromList = (
+    location.state as { academic_year_id?: string } | null
+  )?.academic_year_id;
+  const { buildFormBreadcrumbs, navigateWithConfigHub } = useConfigHubNavigation();
   const listPath = "/fees/categories";
   const isEditMode = Boolean(id);
 
@@ -38,7 +42,9 @@ const AddEditFeeCategory = () => {
   const [academicYears, setAcademicYears] = useState<
     { id: number; name: string; is_current?: boolean | number }[]
   >([]);
-  const [classes, setClasses] = useState<{ id: number; name: string }[]>([]);
+  const [allClasses, setAllClasses] = useState<
+    { id: number; name: string; academic_year_id?: number | null }[]
+  >([]);
 
   const initialValues = useMemo<FeeCategoryFormData>(
     () => ({
@@ -49,11 +55,6 @@ const AddEditFeeCategory = () => {
       status: true,
     }),
     []
-  );
-
-  const formConfig = useMemo(
-    () => createFeeCategoryFormConfig({ isEditMode, academicYears, classes }),
-    [isEditMode, academicYears, classes]
   );
 
   const validationConfig: import("../../utils/formValidation").FormValidationConfig<FeeCategoryFormData> = useMemo(() => ({
@@ -81,6 +82,28 @@ const AddEditFeeCategory = () => {
 
   const { formData, setFormData, fieldErrors, setFieldErrors, handleChange, handleFieldValueChange, handleSubmit } = formManager;
 
+  const classes = useMemo(() => {
+    const ayId = formData.academic_year_id;
+    const pool = !ayId
+      ? allClasses
+      : allClasses.filter(
+          (c) => c.academic_year_id != null && String(c.academic_year_id) === String(ayId)
+        );
+    return pool.map((c) => ({ id: c.id, name: c.name }));
+  }, [allClasses, formData.academic_year_id]);
+
+  const formConfig = useMemo(
+    () => createFeeCategoryFormConfig({ isEditMode, academicYears, classes }),
+    [isEditMode, academicYears, classes]
+  );
+
+  useEffect(() => {
+    if (!formData.class_id || !formData.academic_year_id) return;
+    if (!classes.some((c) => String(c.id) === String(formData.class_id))) {
+      setFormData((prev) => ({ ...prev, class_id: "" }));
+    }
+  }, [formData.academic_year_id, formData.class_id, classes, setFormData]);
+
   useEffect(() => {
     const loadLookups = async () => {
       try {
@@ -96,12 +119,19 @@ const AddEditFeeCategory = () => {
           })
         );
         setAcademicYears(years);
-        setClasses((cls || []).map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })));
+        setAllClasses(
+          (cls || []).map((c: { id: number; name: string; academic_year_id?: number | null }) => ({
+            id: c.id,
+            name: c.name,
+            academic_year_id: c.academic_year_id,
+          }))
+        );
         if (!isEditMode) {
-          const currentYearId = resolveCurrentAcademicYearId(years);
-          if (currentYearId) {
+          const defaultYearId =
+            academicYearFromList || resolveCurrentAcademicYearId(years);
+          if (defaultYearId) {
             setFormData((prev) =>
-              prev.academic_year_id ? prev : { ...prev, academic_year_id: currentYearId }
+              prev.academic_year_id ? prev : { ...prev, academic_year_id: defaultYearId }
             );
           }
         }
@@ -110,7 +140,7 @@ const AddEditFeeCategory = () => {
       }
     };
     void loadLookups();
-  }, [isEditMode, setFormData]);
+  }, [isEditMode, setFormData, academicYearFromList]);
 
   const fetchCategory = useCallback(async () => {
     if (!id) return;
@@ -164,7 +194,13 @@ const AddEditFeeCategory = () => {
       }
       setTimeout(() => {
         setSnackbar(null);
-        navigateWithConfigHub(listPath);
+        navigateWithConfigHub(listPath, {
+          state: {
+            academic_year_id: formData.academic_year_id
+              ? String(formData.academic_year_id)
+              : undefined,
+          },
+        });
       }, 1200);
     } catch (err: any) {
       let message = err?.message || (isEditMode ? "Failed to update category." : "Failed to create category.");
@@ -206,8 +242,17 @@ const AddEditFeeCategory = () => {
         ),
         homePath: listPath,
       }}
-      onCancelNavigate={() => navigateToList(listPath)}
+      onCancelNavigate={() =>
+        navigateWithConfigHub(listPath, {
+          state: {
+            academic_year_id: formData.academic_year_id
+              ? String(formData.academic_year_id)
+              : academicYearFromList,
+          },
+        })
+      }
       confirmMessage={isEditMode ? "Update this fee category?" : "Create this fee category?"}
+      hideFieldValidationDialog
       gridSpacing={3}
     />
   );
