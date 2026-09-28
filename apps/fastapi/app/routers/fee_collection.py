@@ -108,6 +108,7 @@ pending_router = APIRouter(prefix="/fees", tags=["Fees - Pending Approval"])
 async def list_fee_pending_approval(
     page: int = Query(0, ge=0),
     size: int = Query(20, ge=1),
+    academic_year_id: int | None = Query(None, ge=1),
     class_id: int | None = Query(None, ge=1),
     division_id: int | None = Query(None, ge=1),
     student_id: int | None = Query(None, ge=1),
@@ -119,6 +120,7 @@ async def list_fee_pending_approval(
     return list_pending_approvals(
         db,
         tenant_id=current_user.tenant_id,
+        academic_year_id=academic_year_id,
         class_id=class_id,
         division_id=division_id,
         student_id=student_id,

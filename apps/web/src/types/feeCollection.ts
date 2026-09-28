@@ -103,6 +103,7 @@ export interface FeePaymentApprovalListResponse {
 export interface FeePaymentApprovalListParams {
   page?: number;
   size?: number;
+  academic_year_id?: number;
   class_id?: number;
   division_id?: number;
   student_id?: number;

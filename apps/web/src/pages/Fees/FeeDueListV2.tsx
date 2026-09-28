@@ -16,10 +16,7 @@ import {
 } from "../../components/reusable";
 import { type FeeDueStatusFilter } from "../../api/services/feesApi";
 import { useFeeDueListController, type FeeDueTableRow } from "../../hooks/useFeeDueListController";
-import {
-  createFeeDueListV2Columns,
-  FEE_DUE_STATUS_OPTIONS,
-} from "./FeeDueListV2.listConfig";
+import { createFeeDueListV2Columns } from "./FeeDueListV2.listConfig";
 import {
   LIST_ROWS_PER_PAGE_OPTIONS,
   shouldShowStandardListPagination,
@@ -47,6 +44,19 @@ export default function FeeDueListV2() {
                 searchPlaceholder="Search by student name or invoice ID"
                 renderActions={
                   <>
+                    <Select
+                      value={controller.academicYearId ?? ""}
+                      onChange={(e) => controller.setAcademicYearId(Number(e.target.value))}
+                      size="small"
+                      data-testid="input-academic-year"
+                      sx={{ minWidth: { xs: "100%", sm: 160 } }}
+                    >
+                      {controller.academicYears.map((year) => (
+                        <MenuItem key={year.id} value={year.id}>
+                          {year.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
                     <Select
                       value={controller.classId}
                       onChange={(e) => controller.setClassId(e.target.value)}
@@ -84,7 +94,7 @@ export default function FeeDueListV2() {
                       data-testid="input-status"
                       sx={{ minWidth: { xs: "100%", sm: 150 } }}
                     >
-                      {FEE_DUE_STATUS_OPTIONS.map((item) => (
+                      {controller.statusOptions.map((item) => (
                         <MenuItem key={item.value} value={item.value}>
                           {item.value === "ALL" ? "All Statuses" : item.label}
                         </MenuItem>

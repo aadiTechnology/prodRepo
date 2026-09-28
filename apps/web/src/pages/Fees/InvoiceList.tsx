@@ -28,7 +28,6 @@ import { FEE_LIST_MENU_LABEL, FEE_LIST_MENU_PATH } from "../../utils/menuNavigat
 import {
   createFeePendingApprovalColumns,
   createInvoiceListConfig,
-  FEE_PENDING_APPROVAL_STATUS_OPTIONS,
 } from "./InvoiceList.listConfig";
 import {
   LIST_ROWS_PER_PAGE_OPTIONS,
@@ -268,6 +267,20 @@ export function FeePendingApprovalPage() {
                 renderActions={
                   <>
                     <Select
+                      value={controller.academicYearId}
+                      onChange={(e) => controller.setAcademicYearId(e.target.value)}
+                      displayEmpty
+                      size="small"
+                      data-testid="input-academic-year"
+                      sx={{ minWidth: { xs: "100%", sm: 160 } }}
+                    >
+                      {controller.years.map((y) => (
+                        <MenuItem key={y.id} value={String(y.id)}>
+                          {y.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Select
                       value={controller.classId}
                       onChange={(e) => controller.setClassId(e.target.value)}
                       displayEmpty
@@ -321,7 +334,7 @@ export function FeePendingApprovalPage() {
                       data-testid="input-status"
                       sx={{ minWidth: { xs: "100%", sm: 160 } }}
                     >
-                      {FEE_PENDING_APPROVAL_STATUS_OPTIONS.map((item) => (
+                      {controller.statusOptions.map((item) => (
                         <MenuItem key={item.value} value={item.value}>
                           {item.label}
                         </MenuItem>

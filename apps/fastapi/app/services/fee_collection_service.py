@@ -954,6 +954,7 @@ def list_pending_approvals(
     db: Session,
     *,
     tenant_id: int,
+    academic_year_id: int | None,
     class_id: int | None,
     division_id: int | None,
     student_id: int | None,
@@ -977,6 +978,7 @@ def list_pending_approvals(
     rows, total = invoice_repository.list_fee_pending_approvals(
         db,
         tenant_id=tenant_id,
+        academic_year_id=academic_year_id,
         class_id=class_id,
         division_id=division_id,
         student_id=student_id,

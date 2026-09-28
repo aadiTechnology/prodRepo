@@ -485,6 +485,7 @@ def list_fee_pending_approvals(
     db: Session,
     *,
     tenant_id: int,
+    academic_year_id: int | None,
     class_id: int | None,
     division_id: int | None,
     student_id: int | None,
@@ -504,6 +505,10 @@ def list_fee_pending_approvals(
         where_sql.append(f"fp.student_id IN ({placeholders})")
         for idx, sid in enumerate(scoped_student_ids):
             params[f"scope_{idx}"] = int(sid)
+
+    if academic_year_id is not None:
+        where_sql.append("s.academic_year_id = :academic_year_id")
+        params["academic_year_id"] = academic_year_id
 
     if class_id is not None:
         where_sql.append("s.class_id = :class_id")
