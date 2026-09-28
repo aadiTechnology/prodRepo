@@ -23,31 +23,51 @@ type StudentOption = {
   name: string;
 };
 
-let invoiceLookupCache: InvoiceLookupPayload | null = null;
-let invoiceLookupInFlight: Promise<InvoiceLookupPayload> | null = null;
+let yearsLookupCache: AcademicYear[] | null = null;
+let classesLookupCache: SchoolClass[] | null = null;
+let yearsLookupInFlight: Promise<AcademicYear[]> | null = null;
+let classesLookupInFlight: Promise<SchoolClass[]> | null = null;
 
-async function getInvoiceLookups(): Promise<InvoiceLookupPayload> {
-  if (invoiceLookupCache) return invoiceLookupCache;
-
-  if (!invoiceLookupInFlight) {
-    invoiceLookupInFlight = Promise.all([
-      academicYearService.listActive(),
-      schoolClassService.getAll(),
-    ])
-      .then(([yearData, classData]) => {
-        const payload: InvoiceLookupPayload = {
-          years: yearData ?? [],
-          classes: classData ?? [],
-        };
-        invoiceLookupCache = payload;
-        return payload;
+async function loadAcademicYearsForInvoiceList(): Promise<AcademicYear[]> {
+  if (yearsLookupCache) return yearsLookupCache;
+  if (!yearsLookupInFlight) {
+    yearsLookupInFlight = academicYearService
+      .listActive()
+      .then((data) => {
+        yearsLookupCache = data ?? [];
+        return yearsLookupCache;
       })
+      .catch(() => [])
       .finally(() => {
-        invoiceLookupInFlight = null;
+        yearsLookupInFlight = null;
       });
   }
+  return yearsLookupInFlight;
+}
 
-  return invoiceLookupInFlight;
+async function loadClassesForInvoiceList(): Promise<SchoolClass[]> {
+  if (classesLookupCache) return classesLookupCache;
+  if (!classesLookupInFlight) {
+    classesLookupInFlight = schoolClassService
+      .getAll()
+      .then((data) => {
+        classesLookupCache = data ?? [];
+        return classesLookupCache;
+      })
+      .catch(() => [])
+      .finally(() => {
+        classesLookupInFlight = null;
+      });
+  }
+  return classesLookupInFlight;
+}
+
+async function getInvoiceLookups(): Promise<InvoiceLookupPayload> {
+  const [years, classes] = await Promise.all([
+    loadAcademicYearsForInvoiceList(),
+    loadClassesForInvoiceList(),
+  ]);
+  return { years, classes };
 }
 
 export function useInvoiceListController() {
@@ -152,10 +172,13 @@ export function useInvoiceListController() {
   }, [academicYearId, classId, divisionId]);
 
   const fetchInvoices = useCallback(async () => {
+    const selectedStudentId = studentId ? Number(studentId) : undefined;
+    if (!selectedStudentId && !academicYearId) {
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-      const selectedStudentId = studentId ? Number(studentId) : undefined;
       const response = await invoiceService.getInvoices({
         page,
         size: rowsPerPage,
@@ -163,9 +186,7 @@ export function useInvoiceListController() {
         student_id: selectedStudentId,
         academic_year_id: selectedStudentId
           ? undefined
-          : academicYearId
-            ? Number(academicYearId)
-            : undefined,
+          : Number(academicYearId),
         class_id: selectedStudentId ? undefined : classId ? Number(classId) : undefined,
         division_id: selectedStudentId ? undefined : divisionId ? Number(divisionId) : undefined,
         status: (status || undefined) as InvoiceStatus | undefined,
@@ -264,8 +285,11 @@ export function useInvoiceListController() {
   }, [fetchLookups]);
 
   useEffect(() => {
+    if (!studentId && !academicYearId) {
+      return;
+    }
     void fetchInvoices();
-  }, [fetchInvoices]);
+  }, [academicYearId, studentId, fetchInvoices]);
 
   useEffect(() => {
     void fetchStudents();
@@ -485,13 +509,16 @@ export function useFeePendingApprovalController() {
   }, [academicYearId, classId, divisionId]);
 
   const fetchItems = useCallback(async () => {
+    if (!academicYearId) {
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
       const response = await listFeePendingApprovals({
         page,
         size: rowsPerPage,
-        academic_year_id: academicYearId ? Number(academicYearId) : undefined,
+        academic_year_id: Number(academicYearId),
         class_id: classId ? Number(classId) : undefined,
         division_id: divisionId ? Number(divisionId) : undefined,
         student_id: studentId ? Number(studentId) : undefined,
@@ -527,8 +554,11 @@ export function useFeePendingApprovalController() {
   }, [fetchStudents]);
 
   useEffect(() => {
+    if (!academicYearId) {
+      return;
+    }
     void fetchItems();
-  }, [fetchItems]);
+  }, [academicYearId, fetchItems]);
 
   useEffect(() => {
     if (!studentId) return;
@@ -592,9 +622,12 @@ export function useFeePendingApprovalController() {
         } while (currentPage * pageSize < total);
 
         const next = feeApprovalStatusOptions.filter(
-          (option) => option.value === "ALL" || found.has(option.value)
+          (option) =>
+            option.value === "ALL" ||
+            option.value === "Pending Approval" ||
+            found.has(option.value)
         );
-        setStatusOptions(next.length ? next : feeApprovalStatusOptions);
+        setStatusOptions(next);
       } catch {
         if (!cancelled) setStatusOptions(feeApprovalStatusOptions);
       }
