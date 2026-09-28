@@ -71,7 +71,24 @@ export default function InvoiceList() {
                     : "Search by student name / invoice ID..."
                 }
                 renderActions={
-                  perms.readOnlyAudience ? undefined : (
+                  <>
+                    <Select
+                      value={controller.academicYearId}
+                      onChange={(e) =>
+                        controller.setAcademicYearId(e.target.value as string)
+                      }
+                      displayEmpty
+                      size="small"
+                      data-testid="input-academic-year"
+                      sx={{ minWidth: { xs: "100%", sm: 160 } }}
+                    >
+                      {controller.years.map((y) => (
+                        <MenuItem key={y.id} value={String(y.id)}>
+                          {y.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    {!perms.readOnlyAudience ? (
                   <>
                     <Select
                       value={controller.classId}
@@ -148,7 +165,8 @@ export default function InvoiceList() {
                       ))}
                     </Select>
                   </>
-                  )
+                    ) : null}
+                  </>
                 }
               />
             }

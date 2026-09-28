@@ -73,20 +73,28 @@ export function useInvoiceListController() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<string | null>(null);
 
-  const statusOptions = useMemo(
-    () => invoiceStatuses.map((s) => ({ label: s, value: s })),
-    []
+  const [statusOptions, setStatusOptions] = useState(() =>
+    invoiceStatuses.map((s) => ({ label: s, value: s }))
   );
+
+  const classesForYear = useMemo(() => {
+    if (!academicYearId) return classes;
+    return classes.filter(
+      (c) =>
+        c.academic_year_id != null &&
+        String(c.academic_year_id) === String(academicYearId)
+    );
+  }, [classes, academicYearId]);
 
   const divisionOptions = useMemo(() => {
     if (!classId) return [];
-    const selectedClass = classes.find((c) => String(c.id) === classId);
+    const selectedClass = classesForYear.find((c) => String(c.id) === classId);
     if (!selectedClass?.divisions?.length) return [];
     return selectedClass.divisions.map((division) => ({
       value: String(division.id),
       label: division.division_name,
     }));
-  }, [classId, classes]);
+  }, [classId, classesForYear]);
 
   const fetchLookups = useCallback(async () => {
     try {
@@ -104,7 +112,7 @@ export function useInvoiceListController() {
   }, [academicYearId]);
 
   const fetchStudents = useCallback(async () => {
-    if (!classId || !divisionId) {
+    if (!classId || !divisionId || !academicYearId) {
       setStudentOptions([]);
       return;
     }
@@ -116,6 +124,7 @@ export function useInvoiceListController() {
 
       do {
         const response = await invoiceService.getInvoices({
+          academic_year_id: Number(academicYearId),
           class_id: Number(classId),
           division_id: Number(divisionId),
           page: currentPage,
@@ -140,7 +149,7 @@ export function useInvoiceListController() {
     } catch {
       setStudentOptions([]);
     }
-  }, [classId, divisionId]);
+  }, [academicYearId, classId, divisionId]);
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -225,6 +234,10 @@ export function useInvoiceListController() {
 
   const onAcademicYearChange = useCallback((value: string) => {
     setAcademicYearId(value);
+    setClassId("");
+    setDivisionId("");
+    setStudentId("");
+    setStatus("");
     setPage(0);
   }, []);
 
@@ -265,6 +278,79 @@ export function useInvoiceListController() {
     }
   }, [studentOptions, studentId]);
 
+  useEffect(() => {
+    if (!classId) return;
+    if (!classesForYear.some((c) => String(c.id) === classId)) {
+      setClassId("");
+      setDivisionId("");
+      setStudentId("");
+    }
+  }, [classesForYear, classId]);
+
+  useEffect(() => {
+    if (!divisionId || !classId) return;
+    if (!divisionOptions.some((option) => option.value === divisionId)) {
+      setDivisionId("");
+      setStudentId("");
+    }
+  }, [divisionOptions, divisionId, classId]);
+
+  useEffect(() => {
+    if (!status) return;
+    if (!statusOptions.some((option) => option.value === status)) {
+      setStatus("");
+    }
+  }, [statusOptions, status]);
+
+  useEffect(() => {
+    if (!academicYearId) {
+      setStatusOptions(invoiceStatuses.map((s) => ({ label: s, value: s })));
+      return;
+    }
+
+    let cancelled = false;
+    const loadStatusesForYear = async () => {
+      const found = new Set<InvoiceStatus>();
+      const pageSize = 100;
+      let currentPage = 0;
+      let total = 0;
+
+      try {
+        do {
+          const response = await invoiceService.getInvoices({
+            page: currentPage,
+            size: pageSize,
+            academic_year_id: Number(academicYearId),
+          });
+          if (cancelled) return;
+          total = response.total ?? 0;
+          for (const invoice of response.items ?? []) {
+            const invoiceStatus = invoice.status as InvoiceStatus;
+            if (invoiceStatus && invoiceStatuses.includes(invoiceStatus)) {
+              found.add(invoiceStatus);
+            }
+          }
+          if (found.size === invoiceStatuses.length) break;
+          currentPage += 1;
+        } while (currentPage * pageSize < total);
+
+        const next = invoiceStatuses
+          .filter((s) => found.has(s))
+          .map((s) => ({ label: s, value: s }));
+        setStatusOptions(next);
+      } catch {
+        if (!cancelled) {
+          setStatusOptions(invoiceStatuses.map((s) => ({ label: s, value: s })));
+        }
+      }
+    };
+
+    void loadStatusesForYear();
+    return () => {
+      cancelled = true;
+    };
+  }, [academicYearId]);
+
   return {
     invoices,
     loading,
@@ -294,7 +380,7 @@ export function useInvoiceListController() {
     status,
     setStatus,
     years,
-    classes,
+    classes: classesForYear,
     statusOptions,
     fetchInvoices,
     confirmDialogOpen,

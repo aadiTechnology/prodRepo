@@ -11,6 +11,7 @@ export interface FeeDiscount {
 }
 
 export interface FeeDiscountCreate {
+  academic_year_id: number;
   discount_name: string;
   discount_type: "PERCENTAGE" | "FIXED";
   discount_value: number;

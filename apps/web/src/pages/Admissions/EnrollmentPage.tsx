@@ -430,26 +430,6 @@ export default function EnrollmentPage() {
       })
       .catch(() => { });
 
-    feeDiscountService
-      .list({ page: 1, page_size: 100 })
-      .then((res: any) => {
-        const items = res?.data || res || [];
-        setDiscounts(
-          items
-            .filter((d: any) => d?.status === true || d?.status === 1)
-            .map((d: any) => ({
-              id: Number(d.id),
-              discount_name: d.discount_name,
-              discount_type: d.discount_type,
-              discount_value: Number(d.discount_value),
-              applicable_class: d.applicable_class ?? null,
-            }))
-        );
-      })
-      .catch(() => {
-        setDiscounts([]);
-      });
-
     if (!isEditMode && !isViewMode && tenantId) {
       enrollmentService
         .getNextAdmissionNo()
@@ -462,6 +442,73 @@ export default function EnrollmentPage() {
         .catch(() => {});
     }
   }, [isEditMode, isViewMode, setFormData, tenantId]);
+
+  useEffect(() => {
+    const yearId = formData.academic_year_id ? Number(formData.academic_year_id) : NaN;
+    if (!Number.isFinite(yearId) || yearId <= 0) {
+      setDiscounts([]);
+      return;
+    }
+
+    let cancelled = false;
+    const mapDiscountRow = (d: {
+      id?: number;
+      discount_name?: string;
+      discount_type?: string;
+      discount_value?: number;
+      applicable_class?: string | null;
+      status?: boolean | number;
+    }) => ({
+      id: Number(d.id),
+      discount_name: d.discount_name ?? "",
+      discount_type: d.discount_type ?? "",
+      discount_value: Number(d.discount_value),
+      applicable_class: d.applicable_class ?? null,
+    });
+
+    const loadForYear = async () => {
+      try {
+        const first = await feeDiscountService.list({
+          page: 1,
+          page_size: 100,
+          academic_year_id: yearId,
+        });
+        if (cancelled) return;
+        const firstItems = (first?.data || []) as Array<{
+          id?: number;
+          status?: boolean | number;
+        }>;
+        const total = Number(first?.total ?? firstItems.length);
+        const allRows = [...firstItems];
+        const pageSize = 100;
+        let page = 2;
+        while (allRows.length < total && page <= Math.ceil(total / pageSize)) {
+          const res = await feeDiscountService.list({
+            page,
+            page_size: pageSize,
+            academic_year_id: yearId,
+          });
+          if (cancelled) return;
+          const chunk = (res?.data || []) as typeof firstItems;
+          if (!chunk.length) break;
+          allRows.push(...chunk);
+          page += 1;
+        }
+        setDiscounts(
+          allRows
+            .filter((d) => d?.status === true || d?.status === 1)
+            .map((d) => mapDiscountRow(d))
+        );
+      } catch {
+        if (!cancelled) setDiscounts([]);
+      }
+    };
+
+    void loadForYear();
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.academic_year_id]);
 
   // Prefill from lead if leadId route param or fromLead query exists
   useEffect(() => {

@@ -7,6 +7,7 @@ class FeeDiscount(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     tenant_id = Column(Integer, nullable=False, index=True)
+    academic_year_id = Column(Integer, nullable=True, index=True)
     discount_name = Column(String(150), nullable=False)
     discount_type = Column(String(20), nullable=False)  # Percentage or Fixed
     discount_value = Column(DECIMAL(10, 2), nullable=False)

@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from app.models.fee import FeeCategory
 from app.models.fee_discount import FeeDiscount
 from app.schemas.fee_discount import FeeDiscountCreate, FeeDiscountUpdate
 from fastapi import HTTPException, status
@@ -21,16 +22,21 @@ def create_discount(db: Session, tenant_id: int, data: FeeDiscountCreate):
     if not fee_category:
         raise HTTPException(status_code=400, detail="Fee category is required")
 
-    existing = db.query(FeeDiscount).filter(
-        FeeDiscount.tenant_id == tenant_id,
-        FeeDiscount.discount_name == discount_name,
-    ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Discount name already exists")
+    academic_year_id = _resolve_academic_year_id(
+        db, tenant_id, data.academic_year_id, fee_category
+    )
+    if _discount_name_exists_in_academic_year(
+        db, tenant_id, discount_name, academic_year_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Discount name already exists for this academic year",
+        )
     try:
         now = datetime.utcnow()
         discount = FeeDiscount(
             tenant_id=tenant_id,
+            academic_year_id=academic_year_id,
             discount_name=discount_name,
             discount_type=data.discount_type,
             discount_value=data.discount_value,
@@ -48,7 +54,10 @@ def create_discount(db: Session, tenant_id: int, data: FeeDiscountCreate):
         return discount
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Discount name already exists")
+        raise HTTPException(
+            status_code=400,
+            detail="Discount name already exists for this academic year",
+        )
     except SQLAlchemyError:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error")
@@ -81,13 +90,61 @@ def _apply_academic_year_filter(query, tenant_id: int, academic_year_id: int):
         FeeDiscount.applicable_class.isnot(None),
         FeeDiscount.applicable_class != "",
     )
+    legacy_year_match = or_(
+        and_(has_cat, has_class, cat_exists, class_exists),
+        and_(has_cat, ~has_class, cat_exists),
+        and_(~has_cat, has_class, class_exists),
+    )
     return query.filter(
         or_(
-            and_(has_cat, has_class, cat_exists, class_exists),
-            and_(has_cat, ~has_class, cat_exists),
-            and_(~has_cat, has_class, class_exists),
+            FeeDiscount.academic_year_id == academic_year_id,
+            and_(FeeDiscount.academic_year_id.is_(None), legacy_year_match),
         )
     )
+
+
+def _discount_name_exists_in_academic_year(
+    db: Session,
+    tenant_id: int,
+    discount_name: str,
+    academic_year_id: int,
+    exclude_id: int = None,
+) -> bool:
+    if not academic_year_id:
+        return False
+    query = db.query(FeeDiscount).filter(
+        FeeDiscount.tenant_id == tenant_id,
+        FeeDiscount.discount_name == discount_name,
+    )
+    if exclude_id is not None:
+        query = query.filter(FeeDiscount.id != exclude_id)
+    query = _apply_academic_year_filter(query, tenant_id, academic_year_id)
+    return query.first() is not None
+
+
+def _resolve_academic_year_id(
+    db: Session,
+    tenant_id: int,
+    academic_year_id: int,
+    fee_category: str,
+) -> int:
+    if not academic_year_id:
+        raise HTTPException(status_code=400, detail="Academic year is required")
+    cat = (
+        db.query(FeeCategory)
+        .filter(
+            FeeCategory.tenant_id == tenant_id,
+            FeeCategory.name == fee_category,
+            FeeCategory.status == True,  # noqa: E712
+        )
+        .first()
+    )
+    if cat and cat.academic_year_id and int(cat.academic_year_id) != int(academic_year_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Fee category does not belong to the selected academic year",
+        )
+    return int(academic_year_id)
 
 
 def get_all_discount_names(
@@ -140,19 +197,40 @@ def update_discount(db: Session, tenant_id: int, discount_id: int, data: FeeDisc
     ).first()
     if not discount:
         raise HTTPException(status_code=404, detail="Discount not found")
-    new_name = (data.discount_name or "").strip() if data.discount_name else None
-    if new_name and new_name != discount.discount_name:
-        existing = db.query(FeeDiscount).filter(
-            FeeDiscount.tenant_id == tenant_id,
-            FeeDiscount.discount_name == new_name,
-            FeeDiscount.id != discount_id,
-        ).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Discount name already exists")
+    updates = data.dict(exclude_unset=True)
+    fee_category = (updates.get("fee_category") or discount.fee_category or "").strip()
+    academic_year_id = updates.get("academic_year_id") or discount.academic_year_id
+    if not academic_year_id and fee_category:
+        cat = (
+            db.query(FeeCategory)
+            .filter(
+                FeeCategory.tenant_id == tenant_id,
+                FeeCategory.name == fee_category,
+            )
+            .first()
+        )
+        if cat and cat.academic_year_id:
+            academic_year_id = int(cat.academic_year_id)
+    if academic_year_id and fee_category:
+        academic_year_id = _resolve_academic_year_id(
+            db, tenant_id, int(academic_year_id), fee_category
+        )
+        updates["academic_year_id"] = academic_year_id
+    new_name = (updates.get("discount_name") or discount.discount_name or "").strip()
+    if "discount_name" in updates and updates["discount_name"]:
+        updates["discount_name"] = new_name
+    if new_name and academic_year_id and _discount_name_exists_in_academic_year(
+        db,
+        tenant_id,
+        new_name,
+        int(academic_year_id),
+        exclude_id=discount_id,
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Discount name already exists for this academic year",
+        )
     try:
-        updates = data.dict(exclude_unset=True)
-        if "discount_name" in updates and updates["discount_name"]:
-            updates["discount_name"] = updates["discount_name"].strip()
         if "fee_category" in updates:
             fc = (updates["fee_category"] or "").strip()
             if not fc:
@@ -169,7 +247,10 @@ def update_discount(db: Session, tenant_id: int, discount_id: int, data: FeeDisc
         return discount
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Discount name already exists")
+        raise HTTPException(
+            status_code=400,
+            detail="Discount name already exists for this academic year",
+        )
     except SQLAlchemyError:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error")

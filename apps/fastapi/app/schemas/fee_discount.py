@@ -31,6 +31,7 @@ class FeeDiscountBase(BaseModel):
         return v
 
 class FeeDiscountCreate(FeeDiscountBase):
+    academic_year_id: int = Field(..., ge=1)
     fee_category: str = Field(..., min_length=1, max_length=120)
 
     @validator("fee_category")
@@ -45,6 +46,7 @@ class FeeDiscountUpdate(FeeDiscountBase):
     discount_name: Optional[str] = None
     discount_type: Optional[str] = None
     discount_value: Optional[Decimal] = None
+    academic_year_id: Optional[int] = Field(None, ge=1)
     fee_category: Optional[str] = None
     applicable_class: Optional[str] = None
 
@@ -58,6 +60,7 @@ class FeeDiscountResponse(BaseModel):
     applicable_class: Optional[str] = None
     description: Optional[str] = None
     status: bool
+    academic_year_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

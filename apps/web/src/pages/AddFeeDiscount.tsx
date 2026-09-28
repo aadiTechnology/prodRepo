@@ -204,7 +204,10 @@ export default function AddFeeDiscount() {
       const matchedCat = allCategories.find((c) => c.name === data.fee_category);
       const matchedClass = allClasses.find((c) => c.name === data.applicable_class);
       const yearId =
-        matchedCat?.academic_year_id ?? matchedClass?.academic_year_id ?? "";
+        data.academic_year_id ??
+        matchedCat?.academic_year_id ??
+        matchedClass?.academic_year_id ??
+        "";
       setFormData({
         academic_year_id: yearId !== "" ? Number(yearId) : "",
         discountName: data.discount_name || "",
@@ -248,8 +251,14 @@ export default function AddFeeDiscount() {
         setLoading(false);
         return;
       }
+      if (formData.academic_year_id === "") {
+        setError("Academic Year is required.");
+        setLoading(false);
+        return;
+      }
 
       const payload = {
+        academic_year_id: Number(formData.academic_year_id),
         discount_name: String(formData.discountName).trim(),
         discount_type: formData.discountType,
         discount_value: discountValue,
