@@ -14,7 +14,11 @@ from app.schemas.fee_report_schema import (
 )
 
 
-def get_filter_options(db: Session, tenant_id: int) -> FeeReportFilterOptions:
+def get_filter_options(
+    db: Session,
+    tenant_id: int,
+    academic_year_id: Optional[int] = None,
+) -> FeeReportFilterOptions:
     """Return dropdown options for academic year, class, and installment filters."""
 
     academic_years = db.execute(
@@ -31,30 +35,46 @@ def get_filter_options(db: Session, tenant_id: int) -> FeeReportFilterOptions:
         {"tenant_id": tenant_id},
     ).fetchall()
 
+    class_filters = [
+        "s.tenant_id = :tenant_id",
+        "c.is_active = 1",
+        "c.is_deleted = 0",
+    ]
+    class_params: dict = {"tenant_id": tenant_id}
+    if academic_year_id:
+        class_filters.append("si.academic_year_id = :academic_year_id")
+        class_params["academic_year_id"] = academic_year_id
+
     classes = db.execute(
-        text("""
+        text(f"""
             SELECT DISTINCT c.id, c.name
             FROM classes c
             JOIN student_invoices si ON si.class_id = c.id
             JOIN students s ON s.id = si.student_id
-            WHERE s.tenant_id = :tenant_id
-              AND c.is_active = 1
-              AND c.is_deleted = 0
+            WHERE {" AND ".join(class_filters)}
             ORDER BY c.name
         """),
-        {"tenant_id": tenant_id},
+        class_params,
     ).fetchall()
 
+    installment_filters = [
+        "s.tenant_id = :tenant_id",
+        "si.Installment IS NOT NULL",
+    ]
+    installment_params: dict = {"tenant_id": tenant_id}
+    if academic_year_id:
+        installment_filters.append("si.academic_year_id = :academic_year_id")
+        installment_params["academic_year_id"] = academic_year_id
+
     installments = db.execute(
-        text("""
+        text(f"""
             SELECT DISTINCT si.Installment
             FROM student_invoices si
             JOIN students s ON s.id = si.student_id
-            WHERE s.tenant_id = :tenant_id
-              AND si.Installment IS NOT NULL
+            WHERE {" AND ".join(installment_filters)}
             ORDER BY si.Installment
         """),
-        {"tenant_id": tenant_id},
+        installment_params,
     ).fetchall()
 
     return FeeReportFilterOptions(

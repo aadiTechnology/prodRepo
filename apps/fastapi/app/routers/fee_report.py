@@ -17,11 +17,16 @@ router = APIRouter(prefix="/fees/reports", tags=["Fees - Reports"])
 
 @router.get("/options", response_model=FeeReportFilterOptions)
 def get_report_filter_options(
+    academic_year_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> FeeReportFilterOptions:
     """Return dropdown options for the fee report filters."""
-    return fee_report_service.get_filter_options(db, tenant_id=current_user.tenant_id)
+    return fee_report_service.get_filter_options(
+        db,
+        tenant_id=current_user.tenant_id,
+        academic_year_id=academic_year_id,
+    )
 
 
 @router.get("", response_model=FeeReportResponse)

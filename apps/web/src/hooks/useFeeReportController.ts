@@ -43,12 +43,14 @@ export function useFeeReportController() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load filter dropdowns once
   useEffect(() => {
     feeReportService
       .getFilterOptions()
       .then((options) => {
-        setFilterOptions(options);
+        setFilterOptions((prev) => ({
+          ...prev,
+          academic_years: options.academic_years ?? [],
+        }));
         setAcademicYearId((prev) => {
           if (prev != null) return prev;
           const currentYearId = resolveCurrentAcademicYearId(options.academic_years ?? []);
@@ -58,6 +60,47 @@ export function useFeeReportController() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!academicYearId) {
+      setFilterOptions((prev) => ({
+        ...prev,
+        classes: [],
+        installments: [],
+      }));
+      return;
+    }
+    feeReportService
+      .getFilterOptions(academicYearId)
+      .then((options) => {
+        setFilterOptions((prev) => ({
+          ...prev,
+          classes: options.classes ?? [],
+          installments: options.installments ?? [],
+        }));
+      })
+      .catch(() => {
+        setFilterOptions((prev) => ({
+          ...prev,
+          classes: [],
+          installments: [],
+        }));
+      });
+  }, [academicYearId]);
+
+  useEffect(() => {
+    if (classId == null) return;
+    if (!filterOptions.classes.some((item) => item.id === classId)) {
+      setClassId(null);
+    }
+  }, [filterOptions.classes, classId]);
+
+  useEffect(() => {
+    if (!installment) return;
+    if (!filterOptions.installments.includes(installment)) {
+      setInstallment("");
+    }
+  }, [filterOptions.installments, installment]);
 
   const fetchReport = useCallback(async () => {
     setLoading(true);

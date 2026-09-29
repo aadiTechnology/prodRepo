@@ -224,7 +224,12 @@ export default function FeeReportPage() {
           search={c.search}
           setSearch={(value) => { c.setSearch(value); c.setPage(0); }}
           academicYearId={c.academicYearId ? String(c.academicYearId) : ""}
-          setAcademicYearId={(id) => { c.setAcademicYearId(id ? Number(id) : null); c.setPage(0); }}
+          setAcademicYearId={(id) => {
+            c.setAcademicYearId(id ? Number(id) : null);
+            c.setClassId(null);
+            c.setInstallment("");
+            c.setPage(0);
+          }}
           classId={c.classId ? String(c.classId) : ""}
           setClassId={(id) => { c.setClassId(id ? Number(id) : null); c.setPage(0); }}
           installment={c.installment}

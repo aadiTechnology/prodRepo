@@ -6,8 +6,15 @@ import type {
 } from "../../types/feeReport";
 
 const feeReportService = {
-  getFilterOptions: async (): Promise<FeeReportFilterOptions> => {
-    const response = await apiClient.get("/fees/reports/options");
+  getFilterOptions: async (
+    academicYearId?: number | null
+  ): Promise<FeeReportFilterOptions> => {
+    const response = await apiClient.get("/fees/reports/options", {
+      params:
+        academicYearId != null && academicYearId > 0
+          ? { academic_year_id: academicYearId }
+          : undefined,
+    });
     return response.data;
   },
 
