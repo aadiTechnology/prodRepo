@@ -436,11 +436,9 @@ export function useFeePendingApprovalController() {
   const [academicYearId, setAcademicYearId] = useState("");
   const [classId, setClassId] = useState("");
   const [divisionId, setDivisionId] = useState("");
-  const [studentId, setStudentId] = useState("");
   const [status, setStatus] = useState<FeeApprovalStatus>("Pending Approval");
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const [studentOptions, setStudentOptions] = useState<{ id: number; name: string }[]>([]);
   const [statusOptions, setStatusOptions] = useState(feeApprovalStatusOptions);
 
   const classesForYear = useMemo(() => {
@@ -479,35 +477,6 @@ export function useFeePendingApprovalController() {
     }
   }, [academicYearId]);
 
-  const fetchStudents = useCallback(async () => {
-    if (!classId || !divisionId || !academicYearId) {
-      setStudentOptions([]);
-      return;
-    }
-    try {
-      const response = await invoiceService.getInvoices({
-        academic_year_id: Number(academicYearId),
-        class_id: Number(classId),
-        division_id: Number(divisionId),
-        page: 0,
-        size: 100,
-      });
-      const studentMap = new Map<number, string>();
-      for (const invoice of response.items ?? []) {
-        const id = Number(invoice.student_id);
-        const name = String(invoice.student_name ?? "").trim();
-        if (Number.isFinite(id) && name) studentMap.set(id, name);
-      }
-      setStudentOptions(
-        Array.from(studentMap.entries())
-          .map(([id, name]) => ({ id, name }))
-          .sort((a, b) => a.name.localeCompare(b.name))
-      );
-    } catch {
-      setStudentOptions([]);
-    }
-  }, [academicYearId, classId, divisionId]);
-
   const fetchItems = useCallback(async () => {
     if (!academicYearId) {
       return;
@@ -521,7 +490,6 @@ export function useFeePendingApprovalController() {
         academic_year_id: Number(academicYearId),
         class_id: classId ? Number(classId) : undefined,
         division_id: divisionId ? Number(divisionId) : undefined,
-        student_id: studentId ? Number(studentId) : undefined,
         status,
         search: search.trim() || undefined,
       });
@@ -542,16 +510,11 @@ export function useFeePendingApprovalController() {
     rowsPerPage,
     search,
     status,
-    studentId,
   ]);
 
   useEffect(() => {
     void fetchLookups();
   }, [fetchLookups]);
-
-  useEffect(() => {
-    void fetchStudents();
-  }, [fetchStudents]);
 
   useEffect(() => {
     if (!academicYearId) {
@@ -561,18 +524,10 @@ export function useFeePendingApprovalController() {
   }, [academicYearId, fetchItems]);
 
   useEffect(() => {
-    if (!studentId) return;
-    if (!studentOptions.some((option) => String(option.id) === studentId)) {
-      setStudentId("");
-    }
-  }, [studentOptions, studentId]);
-
-  useEffect(() => {
     if (!classId) return;
     if (!classesForYear.some((c) => String(c.id) === classId)) {
       setClassId("");
       setDivisionId("");
-      setStudentId("");
     }
   }, [classesForYear, classId]);
 
@@ -580,7 +535,6 @@ export function useFeePendingApprovalController() {
     if (!divisionId || !classId) return;
     if (!divisionOptions.some((option) => option.value === divisionId)) {
       setDivisionId("");
-      setStudentId("");
     }
   }, [divisionOptions, divisionId, classId]);
 
@@ -661,18 +615,11 @@ export function useFeePendingApprovalController() {
     setClassId: (value: string) => {
       setClassId(value);
       setDivisionId("");
-      setStudentId("");
       setPage(0);
     },
     divisionId,
     setDivisionId: (value: string) => {
       setDivisionId(value);
-      setStudentId("");
-      setPage(0);
-    },
-    studentId,
-    setStudentId: (value: string) => {
-      setStudentId(value);
       setPage(0);
     },
     status,
@@ -685,14 +632,12 @@ export function useFeePendingApprovalController() {
       setAcademicYearId(value);
       setClassId("");
       setDivisionId("");
-      setStudentId("");
       setStatus("Pending Approval");
       setPage(0);
     },
     years,
     classes: classesForYear,
     divisionOptions,
-    studentOptions,
     statusOptions,
     refetch: fetchItems,
     approve: approveFeePendingPayment,

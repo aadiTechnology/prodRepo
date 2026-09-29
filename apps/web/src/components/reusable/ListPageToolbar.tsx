@@ -10,6 +10,7 @@ import { Stack } from "../primitives";
 import PrimaryActionButton from "./PrimaryActionButton";
 import { colorTokens } from "../../tokens/colors";
 import { alpha } from "@mui/material";
+import type { Theme } from "@mui/material/styles";
 
 export interface ToolbarFilter {
   value: string;
@@ -41,6 +42,15 @@ export interface ListPageToolbarProps {
   searchTestId?: string;
   /** Stable test hook for the primary add action button. */
   addButtonTestId?: string;
+  /**
+   * inline: filters/actions and search in one flow (default).
+   * stacked: search on first row; filters + renderActions wrap on a full-width second row.
+   */
+  layout?: "inline" | "stacked";
+  /** Search field width on sm+ (inline layout). Default 280. */
+  searchMinWidth?: number;
+  /** Inline toolbar horizontal alignment. Default end (right). */
+  toolbarAlign?: "start" | "end";
 }
 
 export default function ListPageToolbar({
@@ -55,7 +65,124 @@ export default function ListPageToolbar({
   actionsAfterSearch = false,
   searchTestId = "input-search",
   addButtonTestId = "btn-add",
+  layout = "inline",
+  searchMinWidth = 280,
+  toolbarAlign = "end",
 }: ListPageToolbarProps) {
+  const searchFieldSx = (_theme: Theme) => ({
+    width: {
+      xs: "100%",
+      sm: layout === "stacked" ? "100%" : "auto",
+    },
+    minWidth: layout === "inline" ? { sm: searchMinWidth } : undefined,
+    maxWidth: layout === "stacked" ? { sm: 480 } : undefined,
+    flex: layout === "stacked" ? { sm: "1 1 280px" } : { sm: "0 0 auto" },
+    flexShrink: 0,
+    "& .MuiOutlinedInput-root": {
+      bgcolor: "#ffffff",
+      borderRadius: "15px",
+      fontSize: "0.85rem",
+      fontWeight: 600,
+      "& fieldset": { borderColor: colorTokens.border.subtle },
+      "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
+      "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
+    },
+  });
+
+  const filterSelectSx = {
+    minWidth: { xs: "100%", sm: layout === "stacked" ? 132 : 160 },
+    flex: layout === "stacked" ? { sm: "1 1 132px" } : undefined,
+    maxWidth: layout === "stacked" ? { sm: 200 } : undefined,
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "15px",
+      fontSize: "0.85rem",
+      fontWeight: 600,
+    },
+  };
+
+  if (layout === "stacked") {
+    return (
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, width: "100%", minWidth: 0 }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 2,
+            width: "100%",
+            justifyContent: { xs: "stretch", sm: "flex-end" },
+          }}
+        >
+          <TextField
+            placeholder={searchPlaceholder}
+            value={searchValue}
+            onChange={(e) => onSearchChange(e.target.value)}
+            variant="outlined"
+            size="small"
+            fullWidth={false}
+            inputProps={{ "data-testid": searchTestId }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={(theme) => ({ color: theme.palette.grey[500], fontSize: 20 })} />
+                </InputAdornment>
+              ),
+            }}
+            sx={searchFieldSx}
+          />
+          {onAddClick != null && (
+            <PrimaryActionButton
+              onClick={onAddClick}
+              icon={addIcon ?? <AddIcon sx={{ fontSize: 24 }} />}
+              label={addLabel}
+              data-testid={addButtonTestId}
+            />
+          )}
+        </Box>
+        {(filters != null && filters.length > 0) || renderActions != null ? (
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 1.5,
+              width: "100%",
+              minWidth: 0,
+            }}
+          >
+            {filters != null &&
+              filters.length > 0 &&
+              filters.map((filter) => (
+                <Select
+                  key={filter.label}
+                  value={filter.value}
+                  onChange={(e) => filter.onChange(e.target.value as string)}
+                  displayEmpty
+                  disabled={filter.disabled}
+                  size="small"
+                  data-testid={filter.testId}
+                  inputProps={filter.testId ? { "data-testid": `${filter.testId}-input` } : undefined}
+                  sx={filterSelectSx}
+                >
+                  <MenuItem value="">
+                    <Typography variant="body2" color="text.secondary">
+                      {filter.label}
+                    </Typography>
+                  </MenuItem>
+                  {filter.options.map((opt) => (
+                    <MenuItem key={`${filter.label}-${opt.value}`} value={opt.value} data-testid={opt.testId}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              ))}
+            {renderActions}
+          </Box>
+        ) : null}
+      </Box>
+    );
+  }
+
   return (
     /* 
       Arrangement: Filters > renderActions (default) > Search > Add
@@ -71,7 +198,8 @@ export default function ListPageToolbar({
       minWidth: 0,
       maxWidth: "100%",
       flexWrap: "wrap",
-      justifyContent: "flex-end"
+      justifyContent: toolbarAlign === "start" ? "flex-start" : "flex-end",
+      width: toolbarAlign === "start" ? "100%" : { xs: "100%", sm: "auto" },
     }}>
       {filters && filters.length > 0 && (
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
@@ -114,6 +242,8 @@ export default function ListPageToolbar({
           direction={{ xs: "column", sm: "row" }}
           spacing={2}
           alignItems={{ xs: "stretch", sm: "center" }}
+          flexWrap="wrap"
+          useFlexGap
           sx={{ minWidth: 0, maxWidth: "100%", alignSelf: { xs: "stretch", sm: "auto" } }}
         >
           {renderActions}
@@ -134,18 +264,7 @@ export default function ListPageToolbar({
             </InputAdornment>
           ),
         }}
-        sx={(theme) => ({
-          width: { xs: "100%", sm: 280 },
-          "& .MuiOutlinedInput-root": {
-            bgcolor: "#ffffff",
-            borderRadius: '15px',
-            fontSize: "0.85rem",
-            fontWeight: 600,
-            "& fieldset": { borderColor: colorTokens.border.subtle },
-            "&:hover fieldset": { borderColor: alpha(colorTokens.preschool.turquoise.main, 0.4) },
-            "&.Mui-focused fieldset": { borderColor: colorTokens.preschool.turquoise.main },
-          },
-        })}
+        sx={searchFieldSx}
       />
       {/* renderActions AFTER search (opt-in via actionsAfterSearch prop) */}
       {actionsAfterSearch && renderActions != null && (
@@ -153,6 +272,8 @@ export default function ListPageToolbar({
           direction={{ xs: "column", sm: "row" }}
           spacing={2}
           alignItems={{ xs: "stretch", sm: "center" }}
+          flexWrap="wrap"
+          useFlexGap
           sx={{ minWidth: 0, maxWidth: "100%", alignSelf: { xs: "stretch", sm: "auto" } }}
         >
           {renderActions}

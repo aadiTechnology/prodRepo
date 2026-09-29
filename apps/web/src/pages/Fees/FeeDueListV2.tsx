@@ -26,7 +26,7 @@ export default function FeeDueListV2() {
   const navigate = useNavigate();
   const controller = useFeeDueListController();
 
-  const columns = useMemo(() => createFeeDueListV2Columns({ navigate }), [navigate]);
+  const columns = useMemo(() => createFeeDueListV2Columns(), []);
 
   return (
     <ListPageLayout

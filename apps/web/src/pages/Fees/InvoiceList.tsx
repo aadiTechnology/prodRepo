@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Alert,
+  Box,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -209,6 +210,17 @@ export default function InvoiceList() {
 
 const PENDING_ACTIONS_WIDTH = 140;
 
+const PENDING_APPROVAL_FILTER_SELECT_SX = {
+  minWidth: { xs: "100%", sm: 132 },
+  flex: { sm: "1 1 132px" },
+  maxWidth: { sm: 200 },
+  "& .MuiOutlinedInput-root": {
+    borderRadius: "15px",
+    fontSize: "0.85rem",
+    fontWeight: 600,
+  },
+} as const;
+
 export function FeePendingApprovalPage() {
   const controller = useFeePendingApprovalController();
   const perms = useInvoicePermissions();
@@ -256,11 +268,15 @@ export function FeePendingApprovalPage() {
       data-testid="page-fee-pending-approval"
       header={
         <>
-          <PageHeader
-            links={[{ title: "Fee Pending Approval", path: "/fees/pending-approval" }]}
-            homePath="/"
-            actions={
+          <Box sx={{ width: "100%", minWidth: 0 }}>
+            <PageHeader
+              links={[{ title: "Fee Pending Approval", path: "/fees/pending-approval" }]}
+              homePath="/"
+            />
+            <Box sx={{ width: "100%", minWidth: 0, mt: 0.5 }}>
               <ListPageToolbar
+                toolbarAlign="start"
+                searchMinWidth={300}
                 searchValue={controller.search}
                 onSearchChange={controller.setSearch}
                 searchPlaceholder="Search student or transaction ID"
@@ -272,7 +288,7 @@ export function FeePendingApprovalPage() {
                       displayEmpty
                       size="small"
                       data-testid="input-academic-year"
-                      sx={{ minWidth: { xs: "100%", sm: 160 } }}
+                      sx={PENDING_APPROVAL_FILTER_SELECT_SX}
                     >
                       {controller.years.map((y) => (
                         <MenuItem key={y.id} value={String(y.id)}>
@@ -286,7 +302,7 @@ export function FeePendingApprovalPage() {
                       displayEmpty
                       size="small"
                       data-testid="input-class"
-                      sx={{ minWidth: { xs: "100%", sm: 140 } }}
+                      sx={PENDING_APPROVAL_FILTER_SELECT_SX}
                     >
                       <MenuItem value="">All Classes</MenuItem>
                       {controller.classes.map((c) => (
@@ -302,7 +318,7 @@ export function FeePendingApprovalPage() {
                       size="small"
                       disabled={!controller.classId}
                       data-testid="input-division"
-                      sx={{ minWidth: { xs: "100%", sm: 140 } }}
+                      sx={PENDING_APPROVAL_FILTER_SELECT_SX}
                     >
                       <MenuItem value="">All Divisions</MenuItem>
                       {controller.divisionOptions.map((option) => (
@@ -312,27 +328,11 @@ export function FeePendingApprovalPage() {
                       ))}
                     </Select>
                     <Select
-                      value={controller.studentId}
-                      onChange={(e) => controller.setStudentId(e.target.value)}
-                      displayEmpty
-                      size="small"
-                      disabled={!controller.classId || !controller.divisionId}
-                      data-testid="input-student"
-                      sx={{ minWidth: { xs: "100%", sm: 180 } }}
-                    >
-                      <MenuItem value="">All Students</MenuItem>
-                      {controller.studentOptions.map((option) => (
-                        <MenuItem key={option.id} value={String(option.id)}>
-                          {option.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    <Select
                       value={controller.status}
                       onChange={(e) => controller.setStatus(e.target.value as typeof controller.status)}
                       size="small"
                       data-testid="input-status"
-                      sx={{ minWidth: { xs: "100%", sm: 160 } }}
+                      sx={PENDING_APPROVAL_FILTER_SELECT_SX}
                     >
                       {controller.statusOptions.map((item) => (
                         <MenuItem key={item.value} value={item.value}>
@@ -343,8 +343,8 @@ export function FeePendingApprovalPage() {
                   </>
                 }
               />
-            }
-          />
+            </Box>
+          </Box>
           {controller.error && (
             <Alert severity="error" sx={{ m: 2 }} onClose={() => controller.setError(null)}>
               {controller.error}

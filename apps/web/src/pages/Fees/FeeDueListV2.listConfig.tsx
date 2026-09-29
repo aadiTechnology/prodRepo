@@ -1,6 +1,4 @@
-import { Avatar, Link, Skeleton, Stack, Typography } from "@mui/material";
-import type { NavigateFunction } from "react-router-dom";
-
+import { Avatar, Skeleton, Stack, Typography } from "@mui/material";
 import type { DataTableColumn } from "../../components/reusable";
 import StatusChip from "../../components/roles/StatusChip";
 import { colorTokens } from "../../tokens/colors";
@@ -30,13 +28,7 @@ function getInitials(name: string) {
     .join("");
 }
 
-type FeeDueListConfigArgs = {
-  navigate: NavigateFunction;
-};
-
-export function createFeeDueListV2Columns({
-  navigate,
-}: FeeDueListConfigArgs): DataTableColumn<FeeDueTableRow>[] {
+export function createFeeDueListV2Columns(): DataTableColumn<FeeDueTableRow>[] {
   return [
     {
       id: "student_name",
@@ -62,29 +54,6 @@ export function createFeeDueListV2Columns({
       id: "installment",
       label: "Installment",
       render: (row: FeeDueTableRow) => (row.__skeleton ? <Skeleton width={90} /> : row.installment || "-"),
-    },
-    {
-      id: "invoice_id",
-      label: "Invoice ID",
-      render: (row: FeeDueTableRow) =>
-        row.__skeleton ? (
-          <Skeleton width={90} />
-        ) : row.invoice_id ? (
-          <Link
-            component="button"
-            underline="hover"
-            onClick={() => navigate(`/fees/invoices?search=${encodeURIComponent(row.invoice_id || "")}`)}
-            sx={{
-              color: colorTokens.text.primary,
-              "&:hover": { color: colorTokens.text.primary },
-              "&:visited": { color: colorTokens.text.primary },
-            }}
-          >
-            {row.invoice_id}
-          </Link>
-        ) : (
-          "-"
-        ),
     },
     {
       id: "due_amount",
