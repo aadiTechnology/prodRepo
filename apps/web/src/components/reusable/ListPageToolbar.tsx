@@ -194,7 +194,6 @@ export default function ListPageToolbar({
       alignItems: { xs: "stretch", sm: "center" },
       flexDirection: { xs: "column", sm: "row" },
       gap: 2,
-      width: { xs: "100%", sm: "auto" },
       minWidth: 0,
       maxWidth: "100%",
       flexWrap: "wrap",
