@@ -1,6 +1,6 @@
 /**
  * Tenant configuration: how many days before the due date an outstanding
- * installment starts appearing in the Due Fee list (overdue is always listed).
+ * installment starts appearing in the Due Fee list (past-due installments are always listed).
  */
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -75,7 +75,7 @@ export default function FeeDueDisplayConfigPage() {
   const exampleVisibleFrom = exampleDue.subtract(daysBeforeDue, "day");
   const notes = [
     "Choose when an unpaid installment starts appearing in the Due Fee list.",
-    "Overdue installments are always shown.",
+    "Installments past their due date are always shown.",
     `Example: an installment due on ${exampleDue.format("DD MMM YYYY")} will appear in the Due Fee list from ${exampleVisibleFrom.format("DD MMM YYYY")}.`,
   ];
 

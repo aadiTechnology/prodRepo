@@ -102,7 +102,7 @@ class TenantFeeDueDisplayConfig(Base):
     Per-tenant rule for when outstanding installments start appearing in the Due Fee list.
 
     When display_enabled is on, an installment is listed only from `days_before_due` days
-    before its due date; overdue installments are always listed. When off, all
+    before its due date; installments past their due date are always listed. When off, all
     outstanding installments are listed.
     """
 

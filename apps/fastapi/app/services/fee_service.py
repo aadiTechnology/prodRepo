@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 from math import floor
 from uuid import uuid4
-from sqlalchemy import String, and_, case, cast, func, or_
+from sqlalchemy import String, and_, cast, func, or_
 from sqlalchemy.orm import Session
 from app.models.fee import FeeCategory, FeeStructure, FeeInstallment
 from app.models.academic import SchoolClass, AcademicYear
@@ -606,18 +606,14 @@ def get_fee_due_list_v2(
     class_id: int | None = None,
     installment: str | None = None,
     search: str | None = None,
-    status_filter: str = "ALL",
     page: int = 1,
     page_size: int = 10,
 ) -> dict:
     """
     Return due-fee list (installment + invoice) with summary and pagination.
+    Every outstanding installment is reported with status DUE.
     """
     try:
-        normalized_status = (status_filter or "ALL").strip().upper()
-        if normalized_status not in {"ALL", "DUE", "OVERDUE"}:
-            raise AppException("Invalid status. Allowed values: ALL, DUE, OVERDUE", status_code=422)
-
         today = date.today()
         visible_until = _due_list_visible_until(db, tenant_id, today)
 
@@ -739,17 +735,9 @@ def get_fee_due_list_v2(
         if visible_until is not None:
             base_query = base_query.filter(StudentFeeInstallment.due_date <= visible_until)
 
-        if normalized_status == "DUE":
-            base_query = base_query.filter(StudentFeeInstallment.due_date >= today)
-        elif normalized_status == "OVERDUE":
-            base_query = base_query.filter(StudentFeeInstallment.due_date < today)
-
         summary_query = (
             db.query(
                 func.coalesce(func.sum(due_amount_expr), 0).label("total_due"),
-                func.count(func.distinct(case((StudentFeeInstallment.due_date < today, Student.id)))).label(
-                    "overdue_students"
-                ),
             )
             .select_from(Student)
             .join(StudentFeeAssignment, StudentFeeAssignment.student_id == Student.id)
@@ -817,10 +805,6 @@ def get_fee_due_list_v2(
             summary_query = summary_query.filter(StudentInvoice.installment == installment.strip())
         if visible_until is not None:
             summary_query = summary_query.filter(StudentFeeInstallment.due_date <= visible_until)
-        if normalized_status == "DUE":
-            summary_query = summary_query.filter(StudentFeeInstallment.due_date >= today)
-        elif normalized_status == "OVERDUE":
-            summary_query = summary_query.filter(StudentFeeInstallment.due_date < today)
 
         total = base_query.count()
         offset = (page - 1) * page_size
@@ -842,8 +826,7 @@ def get_fee_due_list_v2(
                 "invoice_id": row.invoice_id,
                 "due_amount": float(row.due_amount or 0),
                 "due_date": row.due_date,
-                "days_overdue": (today - row.due_date).days if row.due_date and row.due_date < today else 0,
-                "status": "OVERDUE" if row.due_date and row.due_date < today else "DUE",
+                "status": "DUE",
             }
             for row in rows
         ]
@@ -851,7 +834,6 @@ def get_fee_due_list_v2(
         return {
             "summary": {
                 "total_due": float(summary_row.total_due or 0),
-                "overdue_students": int(summary_row.overdue_students or 0),
             },
             "data": data,
             "total": total,

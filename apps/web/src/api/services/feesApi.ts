@@ -1,8 +1,6 @@
 import apiClient from "../client";
 import academicYearService from "./academicYearService";
 
-export type FeeDueStatusFilter = "ALL" | "DUE" | "OVERDUE";
-
 export interface FeeDueListItem {
   student_id: number;
   student_name: string;
@@ -12,13 +10,11 @@ export interface FeeDueListItem {
   invoice_id: string | null;
   due_amount: number;
   due_date: string;
-  days_overdue: number;
-  status: "DUE" | "OVERDUE";
+  status: "DUE";
 }
 
 export interface FeeDueListSummary {
   total_due: number;
-  overdue_students: number;
 }
 
 export interface FeeDueListResponse {
@@ -34,7 +30,6 @@ export interface FeeDueListQueryParams {
   class_id?: number;
   installment?: string;
   search?: string;
-  status?: FeeDueStatusFilter;
   page?: number;
   page_size?: number;
 }

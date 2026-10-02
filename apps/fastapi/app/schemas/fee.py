@@ -116,7 +116,6 @@ class FeeStructurePaginatedResponse(BaseModel):
 
 class FeeDueListSummary(BaseModel):
     total_due: float
-    overdue_students: int
 
 
 class FeeDueListItem(BaseModel):
@@ -128,7 +127,6 @@ class FeeDueListItem(BaseModel):
     invoice_id: Optional[str] = None
     due_amount: float
     due_date: date
-    days_overdue: int
     status: str
 
 

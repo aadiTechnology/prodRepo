@@ -5,17 +5,10 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import feesApi, {
   type AcademicYearOption,
   type FeeDueListItem,
-  type FeeDueStatusFilter,
 } from "../api/services/feesApi";
 import { resolveCurrentAcademicYearId } from "../utils/academicYear";
 
 export type FeeDueTableRow = FeeDueListItem & { __skeleton?: boolean; __key: string };
-
-const FEE_DUE_STATUS_OPTIONS: { label: string; value: FeeDueStatusFilter }[] = [
-  { label: "All", value: "ALL" },
-  { label: "Due", value: "DUE" },
-  { label: "Overdue", value: "OVERDUE" },
-];
 
 export type UseFeeDueListControllerResult = {
   search: string;
@@ -24,8 +17,6 @@ export type UseFeeDueListControllerResult = {
   setClassId: (value: string) => void;
   installment: string;
   setInstallment: (value: string) => void;
-  status: FeeDueStatusFilter;
-  setStatus: (value: FeeDueStatusFilter) => void;
   page: number;
   setPage: (value: number) => void;
   rowsPerPage: number;
@@ -35,7 +26,6 @@ export type UseFeeDueListControllerResult = {
   academicYears: AcademicYearOption[];
   classes: Array<{ id: number; name: string }>;
   installmentOptions: string[];
-  statusOptions: { label: string; value: FeeDueStatusFilter }[];
   total: number;
   rows: FeeDueTableRow[];
   loading: boolean;
@@ -56,7 +46,6 @@ async function collectDueListRows(
     const response = await feesApi.getDueListV2({
       academic_year_id: academicYearId,
       class_id: classId ? Number(classId) : undefined,
-      status: "ALL",
       page,
       page_size: pageSize,
     });
@@ -73,7 +62,6 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [classId, setClassIdState] = useState<string>("");
   const [installment, setInstallmentState] = useState<string>("");
-  const [status, setStatusState] = useState<FeeDueStatusFilter>("ALL");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_LIST_ROWS_PER_PAGE);
   const [academicYearId, setAcademicYearIdState] = useState<number | null>(null);
@@ -81,22 +69,16 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
   const setClassId = useCallback((value: string) => {
     setClassIdState(value);
     setInstallmentState("");
-    setStatusState("ALL");
   }, []);
 
   const setInstallment = useCallback((value: string) => {
     setInstallmentState(value);
   }, []);
 
-  const setStatus = useCallback((value: FeeDueStatusFilter) => {
-    setStatusState(value);
-  }, []);
-
   const setAcademicYearId = useCallback((value: number) => {
     setAcademicYearIdState(value);
     setClassIdState("");
     setInstallmentState("");
-    setStatusState("ALL");
   }, []);
 
   useEffect(() => {
@@ -106,7 +88,7 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, classId, installment, status, academicYearId]);
+  }, [debouncedSearch, classId, installment, academicYearId]);
 
   const { data: academicYears = [] } = useQuery({
     queryKey: ["fee-due-list-v2", "academic-years"],
@@ -132,7 +114,6 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
       academicYearId,
       classId,
       installment,
-      status,
       debouncedSearch,
       page,
       rowsPerPage,
@@ -143,7 +124,6 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
         class_id: classId ? Number(classId) : undefined,
         installment: installment || undefined,
         search: debouncedSearch || undefined,
-        status,
         page: page + 1,
         page_size: rowsPerPage,
       }),
@@ -163,34 +143,13 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
     enabled: !!academicYearId,
   });
 
-  const statusOptionsQuery = useQuery({
-    queryKey: ["fee-due-list-v2", "statuses", academicYearId, classId],
-    queryFn: async () => {
-      if (!academicYearId) return FEE_DUE_STATUS_OPTIONS;
-      const rows = await collectDueListRows(academicYearId, classId);
-      const found = new Set<FeeDueStatusFilter>();
-      for (const row of rows) {
-        if (row.status === "DUE" || row.status === "OVERDUE") {
-          found.add(row.status);
-        }
-      }
-      const next = FEE_DUE_STATUS_OPTIONS.filter(
-        (option) => option.value === "ALL" || found.has(option.value)
-      );
-      return next.length ? next : [{ label: "All", value: "ALL" }];
-    },
-    enabled: !!academicYearId,
-  });
-
   const installmentOptions = installmentQuery.data ?? [];
-  const statusOptions = statusOptionsQuery.data ?? FEE_DUE_STATUS_OPTIONS;
 
   useEffect(() => {
     if (!classId) return;
     if (!classes.some((item) => String(item.id) === classId)) {
       setClassIdState("");
       setInstallmentState("");
-      setStatusState("ALL");
     }
   }, [classes, classId]);
 
@@ -200,12 +159,6 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
       setInstallmentState("");
     }
   }, [installmentOptions, installment]);
-
-  useEffect(() => {
-    if (!statusOptions.some((option) => option.value === status)) {
-      setStatusState("ALL");
-    }
-  }, [statusOptions, status]);
 
   const records = dueListQuery.data?.data ?? [];
   const total = dueListQuery.data?.total ?? 0;
@@ -224,8 +177,6 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
     setClassId,
     installment,
     setInstallment,
-    status,
-    setStatus,
     page,
     setPage,
     rowsPerPage,
@@ -235,7 +186,6 @@ export function useFeeDueListController(): UseFeeDueListControllerResult {
     academicYears,
     classes,
     installmentOptions,
-    statusOptions,
     total,
     rows,
     loading: dueListQuery.isLoading,

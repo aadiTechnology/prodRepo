@@ -168,7 +168,6 @@ async def read_fee_due_list_v2(
     class_id: int | None = Query(None, ge=1),
     installment: str | None = Query(None),
     search: str | None = Query(None),
-    status: str = Query("ALL"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -182,7 +181,6 @@ async def read_fee_due_list_v2(
         class_id=class_id,
         installment=installment,
         search=search,
-        status_filter=status,
         page=page,
         page_size=page_size,
     )

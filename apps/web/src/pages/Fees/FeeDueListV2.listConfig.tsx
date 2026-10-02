@@ -2,14 +2,7 @@ import { Avatar, Skeleton, Stack, Typography } from "@mui/material";
 import type { DataTableColumn } from "../../components/reusable";
 import StatusChip from "../../components/roles/StatusChip";
 import { colorTokens } from "../../tokens/colors";
-import type { FeeDueStatusFilter } from "../../api/services/feesApi";
 import type { FeeDueTableRow } from "../../hooks/useFeeDueListController";
-
-export const FEE_DUE_STATUS_OPTIONS: { label: string; value: FeeDueStatusFilter }[] = [
-  { label: "All", value: "ALL" },
-  { label: "Due", value: "DUE" },
-  { label: "Overdue", value: "OVERDUE" },
-];
 
 export function formatCurrency(amount: number) {
   return `₹${Number(amount || 0).toLocaleString("en-IN")}`;
@@ -74,10 +67,7 @@ export function createFeeDueListV2Columns(): DataTableColumn<FeeDueTableRow>[] {
         row.__skeleton ? (
           <Skeleton width={120} />
         ) : (
-          <StatusChip
-            status={row.status}
-            label={row.status === "OVERDUE" ? `${row.days_overdue} days overdue` : "Due"}
-          />
+          <StatusChip status="DUE" />
         ),
     },
   ];

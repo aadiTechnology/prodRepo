@@ -2,7 +2,7 @@ import { Chip, alpha } from "@mui/material";
 import { colorTokens } from "../../tokens/colors";
 
 interface StatusChipProps {
-  status: "ACTIVE" | "INACTIVE" | "COMPLETED" | "DUE" | "OVERDUE";
+  status: "ACTIVE" | "INACTIVE" | "COMPLETED" | "DUE";
   label?: string;
 }
 
@@ -24,9 +24,7 @@ export default function StatusChip({ status, label }: StatusChipProps) {
         ? "Completed"
         : status === "DUE"
           ? "Due"
-          : status === "OVERDUE"
-            ? "Overdue"
-            : "Inactive");
+          : "Inactive");
 
   return (
     <Chip

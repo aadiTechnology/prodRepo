@@ -15,7 +15,6 @@ import {
   ListPageLayout,
   ListPageToolbar,
 } from "../../components/reusable";
-import { type FeeDueStatusFilter } from "../../api/services/feesApi";
 import { useFeeDueListController, type FeeDueTableRow } from "../../hooks/useFeeDueListController";
 import { createFeeDueListV2Columns } from "./FeeDueListV2.listConfig";
 import {
@@ -90,19 +89,6 @@ export default function FeeDueListV2() {
                       {controller.installmentOptions.map((item) => (
                         <MenuItem key={item} value={item}>
                           {item}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    <Select
-                      value={controller.status}
-                      onChange={(e) => controller.setStatus(e.target.value as FeeDueStatusFilter)}
-                      size="small"
-                      data-testid="input-status"
-                      sx={{ minWidth: { xs: "100%", sm: 150 } }}
-                    >
-                      {controller.statusOptions.map((item) => (
-                        <MenuItem key={item.value} value={item.value}>
-                          {item.value === "ALL" ? "All Statuses" : item.label}
                         </MenuItem>
                       ))}
                     </Select>
