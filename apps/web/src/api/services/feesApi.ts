@@ -39,6 +39,11 @@ export interface FeeDueListQueryParams {
   page_size?: number;
 }
 
+export interface FeeDueDisplayConfig {
+  display_enabled: boolean;
+  days_before_due: number;
+}
+
 export interface AcademicYearOption {
   id: number;
   name: string;
@@ -52,6 +57,16 @@ export interface ClassOption {
 const feesApi = {
   getDueListV2: async (params: FeeDueListQueryParams): Promise<FeeDueListResponse> => {
     const response = await apiClient.get<FeeDueListResponse>("/fees/due-list-v2", { params });
+    return response.data;
+  },
+
+  getDueDisplayConfig: async (): Promise<FeeDueDisplayConfig> => {
+    const response = await apiClient.get<FeeDueDisplayConfig>("/fees/due-display-config");
+    return response.data;
+  },
+
+  updateDueDisplayConfig: async (payload: Partial<FeeDueDisplayConfig>): Promise<FeeDueDisplayConfig> => {
+    const response = await apiClient.put<FeeDueDisplayConfig>("/fees/due-display-config", payload);
     return response.data;
   },
 

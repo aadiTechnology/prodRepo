@@ -18,7 +18,7 @@ from app.models.theme_template import ThemeTemplate
 from app.models.class_fee_structure_assignment import ClassFeeStructureAssignment, AssignmentStatus
 from app.models.academic import AcademicYear, SchoolClass, ClassDivision
 # from app.models.school_class import SchoolClass
-from app.models.fee import FeeCategory, FeeStructure, FeeInstallment
+from app.models.fee import FeeCategory, FeeStructure, FeeInstallment, TenantFeeDueDisplayConfig
 from app.models.fee_discount import FeeDiscount
 from app.models.fee_payment import FeePayment, FeePaymentAllocation
 from app.models.role_menu_permission import RoleMenuPermission
@@ -94,6 +94,7 @@ __all__ = [
     "AcademicYear",
     "FeeCategory",
     "FeeInstallment",
+    "TenantFeeDueDisplayConfig",
     "FeeDiscount",
     "FeeLedger",
     "Student",

@@ -83,6 +83,7 @@ const ReceiptPage = lazy(() => import("../pages/Fees/ReceiptPage"));
 const GenerateInvoice = lazy(() => import("../pages/Fees/GenerateInvoice"));
 const FeeReportPage = lazy(() => import("../pages/Fees/FeeReportPage"));
 const FeeDueListV2 = lazy(() => import("../pages/Fees/FeeDueListV2"));
+const FeeDueDisplayConfigPage = lazy(() => import("../pages/Fees/FeeDueDisplayConfigPage"));
 const CreateNotice = lazy(() => import("../pages/Communication/CreateNotice"));
 const NoticeList = lazy(() => import("../pages/Communication/NoticeList"));
 const NoticeDetails = lazy(() => import("../pages/Communication/NoticeDetails"));
@@ -329,6 +330,10 @@ export default function AppRoutes() {
           <Route
             path="/fees/due-list-v2"
             element={<ProtectedRoute requiredPermissions="FEE_MGMT:view"><FeeDueListV2 /></ProtectedRoute>}
+          />
+          <Route
+            path="/fees/due-display-config"
+            element={<ProtectedRoute requiredPermissions="FEE_MGMT:edit"><FeeDueDisplayConfigPage /></ProtectedRoute>}
           />
           <Route
             path="/fees/pending-approval"

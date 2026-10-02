@@ -144,6 +144,13 @@ const CONFIG_SECTIONS: ConfigSection[] = [
         permission: "FEE_MGMT:view",
         menuPaths: ["/fees/discounts"],
       },
+      {
+        id: "due-fee-configuration",
+        label: "Due Fee Configuration",
+        path: "/fees/due-display-config",
+        permission: "FEE_MGMT:edit",
+        menuPaths: ["/fees/due-display-config", "/fees/due-list-v2", "/fees/setup"],
+      },
     ],
   },
 ];

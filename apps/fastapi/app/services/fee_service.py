@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from math import floor
 from uuid import uuid4
 from sqlalchemy import String, and_, case, cast, func, or_
@@ -10,7 +10,15 @@ from app.models.student import Student
 from app.models.student_fee_assignment import StudentFeeAssignment, StudentFeeInstallment
 from app.services.school_class_service import require_active_class, require_active_division
 from app.models.student_invoice import StudentInvoice
-from app.schemas.fee import FeeStructureCreate, FeeStructureUpdate, FeeCategoryCreate, FeeCategoryUpdate
+from app.schemas.fee import (
+    FeeStructureCreate,
+    FeeStructureUpdate,
+    FeeCategoryCreate,
+    FeeCategoryUpdate,
+    FeeDueDisplayConfigResponse,
+    FeeDueDisplayConfigUpdate,
+)
+from app.repositories import fee_due_display_config_repository as due_display_repo
 from app.core.exceptions import AppException, NotFoundException, ConflictException
 from app.core.logging_config import get_logger
 
@@ -539,6 +547,57 @@ def delete_fee_structure(db: Session, structure_id: int, tenant_id: int, user_id
     db.commit()
 
 
+def _clamp_days_before_due(value) -> int:
+    try:
+        days = int(value)
+    except (TypeError, ValueError):
+        return due_display_repo.DEFAULT_DAYS_BEFORE_DUE
+    return max(0, min(30, days))
+
+
+def _due_display_config_to_response(row) -> FeeDueDisplayConfigResponse:
+    return FeeDueDisplayConfigResponse(
+        display_enabled=bool(row.display_enabled),
+        days_before_due=_clamp_days_before_due(row.days_before_due),
+    )
+
+
+def get_fee_due_display_config(db: Session, tenant_id: int) -> FeeDueDisplayConfigResponse:
+    row = due_display_repo.get_or_create_config(db, tenant_id=tenant_id)
+    return _due_display_config_to_response(row)
+
+
+def update_fee_due_display_config(
+    db: Session,
+    tenant_id: int,
+    payload: FeeDueDisplayConfigUpdate,
+    user_id: int | None = None,
+) -> FeeDueDisplayConfigResponse:
+    if payload.display_enabled is None and payload.days_before_due is None:
+        raise AppException("display_enabled or days_before_due is required", status_code=422)
+    row = due_display_repo.get_or_create_config(db, tenant_id=tenant_id, created_by=user_id)
+    updated = due_display_repo.update_config(
+        db,
+        row=row,
+        display_enabled=payload.display_enabled,
+        days_before_due=(
+            _clamp_days_before_due(payload.days_before_due)
+            if payload.days_before_due is not None
+            else None
+        ),
+        updated_by=user_id,
+    )
+    return _due_display_config_to_response(updated)
+
+
+def _due_list_visible_until(db: Session, tenant_id: int, today: date) -> date | None:
+    """Last due date shown in the Due Fee list, or None when every outstanding installment is shown."""
+    row = due_display_repo.get_config(db, tenant_id=tenant_id)
+    if not row or not row.display_enabled:
+        return None
+    return today + timedelta(days=_clamp_days_before_due(row.days_before_due))
+
+
 def get_fee_due_list_v2(
     db: Session,
     *,
@@ -560,6 +619,7 @@ def get_fee_due_list_v2(
             raise AppException("Invalid status. Allowed values: ALL, DUE, OVERDUE", status_code=422)
 
         today = date.today()
+        visible_until = _due_list_visible_until(db, tenant_id, today)
 
         latest_assignment_sq = (
             db.query(
@@ -676,6 +736,9 @@ def get_fee_due_list_v2(
         if installment:
             base_query = base_query.filter(StudentInvoice.installment == installment.strip())
 
+        if visible_until is not None:
+            base_query = base_query.filter(StudentFeeInstallment.due_date <= visible_until)
+
         if normalized_status == "DUE":
             base_query = base_query.filter(StudentFeeInstallment.due_date >= today)
         elif normalized_status == "OVERDUE":
@@ -752,6 +815,8 @@ def get_fee_due_list_v2(
             )
         if installment:
             summary_query = summary_query.filter(StudentInvoice.installment == installment.strip())
+        if visible_until is not None:
+            summary_query = summary_query.filter(StudentFeeInstallment.due_date <= visible_until)
         if normalized_status == "DUE":
             summary_query = summary_query.filter(StudentFeeInstallment.due_date >= today)
         elif normalized_status == "OVERDUE":

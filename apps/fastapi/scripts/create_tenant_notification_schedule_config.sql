@@ -1,6 +1,8 @@
--- Tenant admin configuration for Holiday/Exam scheduled reminder & day notifications.
+-- Tenant admin configuration for Holiday/Exam/Fee scheduled reminder & day notifications.
 -- Target: MS SQL Server (erpdb). Run once in SSMS.
--- Supports events only: holiday.reminder, holiday.day, exam.reminder, exam.day
+-- Supports events: holiday.reminder, holiday.day, exam.reminder, exam.day, fee.reminder, fee.day
+-- Existing databases created before the fee columns: run
+-- alter_tenant_notification_schedule_config_add_fee.sql instead (safe to re-run).
 
 USE [erpdb];
 GO
@@ -30,6 +32,14 @@ BEGIN
             CONSTRAINT [DF_tns_config_exam_day_enabled] DEFAULT (1),
         [exam_push_enabled]               BIT            NOT NULL
             CONSTRAINT [DF_tns_config_exam_push_enabled] DEFAULT (1),
+        [fee_reminder_enabled]            BIT            NOT NULL
+            CONSTRAINT [DF_tns_config_fee_reminder_enabled] DEFAULT (1),
+        [fee_reminder_days_before]        INT            NOT NULL
+            CONSTRAINT [DF_tns_config_fee_reminder_days] DEFAULT (1),
+        [fee_day_enabled]                 BIT            NOT NULL
+            CONSTRAINT [DF_tns_config_fee_day_enabled] DEFAULT (1),
+        [fee_push_enabled]                BIT            NOT NULL
+            CONSTRAINT [DF_tns_config_fee_push_enabled] DEFAULT (1),
         [created_at]                      DATETIME2(7)   NOT NULL
             CONSTRAINT [DF_tns_config_created_at] DEFAULT (SYSUTCDATETIME()),
         [created_by]                      INT            NULL,
@@ -42,7 +52,9 @@ BEGIN
         CONSTRAINT [CK_tns_config_holiday_days_before]
             CHECK ([holiday_reminder_days_before] BETWEEN 0 AND 30),
         CONSTRAINT [CK_tns_config_exam_days_before]
-            CHECK ([exam_reminder_days_before] BETWEEN 0 AND 30)
+            CHECK ([exam_reminder_days_before] BETWEEN 0 AND 30),
+        CONSTRAINT [CK_tns_config_fee_days_before]
+            CHECK ([fee_reminder_days_before] BETWEEN 0 AND 30)
     );
 END
 GO

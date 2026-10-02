@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import Optional, List
-from pydantic import BaseModel, constr, condecimal
+from pydantic import BaseModel, Field, constr, condecimal
 
 
 class FeeCategoryBase(BaseModel):
@@ -138,3 +138,13 @@ class FeeDueListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class FeeDueDisplayConfigResponse(BaseModel):
+    display_enabled: bool
+    days_before_due: int
+
+
+class FeeDueDisplayConfigUpdate(BaseModel):
+    display_enabled: Optional[bool] = None
+    days_before_due: Optional[int] = Field(None, ge=0, le=30)

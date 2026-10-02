@@ -95,3 +95,23 @@ class FeeInstallment(Base):
     fee_category = relationship("FeeCategory")
     # Fee payments are linked via FeePaymentAllocation (no direct FK from FeePayment -> FeeInstallment).
     # Keep the model graph consistent and let repositories join through allocations.
+
+
+class TenantFeeDueDisplayConfig(Base):
+    """
+    Per-tenant rule for when outstanding installments start appearing in the Due Fee list.
+
+    When display_enabled is on, an installment is listed only from `days_before_due` days
+    before its due date; overdue installments are always listed. When off, all
+    outstanding installments are listed.
+    """
+
+    __tablename__ = "tenant_fee_due_display_config"
+
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), primary_key=True)
+    display_enabled = Column(Boolean, nullable=False, default=False)
+    days_before_due = Column(Integer, nullable=False, default=7)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_by = Column(Integer, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+    updated_by = Column(Integer, nullable=True)

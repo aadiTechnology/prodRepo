@@ -11,6 +11,8 @@ from app.schemas.fee import (
     FeeStructureResponse,
     FeeStructurePaginatedResponse,
     FeeDueListResponse,
+    FeeDueDisplayConfigResponse,
+    FeeDueDisplayConfigUpdate,
 )
 from app.services import fee_service
 from app.core.logging_config import get_logger
@@ -183,5 +185,26 @@ async def read_fee_due_list_v2(
         status_filter=status,
         page=page,
         page_size=page_size,
+    )
+
+
+@router.get("/due-display-config", response_model=FeeDueDisplayConfigResponse)
+async def read_fee_due_display_config(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_permission("Fees", "view")),
+):
+    """Get when outstanding installments start appearing in the Due Fee list."""
+    return fee_service.get_fee_due_display_config(db, current_user.tenant_id)
+
+
+@router.put("/due-display-config", response_model=FeeDueDisplayConfigResponse)
+async def update_fee_due_display_config(
+    payload: FeeDueDisplayConfigUpdate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_permission("Fees", "edit")),
+):
+    """Update when outstanding installments start appearing in the Due Fee list."""
+    return fee_service.update_fee_due_display_config(
+        db, current_user.tenant_id, payload, current_user.id
     )
 

@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
+import { useRBAC } from "../../context/RBACContext";
 import { PageHeader } from "../../components/layout";
 import {
   EntityTableSection,
@@ -24,6 +25,8 @@ import {
 
 export default function FeeDueListV2() {
   const navigate = useNavigate();
+  const { hasPermission } = useRBAC();
+  const canConfigure = hasPermission("FEE_MGMT:edit");
   const controller = useFeeDueListController();
 
   const columns = useMemo(() => createFeeDueListV2Columns(), []);
@@ -42,6 +45,9 @@ export default function FeeDueListV2() {
                 searchValue={controller.search}
                 onSearchChange={controller.setSearch}
                 searchPlaceholder="Search by student name or invoice ID"
+                onAddClick={canConfigure ? () => navigate("/fees/due-display-config") : undefined}
+                addLabel="Due Fee Configuration"
+                addButtonTestId="btn-due-display-config"
                 renderActions={
                   <>
                     <Select
