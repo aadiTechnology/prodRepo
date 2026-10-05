@@ -1,4 +1,5 @@
 """Dashboard response schemas."""
+from datetime import date
 from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
@@ -25,6 +26,39 @@ class FeeCollectionSummary(BaseModel):
     total_fee: float = Field(default=0.0)
     total_paid: float = Field(default=0.0)
     total_balance: float = Field(default=0.0)
+
+class DashboardFeeDueItem(BaseModel):
+    """One outstanding installment shown in the admin Upcoming Dues list."""
+    student_id: int
+    student_name: str
+    class_name: Optional[str] = None
+    installment: Optional[str] = None
+    invoice_row_id: Optional[int] = None
+    due_amount: float = Field(default=0.0)
+    due_date: Optional[date] = None
+
+class AdminFeeOverview(BaseModel):
+    """Admin dashboard fee widgets for one academic year."""
+    academic_year_id: Optional[int] = None
+    # Fee Collection Summary widget
+    total_fee: float = Field(default=0.0)
+    total_collected: float = Field(default=0.0)
+    total_pending: float = Field(default=0.0)
+    collection_percentage: float = Field(default=0.0)
+    paid_invoices: int = Field(default=0)
+    partial_invoices: int = Field(default=0)
+    pending_invoices: int = Field(default=0)
+    students_with_dues: int = Field(default=0)
+    # Collections & Upcoming Dues widget
+    today_collected: float = Field(default=0.0)
+    month_collected: float = Field(default=0.0)
+    pending_approval_count: int = Field(default=0)
+    pending_approval_amount: float = Field(default=0.0)
+    due_total: float = Field(default=0.0)
+    due_count: int = Field(default=0)
+    # None = Due Fee list shows every outstanding installment (no look-ahead window configured)
+    due_window_days: Optional[int] = None
+    upcoming_dues: List[DashboardFeeDueItem] = Field(default_factory=list)
 
 class ClassStudentCount(BaseModel):
     """Per-class student count for admin snapshot."""

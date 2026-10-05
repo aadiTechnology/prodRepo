@@ -1,12 +1,12 @@
 """Dashboard router - Unified role-based landing stats endpoint."""
 from datetime import datetime, date, timedelta
 from typing import Any, Optional, List, cast as typing_cast
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text, func, and_, or_, case, extract, cast, Date
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, get_rbac_role_codes
+from app.core.dependencies import get_current_user, get_rbac_role_codes, require_permission
 from app.core.logging_config import get_logger
 from app.schemas.auth import CurrentUser
 
@@ -17,7 +17,7 @@ from app.models.student_invoice import StudentInvoice
 from app.models.holiday import Holiday
 from app.repositories import notice_repository
 from app.services.notice_access import NoticeViewerContext
-from app.services import notice_service, profile_image_service
+from app.services import fee_report_service, notice_service, profile_image_service
 from app.services.enrollment_document_storage import resolve_document_url
 from app.models.homework import Homework
 from app.repositories.homework_repository import _build_class_division_scope_filter
@@ -29,6 +29,7 @@ from app.models.academic import SchoolClass, ClassDivision
 from app.schemas.dashboard import (
     DashboardResponse,
     AdminDashboardResponse,
+    AdminFeeOverview,
     TeacherDashboardResponse,
     StudentDashboardResponse,
     AttendanceOverview,
@@ -439,6 +440,25 @@ def get_fees_card(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to load fee data.",
         )
+
+
+@router.get("/fee-overview", response_model=AdminFeeOverview)
+def get_fee_overview_card(
+    academic_year_id: Optional[int] = Query(None, ge=1),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_permission("Fees", "view")),
+):
+    """Admin fee widgets: collection summary, recent collections and upcoming dues for one academic year."""
+    if _resolve_dashboard_role(db, current_user) not in ("SYSTEM_ADMIN", "TENANT_ADMIN"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Fee overview is available to administrators only.",
+        )
+    return fee_report_service.get_dashboard_fee_overview(
+        db,
+        tenant_id=current_user.tenant_id or 1,
+        academic_year_id=academic_year_id,
+    )
 
 
 def _build_admin_dashboard(
@@ -1135,6 +1155,29 @@ def _build_student_dashboard(
     )
     return DashboardResponse(role=role_str, data=student_data)
 
+def _resolve_dashboard_role(db: Session, current_user: CurrentUser) -> str:
+    """Active dashboard role via RBAC, falling back to the legacy user role."""
+    rbac_role_codes = get_rbac_role_codes(db, current_user.id)
+
+    if any("system_admin" in r or "super_admin" in r for r in rbac_role_codes):
+        return "SYSTEM_ADMIN"
+    if any("tenant_admin" in r or "admin" in r for r in rbac_role_codes):
+        return "TENANT_ADMIN"
+    if any("teacher" in r for r in rbac_role_codes):
+        return "TEACHER"
+    if any("student" in r for r in rbac_role_codes):
+        return "STUDENT"
+
+    from app.models.user import UserRole
+    if current_user.role == UserRole.SUPER_ADMIN:
+        return "SYSTEM_ADMIN"
+    if current_user.role in (UserRole.ADMIN, UserRole.TENANT_ADMIN):
+        return "TENANT_ADMIN"
+    if "teacher" in current_user.email.lower():
+        return "TEACHER"
+    return "STUDENT"
+
+
 def _get_my_dashboard_impl(
     db: Session,
     current_user: CurrentUser,
@@ -1157,33 +1200,7 @@ def _get_my_dashboard_impl(
     eff_fee_start: Optional[date] = fee_start_date or start_date
     eff_fee_end: Optional[date] = fee_end_date or end_date
 
-    # Determine active role via RBAC
-    rbac_role_codes = get_rbac_role_codes(db, current_user.id)
-    role_str = "STUDENT"
-
-    is_system_admin = any("system_admin" in r or "super_admin" in r for r in rbac_role_codes)
-    is_tenant_admin = any("tenant_admin" in r or "admin" in r for r in rbac_role_codes)
-    is_teacher = any("teacher" in r for r in rbac_role_codes)
-    is_student = any("student" in r for r in rbac_role_codes)
-
-    if is_system_admin:
-        role_str = "SYSTEM_ADMIN"
-    elif is_tenant_admin:
-        role_str = "TENANT_ADMIN"
-    elif is_teacher:
-        role_str = "TEACHER"
-    elif is_student:
-        role_str = "STUDENT"
-    else:
-        from app.models.user import UserRole
-        if current_user.role == UserRole.SUPER_ADMIN:
-            role_str = "SYSTEM_ADMIN"
-        elif current_user.role in (UserRole.ADMIN, UserRole.TENANT_ADMIN):
-            role_str = "TENANT_ADMIN"
-        elif "teacher" in current_user.email.lower():
-            role_str = "TEACHER"
-        else:
-            role_str = "STUDENT"
+    role_str = _resolve_dashboard_role(db, current_user)
 
     logger.info(f"Dashboard for {current_user.email} → {role_str} (tenant {tenant_id})")
 

@@ -1,17 +1,23 @@
 """Fee Report Service — reads from student_invoices (source of truth)."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
+from app.repositories import invoice_repository
+from app.schemas.dashboard import AdminFeeOverview, DashboardFeeDueItem
 from app.schemas.fee_report_schema import (
     FeeReportFilterOptions,
     FeeReportResponse,
     FeeReportRow,
     FeeReportSummary,
 )
+from app.services import fee_service
+from app.services.homework_service import resolve_current_academic_year_id
+
+DASHBOARD_UPCOMING_DUES_LIMIT = 5
 
 
 def get_filter_options(
@@ -223,4 +229,72 @@ def get_fee_report(
         total=total,
         page=page,
         size=size,
+    )
+
+
+def get_dashboard_fee_overview(
+    db: Session,
+    tenant_id: int,
+    academic_year_id: Optional[int] = None,
+) -> AdminFeeOverview:
+    """Fee status for the admin dashboard widgets; defaults to the tenant's current academic year."""
+    ay_id = academic_year_id or resolve_current_academic_year_id(db, tenant_id)
+    if ay_id is None:
+        return AdminFeeOverview()
+
+    invoice_summary = invoice_repository.get_dashboard_invoice_summary(
+        db, tenant_id=tenant_id, academic_year_id=ay_id
+    )
+    total_fee = float(invoice_summary.get("total_fee") or 0)
+    total_collected = float(invoice_summary.get("total_collected") or 0)
+
+    # fee_payments.payment_date is stored in UTC.
+    today_utc = datetime.utcnow().date()
+    collections = invoice_repository.get_dashboard_collection_summary(
+        db,
+        tenant_id=tenant_id,
+        academic_year_id=ay_id,
+        today=today_utc,
+        month_start=today_utc.replace(day=1),
+    )
+
+    due_list = fee_service.get_fee_due_list_v2(
+        db,
+        tenant_id=tenant_id,
+        academic_year_id=ay_id,
+        page=1,
+        page_size=DASHBOARD_UPCOMING_DUES_LIMIT,
+    )
+
+    return AdminFeeOverview(
+        academic_year_id=ay_id,
+        total_fee=total_fee,
+        total_collected=total_collected,
+        total_pending=float(invoice_summary.get("total_pending") or 0),
+        collection_percentage=(
+            round(total_collected * 100.0 / total_fee, 2) if total_fee > 0 else 0.0
+        ),
+        paid_invoices=int(invoice_summary.get("paid_invoices") or 0),
+        partial_invoices=int(invoice_summary.get("partial_invoices") or 0),
+        pending_invoices=int(invoice_summary.get("pending_invoices") or 0),
+        students_with_dues=int(invoice_summary.get("students_with_dues") or 0),
+        today_collected=float(collections.get("today_collected") or 0),
+        month_collected=float(collections.get("month_collected") or 0),
+        pending_approval_count=int(collections.get("pending_approval_count") or 0),
+        pending_approval_amount=float(collections.get("pending_approval_amount") or 0),
+        due_total=float(due_list["summary"]["total_due"] or 0),
+        due_count=int(due_list["total"] or 0),
+        due_window_days=fee_service.get_due_list_window_days(db, tenant_id),
+        upcoming_dues=[
+            DashboardFeeDueItem(
+                student_id=row["student_id"],
+                student_name=row["student_name"],
+                class_name=row["class_name"],
+                installment=row["installment"] or None,
+                invoice_row_id=row["invoice_row_id"],
+                due_amount=row["due_amount"],
+                due_date=row["due_date"],
+            )
+            for row in due_list["data"]
+        ],
     )

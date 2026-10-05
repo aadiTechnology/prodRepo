@@ -23,6 +23,37 @@ export interface FeeCollectionSummary {
   total_balance: number;
 }
 
+export interface DashboardFeeDueItem {
+  student_id: number;
+  student_name: string;
+  class_name: string | null;
+  installment: string | null;
+  invoice_row_id: number | null;
+  due_amount: number;
+  due_date: string | null;
+}
+
+export interface AdminFeeOverview {
+  academic_year_id: number | null;
+  total_fee: number;
+  total_collected: number;
+  total_pending: number;
+  collection_percentage: number;
+  paid_invoices: number;
+  partial_invoices: number;
+  pending_invoices: number;
+  students_with_dues: number;
+  today_collected: number;
+  month_collected: number;
+  pending_approval_count: number;
+  pending_approval_amount: number;
+  due_total: number;
+  due_count: number;
+  /** null = Due Fee list shows every outstanding installment (no look-ahead window). */
+  due_window_days: number | null;
+  upcoming_dues: DashboardFeeDueItem[];
+}
+
 export interface ClassStudentCount {
   class_name: string;
   count: number;
@@ -193,6 +224,21 @@ const dashboardService = {
       params: { start_date: startDate, end_date: endDate },
     });
     return data;
+  },
+
+  /** Admin fee widgets (collection summary + collections & upcoming dues) for one academic year. */
+  async getFeeOverview(academicYearId?: number): Promise<AdminFeeOverview> {
+    const { data } = await axiosInstance.get<AdminFeeOverview>("/api/dashboard/fee-overview", {
+      params: { academic_year_id: academicYearId },
+    });
+    // A 200 with a non-JSON body (e.g. an SPA fallback page) must surface as an error, not crash the cards.
+    if (!data || typeof data !== "object" || typeof data.total_fee !== "number") {
+      throw new Error("Unexpected response from /api/dashboard/fee-overview");
+    }
+    return {
+      ...data,
+      upcoming_dues: Array.isArray(data.upcoming_dues) ? data.upcoming_dues : [],
+    };
   },
 };
 

@@ -474,6 +474,78 @@ def get_pending_payments_for_student(
     return [dict(r) for r in rows]
 
 
+def get_dashboard_invoice_summary(
+    db: Session, *, tenant_id: int, academic_year_id: int
+) -> dict:
+    """Invoice totals and status counts for the admin dashboard (same scope as the Fee Report)."""
+    sql = text(
+        """
+        SELECT
+            ISNULL(SUM(CONVERT(decimal(18, 2), si.total_amount)), 0) AS total_fee,
+            ISNULL(SUM(CONVERT(decimal(18, 2), ISNULL(si.paid_amount, 0))), 0) AS total_collected,
+            ISNULL(SUM(CONVERT(decimal(18, 2), si.due_amount)), 0) AS total_pending,
+            ISNULL(SUM(CASE WHEN si.due_amount <= 0 THEN 1 ELSE 0 END), 0) AS paid_invoices,
+            ISNULL(SUM(CASE WHEN si.due_amount > 0 AND ISNULL(si.paid_amount, 0) > 0 THEN 1 ELSE 0 END), 0)
+                AS partial_invoices,
+            ISNULL(SUM(CASE WHEN si.due_amount > 0 AND ISNULL(si.paid_amount, 0) <= 0 THEN 1 ELSE 0 END), 0)
+                AS pending_invoices,
+            COUNT(DISTINCT CASE WHEN si.due_amount > 0 THEN si.student_id END) AS students_with_dues
+        FROM student_invoices si
+        INNER JOIN students s ON s.id = si.student_id
+        WHERE si.tenant_id = :tenant_id
+          AND si.academic_year_id = :academic_year_id
+          AND s.is_active = 1
+        """
+    )
+    row = db.execute(
+        sql, {"tenant_id": tenant_id, "academic_year_id": academic_year_id}
+    ).mappings().first()
+    return dict(row) if row else {}
+
+
+def get_dashboard_collection_summary(
+    db: Session,
+    *,
+    tenant_id: int,
+    academic_year_id: int,
+    today: date,
+    month_start: date,
+) -> dict:
+    """Completed collections (today / month to date) and payments awaiting approval."""
+    # Multi-installment payments are saved without academic_year_id; attribute them via the student.
+    sql = text(
+        """
+        SELECT
+            ISNULL(SUM(CASE
+                WHEN fp.payment_status = 'completed' AND CAST(fp.payment_date AS DATE) = :today
+                THEN CONVERT(decimal(18, 2), fp.total_amount) ELSE 0 END), 0) AS today_collected,
+            ISNULL(SUM(CASE
+                WHEN fp.payment_status = 'completed'
+                     AND CAST(fp.payment_date AS DATE) BETWEEN :month_start AND :today
+                THEN CONVERT(decimal(18, 2), fp.total_amount) ELSE 0 END), 0) AS month_collected,
+            ISNULL(SUM(CASE WHEN fp.payment_status = 'pending_approval' THEN 1 ELSE 0 END), 0)
+                AS pending_approval_count,
+            ISNULL(SUM(CASE
+                WHEN fp.payment_status = 'pending_approval'
+                THEN CONVERT(decimal(18, 2), fp.total_amount) ELSE 0 END), 0) AS pending_approval_amount
+        FROM fee_payments fp
+        INNER JOIN students s ON s.id = fp.student_id
+        WHERE fp.tenant_id = :tenant_id
+          AND COALESCE(fp.academic_year_id, s.academic_year_id) = :academic_year_id
+        """
+    )
+    row = db.execute(
+        sql,
+        {
+            "tenant_id": tenant_id,
+            "academic_year_id": academic_year_id,
+            "today": today,
+            "month_start": month_start,
+        },
+    ).mappings().first()
+    return dict(row) if row else {}
+
+
 _STATUS_TO_DB = {
     "Pending Approval": "pending_approval",
     "Approved": "completed",

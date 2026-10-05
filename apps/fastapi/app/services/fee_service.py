@@ -590,12 +590,20 @@ def update_fee_due_display_config(
     return _due_display_config_to_response(updated)
 
 
-def _due_list_visible_until(db: Session, tenant_id: int, today: date) -> date | None:
-    """Last due date shown in the Due Fee list, or None when every outstanding installment is shown."""
+def get_due_list_window_days(db: Session, tenant_id: int) -> int | None:
+    """Look-ahead days for the Due Fee list, or None when every outstanding installment is shown."""
     row = due_display_repo.get_config(db, tenant_id=tenant_id)
     if not row or not row.display_enabled:
         return None
-    return today + timedelta(days=_clamp_days_before_due(row.days_before_due))
+    return _clamp_days_before_due(row.days_before_due)
+
+
+def _due_list_visible_until(db: Session, tenant_id: int, today: date) -> date | None:
+    """Last due date shown in the Due Fee list, or None when every outstanding installment is shown."""
+    window_days = get_due_list_window_days(db, tenant_id)
+    if window_days is None:
+        return None
+    return today + timedelta(days=window_days)
 
 
 def get_fee_due_list_v2(
