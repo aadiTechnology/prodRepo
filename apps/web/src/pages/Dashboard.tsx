@@ -20,6 +20,9 @@ import {
   TableHead,
   TableRow,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
 } from "@mui/material";
 import {
   School as SchoolIcon,
@@ -52,6 +55,7 @@ import {
   Edit as EditIcon,
   CheckBox as QuickMarkIcon,
   DragIndicator as DragHandleIcon,
+  ErrorOutline as OverdueIcon,
 } from "@mui/icons-material";
 import {
   DndContext,
@@ -85,9 +89,12 @@ import dashboardService, {
   FeeCollectionSummary,
   type AdminFeeOverview,
   type DashboardFeeDueItem,
+  type StudentFeeWidgets,
+  type StudentFeeInstallmentItem,
 } from "../api/services/dashboardService";
 import type { AcademicYearOption } from "../api/services/feesApi";
 import { useDashboardFeeOverview } from "../hooks/useDashboardFeeOverview";
+import { useStudentFeeWidgets } from "../hooks/useStudentFeeWidgets";
 import schoolClassService, { SchoolClass } from "../api/services/schoolClassService";
 import academicYearService, { AcademicYear } from "../api/services/academicYearService";
 import profileService from "../api/services/profileService";
@@ -920,7 +927,9 @@ const AttRing: React.FC<{
   gradId: string;
   /** Hide "Presence Rate" caption — use on compact dashboard tiles. */
   hideLabel?: boolean;
-}> = ({ pct, size = 130, color = C.blue, gradId, hideLabel = false }) => {
+  /** Decimal places in the center label. Defaults to 1 so existing rings stay unchanged. */
+  fractionDigits?: number;
+}> = ({ pct, size = 130, color = C.blue, gradId, hideLabel = false, fractionDigits = 1 }) => {
   const showLabel = !hideLabel && size >= 100;
   const pctFontSize = size > 110 ? "1.25rem" : size > 88 ? "0.95rem" : size > 76 ? "0.78rem" : "0.72rem";
 
@@ -959,7 +968,7 @@ const AttRing: React.FC<{
         }}
       >
         <Typography sx={{ fontWeight: 800, fontSize: pctFontSize, color, letterSpacing: "-0.4px", lineHeight: 1 }}>
-          {pct.toFixed(1)}%
+          {pct.toFixed(fractionDigits)}%
         </Typography>
         {showLabel && (
           <Typography
@@ -2910,6 +2919,328 @@ const TeacherDashboardView: React.FC<TeacherViewProps> = ({
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// STUDENT FEE WIDGETS — logged-in student only
+// ═══════════════════════════════════════════════════════════════════════════════
+interface StudentFeeWidgetProps {
+  overview: StudentFeeWidgets | null;
+  loading: boolean;
+  error: boolean;
+  onRetry: () => void;
+  academicYears: AcademicYearOption[];
+  academicYearsLoading: boolean;
+  academicYearId: number | null;
+  onAcademicYearChange: (id: number) => void;
+}
+
+const formatStudentInr = (n: number, withSymbol = true) => {
+  const formatted = (n || 0).toLocaleString("en-IN", {
+    maximumFractionDigits: Number.isInteger(n || 0) ? 0 : 2,
+  });
+  return withSymbol ? `₹${formatted}` : formatted;
+};
+
+const formatStudentDueOn = (iso: string | null, overdue: boolean) => {
+  if (!iso) return overdue ? "Overdue" : "Due date not set";
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  const label = new Date(y, m - 1, d).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  return overdue ? `Due since ${label}` : `Due on ${label}`;
+};
+
+const renderStudentFeePlaceholder = (props: StudentFeeWidgetProps, color: string, glass: string) => {
+  if (props.loading || props.academicYearsLoading) return <FeeCardSpinner color={color} glass={glass} />;
+  if (props.error) {
+    return (
+      <Box sx={{ textAlign: "center", py: 1 }}>
+        <Typography sx={{ fontSize: "0.75rem", color: C.red, fontWeight: 600, mb: 0.5 }}>
+          Couldn't load fee data.
+        </Typography>
+        <Button size="small" onClick={props.onRetry} sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.75rem" }}>
+          Retry
+        </Button>
+      </Box>
+    );
+  }
+  if (props.academicYears.length === 0) {
+    return (
+      <Typography sx={{ fontSize: "0.75rem", color: C.muted, fontWeight: 600, textAlign: "center", py: 1 }}>
+        No active academic year configured.
+      </Typography>
+    );
+  }
+  if (!props.overview) return <FeeCardSpinner color={color} glass={glass} />;
+  return null;
+};
+
+const StudentFeeAmountTile: React.FC<{
+  label: string;
+  value: string;
+  color: string;
+  bg: string;
+  icon: React.ReactNode;
+}> = ({ label, value, color, bg, icon }) => (
+  <Box
+    sx={{
+      p: 1.1,
+      bgcolor: bg,
+      borderRadius: C.radius.md,
+      border: `1px solid ${color}22`,
+      minWidth: 0,
+    }}
+  >
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.6 }}>
+      <Box sx={{ color, display: "flex", "& svg": { fontSize: 14 } }}>{icon}</Box>
+      <Typography
+        sx={{
+          color,
+          fontWeight: 800,
+          fontSize: "0.62rem",
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </Typography>
+    </Box>
+    <Typography sx={{ fontWeight: 800, color: C.slateText, fontSize: "1.05rem", lineHeight: 1.1 }}>{value}</Typography>
+  </Box>
+);
+
+const StudentFeeSummaryCard: React.FC<StudentFeeWidgetProps & { onViewDetails: () => void }> = (props) => {
+  const { overview, onViewDetails } = props;
+  const placeholder = renderStudentFeePlaceholder(props, C.green, C.greenGlass);
+
+  return (
+    <GCard sx={{ height: "100%", display: "flex", flexDirection: "column", minHeight: { xs: 0, sm: 280 } }}>
+      <CardContent sx={dashTileCardContentSx}>
+        <CardHeader
+          compact
+          title="Fee Widget Summary"
+          icon={<FeeIcon sx={{ color: C.green }} />}
+          action={<ActionLink label="View Details" onClick={onViewDetails} />}
+        />
+        <Box sx={dashFilterBarSx}>
+          <FeeAcademicYearSelect {...props} />
+        </Box>
+        <Box sx={{ ...dashTilePanelSx, flex: 1, justifyContent: placeholder ? "center" : "flex-start" }}>
+          {placeholder ??
+            (overview && (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: { xs: 1.5, sm: 2 },
+                  }}
+                >
+                  <AttRing
+                    pct={overview.paid_percentage}
+                    size={96}
+                    hideLabel
+                    fractionDigits={0}
+                    color={C.green}
+                    gradId="studentFeeGrad"
+                  />
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.85, minWidth: 140 }}>
+                    <DashStatRow label="Paid Fee" value={formatStudentInr(overview.paid_fee)} color={C.green} />
+                    <DashStatRow label="Pending Fee" value={formatStudentInr(overview.pending_fee)} color={C.amber} />
+                    <DashStatRow label="Total Fee" value={formatStudentInr(overview.total_fee)} color={C.blue} />
+                  </Box>
+                </Box>
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 0.75 }}>
+                  <StudentFeeAmountTile
+                    label="Paid"
+                    value={formatStudentInr(overview.paid_fee, false)}
+                    color={C.green}
+                    bg={C.greenGlass}
+                    icon={<PresentIcon />}
+                  />
+                  <StudentFeeAmountTile
+                    label="Pending"
+                    value={formatStudentInr(overview.pending_fee, false)}
+                    color={C.amber}
+                    bg={C.amberGlass}
+                    icon={<AccessTimeIcon />}
+                  />
+                  <StudentFeeAmountTile
+                    label="Due"
+                    value={formatStudentInr(overview.overdue_fee, false)}
+                    color={C.red}
+                    bg={C.redGlass}
+                    icon={<OverdueIcon />}
+                  />
+                </Box>
+                <Typography sx={{ fontSize: "0.68rem", color: C.muted, fontWeight: 600, textAlign: "center" }}>
+                  {overview.installments.length === 0 ? "No fee records for this academic year" : ""}
+                </Typography>
+              </Box>
+            ))}
+        </Box>
+      </CardContent>
+    </GCard>
+  );
+};
+
+const StudentUpcomingDueRow: React.FC<{ item: StudentFeeInstallmentItem }> = ({ item }) => (
+  <Box
+    sx={{
+      display: "flex",
+      alignItems: "center",
+      gap: 1,
+      px: 1,
+      py: 0.75,
+      bgcolor: C.surface,
+      borderRadius: C.radius.sm,
+      border: `1px solid ${C.borderLight}`,
+    }}
+  >
+    <CalendarIcon sx={{ fontSize: 16, color: C.muted, flexShrink: 0 }} />
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Typography noWrap sx={{ fontSize: "0.78rem", fontWeight: 700, color: C.slateText }}>
+        {item.label}
+      </Typography>
+      <Typography noWrap sx={{ fontSize: "0.65rem", color: C.muted, fontWeight: 600 }}>
+        {formatStudentDueOn(item.due_date, item.fee_status === "overdue")}
+      </Typography>
+    </Box>
+    <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: C.red, flexShrink: 0 }}>
+      {formatStudentInr(item.due_amount)}
+    </Typography>
+  </Box>
+);
+
+const StudentFeeCollectionCard: React.FC<StudentFeeWidgetProps & { onOpenDueList: () => void }> = (props) => {
+  const { overview, onOpenDueList } = props;
+  const placeholder = renderStudentFeePlaceholder(props, C.blue, C.blueGlass);
+  const outstanding = (overview?.installments ?? []).filter((item) => item.fee_status !== "paid").slice(0, 3);
+
+  return (
+    <GCard sx={{ height: "100%", display: "flex", flexDirection: "column", minHeight: { xs: 0, sm: 280 } }}>
+      <CardContent sx={dashTileCardContentSx}>
+        <CardHeader
+          compact
+          title="Fee Collection & Due"
+          icon={<PaymentsIcon sx={{ color: C.blue }} />}
+          action={<ActionLink label="Due List" onClick={onOpenDueList} />}
+        />
+        <Box sx={dashFilterBarSx}>
+          <FeeAcademicYearSelect {...props} />
+        </Box>
+        <Box sx={{ ...dashTilePanelSx, flex: 1, justifyContent: placeholder ? "center" : "flex-start" }}>
+          {placeholder ??
+            (overview && (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 0.75 }}>
+                  <StatPill label="Total Paid" value={formatStudentInr(overview.paid_fee)} color={C.green} bg={C.greenGlass} />
+                  <StatPill label="Total Due" value={formatStudentInr(overview.total_due)} color={C.blue} bg={C.blueGlass} />
+                </Box>
+                <Typography
+                  sx={{
+                    fontSize: "0.68rem",
+                    fontWeight: 800,
+                    color: C.slateText,
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  Upcoming Dues
+                </Typography>
+                {outstanding.length === 0 ? (
+                  <Typography sx={{ fontSize: "0.72rem", color: C.muted, fontWeight: 600, textAlign: "center", py: 1 }}>
+                    No upcoming dues
+                  </Typography>
+                ) : (
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                    {outstanding.map((item) => (
+                      <StudentUpcomingDueRow key={item.invoice_id} item={item} />
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            ))}
+        </Box>
+      </CardContent>
+    </GCard>
+  );
+};
+
+const StudentFeeListDialog: React.FC<{
+  mode: "details" | "dues" | null;
+  installments: StudentFeeInstallmentItem[];
+  onClose: () => void;
+}> = ({ mode, installments, onClose }) => {
+  const rows = mode === "dues" ? installments.filter((item) => item.fee_status !== "paid") : installments;
+  const statusColor = (status: StudentFeeInstallmentItem["fee_status"]) =>
+    status === "paid" ? C.green : status === "overdue" ? C.red : C.amber;
+
+  return (
+    <Dialog open={mode != null} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle sx={{ fontWeight: 800, fontSize: "1rem", color: C.slateText }}>
+        {mode === "dues" ? "Due List" : "Fee Details"}
+      </DialogTitle>
+      <DialogContent>
+        {rows.length === 0 ? (
+          <Typography sx={{ fontSize: "0.85rem", color: C.muted, fontWeight: 600, py: 1 }}>
+            {mode === "dues" ? "No pending dues for this academic year." : "No fee records for this academic year."}
+          </Typography>
+        ) : (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, pt: 0.5 }}>
+            {rows.map((item) => (
+              <Box
+                key={item.invoice_id}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  px: 1.25,
+                  py: 1,
+                  borderRadius: C.radius.sm,
+                  border: `1px solid ${C.borderLight}`,
+                }}
+              >
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography noWrap sx={{ fontSize: "0.82rem", fontWeight: 700, color: C.slateText }}>
+                    {item.label}
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.7rem", color: C.muted, fontWeight: 600 }}>
+                    {formatStudentDueOn(item.due_date, item.fee_status === "overdue")}
+                    {" · "}Paid {formatStudentInr(item.paid_amount)}
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+                  <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: item.due_amount > 0 ? C.red : C.green }}>
+                    {formatStudentInr(item.due_amount > 0 ? item.due_amount : item.paid_amount)}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: "0.65rem",
+                      fontWeight: 800,
+                      color: statusColor(item.fee_status),
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {item.fee_status}
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        )}
+        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.5 }}>
+          <Button onClick={onClose} sx={{ textTransform: "none", fontWeight: 700 }}>
+            Close
+          </Button>
+        </Box>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // 3. STUDENT DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
 /** Set true to show the student homework banner on the dashboard. */
@@ -2918,16 +3249,18 @@ const STUDENT_SHOW_HOMEWORK = false;
 const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present"];
 // Pending HW KPI removed per QA — homework status remains on the s_homework card below.
 // const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw"];
-const STUDENT_CARDS_DEFAULT = ["s_att", "s_profile", "s_homework", "s_notices"];
+const STUDENT_CARDS_DEFAULT = ["s_att", "s_profile", "s_homework", "s_notices", "s_fee_summary", "s_fee_due"];
 const STUDENT_FULL_WIDTH_CARDS = new Set(
   STUDENT_SHOW_HOMEWORK ? ["s_homework", "s_notices"] : ["s_notices"]
 );
-const STUDENT_COMPACT_CARDS = new Set(["s_att", "s_profile"]);
-// Fee card hidden for students — restore when fee module is enabled:
-// const STUDENT_CARDS_DEFAULT = ["s_att", "s_profile", "s_fee", "s_homework", "s_notices"];
+const STUDENT_COMPACT_CARDS = new Set(["s_fee_summary", "s_fee_due", "s_att", "s_profile"]);
 
-const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }) => {
+const StudentDashboardView: React.FC<{
+  data: StudentDashboardData;
+  feeWidget: StudentFeeWidgetProps;
+}> = ({ data, feeWidget }) => {
   const navigate = useNavigate();
+  const [feeDialog, setFeeDialog] = useState<"details" | "dues" | null>(null);
   const { profile, attendance, /* fee_status, */ class_teacher, homework, recent_notices } = data;
   // Fee fields — uncomment with s_kpi_fees / s_fee cards below
   // const { total_fee, total_paid, total_balance, is_overdue, next_due_date } = fee_status;
@@ -2935,7 +3268,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
   // const fmtINR = (n: number) => "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
   const kpiDrag = useSortableDrag("student_kpi_v2", STUDENT_KPI_DEFAULT);
-  const cardDrag = useSortableDrag("student_cards_v6", STUDENT_CARDS_DEFAULT);
+  const cardDrag = useSortableDrag("student_cards_v8", STUDENT_CARDS_DEFAULT);
   const visibleCardIds = React.useMemo(
     () => cardDrag.order.filter((id) => STUDENT_SHOW_HOMEWORK || id !== "s_homework"),
     [cardDrag.order]
@@ -3048,6 +3381,10 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
 
   const renderCard = (id: string) => {
     switch (id) {
+      case "s_fee_summary":
+        return <StudentFeeSummaryCard {...feeWidget} onViewDetails={() => setFeeDialog("details")} />;
+      case "s_fee_due":
+        return <StudentFeeCollectionCard {...feeWidget} onOpenDueList={() => setFeeDialog("dues")} />;
       case "s_att":
         return (
           <GCard sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -3249,6 +3586,7 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
   };
 
   return (
+    <>
     <Grid container spacing={{ xs: 2, md: 2.5 }}>
       <Grid item xs={12}>
         <SortableKpiRow
@@ -3274,6 +3612,12 @@ const StudentDashboardView: React.FC<{ data: StudentDashboardData }> = ({ data }
         />
       </Grid>
     </Grid>
+    <StudentFeeListDialog
+      mode={feeDialog}
+      installments={feeWidget.overview?.installments ?? []}
+      onClose={() => setFeeDialog(null)}
+    />
+    </>
   );
 };
 
@@ -3318,6 +3662,18 @@ export default function Dashboard() {
     academicYearsLoading: feeOverview.academicYearsLoading,
     academicYearId: feeOverview.academicYearId,
     onAcademicYearChange: feeOverview.setAcademicYearId,
+  };
+  const isStudentDashboard = data?.role === "STUDENT";
+  const studentFee = useStudentFeeWidgets(isStudentDashboard);
+  const studentFeeWidget: StudentFeeWidgetProps = {
+    overview: studentFee.overview,
+    loading: studentFee.loading,
+    error: studentFee.error,
+    onRetry: studentFee.refetch,
+    academicYears: studentFee.academicYears,
+    academicYearsLoading: studentFee.academicYearsLoading,
+    academicYearId: studentFee.academicYearId,
+    onAcademicYearChange: studentFee.setAcademicYearId,
   };
 
   const seqRef = useRef(0);
@@ -3510,6 +3866,7 @@ export default function Dashboard() {
         onRefresh={() => {
           fetchData(true);
           feeOverview.refetch();
+          studentFee.refetch();
         }}
       />
 
@@ -3570,7 +3927,7 @@ export default function Dashboard() {
             attMaxDate={attMaxDate}
           />
         ) : (
-          <StudentDashboardView data={data.data as StudentDashboardData} />
+          <StudentDashboardView data={data.data as StudentDashboardData} feeWidget={studentFeeWidget} />
         ))}
 
       <style>{`

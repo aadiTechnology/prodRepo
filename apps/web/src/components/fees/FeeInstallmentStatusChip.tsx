@@ -20,7 +20,10 @@ export default function FeeInstallmentStatusChip({
 }: {
   status: FeeInstallmentStatusValue;
 }) {
-  const cfg = statusConfig[status] ?? statusConfig.Pending;
+  // Fee List no longer surfaces Overdue; treat legacy Overdue rows as Pending.
+  const normalizedStatus: FeeInstallmentStatusValue =
+    status === "Overdue" ? "Pending" : status;
+  const cfg = statusConfig[normalizedStatus] ?? statusConfig.Pending;
   return (
     <Chip
       size="small"

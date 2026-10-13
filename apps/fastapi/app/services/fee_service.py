@@ -619,7 +619,7 @@ def get_fee_due_list_v2(
 ) -> dict:
     """
     Return due-fee list (installment + invoice) with summary and pagination.
-    Every outstanding installment is reported with status DUE.
+    Every outstanding installment (Pending, Partial, or Overdue) is reported with status DUE.
     """
     try:
         today = date.today()
@@ -720,7 +720,7 @@ def get_fee_due_list_v2(
                 Student.academic_year_id == academic_year_id,
                 StudentFeeAssignment.academic_year_id == academic_year_id,
                 StudentInvoice.id.isnot(None),
-                func.upper(StudentInvoice.status).in_(["PARTIAL", "PENDING"]),
+                func.upper(StudentInvoice.status).in_(["PARTIAL", "PENDING", "OVERDUE"]),
                 due_amount_expr > 0,
             )
         )
@@ -794,7 +794,7 @@ def get_fee_due_list_v2(
                 Student.academic_year_id == academic_year_id,
                 StudentFeeAssignment.academic_year_id == academic_year_id,
                 StudentInvoice.id.isnot(None),
-                func.upper(StudentInvoice.status).in_(["PARTIAL", "PENDING"]),
+                func.upper(StudentInvoice.status).in_(["PARTIAL", "PENDING", "OVERDUE"]),
                 due_amount_expr > 0,
             )
         )
@@ -867,7 +867,7 @@ def list_fee_dues_for_due_date(
     """
     Outstanding installment rows for reminder scheduling / materialization.
 
-    Same due predicates as get_fee_due_list_v2 (invoice PARTIAL/PENDING, amount > 0).
+    Same due predicates as get_fee_due_list_v2 (invoice PARTIAL/PENDING/OVERDUE, amount > 0).
     Pass either due_date (exact) or due_on_or_before (<= day, for due+overdue).
     """
     if due_date is None and due_on_or_before is None:
@@ -972,7 +972,7 @@ def list_fee_dues_for_due_date(
             Student.academic_year_id == academic_year_id,
             StudentFeeAssignment.academic_year_id == academic_year_id,
             StudentInvoice.id.isnot(None),
-            func.upper(StudentInvoice.status).in_(["PARTIAL", "PENDING"]),
+            func.upper(StudentInvoice.status).in_(["PARTIAL", "PENDING", "OVERDUE"]),
             due_amount_expr > 0,
         )
     )

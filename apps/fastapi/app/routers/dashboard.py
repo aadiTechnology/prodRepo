@@ -44,6 +44,7 @@ from app.schemas.dashboard import (
     StudentProfileInfo,
     StudentAttendanceSummary,
     StudentFeeStatus,
+    StudentFeeWidgets,
     StudentHomeworkSummary,
     TeacherHomeworkItem,
 )
@@ -457,6 +458,33 @@ def get_fee_overview_card(
     return fee_report_service.get_dashboard_fee_overview(
         db,
         tenant_id=current_user.tenant_id or 1,
+        academic_year_id=academic_year_id,
+    )
+
+
+@router.get("/student-fee-widgets", response_model=StudentFeeWidgets)
+def get_student_fee_widgets(
+    academic_year_id: Optional[int] = Query(None, ge=1),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Fee summary for the logged-in student. Other roles keep their own dashboard widgets."""
+    if _resolve_dashboard_role(db, current_user) != "STUDENT":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Student fee widgets are available on the student dashboard only.",
+        )
+    tenant_id = current_user.tenant_id or 1
+    student = profile_image_service._resolve_student_for_user(db, current_user.id)
+    if not student or student.tenant_id != tenant_id or not student.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Active student profile not found for this account.",
+        )
+    return fee_report_service.get_student_fee_widgets(
+        db,
+        tenant_id=tenant_id,
+        student_id=int(student.id),
         academic_year_id=academic_year_id,
     )
 

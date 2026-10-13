@@ -164,6 +164,27 @@ export interface StudentFeeStatus {
   next_due_date: string | null;
 }
 
+export interface StudentFeeInstallmentItem {
+  invoice_id: number;
+  label: string;
+  due_date: string | null;
+  total_amount: number;
+  paid_amount: number;
+  due_amount: number;
+  fee_status: "paid" | "pending" | "overdue";
+}
+
+export interface StudentFeeWidgets {
+  academic_year_id: number | null;
+  total_fee: number;
+  paid_fee: number;
+  pending_fee: number;
+  overdue_fee: number;
+  total_due: number;
+  paid_percentage: number;
+  installments: StudentFeeInstallmentItem[];
+}
+
 export interface StudentHomeworkSummary {
   pending_count: number;
   total_count: number;
@@ -224,6 +245,20 @@ const dashboardService = {
       params: { start_date: startDate, end_date: endDate },
     });
     return data;
+  },
+
+  /** Logged-in student's own fee widgets for one academic year. */
+  async getStudentFeeWidgets(academicYearId?: number): Promise<StudentFeeWidgets> {
+    const { data } = await axiosInstance.get<StudentFeeWidgets>("/api/dashboard/student-fee-widgets", {
+      params: { academic_year_id: academicYearId },
+    });
+    if (!data || typeof data !== "object" || typeof data.total_fee !== "number") {
+      throw new Error("Unexpected response from /api/dashboard/student-fee-widgets");
+    }
+    return {
+      ...data,
+      installments: Array.isArray(data.installments) ? data.installments : [],
+    };
   },
 
   /** Admin fee widgets (collection summary + collections & upcoming dues) for one academic year. */

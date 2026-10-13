@@ -106,7 +106,6 @@ def list_invoices(
             MIN(si.due_date) AS due_date,
             CASE
                 WHEN SUM(CONVERT(decimal(18, 2), si.due_amount)) <= 0 THEN 'Paid'
-                WHEN SUM(CASE WHEN si.status = 'Overdue' THEN 1 ELSE 0 END) > 0 THEN 'Overdue'
                 WHEN SUM(CONVERT(decimal(18, 2), si.paid_amount)) > 0
                      AND SUM(CONVERT(decimal(18, 2), si.due_amount)) > 0 THEN 'Partial'
                 ELSE 'Pending'

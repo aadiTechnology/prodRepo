@@ -7,7 +7,12 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.repositories import invoice_repository
-from app.schemas.dashboard import AdminFeeOverview, DashboardFeeDueItem
+from app.schemas.dashboard import (
+    AdminFeeOverview,
+    DashboardFeeDueItem,
+    StudentFeeInstallmentItem,
+    StudentFeeWidgets,
+)
 from app.schemas.fee_report_schema import (
     FeeReportFilterOptions,
     FeeReportResponse,
@@ -229,6 +234,89 @@ def get_fee_report(
         total=total,
         page=page,
         size=size,
+    )
+
+
+def _installment_label(installment_name: Optional[str], installment: Optional[str]) -> str:
+    name = (installment_name or "").strip()
+    if name:
+        return name
+    code = (installment or "").strip()
+    if not code:
+        return "Fee"
+    if code.isdigit():
+        return f"Installment {code}"
+    return code
+
+
+def _as_date(value) -> Optional[date]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return None
+
+
+def get_student_fee_widgets(
+    db: Session,
+    tenant_id: int,
+    student_id: int,
+    academic_year_id: Optional[int] = None,
+) -> StudentFeeWidgets:
+    """Paid, pending, and overdue totals for one student. Never includes other students."""
+    ay_id = academic_year_id or resolve_current_academic_year_id(db, tenant_id)
+    if ay_id is None:
+        return StudentFeeWidgets()
+
+    rows = invoice_repository.list_student_invoices_for_year(
+        db,
+        tenant_id=tenant_id,
+        student_id=student_id,
+        academic_year_id=ay_id,
+    )
+    today = datetime.utcnow().date()
+    total_fee = paid_fee = pending_fee = overdue_fee = 0.0
+    installments: list[StudentFeeInstallmentItem] = []
+
+    for row in rows:
+        total_amount = float(row.get("total_amount") or 0)
+        paid_amount = float(row.get("paid_amount") or 0)
+        due_amount = float(row.get("due_amount") or 0)
+        due_on = _as_date(row.get("due_date"))
+        total_fee += total_amount
+        paid_fee += paid_amount
+        if due_amount > 0 and due_on is not None and due_on < today:
+            fee_status = "overdue"
+            overdue_fee += due_amount
+        elif due_amount > 0:
+            fee_status = "pending"
+            pending_fee += due_amount
+        else:
+            fee_status = "paid"
+
+        installments.append(
+            StudentFeeInstallmentItem(
+                invoice_id=int(row["id"]),
+                label=_installment_label(row.get("installment_name"), row.get("installment")),
+                due_date=due_on,
+                total_amount=round(total_amount, 2),
+                paid_amount=round(paid_amount, 2),
+                due_amount=round(due_amount, 2),
+                fee_status=fee_status,
+            )
+        )
+
+    return StudentFeeWidgets(
+        academic_year_id=ay_id,
+        total_fee=round(total_fee, 2),
+        paid_fee=round(paid_fee, 2),
+        pending_fee=round(pending_fee, 2),
+        overdue_fee=round(overdue_fee, 2),
+        total_due=round(pending_fee + overdue_fee, 2),
+        paid_percentage=round(paid_fee * 100.0 / total_fee, 1) if total_fee > 0 else 0.0,
+        installments=installments,
     )
 
 

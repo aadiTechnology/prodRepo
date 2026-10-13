@@ -173,6 +173,27 @@ class StudentFeeStatus(BaseModel):
     is_overdue: bool = Field(default=False)
     next_due_date: Optional[str] = None
 
+class StudentFeeInstallmentItem(BaseModel):
+    """One installment on the logged-in student's fee widgets."""
+    invoice_id: int
+    label: str
+    due_date: Optional[date] = None
+    total_amount: float = Field(default=0.0)
+    paid_amount: float = Field(default=0.0)
+    due_amount: float = Field(default=0.0)
+    fee_status: Literal["paid", "pending", "overdue"] = "pending"
+
+class StudentFeeWidgets(BaseModel):
+    """Fee summary and upcoming dues for the logged-in student only."""
+    academic_year_id: Optional[int] = None
+    total_fee: float = Field(default=0.0)
+    paid_fee: float = Field(default=0.0)
+    pending_fee: float = Field(default=0.0)
+    overdue_fee: float = Field(default=0.0)
+    total_due: float = Field(default=0.0)
+    paid_percentage: float = Field(default=0.0)
+    installments: List[StudentFeeInstallmentItem] = Field(default_factory=list)
+
 class StudentHomeworkSummary(BaseModel):
     """Pending homework count for student."""
     pending_count: int = Field(default=0)

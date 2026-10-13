@@ -38,13 +38,12 @@ ALLOWED_INVOICE_STATUSES = {"Paid", "Partial", "Pending", "Overdue"}
 
 
 def _calc_status(*, total_amount: Decimal, paid_amount: Decimal, due_date: date) -> str:
-    today = date.today()
+    # due_date kept for call-site compatibility; overdue is no longer a distinct Fee List status.
+    _ = due_date
     if paid_amount >= total_amount:
         return "Paid"
     if paid_amount > Decimal("0"):
         return "Partial"
-    if due_date < today:
-        return "Overdue"
     return "Pending"
 
 
@@ -393,8 +392,6 @@ def get_invoice_detail(
     invoice.due_amount = due_amount
     if due_amount <= 0:
         invoice.status = "Paid"
-    elif any(str(row.get("status")) == "Overdue" for row in sibling_invoices):
-        invoice.status = "Overdue"
     elif paid_amount > 0:
         invoice.status = "Partial"
     else:

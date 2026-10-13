@@ -11,7 +11,7 @@ import academicYearService, { type AcademicYear } from "../api/services/academic
 import type { InvoiceItem, InvoiceStatus } from "../types/invoice";
 import type { FeeApprovalStatus, FeePaymentApprovalListItem } from "../types/feeCollection";
 
-const invoiceStatuses: InvoiceStatus[] = ["Paid", "Partial", "Pending", "Overdue"];
+const invoiceStatuses: InvoiceStatus[] = ["Paid", "Partial", "Pending"];
 
 type InvoiceLookupPayload = {
   years: AcademicYear[];
