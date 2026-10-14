@@ -53,6 +53,7 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
     teachersLoading,
     teachersError,
     saving,
+    markOfficeTimingConfig,
   } = controller;
 
   const approvalState =
@@ -204,6 +205,25 @@ export default function TeacherMarkAttendanceTab({ controller }: TeacherMarkAtte
                 No active teachers found for this school. Add teachers in Teacher Management first.
               </Alert>
             ) : null}
+
+            <Box
+              sx={{
+                borderRadius: 2,
+                px: 1.5,
+                py: 1,
+                bgcolor: "action.hover",
+                border: 1,
+                borderColor: "divider",
+              }}
+              data-testid="mark-office-hours"
+            >
+              <Typography variant="body2" color="text.secondary">
+                Office hours for this date:{" "}
+                <strong>{formatTimeDisplay(markOfficeTimingConfig.startTime)}</strong>
+                {" – "}
+                <strong>{formatTimeDisplay(markOfficeTimingConfig.endTime)}</strong>
+              </Typography>
+            </Box>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               {isAdminLike ? (

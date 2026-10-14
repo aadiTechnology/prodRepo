@@ -22,6 +22,8 @@ import type {
   Shift,
   ShiftFormValues,
   StatusFormValues,
+  ExtraWorkingTeacher,
+  DateShiftOverride,
   WorkingDayKey,
   WorkingDaysConfig,
   CheckInRules,
@@ -46,6 +48,9 @@ function emptyConfigurationState(academicYearId = ""): AttendanceConfigurationSt
       saturday: false,
       sunday: false,
     },
+    extraWorkingTeachers: [],
+    dateShiftOverrides: [],
+    nonWorkingDates: [],
     holidays: [],
     shifts: [],
     officeTiming: {
@@ -306,6 +311,71 @@ export function useAttendanceConfigurationController() {
     [academicYearIdNum, runSave, state.workingDays]
   );
 
+  const saveExtraWorkingTeachers = useCallback(
+    (items: ExtraWorkingTeacher[]) => {
+      if (academicYearIdNum == null) return;
+      void runSave(
+        async () => {
+          const next = await attendanceConfigurationService.updateSettings(academicYearIdNum, {
+            extra_working_teachers: items.map((item) => ({
+              teacher_id: Number(item.teacherId),
+              day: item.day,
+              work_date: item.date ?? null,
+            })),
+          });
+          return { ...next, extraWorkingTeachers: items };
+        },
+        "Extra working teachers updated.",
+        "Failed to update extra working teachers."
+      );
+    },
+    [academicYearIdNum, runSave]
+  );
+
+  const saveDateShiftOverrides = useCallback(
+    (items: DateShiftOverride[]) => {
+      if (academicYearIdNum == null) return;
+      void runSave(
+        async () => {
+          const next = await attendanceConfigurationService.updateSettings(academicYearIdNum, {
+            date_shift_overrides: items.map((item) => ({
+              work_date: item.date,
+              start_time: item.startTime,
+              end_time: item.endTime,
+              shift_id: item.shiftId ? Number(item.shiftId) : null,
+              teacher_id:
+                item.teacherId != null && String(item.teacherId).trim() !== ""
+                  ? Number(item.teacherId)
+                  : null,
+            })),
+          });
+          return next;
+        },
+        "Date shift timing updated.",
+        "Failed to update shift timing."
+      );
+    },
+    [academicYearIdNum, runSave]
+  );
+
+  const saveNonWorkingDates = useCallback(
+    (dates: string[]) => {
+      if (academicYearIdNum == null) return;
+      const unique = [...new Set(dates)].sort();
+      void runSave(
+        async () => {
+          const next = await attendanceConfigurationService.updateSettings(academicYearIdNum, {
+            non_working_dates: unique.map((work_date) => ({ work_date })),
+          });
+          return { ...next, nonWorkingDates: unique };
+        },
+        "Off days updated.",
+        "Failed to update off days."
+      );
+    },
+    [academicYearIdNum, runSave]
+  );
+
   const setWorkingDays = useCallback(
     (workingDays: WorkingDaysConfig) => {
       if (academicYearIdNum == null) return;
@@ -444,6 +514,22 @@ export function useAttendanceConfigurationController() {
     [academicYearIdNum, editTarget, runSave]
   );
 
+  const removeHoliday = useCallback(
+    (holiday: PublicHoliday) => {
+      if (academicYearIdNum == null) return;
+      void runSave(
+        () =>
+          attendanceConfigurationService.deleteHoliday(
+            academicYearIdNum,
+            Number(holiday.id)
+          ),
+        "Holiday removed.",
+        "Failed to remove holiday."
+      );
+    },
+    [academicYearIdNum, runSave]
+  );
+
   const saveShift = useCallback(
     (values: ShiftFormValues) => {
       if (academicYearIdNum == null) return;
@@ -557,11 +643,15 @@ export function useAttendanceConfigurationController() {
     setAttendanceMarkedBy,
     setWorkingDay,
     setWorkingDays,
+    saveExtraWorkingTeachers,
+    saveDateShiftOverrides,
+    saveNonWorkingDates,
     setOfficeTiming,
     setGraceTime,
     setCheckInRules,
     toggleNotification,
     saveHoliday,
+    removeHoliday,
     saveShift,
     saveStatus,
     reload: () => {

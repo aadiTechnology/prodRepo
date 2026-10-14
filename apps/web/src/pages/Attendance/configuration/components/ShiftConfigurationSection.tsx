@@ -7,6 +7,7 @@ import {
   TableRowActions,
 } from "../../../../components/reusable";
 import type { AttendanceConfigurationController } from "../../../../hooks/useAttendanceConfigurationController";
+import { formatTime12Hour } from "../../../../utils/formatters";
 import type { EntityStatus, Shift, ShiftFormValues } from "../attendanceConfiguration.types";
 import ConfigEntityDialog, { statusField } from "./ConfigEntityDialog";
 import ConfigSectionCard from "./ConfigSectionCard";
@@ -73,8 +74,16 @@ export default function ShiftConfigurationSection({ controller }: Props) {
       <DataTable<Shift>
         columns={[
           { id: "name", label: "Shift Name", field: "name" },
-          { id: "startTime", label: "Start Time", field: "startTime" },
-          { id: "endTime", label: "End Time", field: "endTime" },
+          {
+            id: "startTime",
+            label: "Start Time",
+            render: (row) => formatTime12Hour(row.startTime),
+          },
+          {
+            id: "endTime",
+            label: "End Time",
+            render: (row) => formatTime12Hour(row.endTime),
+          },
           {
             id: "status",
             label: "Status",

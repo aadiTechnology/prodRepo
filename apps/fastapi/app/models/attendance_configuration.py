@@ -72,6 +72,31 @@ class AttendanceConfiguration(Base):
     )
 
 
+class AttendanceConfigExtraWorkingDay(Base):
+    """Teacher who may mark attendance on a school off-day or public holiday."""
+
+    __tablename__ = "attendance_config_extra_working_days"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="NO ACTION"), nullable=False)
+    configuration_id = Column(
+        Integer,
+        ForeignKey("attendance_configurations.id", ondelete="NO ACTION"),
+        nullable=False,
+    )
+    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="NO ACTION"), nullable=False)
+    weekday = Column(String(10), nullable=False)
+    work_date = Column(Date, nullable=True)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="NO ACTION"), nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+    updated_by = Column(Integer, ForeignKey("users.id", ondelete="NO ACTION"), nullable=True)
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(Integer, ForeignKey("users.id", ondelete="NO ACTION"), nullable=True)
+
+
 class AttendanceConfigHoliday(Base):
     __tablename__ = "attendance_config_holidays"
 
@@ -86,6 +111,56 @@ class AttendanceConfigHoliday(Base):
     holiday_date = Column(Date, nullable=False)
     description = Column(NVARCHAR(500), nullable=True)
     status = Column(String(20), nullable=False, default="active")
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="NO ACTION"), nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+    updated_by = Column(Integer, ForeignKey("users.id", ondelete="NO ACTION"), nullable=True)
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(Integer, ForeignKey("users.id", ondelete="NO ACTION"), nullable=True)
+
+
+class AttendanceConfigNonWorkingDate(Base):
+    """Specific calendar date off (e.g. selected Saturdays) — not a public holiday."""
+
+    __tablename__ = "attendance_config_non_working_dates"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="NO ACTION"), nullable=False)
+    configuration_id = Column(
+        Integer,
+        ForeignKey("attendance_configurations.id", ondelete="NO ACTION"),
+        nullable=False,
+    )
+    work_date = Column(Date, nullable=False)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="NO ACTION"), nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+    updated_by = Column(Integer, ForeignKey("users.id", ondelete="NO ACTION"), nullable=True)
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(Integer, ForeignKey("users.id", ondelete="NO ACTION"), nullable=True)
+
+
+class AttendanceConfigDateShift(Base):
+    """Office/shift timing override for a specific calendar date."""
+
+    __tablename__ = "attendance_config_date_shifts"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="NO ACTION"), nullable=False)
+    configuration_id = Column(
+        Integer,
+        ForeignKey("attendance_configurations.id", ondelete="NO ACTION"),
+        nullable=False,
+    )
+    work_date = Column(Date, nullable=False)
+    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="NO ACTION"), nullable=True)
+    shift_id = Column(Integer, ForeignKey("attendance_config_shifts.id", ondelete="NO ACTION"), nullable=True)
+    start_time = Column(String(5), nullable=False)
+    end_time = Column(String(5), nullable=False)
 
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="NO ACTION"), nullable=True)

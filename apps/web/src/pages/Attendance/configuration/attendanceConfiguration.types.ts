@@ -23,6 +23,13 @@ export type WorkingDayKey =
 
 export type WorkingDaysConfig = Record<WorkingDayKey, boolean>;
 
+export type ExtraWorkingTeacher = {
+  teacherId: string;
+  day: WorkingDayKey;
+  /** ISO date when set; otherwise every matching weekday. */
+  date?: string;
+};
+
 export type EntityStatus = "active" | "inactive";
 
 export type PublicHoliday = {
@@ -31,6 +38,15 @@ export type PublicHoliday = {
   date: string;
   description: string;
   status: EntityStatus;
+};
+
+export type DateShiftOverride = {
+  date: string;
+  startTime: string;
+  endTime: string;
+  shiftId?: string;
+  /** When omitted or null, timing applies to all teachers on this date. */
+  teacherId?: string | null;
 };
 
 export type Shift = {
@@ -95,6 +111,10 @@ export type GeneralConfiguration = {
 export type AttendanceConfigurationState = {
   general: GeneralConfiguration;
   workingDays: WorkingDaysConfig;
+  extraWorkingTeachers: ExtraWorkingTeacher[];
+  dateShiftOverrides: DateShiftOverride[];
+  /** ISO dates off while the weekday is otherwise a working day (e.g. selected Saturdays). */
+  nonWorkingDates: string[];
   holidays: PublicHoliday[];
   shifts: Shift[];
   officeTiming: OfficeTiming;

@@ -100,6 +100,9 @@ export function createInitialAttendanceConfiguration(): AttendanceConfigurationS
       saturday: false,
       sunday: false,
     },
+    extraWorkingTeachers: [],
+    dateShiftOverrides: [],
+    nonWorkingDates: [],
     holidays: MOCK_HOLIDAYS,
     shifts: MOCK_SHIFTS,
     officeTiming: {

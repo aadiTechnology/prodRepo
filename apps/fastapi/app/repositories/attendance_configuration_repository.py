@@ -2,15 +2,155 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.attendance_configuration import (
+    AttendanceConfigDateShift,
+    AttendanceConfigExtraWorkingDay,
     AttendanceConfigHoliday,
+    AttendanceConfigNonWorkingDate,
     AttendanceConfigNotification,
     AttendanceConfigShift,
     AttendanceConfigStatus,
     AttendanceConfiguration,
 )
+
+_extra_table_ready = False
+_date_shift_table_ready = False
+_non_working_dates_table_ready = False
+
+
+def ensure_date_shift_table(db: Session) -> None:
+    global _date_shift_table_ready
+    if not _date_shift_table_ready:
+        db.execute(
+            text(
+                """
+                IF NOT EXISTS (
+                    SELECT 1 FROM sys.tables
+                    WHERE name = N'attendance_config_date_shifts'
+                      AND schema_id = SCHEMA_ID(N'dbo')
+                )
+                BEGIN
+                    CREATE TABLE [dbo].[attendance_config_date_shifts] (
+                        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        [tenant_id] INT NOT NULL,
+                        [configuration_id] INT NOT NULL,
+                        [work_date] DATE NOT NULL,
+                        [teacher_id] INT NULL,
+                        [shift_id] INT NULL,
+                        [start_time] VARCHAR(5) NOT NULL,
+                        [end_time] VARCHAR(5) NOT NULL,
+                        [created_at] DATETIME NOT NULL
+                            CONSTRAINT [DF_att_date_shift_created] DEFAULT (GETUTCDATE()),
+                        [created_by] INT NULL,
+                        [updated_at] DATETIME NULL,
+                        [updated_by] INT NULL,
+                        [is_deleted] BIT NOT NULL
+                            CONSTRAINT [DF_att_date_shift_deleted] DEFAULT ((0)),
+                        [deleted_at] DATETIME NULL,
+                        [deleted_by] INT NULL
+                    );
+                END
+                """
+            )
+        )
+        db.commit()
+        _date_shift_table_ready = True
+
+    db.execute(
+        text(
+            """
+            IF OBJECT_ID(N'dbo.attendance_config_date_shifts', N'U') IS NOT NULL
+               AND COL_LENGTH(N'dbo.attendance_config_date_shifts', N'teacher_id') IS NULL
+            BEGIN
+                ALTER TABLE [dbo].[attendance_config_date_shifts]
+                ADD [teacher_id] INT NULL;
+            END
+            """
+        )
+    )
+    db.commit()
+
+
+def ensure_non_working_dates_table(db: Session) -> None:
+    global _non_working_dates_table_ready
+    if _non_working_dates_table_ready:
+        return
+    db.execute(
+        text(
+            """
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.tables
+                WHERE name = N'attendance_config_non_working_dates'
+                  AND schema_id = SCHEMA_ID(N'dbo')
+            )
+            BEGIN
+                CREATE TABLE [dbo].[attendance_config_non_working_dates] (
+                    [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    [tenant_id] INT NOT NULL,
+                    [configuration_id] INT NOT NULL,
+                    [work_date] DATE NOT NULL,
+                    [created_at] DATETIME NOT NULL
+                        CONSTRAINT [DF_att_non_working_created] DEFAULT (GETUTCDATE()),
+                    [created_by] INT NULL,
+                    [updated_at] DATETIME NULL,
+                    [updated_by] INT NULL,
+                    [is_deleted] BIT NOT NULL
+                        CONSTRAINT [DF_att_non_working_deleted] DEFAULT ((0)),
+                    [deleted_at] DATETIME NULL,
+                    [deleted_by] INT NULL
+                );
+            END
+            """
+        )
+    )
+    db.commit()
+    _non_working_dates_table_ready = True
+
+
+def ensure_extra_working_table(db: Session) -> None:
+    """Create the extra-working-day table when this database predates the model."""
+    global _extra_table_ready
+    if _extra_table_ready:
+        return
+    db.execute(
+        text(
+            """
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.tables
+                WHERE name = N'attendance_config_extra_working_days'
+                  AND schema_id = SCHEMA_ID(N'dbo')
+            )
+            BEGIN
+                CREATE TABLE [dbo].[attendance_config_extra_working_days] (
+                    [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    [tenant_id] INT NOT NULL,
+                    [configuration_id] INT NOT NULL,
+                    [teacher_id] INT NOT NULL,
+                    [weekday] VARCHAR(10) NOT NULL,
+                    [created_at] DATETIME NOT NULL
+                        CONSTRAINT [DF_att_extra_created] DEFAULT (GETUTCDATE()),
+                    [created_by] INT NULL,
+                    [updated_at] DATETIME NULL,
+                    [updated_by] INT NULL,
+                    [is_deleted] BIT NOT NULL
+                        CONSTRAINT [DF_att_extra_deleted] DEFAULT ((0)),
+                    [deleted_at] DATETIME NULL,
+                    [deleted_by] INT NULL
+                );
+            END
+            IF COL_LENGTH(N'dbo.attendance_config_extra_working_days', N'work_date') IS NULL
+            BEGIN
+                ALTER TABLE [dbo].[attendance_config_extra_working_days]
+                ADD [work_date] DATE NULL;
+            END
+            """
+        )
+    )
+    db.commit()
+    _extra_table_ready = True
 
 
 def get_by_tenant_year(
@@ -453,3 +593,203 @@ def update_notification(
 
 def commit(db: Session) -> None:
     db.commit()
+
+
+def list_extra_working_days(
+    db: Session, *, tenant_id: int, configuration_id: int
+) -> list[AttendanceConfigExtraWorkingDay]:
+    ensure_extra_working_table(db)
+    return (
+        db.query(AttendanceConfigExtraWorkingDay)
+        .filter(
+            AttendanceConfigExtraWorkingDay.tenant_id == tenant_id,
+            AttendanceConfigExtraWorkingDay.configuration_id == configuration_id,
+            AttendanceConfigExtraWorkingDay.is_deleted == False,  # noqa: E712
+        )
+        .order_by(
+            AttendanceConfigExtraWorkingDay.weekday.asc(),
+            AttendanceConfigExtraWorkingDay.teacher_id.asc(),
+        )
+        .all()
+    )
+
+
+def replace_extra_working_days(
+    db: Session,
+    *,
+    tenant_id: int,
+    configuration_id: int,
+    user_id: int,
+    items: list[tuple[int, str, date | None]],
+) -> None:
+    now = datetime.utcnow()
+    for row in list_extra_working_days(
+        db, tenant_id=tenant_id, configuration_id=configuration_id
+    ):
+        row.is_deleted = True
+        row.deleted_at = now
+        row.deleted_by = user_id
+        row.updated_at = now
+        row.updated_by = user_id
+    for teacher_id, weekday, work_date in items:
+        db.add(
+            AttendanceConfigExtraWorkingDay(
+                tenant_id=tenant_id,
+                configuration_id=configuration_id,
+                teacher_id=teacher_id,
+                weekday=weekday,
+                work_date=work_date,
+                created_at=now,
+                created_by=user_id,
+            )
+        )
+    db.flush()
+
+
+def list_date_shift_overrides(
+    db: Session, *, tenant_id: int, configuration_id: int
+) -> list[AttendanceConfigDateShift]:
+    ensure_date_shift_table(db)
+    return (
+        db.query(AttendanceConfigDateShift)
+        .filter(
+            AttendanceConfigDateShift.tenant_id == tenant_id,
+            AttendanceConfigDateShift.configuration_id == configuration_id,
+            AttendanceConfigDateShift.is_deleted == False,  # noqa: E712
+        )
+        .order_by(AttendanceConfigDateShift.work_date.asc())
+        .all()
+    )
+
+
+def get_date_shift_override_for_teacher(
+    db: Session,
+    *,
+    tenant_id: int,
+    configuration_id: int,
+    work_date: date,
+    teacher_id: int | None = None,
+) -> AttendanceConfigDateShift | None:
+    ensure_date_shift_table(db)
+    base = (
+        AttendanceConfigDateShift.tenant_id == tenant_id,
+        AttendanceConfigDateShift.configuration_id == configuration_id,
+        AttendanceConfigDateShift.work_date == work_date,
+        AttendanceConfigDateShift.is_deleted == False,  # noqa: E712
+    )
+    if teacher_id is not None:
+        row = (
+            db.query(AttendanceConfigDateShift)
+            .filter(*base, AttendanceConfigDateShift.teacher_id == teacher_id)
+            .first()
+        )
+        if row is not None:
+            return row
+    return (
+        db.query(AttendanceConfigDateShift)
+        .filter(*base, AttendanceConfigDateShift.teacher_id.is_(None))
+        .first()
+    )
+
+
+def list_non_working_dates(
+    db: Session, *, tenant_id: int, configuration_id: int
+) -> list[AttendanceConfigNonWorkingDate]:
+    ensure_non_working_dates_table(db)
+    return (
+        db.query(AttendanceConfigNonWorkingDate)
+        .filter(
+            AttendanceConfigNonWorkingDate.tenant_id == tenant_id,
+            AttendanceConfigNonWorkingDate.configuration_id == configuration_id,
+            AttendanceConfigNonWorkingDate.is_deleted == False,  # noqa: E712
+        )
+        .order_by(AttendanceConfigNonWorkingDate.work_date.asc())
+        .all()
+    )
+
+
+def is_non_working_date(
+    db: Session,
+    *,
+    tenant_id: int,
+    configuration_id: int,
+    work_date: date,
+) -> bool:
+    ensure_non_working_dates_table(db)
+    row = (
+        db.query(AttendanceConfigNonWorkingDate.id)
+        .filter(
+            AttendanceConfigNonWorkingDate.tenant_id == tenant_id,
+            AttendanceConfigNonWorkingDate.configuration_id == configuration_id,
+            AttendanceConfigNonWorkingDate.work_date == work_date,
+            AttendanceConfigNonWorkingDate.is_deleted == False,  # noqa: E712
+        )
+        .first()
+    )
+    return row is not None
+
+
+def replace_non_working_dates(
+    db: Session,
+    *,
+    tenant_id: int,
+    configuration_id: int,
+    user_id: int,
+    work_dates: list[date],
+) -> None:
+    ensure_non_working_dates_table(db)
+    now = datetime.utcnow()
+    for row in list_non_working_dates(
+        db, tenant_id=tenant_id, configuration_id=configuration_id
+    ):
+        row.is_deleted = True
+        row.deleted_at = now
+        row.deleted_by = user_id
+        row.updated_at = now
+        row.updated_by = user_id
+    for work_date in work_dates:
+        db.add(
+            AttendanceConfigNonWorkingDate(
+                tenant_id=tenant_id,
+                configuration_id=configuration_id,
+                work_date=work_date,
+                created_at=now,
+                created_by=user_id,
+            )
+        )
+    db.flush()
+
+
+def replace_date_shift_overrides(
+    db: Session,
+    *,
+    tenant_id: int,
+    configuration_id: int,
+    user_id: int,
+    items: list[tuple[date, str, str, int | None, int | None]],
+) -> None:
+    ensure_date_shift_table(db)
+    now = datetime.utcnow()
+    for row in list_date_shift_overrides(
+        db, tenant_id=tenant_id, configuration_id=configuration_id
+    ):
+        row.is_deleted = True
+        row.deleted_at = now
+        row.deleted_by = user_id
+        row.updated_at = now
+        row.updated_by = user_id
+    for work_date, start_time, end_time, shift_id, teacher_id in items:
+        db.add(
+            AttendanceConfigDateShift(
+                tenant_id=tenant_id,
+                configuration_id=configuration_id,
+                work_date=work_date,
+                teacher_id=teacher_id,
+                shift_id=shift_id,
+                start_time=start_time,
+                end_time=end_time,
+                created_at=now,
+                created_by=user_id,
+            )
+        )
+    db.flush()

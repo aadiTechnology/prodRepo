@@ -17,6 +17,7 @@ import type {
   Shift,
   ShiftFormValues,
   StatusFormValues,
+  WorkingDayKey,
   WorkingDaysConfig,
 } from "../../pages/Attendance/configuration/attendanceConfiguration.types";
 
@@ -43,6 +44,19 @@ export interface AttendanceConfigurationApiResponse {
     saturday: boolean;
     sunday: boolean;
   };
+  extra_working_teachers?: Array<{
+    teacher_id: number;
+    day: WorkingDayKey;
+    work_date?: string | null;
+  }>;
+  date_shift_overrides?: Array<{
+    work_date: string;
+    start_time: string;
+    end_time: string;
+    shift_id?: number | null;
+    teacher_id?: number | null;
+  }>;
+  non_working_dates?: Array<{ work_date: string }>;
   holidays: Array<{
     id: number;
     name: string;
@@ -107,6 +121,15 @@ export type AttendanceConfigurationUpdatePayload = {
   apply_changes_to?: "future-only";
   attendance_marked_by?: { teacher: boolean; school_admin: boolean };
   working_days?: WorkingDaysConfig;
+  extra_working_teachers?: Array<{ teacher_id: number; day: WorkingDayKey; work_date?: string | null }>;
+  date_shift_overrides?: Array<{
+    work_date: string;
+    start_time: string;
+    end_time: string;
+    shift_id?: number | null;
+    teacher_id?: number | null;
+  }>;
+  non_working_dates?: Array<{ work_date: string }>;
   office_timing?: {
     start_time: string;
     end_time: string;
@@ -152,6 +175,26 @@ export function mapConfigurationToState(
       saturday: data.working_days.saturday,
       sunday: data.working_days.sunday,
     },
+    extraWorkingTeachers: (data.extra_working_teachers ?? []).map((item) => {
+      const raw = item.work_date;
+      const date =
+        raw != null && String(raw).trim() !== "" ? String(raw).slice(0, 10) : undefined;
+      return {
+        teacherId: String(item.teacher_id),
+        day: item.day,
+        ...(date ? { date } : {}),
+      };
+    }),
+    dateShiftOverrides: (data.date_shift_overrides ?? []).map((item) => ({
+      date: String(item.work_date).slice(0, 10),
+      startTime: item.start_time,
+      endTime: item.end_time,
+      ...(item.shift_id != null ? { shiftId: String(item.shift_id) } : {}),
+      ...(item.teacher_id != null ? { teacherId: String(item.teacher_id) } : {}),
+    })),
+    nonWorkingDates: (data.non_working_dates ?? []).map((item) =>
+      String(item.work_date).slice(0, 10)
+    ),
     holidays: data.holidays.map(
       (h): PublicHoliday => ({
         id: String(h.id),

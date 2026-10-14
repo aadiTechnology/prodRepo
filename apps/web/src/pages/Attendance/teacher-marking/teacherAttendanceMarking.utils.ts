@@ -150,6 +150,39 @@ export function isWorkingDay(
   return workingDays[dayName] ?? false;
 }
 
+export function isExtraWorkingTeacher(
+  teacherId: string,
+  iso: string,
+  extras: { teacherId: string; day: string; date?: string }[],
+  options?: {
+    workingDays?: {
+      monday: boolean;
+      tuesday: boolean;
+      wednesday: boolean;
+      thursday: boolean;
+      friday: boolean;
+      saturday: boolean;
+      sunday: boolean;
+    };
+    holidays?: Record<string, string>;
+  }
+): boolean {
+  if (!teacherId || !iso) return false;
+  const d = new Date(`${iso}T00:00:00`);
+  const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
+  const dayName = daysOfWeek[d.getDay()];
+  return extras.some((item) => {
+    if (item.teacherId !== teacherId || item.day !== dayName) return false;
+    if (item.date) return item.date === iso;
+    if (options?.workingDays) {
+      const onWeeklyOff = !isWorkingDay(iso, options.workingDays);
+      const onHoliday = options.holidays ? isHoliday(iso, options.holidays) : false;
+      return onWeeklyOff || onHoliday;
+    }
+    return true;
+  });
+}
+
 /** Inclusive ISO date strings from `fromIso` through `toIso`, newest first. */
 export function listDatesInRange(fromIso: string, toIso: string): string[] {
   if (!fromIso || !toIso || fromIso > toIso) return [];

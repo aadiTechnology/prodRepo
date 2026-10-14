@@ -7,7 +7,21 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 from app.models.academic import AcademicYear
-from app.models.attendance_configuration import AttendanceConfiguration, AttendanceConfigHoliday
+from app.models.attendance_configuration import (
+    AttendanceConfigExtraWorkingDay,
+    AttendanceConfigHoliday,
+    AttendanceConfiguration,
+)
+
+_WEEKDAY_NAMES = (
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+)
 
 
 def is_weekend(check_date: date) -> bool:
@@ -15,52 +29,77 @@ def is_weekend(check_date: date) -> bool:
     return check_date.weekday() >= 5
 
 
+def _config_for_year(
+    db: Session,
+    *,
+    tenant_id: int,
+    academic_year_id: int,
+) -> AttendanceConfiguration | None:
+    return (
+        db.query(AttendanceConfiguration)
+        .filter(
+            AttendanceConfiguration.tenant_id == tenant_id,
+            AttendanceConfiguration.academic_year_id == academic_year_id,
+            AttendanceConfiguration.is_deleted == False,  # noqa: E712
+        )
+        .first()
+    )
+
+
 def _get_active_config(
     db: Session,
     *,
     tenant_id: int,
 ) -> AttendanceConfiguration | None:
-    # First try to get config for the CURRENT active academic year (ordered by date)
+    """Use the same academic year the configuration screen saves by default."""
     from datetime import datetime
+
     today = datetime.now().date()
-    
-    active_year = (
+    active = (
+        AcademicYear.tenant_id == tenant_id,
+        AcademicYear.is_active == True,  # noqa: E712
+        AcademicYear.is_deleted == False,  # noqa: E712
+    )
+
+    current_year = (
+        db.query(AcademicYear)
+        .filter(*active, AcademicYear.is_current == True)  # noqa: E712
+        .order_by(AcademicYear.start_date.desc())
+        .first()
+    )
+    if current_year:
+        config = _config_for_year(
+            db, tenant_id=tenant_id, academic_year_id=current_year.id
+        )
+        if config:
+            return config
+
+    dated_year = (
         db.query(AcademicYear)
         .filter(
-            AcademicYear.tenant_id == tenant_id,
-            AcademicYear.is_active == True,  # noqa: E712
-            AcademicYear.is_deleted == False,  # noqa: E712
+            *active,
             AcademicYear.start_date <= today,
             AcademicYear.end_date >= today,
         )
         .first()
     )
-    
-    # If no matching current year, try any active year that has a config
-    if not active_year:
-        # Get the most recent active academic year with a config
-        active_year = (
-            db.query(AcademicYear)
-            .filter(
-                AcademicYear.tenant_id == tenant_id,
-                AcademicYear.is_active == True,  # noqa: E712
-                AcademicYear.is_deleted == False,  # noqa: E712
-            )
-            .order_by(AcademicYear.start_date.desc())
-            .first()
+    if dated_year:
+        config = _config_for_year(
+            db, tenant_id=tenant_id, academic_year_id=dated_year.id
         )
-    
-    if not active_year:
-        return None
+        if config:
+            return config
 
-    return (
-        db.query(AttendanceConfiguration)
-        .filter(
-            AttendanceConfiguration.tenant_id == tenant_id,
-            AttendanceConfiguration.academic_year_id == active_year.id,
-            AttendanceConfiguration.is_deleted == False,  # noqa: E712
-        )
+    latest_year = (
+        db.query(AcademicYear)
+        .filter(*active)
+        .order_by(AcademicYear.start_date.desc())
         .first()
+    )
+    if not latest_year:
+        return None
+    return _config_for_year(
+        db, tenant_id=tenant_id, academic_year_id=latest_year.id
     )
 
 
@@ -77,6 +116,35 @@ def _is_configured_working_day(config: AttendanceConfiguration, check_date: date
     return bool(working_day_map.get(check_date.weekday(), False))
 
 
+def _is_scheduled_non_working_date(
+    db: Session,
+    *,
+    config: AttendanceConfiguration,
+    check_date: date,
+) -> bool:
+    from app.repositories.attendance_configuration_repository import (
+        is_non_working_date,
+    )
+
+    return is_non_working_date(
+        db,
+        tenant_id=config.tenant_id,
+        configuration_id=config.id,
+        work_date=check_date,
+    )
+
+
+def _is_effective_working_day(
+    db: Session,
+    *,
+    config: AttendanceConfiguration,
+    check_date: date,
+) -> bool:
+    if _is_scheduled_non_working_date(db, config=config, check_date=check_date):
+        return False
+    return _is_configured_working_day(config, check_date)
+
+
 def is_working_day_for_tenant(
     db: Session,
     *,
@@ -87,7 +155,7 @@ def is_working_day_for_tenant(
     config = _get_active_config(db, tenant_id=tenant_id)
     if not config:
         return check_date.weekday() < 5
-    return _is_configured_working_day(config, check_date)
+    return _is_effective_working_day(db, config=config, check_date=check_date)
 
 
 def get_holiday_blocking_attendance(
@@ -109,22 +177,80 @@ def get_holiday_blocking_attendance(
     )
 
 
+def teacher_has_extra_working_day(
+    db: Session,
+    *,
+    config: AttendanceConfiguration,
+    teacher_id: int,
+    check_date: date,
+) -> bool:
+    from app.repositories.attendance_configuration_repository import ensure_extra_working_table
+
+    ensure_extra_working_table(db)
+    weekday = _WEEKDAY_NAMES[check_date.weekday()]
+    base = (
+        AttendanceConfigExtraWorkingDay.tenant_id == config.tenant_id,
+        AttendanceConfigExtraWorkingDay.configuration_id == config.id,
+        AttendanceConfigExtraWorkingDay.teacher_id == teacher_id,
+        AttendanceConfigExtraWorkingDay.is_deleted == False,  # noqa: E712
+    )
+
+    date_row = (
+        db.query(AttendanceConfigExtraWorkingDay.id)
+        .filter(*base, AttendanceConfigExtraWorkingDay.work_date == check_date)
+        .first()
+    )
+    if date_row is not None:
+        return True
+
+    weekly_row = (
+        db.query(AttendanceConfigExtraWorkingDay.id)
+        .filter(
+            *base,
+            AttendanceConfigExtraWorkingDay.work_date.is_(None),
+            AttendanceConfigExtraWorkingDay.weekday == weekday,
+        )
+        .first()
+    )
+    if weekly_row is None:
+        return False
+
+    non_working = not _is_effective_working_day(db, config=config, check_date=check_date)
+    holiday = get_holiday_blocking_attendance(
+        db, tenant_id=config.tenant_id, check_date=check_date
+    )
+    return non_working or holiday is not None
+
+
 def get_staff_attendance_block_reason(
     db: Session,
     *,
     tenant_id: int,
     check_date: date,
+    teacher_id: int | None = None,
 ) -> str | None:
     """
     Return blocking reason when staff attendance cannot be marked, else None.
     Respects AttendanceConfiguration working days and public holidays.
+    A teacher listed as an extra working teacher may mark that weekday even when
+    the school day is off or a public holiday. Other teachers stay blocked.
     """
     config = _get_active_config(db, tenant_id=tenant_id)
-    if config and not _is_configured_working_day(config, check_date):
+    non_working = bool(
+        config and not _is_effective_working_day(db, config=config, check_date=check_date)
+    )
+    holiday = get_holiday_blocking_attendance(db, tenant_id=tenant_id, check_date=check_date)
+
+    if teacher_id is not None and config and (non_working or holiday):
+        if teacher_has_extra_working_day(
+            db, config=config, teacher_id=teacher_id, check_date=check_date
+        ):
+            return None
+
+    if non_working and config:
         day_name = check_date.strftime("%A")
         return f"Non-working day ({day_name})"
 
-    holiday = get_holiday_blocking_attendance(db, tenant_id=tenant_id, check_date=check_date)
     if holiday:
         return f"Public Holiday: {holiday.name}"
 
@@ -136,11 +262,14 @@ def assert_staff_attendance_working_day(
     *,
     tenant_id: int,
     check_date: date,
+    teacher_id: int | None = None,
 ) -> None:
     """Raise HTTPException when attendance cannot be marked on check_date."""
     from fastapi import HTTPException
 
-    reason = get_staff_attendance_block_reason(db, tenant_id=tenant_id, check_date=check_date)
+    reason = get_staff_attendance_block_reason(
+        db, tenant_id=tenant_id, check_date=check_date, teacher_id=teacher_id
+    )
     if reason:
         raise HTTPException(
             status_code=400,

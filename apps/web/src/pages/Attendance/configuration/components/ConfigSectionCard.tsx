@@ -25,7 +25,7 @@ export default function ConfigSectionCard({
       sx={{
         borderRadius: 3,
         border: `1px solid ${colorTokens.border.default}`,
-        overflow: "hidden",
+        overflow: "visible",
       }}
     >
       <Box
@@ -34,6 +34,8 @@ export default function ConfigSectionCard({
           py: 1.5,
           bgcolor: theme.palette.grey[50],
           borderBottom: `1px solid ${colorTokens.border.subtle}`,
+          borderTopLeftRadius: 12,
+          borderTopRightRadius: 12,
         })}
       >
         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>

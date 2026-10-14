@@ -10,7 +10,6 @@ import {
   Paper,
   Select,
   Stack,
-  Typography,
 } from "@mui/material";
 
 import { PageHeader } from "../../../components/layout";
@@ -81,19 +80,21 @@ export default function AttendanceConfigurationPage() {
       }
     >
       <Stack spacing={2}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="flex-start">
+        <Stack direction={{ xs: "column", lg: "row" }} spacing={2} alignItems="flex-start">
           <Paper
             sx={{
-              width: { xs: "100%", md: 280 },
-              borderRadius: 3,
-              p: 1.5,
+              width: { xs: "100%", lg: 220 },
+              borderRadius: 2,
+              p: 1,
               flexShrink: 0,
-              position: { md: "sticky" },
-              top: { md: 16 },
+              alignSelf: "flex-start",
+              height: "fit-content",
+              position: { lg: "sticky" },
+              top: { lg: 16 },
             }}
             data-testid="attendance-config-nav"
           >
-            <FormControl fullWidth size="small" sx={{ mb: 1.5, px: 0.5 }}>
+            <FormControl fullWidth size="small" sx={{ mb: 1, px: 0.25 }}>
               <InputLabel id="label-attendance-config-academic-year">Academic Year</InputLabel>
               <Select
                 labelId="label-attendance-config-academic-year"
@@ -113,7 +114,7 @@ export default function AttendanceConfigurationPage() {
                 ))}
               </Select>
             </FormControl>
-            <List disablePadding>
+            <List dense disablePadding>
               {SECTION_NAV.map((section) => {
                 const isActive = controller.activeSection === section.id;
                 return (
@@ -122,11 +123,20 @@ export default function AttendanceConfigurationPage() {
                     selected={isActive}
                     onClick={() => controller.setActiveSection(section.id)}
                     data-testid={section.testId}
-                    sx={{ borderRadius: 2, mb: 0.5 }}
+                    sx={{
+                      borderRadius: 1.5,
+                      py: 0.5,
+                      minHeight: 36,
+                      "&.Mui-selected": { py: 0.5 },
+                    }}
                   >
                     <ListItemText
                       primary={section.label}
-                      primaryTypographyProps={{ fontSize: "0.88rem", fontWeight: isActive ? 700 : 500 }}
+                      primaryTypographyProps={{
+                        fontSize: "0.8125rem",
+                        fontWeight: isActive ? 700 : 500,
+                        lineHeight: 1.3,
+                      }}
                     />
                   </ListItemButton>
                 );
@@ -134,7 +144,10 @@ export default function AttendanceConfigurationPage() {
             </List>
           </Paper>
 
-          <Box sx={{ flex: 1, minWidth: 0, width: "100%" }} data-testid="attendance-config-content">
+          <Box
+            sx={{ flex: 1, minWidth: 0, width: "100%", maxWidth: "100%", overflow: "visible" }}
+            data-testid="attendance-config-content"
+          >
             {activeContent}
           </Box>
         </Stack>

@@ -5,6 +5,7 @@
 
 import { Tooltip, alpha } from "@mui/material";
 import {
+  Add as AddGlyph,
   ArrowBack as ArrowBackGlyph,
   Cancel as CancelGlyph,
   Download as DownloadGlyph,
@@ -24,6 +25,10 @@ type Base = Omit<IconButtonProps, "children">;
 export type FormHeaderIconActionProps =
   | (Base & {
       variant: "cancel";
+      tooltipTitle?: string;
+    })
+  | (Base & {
+      variant: "add";
       tooltipTitle?: string;
     })
   | (Base & {
@@ -105,6 +110,24 @@ const unpublishButtonSx = (theme: Theme) => ({
     boxShadow: `0 4px 12px ${alpha(theme.palette.warning.main, 0.2)}`,
   },
   "&.Mui-disabled": { background: "#e2e8f0", color: "#94a3b8" },
+});
+
+const addButtonSx = () => ({
+  color: colorTokens.primary.contrast,
+  background: `linear-gradient(135deg, ${colorTokens.preschool.turquoise.main} 0%, ${colorTokens.primary.main} 100%)`,
+  borderRadius: "12px",
+  width: 44,
+  height: 44,
+  boxShadow: `0 4px 12px ${alpha(colorTokens.primary.main, 0.28)}`,
+  "&:hover": {
+    transform: "translateY(-2px)",
+    boxShadow: `0 6px 14px ${alpha(colorTokens.primary.main, 0.32)}`,
+  },
+  "&.Mui-disabled": {
+    background: "#e2e8f0",
+    color: "#94a3b8",
+    boxShadow: "none",
+  },
 });
 
 const saveButtonSx = (theme: Theme) => ({
@@ -243,6 +266,32 @@ export default function FormHeaderIconAction(props: FormHeaderIconActionProps) {
     return (
       <Tooltip title={tooltipTitle}>
         {baseDisabled ? <span style={{ display: "inline-flex" }}>{button}</span> : button}
+      </Tooltip>
+    );
+  }
+
+  if (props.variant === "add") {
+    const {
+      variant: _v,
+      tooltipTitle = "Add",
+      disabled,
+      sx,
+      "aria-label": ariaLabel,
+      ...rest
+    } = props;
+    const button = (
+      <IconButton
+        {...rest}
+        aria-label={ariaLabel ?? "Add"}
+        disabled={disabled}
+        sx={[addButtonSx, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
+      >
+        <AddGlyph sx={{ fontSize: 24 }} />
+      </IconButton>
+    );
+    return (
+      <Tooltip title={tooltipTitle}>
+        {disabled ? <span style={{ display: "inline-flex" }}>{button}</span> : button}
       </Tooltip>
     );
   }

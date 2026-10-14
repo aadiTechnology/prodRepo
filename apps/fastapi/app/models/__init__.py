@@ -18,7 +18,7 @@ from app.models.theme_template import ThemeTemplate
 from app.models.class_fee_structure_assignment import ClassFeeStructureAssignment, AssignmentStatus
 from app.models.academic import AcademicYear, SchoolClass, ClassDivision
 # from app.models.school_class import SchoolClass
-from app.models.fee import FeeCategory, FeeStructure, FeeInstallment, TenantFeeDueDisplayConfig
+from app.models.fee import FeeCategory, FeeStructure, FeeInstallment
 from app.models.fee_discount import FeeDiscount
 from app.models.fee_payment import FeePayment, FeePaymentAllocation
 from app.models.role_menu_permission import RoleMenuPermission
@@ -49,7 +49,10 @@ from app.models.syllabus import Syllabus, SyllabusAttachment
 from app.models.staff_attendance import StaffAttendance
 from app.models.attendance_configuration import (
     AttendanceConfiguration,
+    AttendanceConfigDateShift,
+    AttendanceConfigExtraWorkingDay,
     AttendanceConfigHoliday,
+    AttendanceConfigNonWorkingDate,
     AttendanceConfigShift,
     AttendanceConfigStatus,
     AttendanceConfigNotification,
@@ -94,7 +97,6 @@ __all__ = [
     "AcademicYear",
     "FeeCategory",
     "FeeInstallment",
-    "TenantFeeDueDisplayConfig",
     "FeeDiscount",
     "FeeLedger",
     "Student",
@@ -130,7 +132,10 @@ __all__ = [
     "SyllabusAttachment",
     "StaffAttendance",
     "AttendanceConfiguration",
+    "AttendanceConfigDateShift",
+    "AttendanceConfigExtraWorkingDay",
     "AttendanceConfigHoliday",
+    "AttendanceConfigNonWorkingDate",
     "AttendanceConfigShift",
     "AttendanceConfigStatus",
     "AttendanceConfigNotification",

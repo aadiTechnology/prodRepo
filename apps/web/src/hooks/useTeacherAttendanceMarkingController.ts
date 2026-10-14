@@ -6,7 +6,10 @@ import staffAttendanceService, {
 import attendanceConfigurationService, {
   getHolidaysForCalendar,
 } from "../api/services/attendanceConfigurationService";
+import { resolveOfficeTimingForDate } from "../pages/Attendance/configuration/dateShiftTiming.utils";
+import type { DateShiftOverride } from "../pages/Attendance/configuration/attendanceConfiguration.types";
 import academicYearService from "../api/services/academicYearService";
+import { resolveCurrentAcademicYearId } from "../utils/academicYear";
 import teacherService from "../api/services/teacherService";
 import { useAuth } from "../context/AuthContext";
 import { useAttendanceReportRole } from "./useAttendanceReportRole";
@@ -32,6 +35,7 @@ import {
   buildAttendanceListGrid,
   isWeekend,
   isHoliday,
+  isExtraWorkingTeacher,
   primaryCalendarStatus,
   resolveStatusAfterCheckIn,
   toIsoDate,
@@ -168,11 +172,15 @@ export function useTeacherAttendanceMarkingController() {
     saturday: false,
     sunday: false,
   });
-  const [officeTimingConfig, setOfficeTimingConfig] = useState({
+  const [extraWorkingTeachers, setExtraWorkingTeachers] = useState<
+    { teacherId: string; day: string }[]
+  >([]);
+  const [baseOfficeTiming, setBaseOfficeTiming] = useState({
     startTime: "09:00",
     endTime: "17:00",
-    minimumWorkingHours: 360,
+    minimumWorkingHours: 6,
   });
+  const [dateShiftOverrides, setDateShiftOverrides] = useState<DateShiftOverride[]>([]);
   const [graceTimeConfig, setGraceTimeConfig] = useState({
     enabled: false,
     graceMinutes: 0,
@@ -347,8 +355,9 @@ export function useTeacherAttendanceMarkingController() {
         if (!academicYearId) {
           const years = await academicYearService.listActive();
           if (cancelled) return;
-          if (years && years.length > 0) {
-            setAcademicYearId(Number(years[0].id));
+          const yearId = Number(resolveCurrentAcademicYearId(years));
+          if (Number.isFinite(yearId) && yearId > 0) {
+            setAcademicYearId(yearId);
           }
         }
       } catch (err) {
@@ -373,7 +382,9 @@ export function useTeacherAttendanceMarkingController() {
         if (cancelled) return;
         
         setWorkingDays(config.workingDays);
-        setOfficeTimingConfig(config.officeTiming);
+        setExtraWorkingTeachers(config.extraWorkingTeachers ?? []);
+        setBaseOfficeTiming(config.officeTiming);
+        setDateShiftOverrides(config.dateShiftOverrides ?? []);
         setGraceTimeConfig({
           enabled: config.graceTime.enabled,
           graceMinutes: config.graceTime.graceMinutes,
@@ -391,6 +402,27 @@ export function useTeacherAttendanceMarkingController() {
     };
   }, [academicYearId]);
 
+  const officeTimingConfig = useMemo(
+    () =>
+      resolveOfficeTimingForDate(
+        baseOfficeTiming,
+        dateShiftOverrides,
+        today,
+        selfTeacherId || null
+      ),
+    [baseOfficeTiming, dateShiftOverrides, today, selfTeacherId]
+  );
+
+  const markOfficeTimingConfig = useMemo(
+    () =>
+      resolveOfficeTimingForDate(
+        baseOfficeTiming,
+        dateShiftOverrides,
+        markDate,
+        markTeacherId || null
+      ),
+    [baseOfficeTiming, dateShiftOverrides, markDate, markTeacherId]
+  );
 
   const todayRecord = useMemo(() => {
     if (!selfTeacherId) return createEmptyRecord("", today);
@@ -588,7 +620,7 @@ export function useTeacherAttendanceMarkingController() {
     } finally {
       setSaving(false);
     }
-  }, [selfTeacherId, todayRecord, persistMark, today]);
+  }, [selfTeacherId, todayRecord, persistMark, today, officeTimingConfig, graceTimeConfig]);
 
   const handleCheckOut = useCallback(async () => {
     if (!selfTeacherId || !todayRecord.checkInTime || todayRecord.checkOutTime) return;
@@ -670,10 +702,14 @@ export function useTeacherAttendanceMarkingController() {
       const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
       const dayName = daysOfWeek[dayOfWeek];
       const isWorkingDayDate = workingDays[dayName as keyof typeof workingDays] ?? false;
-      
-      if (!isWorkingDayDate) {
+      const allowedOffDay = isExtraWorkingTeacher(markTeacherId, markDate, extraWorkingTeachers, {
+        workingDays,
+        holidays,
+      });
+
+      if (!isWorkingDayDate && !allowedOffDay) {
         errors.push("non-working-day");
-      } else if (isHoliday(markDate, holidays)) {
+      } else if (isHoliday(markDate, holidays) && !allowedOffDay) {
         errors.push("holidays");
       }
     }
@@ -714,7 +750,7 @@ export function useTeacherAttendanceMarkingController() {
     }
 
     // Use configured office timing and grace time
-    const officeStart = officeTimingConfig.startTime;
+    const officeStart = markOfficeTimingConfig.startTime;
     // Always recompute Present/Late from check-in (never keep a sticky Late).
     let status: TeacherAttendanceStatus | undefined;
     if (markDraft.checkInTime) {
@@ -758,7 +794,7 @@ export function useTeacherAttendanceMarkingController() {
     } finally {
       setSaving(false);
     }
-  }, [markTeacherId, markDate, markDraft, markRecord, persistMark, holidays, workingDays, officeTimingConfig, graceTimeConfig]);
+  }, [markTeacherId, markDate, markDraft, markRecord, persistMark, holidays, workingDays, extraWorkingTeachers, markOfficeTimingConfig, graceTimeConfig]);
 
   const updateDetailsFilter = useCallback(
     <K extends keyof AttendanceDetailsFilters>(key: K, value: AttendanceDetailsFilters[K]) => {
@@ -802,6 +838,7 @@ export function useTeacherAttendanceMarkingController() {
     displayCheckOutTime,
     todayAttendanceStatus,
     officeTimingConfig,
+    markOfficeTimingConfig,
     showCheckInButton,
     showCheckOutButton,
     buttonsDisabled,

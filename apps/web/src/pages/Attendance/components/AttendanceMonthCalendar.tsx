@@ -47,12 +47,18 @@ export interface AttendanceMonthCalendarProps {
   month: Date;
   onMonthChange: (next: Date) => void;
   statusByDate: Record<string, AttendanceCalendarStatus>;
+  selectedDate?: string;
+  onDateSelect?: (iso: string) => void;
+  legendStatuses?: AttendanceCalendarStatus[];
 }
 
 export function AttendanceMonthCalendar({
   month,
   onMonthChange,
   statusByDate,
+  selectedDate,
+  onDateSelect,
+  legendStatuses,
 }: AttendanceMonthCalendarProps) {
   const year = month.getFullYear();
   const monthIndex = month.getMonth();
@@ -134,10 +140,22 @@ export function AttendanceMonthCalendar({
 
             const meta = cell.status ? STATUS_META[cell.status] : null;
             const StatusIcon = meta?.Icon;
+            const isSelected = selectedDate === cell.iso;
+            const interactive = !!onDateSelect;
 
             return (
               <Box
                 key={cell.key}
+                role={interactive ? "button" : undefined}
+                tabIndex={interactive ? 0 : undefined}
+                onClick={interactive ? () => onDateSelect!(cell.iso) : undefined}
+                onKeyDown={
+                  interactive
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") onDateSelect!(cell.iso);
+                      }
+                    : undefined
+                }
                 sx={{
                   minHeight: 52,
                   borderRadius: "10px",
@@ -146,10 +164,16 @@ export function AttendanceMonthCalendar({
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 0.25,
+                  cursor: interactive ? "pointer" : "default",
                   bgcolor: meta ? alpha(meta.color, 0.14) : alpha(colorTokens.border.subtle, 0.35),
-                  border: meta
-                    ? `1px solid ${alpha(meta.color, 0.28)}`
-                    : `1px solid ${colorTokens.border.subtle}`,
+                  border: isSelected
+                    ? `2px solid ${colorTokens.preschool.mint.main}`
+                    : meta
+                      ? `1px solid ${alpha(meta.color, 0.28)}`
+                      : `1px solid ${colorTokens.border.subtle}`,
+                  "&:hover": interactive
+                    ? { boxShadow: "0 0 0 1px rgba(0,0,0,0.06)" }
+                    : undefined,
                 }}
               >
                 <Typography
@@ -172,7 +196,7 @@ export function AttendanceMonthCalendar({
           gap={1.5}
           sx={{ pt: 0.5, borderTop: `1px solid ${colorTokens.border.subtle}` }}
         >
-          {(Object.keys(STATUS_META) as AttendanceCalendarStatus[]).map((status) => {
+          {(legendStatuses ?? (Object.keys(STATUS_META) as AttendanceCalendarStatus[])).map((status) => {
             const { color, Icon } = STATUS_META[status];
             return (
               <Stack key={status} direction="row" spacing={0.5} alignItems="center">

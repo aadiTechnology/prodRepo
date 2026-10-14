@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ValidationException
 from app.models.teacher import Teacher
+from app.repositories import attendance_configuration_repository as att_cfg_repo
 from app.repositories import staff_attendance_repository as repo
 from app.schemas.staff_attendance_schema import (
     StaffAttendanceApprovalRequest,
@@ -13,11 +14,12 @@ from app.schemas.staff_attendance_schema import (
     StaffAttendanceMarkRequest,
     StaffAttendanceResponse,
 )
-from app.models.academic import AcademicYear
-from app.models.attendance_configuration import AttendanceConfiguration
 from app.services.attendance_access import is_admin_like, is_teacher_like
 from app.services import teacher_service
-from app.utils.staff_attendance_working_days import assert_staff_attendance_working_day
+from app.utils.staff_attendance_working_days import (
+    assert_staff_attendance_working_day,
+    _get_active_config,
+)
 
 DEFAULT_SHIFT_START = "09:00"
 DEFAULT_SHIFT_END = "17:00"
@@ -44,36 +46,15 @@ class _TimingConfig:
         self.status_after_grace = status_after_grace
 
 
-def _load_timing_config(db: Session, *, tenant_id: int) -> _TimingConfig:
+def _load_timing_config(
+    db: Session,
+    *,
+    tenant_id: int,
+    attendance_date: date | None = None,
+    teacher_id: int | None = None,
+) -> _TimingConfig:
     """Load office timing + grace settings from attendance configuration."""
-    active_year = (
-        db.query(AcademicYear)
-        .filter(
-            AcademicYear.tenant_id == tenant_id,
-            AcademicYear.is_active == True,  # noqa: E712
-            AcademicYear.is_deleted == False,  # noqa: E712
-        )
-        .order_by(AcademicYear.id.desc())
-        .first()
-    )
-    if not active_year:
-        return _TimingConfig(
-            shift_start=DEFAULT_SHIFT_START,
-            shift_end=DEFAULT_SHIFT_END,
-            grace_enabled=True,
-            grace_minutes=DEFAULT_GRACE_MINUTES,
-            status_after_grace=DEFAULT_STATUS_AFTER_GRACE,
-        )
-
-    config = (
-        db.query(AttendanceConfiguration)
-        .filter(
-            AttendanceConfiguration.tenant_id == tenant_id,
-            AttendanceConfiguration.academic_year_id == active_year.id,
-            AttendanceConfiguration.is_deleted == False,  # noqa: E712
-        )
-        .first()
-    )
+    config = _get_active_config(db, tenant_id=tenant_id)
     if not config:
         return _TimingConfig(
             shift_start=DEFAULT_SHIFT_START,
@@ -83,9 +64,24 @@ def _load_timing_config(db: Session, *, tenant_id: int) -> _TimingConfig:
             status_after_grace=DEFAULT_STATUS_AFTER_GRACE,
         )
 
+    shift_start = config.office_start_time or DEFAULT_SHIFT_START
+    shift_end = config.office_end_time or DEFAULT_SHIFT_END
+    if attendance_date is not None:
+        att_cfg_repo.ensure_date_shift_table(db)
+        override = att_cfg_repo.get_date_shift_override_for_teacher(
+            db,
+            tenant_id=tenant_id,
+            configuration_id=config.id,
+            work_date=attendance_date,
+            teacher_id=teacher_id,
+        )
+        if override:
+            shift_start = override.start_time or shift_start
+            shift_end = override.end_time or shift_end
+
     return _TimingConfig(
-        shift_start=config.office_start_time or DEFAULT_SHIFT_START,
-        shift_end=config.office_end_time or DEFAULT_SHIFT_END,
+        shift_start=shift_start,
+        shift_end=shift_end,
         grace_enabled=bool(config.grace_enabled),
         grace_minutes=int(config.grace_minutes or DEFAULT_GRACE_MINUTES),
         status_after_grace=config.status_after_grace or DEFAULT_STATUS_AFTER_GRACE,
@@ -255,6 +251,7 @@ def mark_staff_attendance(
         db,
         tenant_id=tenant_id,
         check_date=payload.attendance_date,
+        teacher_id=payload.teacher_id,
     )
 
     _assert_teacher_in_tenant(db, tenant_id=tenant_id, teacher_id=payload.teacher_id)
@@ -285,7 +282,12 @@ def mark_staff_attendance(
     if check_in_min is not None and check_out_min is not None and check_out_min < check_in_min:
         raise ValidationException("Check-out cannot happen before check-in")
 
-    timing = _load_timing_config(db, tenant_id=tenant_id)
+    timing = _load_timing_config(
+        db,
+        tenant_id=tenant_id,
+        attendance_date=payload.attendance_date,
+        teacher_id=payload.teacher_id,
+    )
 
     working = None
     overtime = None

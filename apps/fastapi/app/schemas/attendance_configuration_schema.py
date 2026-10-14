@@ -28,6 +28,29 @@ class WorkingDaysSchema(BaseModel):
     sunday: bool = False
 
 
+WeekdayName = Literal[
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
+]
+
+
+class ExtraWorkingTeacherSchema(BaseModel):
+    teacher_id: int = Field(..., ge=1)
+    day: WeekdayName
+    work_date: date | None = None
+
+
+class DateShiftOverrideSchema(BaseModel):
+    work_date: date
+    start_time: str = Field(..., min_length=4, max_length=5)
+    end_time: str = Field(..., min_length=4, max_length=5)
+    shift_id: int | None = Field(None, ge=1)
+    teacher_id: int | None = Field(None, ge=1)
+
+
+class NonWorkingDateSchema(BaseModel):
+    work_date: date
+
+
 class OfficeTimingSchema(BaseModel):
     start_time: str = Field(..., min_length=4, max_length=5)
     end_time: str = Field(..., min_length=4, max_length=5)
@@ -157,6 +180,9 @@ class AttendanceConfigurationUpdateRequest(BaseModel):
     apply_changes_to: ApplyChangesTo | None = None
     attendance_marked_by: AttendanceMarkedBySchema | None = None
     working_days: WorkingDaysSchema | None = None
+    extra_working_teachers: list[ExtraWorkingTeacherSchema] | None = None
+    date_shift_overrides: list[DateShiftOverrideSchema] | None = None
+    non_working_dates: list[NonWorkingDateSchema] | None = None
     office_timing: OfficeTimingSchema | None = None
     grace_time: GraceTimeSchema | None = None
     check_in_rules: CheckInRulesSchema | None = None
@@ -167,6 +193,9 @@ class AttendanceConfigurationResponse(BaseModel):
     tenant_id: int
     general: GeneralConfigurationSchema
     working_days: WorkingDaysSchema
+    extra_working_teachers: list[ExtraWorkingTeacherSchema] = Field(default_factory=list)
+    date_shift_overrides: list[DateShiftOverrideSchema] = Field(default_factory=list)
+    non_working_dates: list[NonWorkingDateSchema] = Field(default_factory=list)
     holidays: list[HolidayResponse]
     shifts: list[ShiftResponse]
     office_timing: OfficeTimingSchema

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ValidationException
 from app.models.academic import AcademicYear
+from app.models.teacher import Teacher
 from app.models.attendance_configuration import (
     AttendanceConfigHoliday,
     AttendanceConfigNotification,
@@ -23,6 +24,9 @@ from app.schemas.attendance_configuration_schema import (
     AttendanceConfigurationUpdateRequest,
     AttendanceMarkedBySchema,
     CheckInRulesSchema,
+    DateShiftOverrideSchema,
+    ExtraWorkingTeacherSchema,
+    NonWorkingDateSchema,
     GeneralConfigurationSchema,
     GraceTimeSchema,
     HolidayCreateRequest,
@@ -70,6 +74,8 @@ DEFAULT_NOTIFICATION_LABEL = "Missed Attendance Alert"
 DEFAULT_NOTIFICATION_RECIPIENTS = "teacher,schoolAdmin"
 DEFAULT_NOTIFICATION_TRIGGERS = "missedAttendance"
 DEFAULT_NOTIFICATION_CHANNELS = "sms"
+
+LEGACY_SATURDAY_OFF_HOLIDAY_PREFIX = "Off —"
 
 
 def _parse_hhmm(value: str, *, field: str) -> int:
@@ -223,6 +229,50 @@ def _to_status_response(row: AttendanceConfigStatus) -> StatusResponse:
     )
 
 
+def _migrate_legacy_saturday_off_holidays(
+    db: Session,
+    *,
+    tenant_id: int,
+    configuration_id: int,
+    user_id: int,
+) -> None:
+    """Move legacy Saturday-off rows out of public holidays into non_working_dates."""
+    repo.ensure_non_working_dates_table(db)
+    holidays = repo.list_holidays(
+        db, tenant_id=tenant_id, configuration_id=configuration_id
+    )
+    legacy = [
+        h
+        for h in holidays
+        if (h.name or "").startswith(LEGACY_SATURDAY_OFF_HOLIDAY_PREFIX)
+    ]
+    if not legacy:
+        return
+
+    work_dates = [
+        row.work_date
+        for row in repo.list_non_working_dates(
+            db, tenant_id=tenant_id, configuration_id=configuration_id
+        )
+    ]
+    seen = set(work_dates)
+    for holiday in legacy:
+        if holiday.holiday_date not in seen:
+            work_dates.append(holiday.holiday_date)
+            seen.add(holiday.holiday_date)
+        repo.soft_delete_holiday(db, holiday, user_id=user_id)
+
+    work_dates.sort()
+    repo.replace_non_working_dates(
+        db,
+        tenant_id=tenant_id,
+        configuration_id=configuration_id,
+        user_id=user_id,
+        work_dates=work_dates,
+    )
+    repo.commit(db)
+
+
 def _to_notification_response(row: AttendanceConfigNotification) -> NotificationResponse:
     return NotificationResponse(
         id=row.id,
@@ -273,6 +323,34 @@ def _to_response(
             saturday=row.working_saturday,
             sunday=row.working_sunday,
         ),
+        extra_working_teachers=[
+            ExtraWorkingTeacherSchema(
+                teacher_id=item.teacher_id,
+                day=item.weekday,  # type: ignore[arg-type]
+                work_date=item.work_date,
+            )
+            for item in repo.list_extra_working_days(
+                db, tenant_id=row.tenant_id, configuration_id=row.id
+            )
+        ],
+        date_shift_overrides=[
+            DateShiftOverrideSchema(
+                work_date=item.work_date,
+                start_time=item.start_time,
+                end_time=item.end_time,
+                shift_id=item.shift_id,
+                teacher_id=item.teacher_id,
+            )
+            for item in repo.list_date_shift_overrides(
+                db, tenant_id=row.tenant_id, configuration_id=row.id
+            )
+        ],
+        non_working_dates=[
+            NonWorkingDateSchema(work_date=item.work_date)
+            for item in repo.list_non_working_dates(
+                db, tenant_id=row.tenant_id, configuration_id=row.id
+            )
+        ],
         holidays=[_to_holiday_response(h) for h in holidays],
         shifts=[_to_shift_response(s) for s in shifts],
         office_timing=OfficeTimingSchema(
@@ -308,10 +386,19 @@ def get_configuration(
     academic_year_id: int,
 ) -> AttendanceConfigurationResponse:
     """Get configuration for tenant + academic year (creates defaults if missing)."""
+    repo.ensure_extra_working_table(db)
+    repo.ensure_date_shift_table(db)
+    repo.ensure_non_working_dates_table(db)
     row = _get_or_create_configuration(
         db,
         tenant_id=tenant_id,
         academic_year_id=academic_year_id,
+        user_id=user_id,
+    )
+    _migrate_legacy_saturday_off_holidays(
+        db,
+        tenant_id=tenant_id,
+        configuration_id=row.id,
         user_id=user_id,
     )
     return _to_response(db, row)
@@ -326,10 +413,19 @@ def update_configuration(
     payload: AttendanceConfigurationUpdateRequest,
 ) -> AttendanceConfigurationResponse:
     """Update scalar settings (general / working days / office / grace / check-in)."""
+    repo.ensure_extra_working_table(db)
+    repo.ensure_date_shift_table(db)
+    repo.ensure_non_working_dates_table(db)
     row = _get_or_create_configuration(
         db,
         tenant_id=tenant_id,
         academic_year_id=academic_year_id,
+        user_id=user_id,
+    )
+    _migrate_legacy_saturday_off_holidays(
+        db,
+        tenant_id=tenant_id,
+        configuration_id=row.id,
         user_id=user_id,
     )
 
@@ -357,6 +453,111 @@ def update_configuration(
                 "working_sunday": wd.sunday,
             }
         )
+
+    if payload.extra_working_teachers is not None:
+        seen: set[tuple[int, str, date | None]] = set()
+        items: list[tuple[int, str, date | None]] = []
+        for entry in payload.extra_working_teachers:
+            key = (entry.teacher_id, entry.day, entry.work_date)
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append(key)
+        if items:
+            teacher_ids = {teacher_id for teacher_id, _day, _work_date in items}
+            found = {
+                int(teacher_id)
+                for (teacher_id,) in db.query(Teacher.id)
+                .filter(
+                    Teacher.tenant_id == tenant_id,
+                    Teacher.id.in_(teacher_ids),
+                )
+                .all()
+            }
+            missing = teacher_ids - found
+            if missing:
+                raise ValidationException("One or more teachers were not found")
+        repo.replace_extra_working_days(
+            db,
+            tenant_id=tenant_id,
+            configuration_id=row.id,
+            user_id=user_id,
+            items=items,
+        )
+        repo.commit(db)
+        db.refresh(row)
+
+    if payload.date_shift_overrides is not None:
+        seen_keys: set[tuple[date, int | None]] = set()
+        shift_items: list[tuple[date, str, str, int | None, int | None]] = []
+        valid_shift_ids = {
+            int(s.id)
+            for s in repo.list_shifts(db, tenant_id=tenant_id, configuration_id=row.id)
+        }
+        teacher_ids = {
+            int(entry.teacher_id)
+            for entry in payload.date_shift_overrides
+            if entry.teacher_id is not None
+        }
+        if teacher_ids:
+            found_teachers = {
+                int(teacher_id)
+                for (teacher_id,) in db.query(Teacher.id)
+                .filter(
+                    Teacher.tenant_id == tenant_id,
+                    Teacher.id.in_(teacher_ids),
+                )
+                .all()
+            }
+            missing_teachers = teacher_ids - found_teachers
+            if missing_teachers:
+                raise ValidationException("One or more teachers were not found")
+        for entry in payload.date_shift_overrides:
+            key = (entry.work_date, entry.teacher_id)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            _validate_time_range(entry.start_time, entry.end_time)
+            shift_id = entry.shift_id
+            if shift_id is not None and shift_id not in valid_shift_ids:
+                raise ValidationException("Shift not found for this configuration")
+            shift_items.append(
+                (
+                    entry.work_date,
+                    entry.start_time.strip(),
+                    entry.end_time.strip(),
+                    shift_id,
+                    entry.teacher_id,
+                )
+            )
+        repo.replace_date_shift_overrides(
+            db,
+            tenant_id=tenant_id,
+            configuration_id=row.id,
+            user_id=user_id,
+            items=shift_items,
+        )
+        repo.commit(db)
+        db.refresh(row)
+
+    if payload.non_working_dates is not None:
+        seen_off: set[date] = set()
+        off_dates: list[date] = []
+        for entry in payload.non_working_dates:
+            if entry.work_date in seen_off:
+                continue
+            seen_off.add(entry.work_date)
+            off_dates.append(entry.work_date)
+        off_dates.sort()
+        repo.replace_non_working_dates(
+            db,
+            tenant_id=tenant_id,
+            configuration_id=row.id,
+            user_id=user_id,
+            work_dates=off_dates,
+        )
+        repo.commit(db)
+        db.refresh(row)
 
     if payload.office_timing is not None:
         ot = payload.office_timing
