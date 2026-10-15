@@ -3189,6 +3189,9 @@ const StudentFeeCollectionCard: React.FC<
 /** Set true to show the student homework banner on the dashboard. */
 const STUDENT_SHOW_HOMEWORK = false;
 
+/** Set true to show Fee Widget Summary and Fee Collection & Due on the student dashboard. */
+const STUDENT_SHOW_FEES = false;
+
 const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present"];
 // Pending HW KPI removed per QA — homework status remains on the s_homework card below.
 // const STUDENT_KPI_DEFAULT  = ["s_kpi_att", "s_kpi_present", "s_kpi_hw"];
@@ -3212,7 +3215,12 @@ const StudentDashboardView: React.FC<{
   const kpiDrag = useSortableDrag("student_kpi_v2", STUDENT_KPI_DEFAULT);
   const cardDrag = useSortableDrag("student_cards_v8", STUDENT_CARDS_DEFAULT);
   const visibleCardIds = React.useMemo(
-    () => cardDrag.order.filter((id) => STUDENT_SHOW_HOMEWORK || id !== "s_homework"),
+    () =>
+      cardDrag.order.filter((id) => {
+        if (!STUDENT_SHOW_HOMEWORK && id === "s_homework") return false;
+        if (!STUDENT_SHOW_FEES && (id === "s_fee_summary" || id === "s_fee_due")) return false;
+        return true;
+      }),
     [cardDrag.order]
   );
 
@@ -3606,7 +3614,7 @@ export default function Dashboard() {
     onAcademicYearChange: feeOverview.setAcademicYearId,
   };
   const isStudentDashboard = data?.role === "STUDENT";
-  const studentFee = useStudentFeeWidgets(isStudentDashboard);
+  const studentFee = useStudentFeeWidgets(isStudentDashboard && STUDENT_SHOW_FEES);
   const studentFeeWidget: StudentFeeWidgetProps = {
     overview: studentFee.overview,
     loading: studentFee.loading,
