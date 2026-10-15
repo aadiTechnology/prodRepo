@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from typing import List, Optional, Tuple
 
 from fastapi import HTTPException, status
@@ -39,6 +42,31 @@ from app.utils.homework_status import (
 # Mapping helper (ORM → response schema)
 # ---------------------------------------------------------------------------
 
+# One stuck storage lookup must not hold the homework list open.
+_ATTACHMENT_URL_TIMEOUT_SEC = 2.5
+_storage_skip_until = 0.0
+
+
+def _attachment_file_path(file_path: str) -> str:
+    """Resolve a download URL, but keep the stored path if storage does not answer."""
+    global _storage_skip_until
+    stored = file_path or ""
+    if not stored.strip() or time.monotonic() < _storage_skip_until:
+        return stored
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(resolve_attachment_url, stored)
+    try:
+        return future.result(timeout=_ATTACHMENT_URL_TIMEOUT_SEC)
+    except FuturesTimeout:
+        _storage_skip_until = time.monotonic() + 60
+        return stored
+    except Exception:
+        return stored
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+
 def to_list_responses(
     db: Session,
     items: List[Homework],
@@ -58,12 +86,17 @@ def to_list_responses(
         else set()
     )
     return [
-        _to_response(hw, is_viewed=int(hw.id) in viewed_ids)
+        _to_response(hw, is_viewed=int(hw.id) in viewed_ids, resolve_files=False)
         for hw in items
     ]
 
 
-def _to_response(hw: Homework, *, is_viewed: bool = False) -> HomeworkResponse:
+def _to_response(
+    hw: Homework,
+    *,
+    is_viewed: bool = False,
+    resolve_files: bool = True,
+) -> HomeworkResponse:
     return HomeworkResponse(
         id=hw.id,
         tenant_id=hw.tenant_id,
@@ -91,7 +124,7 @@ def _to_response(hw: Homework, *, is_viewed: bool = False) -> HomeworkResponse:
                 "id": a.id,
                 "homework_id": a.homework_id,
                 "file_name": a.file_name,
-                "file_path": resolve_attachment_url(a.file_path),
+                "file_path": _attachment_file_path(a.file_path) if resolve_files else a.file_path,
                 "file_type": a.file_type,
                 "file_size_kb": a.file_size_kb,
                 "uploaded_at": a.uploaded_at,

@@ -4,7 +4,7 @@ from datetime import datetime, date
 from typing import List, Optional, Tuple
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_, or_, text
 
 from app.models.homework import Homework, HomeworkAttachment, HomeworkView
@@ -131,7 +131,13 @@ def list_homework(
         query = query.filter(Homework.title.ilike(f"%{search}%"))
 
     total = query.count()
-    items = query.order_by(Homework.created_at.desc()).offset(skip).limit(limit).all()
+    items = (
+        query.options(selectinload(Homework.attachments))
+        .order_by(Homework.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     return items, total
 
 
