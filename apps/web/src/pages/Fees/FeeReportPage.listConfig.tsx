@@ -15,6 +15,12 @@ export function money(value: number | undefined | null) {
   })}`;
 }
 
+/** Fee Report no longer surfaces Overdue; show those rows as Due. */
+export function feeReportStatusLabel(status: string | null | undefined) {
+  const value = (status ?? "").trim();
+  return value.toLowerCase() === "overdue" ? "Due" : value;
+}
+
 export const feeReportListConfig: ListConfig<FeeReportRow, any> = {
   columns: [
     { 
@@ -75,12 +81,14 @@ export const feeReportListConfig: ListConfig<FeeReportRow, any> = {
           Paid: colorTokens.preschool.mint.main,
           Partial: colorTokens.preschool.peach.main,
           Pending: colorTokens.preschool.coral.main,
+          Due: colorTokens.preschool.peach.dark,
         };
-        const color = statusColors[row.invoice_status] ?? colorTokens.text.secondary;
+        const label = feeReportStatusLabel(row.invoice_status);
+        const color = statusColors[label] ?? colorTokens.text.secondary;
         
         return (
           <Chip
-            label={row.invoice_status}
+            label={label}
             size="small"
             sx={{ 
               fontWeight: 800,

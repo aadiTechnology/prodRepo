@@ -3086,8 +3086,17 @@ const StudentFeeSummaryCard: React.FC<StudentFeeWidgetProps & { onViewDetails: (
   );
 };
 
-const StudentUpcomingDueRow: React.FC<{ item: StudentFeeInstallmentItem }> = ({ item }) => (
+const studentFeeDetailsPath = (installments: StudentFeeInstallmentItem[], invoiceId?: number) => {
+  const targetId =
+    invoiceId ??
+    installments.find((item) => item.fee_status !== "paid")?.invoice_id ??
+    installments[0]?.invoice_id;
+  return targetId != null ? `/fees/invoices/${targetId}/detail` : "/fees/invoices";
+};
+
+const StudentUpcomingDueRow: React.FC<{ item: StudentFeeInstallmentItem; onClick?: () => void }> = ({ item, onClick }) => (
   <Box
+    onClick={onClick}
     sx={{
       display: "flex",
       alignItems: "center",
@@ -3097,6 +3106,9 @@ const StudentUpcomingDueRow: React.FC<{ item: StudentFeeInstallmentItem }> = ({ 
       bgcolor: C.surface,
       borderRadius: C.radius.sm,
       border: `1px solid ${C.borderLight}`,
+      cursor: onClick ? "pointer" : "default",
+      transition: "border-color 0.15s ease",
+      "&:hover": onClick ? { borderColor: C.brandLight } : undefined,
     }}
   >
     <CalendarIcon sx={{ fontSize: 16, color: C.muted, flexShrink: 0 }} />
@@ -3114,8 +3126,10 @@ const StudentUpcomingDueRow: React.FC<{ item: StudentFeeInstallmentItem }> = ({ 
   </Box>
 );
 
-const StudentFeeCollectionCard: React.FC<StudentFeeWidgetProps & { onOpenDueList: () => void }> = (props) => {
-  const { overview, onOpenDueList } = props;
+const StudentFeeCollectionCard: React.FC<
+  StudentFeeWidgetProps & { onOpenFeeDetails: (invoiceId?: number) => void }
+> = (props) => {
+  const { overview, onOpenFeeDetails } = props;
   const placeholder = renderStudentFeePlaceholder(props, C.blue, C.blueGlass);
   const outstanding = (overview?.installments ?? []).filter((item) => item.fee_status !== "paid").slice(0, 3);
 
@@ -3126,7 +3140,7 @@ const StudentFeeCollectionCard: React.FC<StudentFeeWidgetProps & { onOpenDueList
           compact
           title="Fee Collection & Due"
           icon={<PaymentsIcon sx={{ color: C.blue }} />}
-          action={<ActionLink label="Due List" onClick={onOpenDueList} />}
+          action={<ActionLink label="Fee Details" onClick={() => onOpenFeeDetails()} />}
         />
         <Box sx={dashFilterBarSx}>
           <FeeAcademicYearSelect {...props} />
@@ -3156,7 +3170,11 @@ const StudentFeeCollectionCard: React.FC<StudentFeeWidgetProps & { onOpenDueList
                 ) : (
                   <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                     {outstanding.map((item) => (
-                      <StudentUpcomingDueRow key={item.invoice_id} item={item} />
+                      <StudentUpcomingDueRow
+                        key={item.invoice_id}
+                        item={item}
+                        onClick={() => onOpenFeeDetails(item.invoice_id)}
+                      />
                     ))}
                   </Box>
                 )}
@@ -3384,7 +3402,14 @@ const StudentDashboardView: React.FC<{
       case "s_fee_summary":
         return <StudentFeeSummaryCard {...feeWidget} onViewDetails={() => setFeeDialog("details")} />;
       case "s_fee_due":
-        return <StudentFeeCollectionCard {...feeWidget} onOpenDueList={() => setFeeDialog("dues")} />;
+        return (
+          <StudentFeeCollectionCard
+            {...feeWidget}
+            onOpenFeeDetails={(invoiceId) =>
+              navigate(studentFeeDetailsPath(feeWidget.overview?.installments ?? [], invoiceId))
+            }
+          />
+        );
       case "s_att":
         return (
           <GCard sx={{ height: "100%", display: "flex", flexDirection: "column" }}>

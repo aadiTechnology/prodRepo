@@ -95,6 +95,14 @@ def get_filter_options(
     )
 
 
+def _report_invoice_status(status: str | None) -> str:
+    """Fee Report lists outstanding past-due invoices as Due."""
+    value = (status or "").strip()
+    if value.lower() == "overdue":
+        return "Due"
+    return value
+
+
 def get_fee_report(
     db: Session,
     tenant_id: int,
@@ -221,7 +229,7 @@ def get_fee_report(
             invoiced_amount=float(r.invoiced_amount or 0),
             paid_amount=float(r.paid_amount or 0),
             due_amount=float(r.due_amount or 0),
-            invoice_status=r.invoice_status,
+            invoice_status=_report_invoice_status(r.invoice_status),
             due_date=r.due_date,
             invoice_date=r.invoice_date,
         )

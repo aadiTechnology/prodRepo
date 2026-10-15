@@ -15,7 +15,7 @@ import { EntityTableSection } from "../../components/reusable";
 import { AppCard, TextField } from "../../components/primitives";
 import { colorTokens } from "../../tokens/colors";
 import type { FeeReportRow } from "../../types/feeReport";
-import { feeReportListConfig, money } from "./FeeReportPage.listConfig";
+import { feeReportListConfig, feeReportStatusLabel, money } from "./FeeReportPage.listConfig";
 
 // Components
 import { SummaryAnalytics } from "./components/SummaryAnalytics";
@@ -91,7 +91,7 @@ function exportToCsv(rows: FeeReportRow[]) {
         r.invoiced_amount,
         r.paid_amount,
         r.due_amount,
-        r.invoice_status,
+        feeReportStatusLabel(r.invoice_status),
         r.due_date ? new Date(r.due_date).toLocaleDateString("en-IN") : "",
       ].join(",")
     ),
