@@ -20,9 +20,6 @@ import {
   TableHead,
   TableRow,
   MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
 } from "@mui/material";
 import {
   School as SchoolIcon,
@@ -3021,7 +3018,7 @@ const StudentFeeSummaryCard: React.FC<StudentFeeWidgetProps & { onViewDetails: (
           compact
           title="Fee Widget Summary"
           icon={<FeeIcon sx={{ color: C.green }} />}
-          action={<ActionLink label="View Details" onClick={onViewDetails} />}
+          action={<ActionLink label="Fee List" onClick={onViewDetails} />}
         />
         <Box sx={dashFilterBarSx}>
           <FeeAcademicYearSelect {...props} />
@@ -3186,78 +3183,6 @@ const StudentFeeCollectionCard: React.FC<
   );
 };
 
-const StudentFeeListDialog: React.FC<{
-  mode: "details" | "dues" | null;
-  installments: StudentFeeInstallmentItem[];
-  onClose: () => void;
-}> = ({ mode, installments, onClose }) => {
-  const rows = mode === "dues" ? installments.filter((item) => item.fee_status !== "paid") : installments;
-  const statusColor = (status: StudentFeeInstallmentItem["fee_status"]) =>
-    status === "paid" ? C.green : status === "overdue" ? C.red : C.amber;
-
-  return (
-    <Dialog open={mode != null} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ fontWeight: 800, fontSize: "1rem", color: C.slateText }}>
-        {mode === "dues" ? "Due List" : "Fee Details"}
-      </DialogTitle>
-      <DialogContent>
-        {rows.length === 0 ? (
-          <Typography sx={{ fontSize: "0.85rem", color: C.muted, fontWeight: 600, py: 1 }}>
-            {mode === "dues" ? "No pending dues for this academic year." : "No fee records for this academic year."}
-          </Typography>
-        ) : (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, pt: 0.5 }}>
-            {rows.map((item) => (
-              <Box
-                key={item.invoice_id}
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  px: 1.25,
-                  py: 1,
-                  borderRadius: C.radius.sm,
-                  border: `1px solid ${C.borderLight}`,
-                }}
-              >
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography noWrap sx={{ fontSize: "0.82rem", fontWeight: 700, color: C.slateText }}>
-                    {item.label}
-                  </Typography>
-                  <Typography sx={{ fontSize: "0.7rem", color: C.muted, fontWeight: 600 }}>
-                    {formatStudentDueOn(item.due_date, item.fee_status === "overdue")}
-                    {" · "}Paid {formatStudentInr(item.paid_amount)}
-                  </Typography>
-                </Box>
-                <Box sx={{ textAlign: "right", flexShrink: 0 }}>
-                  <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: item.due_amount > 0 ? C.red : C.green }}>
-                    {formatStudentInr(item.due_amount > 0 ? item.due_amount : item.paid_amount)}
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontSize: "0.65rem",
-                      fontWeight: 800,
-                      color: statusColor(item.fee_status),
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {item.fee_status}
-                  </Typography>
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        )}
-        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.5 }}>
-          <Button onClick={onClose} sx={{ textTransform: "none", fontWeight: 700 }}>
-            Close
-          </Button>
-        </Box>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // 3. STUDENT DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3278,7 +3203,6 @@ const StudentDashboardView: React.FC<{
   feeWidget: StudentFeeWidgetProps;
 }> = ({ data, feeWidget }) => {
   const navigate = useNavigate();
-  const [feeDialog, setFeeDialog] = useState<"details" | "dues" | null>(null);
   const { profile, attendance, /* fee_status, */ class_teacher, homework, recent_notices } = data;
   // Fee fields — uncomment with s_kpi_fees / s_fee cards below
   // const { total_fee, total_paid, total_balance, is_overdue, next_due_date } = fee_status;
@@ -3400,7 +3324,7 @@ const StudentDashboardView: React.FC<{
   const renderCard = (id: string) => {
     switch (id) {
       case "s_fee_summary":
-        return <StudentFeeSummaryCard {...feeWidget} onViewDetails={() => setFeeDialog("details")} />;
+        return <StudentFeeSummaryCard {...feeWidget} onViewDetails={() => navigate("/fees/invoices")} />;
       case "s_fee_due":
         return (
           <StudentFeeCollectionCard
@@ -3611,7 +3535,6 @@ const StudentDashboardView: React.FC<{
   };
 
   return (
-    <>
     <Grid container spacing={{ xs: 2, md: 2.5 }}>
       <Grid item xs={12}>
         <SortableKpiRow
@@ -3637,12 +3560,6 @@ const StudentDashboardView: React.FC<{
         />
       </Grid>
     </Grid>
-    <StudentFeeListDialog
-      mode={feeDialog}
-      installments={feeWidget.overview?.installments ?? []}
-      onClose={() => setFeeDialog(null)}
-    />
-    </>
   );
 };
 
