@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
@@ -26,13 +27,16 @@ from app.services.notice_attachment_storage import (
 )
 from app.services import notification_service
 from app.schemas.notice import (
+    AudienceType,
     NoticeAttachmentResponse,
     NoticeCreateRequest,
     NoticeDropdownOptionsResponse,
     NoticeListResponse,
     NoticeResponse,
+    NoticeStatus,
     NoticeStatusUpdateResponse,
     NoticeTargetResponse,
+    NoticeType,
     NoticeUpdateRequest,
 )
 
@@ -169,21 +173,21 @@ def _derive_status_from_timeline(*, publish_date: datetime, expiry_date: datetim
     return "PUBLISHED"
 
 
-def _effective_notice_status(row: dict) -> str:
+def _effective_notice_status(row: dict) -> NoticeStatus:
     stored = str(row.get("status") or "DRAFT")
     expiry_date = _coerce_naive_utc(row.get("expiry_date"))
     now = datetime.utcnow()
     if expiry_date and expiry_date < now:
-        return "EXPIRED"
+        return cast(NoticeStatus, "EXPIRED")
     if stored in {"DRAFT", "UNPUBLISHED", "EXPIRED"}:
-        return stored
+        return cast(NoticeStatus, stored)
     publish_date = _coerce_naive_utc(row.get("publish_date"))
     if publish_date and publish_date > now:
-        return "UNPUBLISHED"
-    return stored
+        return cast(NoticeStatus, "UNPUBLISHED")
+    return cast(NoticeStatus, stored)
 
 
-def user_can_manage_notices(db: Session, current_user: object) -> bool:
+def user_can_manage_notices(db: Session, current_user: Any) -> bool:
     from app.core.dependencies import get_rbac_role_codes
     from app.models.menu import Menu
     from app.models.role import user_roles as user_roles_table
@@ -196,13 +200,14 @@ def user_can_manage_notices(db: Session, current_user: object) -> bool:
     if role == UserRole.SUPER_ADMIN:
         return True
 
-    rbac_roles = get_rbac_role_codes(db, int(current_user.id))
+    user_id = int(getattr(current_user, "id"))
+    rbac_roles = get_rbac_role_codes(db, user_id)
     if "system_admin" in {r.lower() for r in rbac_roles}:
         return True
 
     role_id_rows = (
         db.query(user_roles_table.c.role_id)
-        .filter(user_roles_table.c.user_id == current_user.id)
+        .filter(user_roles_table.c.user_id == user_id)
         .all()
     )
     role_ids = [r[0] for r in role_id_rows]
@@ -279,10 +284,10 @@ def _normalize_attachments(*, attachments: list[dict]) -> list[dict]:
     return normalized
 
 
-def _attachment_response(item: dict) -> NoticeAttachmentResponse:
+def _attachment_response(item: dict, *, resolve_urls: bool = True) -> NoticeAttachmentResponse:
     payload = dict(item)
     file_path = payload.get("file_path")
-    if file_path:
+    if file_path and resolve_urls:
         # Same pattern as homework/syllabus/support:
         # Azure → SAS URL, Backblaze → time-limited authorized download URL.
         # Do not return the /content proxy as the primary view URL — browsers cannot
@@ -292,34 +297,57 @@ def _attachment_response(item: dict) -> NoticeAttachmentResponse:
     return NoticeAttachmentResponse(**payload)
 
 
-def _to_notice_response(
-    db: Session, row: dict, *, is_viewed: bool = False
-) -> NoticeResponse:
-    targets = notice_repository.get_notice_targets(db, notice_id=int(row["id"]))
-    attachments = notice_repository.get_notice_attachments(db, notice_id=int(row["id"]))
+def _notice_core_fields(row: dict, *, is_viewed: bool = False) -> dict:
+    """Shared NoticeResponse fields from a communication_notices row (no related queries)."""
+    return {
+        "id": int(row["id"]),
+        "tenant_id": int(row["tenant_id"]),
+        "title": str(row["title"]),
+        "description": str(row["description"]),
+        "notice_type": cast(NoticeType, str(row["notice_type"])),
+        "audience_type": cast(AudienceType, str(row["audience_type"])),
+        "status": _effective_notice_status(row),
+        "publish_date": row["publish_date"],
+        "expiry_date": row.get("expiry_date"),
+        "is_draft": str(row["status"]) == "DRAFT",
+        "is_published": bool(row["is_published"]),
+        "published_at": row.get("published_at"),
+        "unpublished_at": row.get("unpublished_at"),
+        "send_notification": bool(row["send_notification"]),
+        "created_by": int(row["created_by"]),
+        "created_at": row["created_at"],
+        "updated_by": int(row["updated_by"]) if row.get("updated_by") else None,
+        "updated_at": row.get("updated_at"),
+        "is_deleted": bool(row["is_deleted"]),
+        "is_viewed": is_viewed,
+    }
+
+
+def _to_notice_list_item(row: dict, *, is_viewed: bool = False) -> NoticeResponse:
+    """
+    Lightweight list row: no target/attachment queries and no Azure/B2 URL resolve.
+    Those belong on notice detail (open one notice).
+    """
     return NoticeResponse(
-        id=int(row["id"]),
-        tenant_id=int(row["tenant_id"]),
-        title=str(row["title"]),
-        description=str(row["description"]),
-        notice_type=str(row["notice_type"]),
-        audience_type=str(row["audience_type"]),
-        status=_effective_notice_status(row),
-        publish_date=row["publish_date"],
-        expiry_date=row.get("expiry_date"),
-        is_draft=str(row["status"]) == "DRAFT",
-        is_published=bool(row["is_published"]),
-        published_at=row.get("published_at"),
-        unpublished_at=row.get("unpublished_at"),
-        send_notification=bool(row["send_notification"]),
-        created_by=int(row["created_by"]),
-        created_at=row["created_at"],
-        updated_by=int(row["updated_by"]) if row.get("updated_by") else None,
-        updated_at=row.get("updated_at"),
-        is_deleted=bool(row["is_deleted"]),
+        **_notice_core_fields(row, is_viewed=is_viewed),
+        targets=[],
+        attachments=[],
+    )
+
+
+def _to_notice_response(
+    db: Session,
+    row: dict,
+    *,
+    is_viewed: bool = False,
+) -> NoticeResponse:
+    notice_id = int(row["id"])
+    targets = notice_repository.get_notice_targets(db, notice_id=notice_id)
+    attachments = notice_repository.get_notice_attachments(db, notice_id=notice_id)
+    return NoticeResponse(
+        **_notice_core_fields(row, is_viewed=is_viewed),
         targets=[NoticeTargetResponse(**item) for item in targets],
-        attachments=[_attachment_response(item) for item in attachments],
-        is_viewed=is_viewed,
+        attachments=[_attachment_response(item, resolve_urls=True) for item in attachments],
     )
 
 
@@ -353,19 +381,18 @@ def list_notices(
         size=size,
         viewer_context=viewer_context,
     )
+    notice_ids = [int(row["id"]) for row in rows]
     viewed_ids: set[int] = set()
-    if current_user_id is not None and rows:
+    if current_user_id is not None and notice_ids:
         viewed_ids = notice_repository.get_viewed_notice_ids(
             db,
             tenant_id=tenant_id,
             user_id=current_user_id,
-            notice_ids=[int(row["id"]) for row in rows],
+            notice_ids=notice_ids,
         )
     return NoticeListResponse(
         items=[
-            _to_notice_response(
-                db, row, is_viewed=int(row["id"]) in viewed_ids
-            )
+            _to_notice_list_item(row, is_viewed=int(row["id"]) in viewed_ids)
             for row in rows
         ],
         total=total,

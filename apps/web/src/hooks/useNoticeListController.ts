@@ -18,13 +18,21 @@ const STATIC_AUDIENCE_VALUES = ["ALL", "STUDENT", "TEACHER", "ADMIN"] as const s
 
 const STATIC_NOTICE_TYPE_VALUES = ["GENERAL", "FEE", "EVENT", "HOLIDAY", "EXAM"] as const satisfies readonly NoticeType[];
 
-const FETCH_PAGE_SIZE = 100;
+function noticeErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (err && typeof err === "object" && "message" in err) {
+    const msg = (err as { message?: unknown }).message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+  }
+  return fallback;
+}
 
 export function useNoticeListController() {
   const { readOnlyAudience, canEdit, canCreate, isTeacherUser } = useNoticePermissions();
   const canUseAdminFilters = canEdit || canCreate;
 
-  const [allItems, setAllItems] = useState<Notice[]>([]);
+  const [items, setItems] = useState<Notice[]>([]);
+  const [totalRows, setTotalRows] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -69,8 +77,10 @@ export function useNoticeListController() {
       status: canUseAdminFilters && status ? status : undefined,
       audience_type: canUseAdminFilters && !readOnlyAudience && audienceType ? audienceType : undefined,
       notice_type: noticeType || undefined,
+      page,
+      size: rowsPerPage,
     }),
-    [audienceType, canUseAdminFilters, debouncedSearch, noticeType, readOnlyAudience, status]
+    [audienceType, canUseAdminFilters, debouncedSearch, noticeType, page, readOnlyAudience, rowsPerPage, status]
   );
 
   const fetchNotices = useCallback(async () => {
@@ -81,33 +91,20 @@ export function useNoticeListController() {
       if (showBlockingLoader) setLoading(true);
       setError(null);
 
-      let pageIndex = 0;
-      let fetched: Notice[] = [];
-      let total = 0;
+      const res = await noticeService.list(listQueryParams);
+      if (generation !== fetchGenerationRef.current) return;
 
-      do {
-        const res = await noticeService.list({
-          ...listQueryParams,
-          page: pageIndex,
-          size: FETCH_PAGE_SIZE,
-        });
-        if (generation !== fetchGenerationRef.current) return;
-
-        fetched = [...fetched, ...(res.items ?? [])];
-        total = res.total ?? fetched.length;
-        pageIndex += 1;
-      } while (fetched.length < total);
-
-      setAllItems(fetched);
+      setItems(res.items ?? []);
+      setTotalRows(res.total ?? 0);
       hasLoadedOnceRef.current = true;
     } catch (err: unknown) {
       if (generation !== fetchGenerationRef.current) return;
 
       if (!hasLoadedOnceRef.current) {
-        setAllItems([]);
+        setItems([]);
+        setTotalRows(0);
       }
-      const msg = err instanceof Error ? err.message : "Unable to load notices";
-      setError(msg);
+      setError(noticeErrorMessage(err, "Unable to load notices"));
     } finally {
       if (generation === fetchGenerationRef.current) {
         setLoading(false);
@@ -170,27 +167,12 @@ export function useNoticeListController() {
     setPage(0);
   }, []);
 
-  const filteredItems = useMemo(() => {
-    if (!canUseAdminFilters || !status) {
-      return allItems;
-    }
-    const normalizedStatus = status.toUpperCase() as NoticeStatus;
-    return allItems.filter((item) => item.status === normalizedStatus);
-  }, [allItems, canUseAdminFilters, status]);
-
-  const totalRows = filteredItems.length;
-
-  const paginatedItems = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredItems.slice(start, start + rowsPerPage);
-  }, [filteredItems, page, rowsPerPage]);
-
   useEffect(() => {
-    const maxPage = Math.max(0, Math.ceil(filteredItems.length / rowsPerPage) - 1);
+    const maxPage = Math.max(0, Math.ceil(totalRows / rowsPerPage) - 1);
     if (page > maxPage) {
       setPage(maxPage);
     }
-  }, [filteredItems.length, page, rowsPerPage]);
+  }, [totalRows, page, rowsPerPage]);
 
   const onStatusChange = useCallback((value: string) => {
     setStatus(value);
@@ -231,17 +213,16 @@ export function useNoticeListController() {
       closeDeleteConfirm();
       await fetchNotices();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to delete notice";
-      setError(msg);
+      setError(noticeErrorMessage(err, "Failed to delete notice"));
     } finally {
       setDeleteLoading(false);
     }
   }, [audienceType, closeDeleteConfirm, fetchNotices, noticeToDelete, noticeType, status]);
 
-  const tableLoading = loading && allItems.length === 0;
+  const tableLoading = loading && items.length === 0;
 
   return {
-    items: paginatedItems,
+    items,
     totalRows,
     loading,
     tableLoading,

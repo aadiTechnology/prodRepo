@@ -428,7 +428,7 @@ def insert_notice(db: Session, *, payload: dict) -> int:
     entity = Notice(**payload)
     db.add(entity)
     db.flush()
-    return int(entity.id)
+    return int(entity.id)  # type: ignore[arg-type]
 
 
 def replace_notice_targets(
@@ -442,7 +442,7 @@ def replace_notice_targets(
     db.query(NoticeTarget).filter(NoticeTarget.notice_id == notice_id).delete()
     if targets:
         db.bulk_insert_mappings(
-            NoticeTarget,
+            NoticeTarget,  # type: ignore[arg-type]
             [
                 {
                     "tenant_id": tenant_id,
@@ -468,7 +468,7 @@ def replace_notice_attachments(
     db.query(NoticeAttachment).filter(NoticeAttachment.notice_id == notice_id).delete()
     if attachments:
         db.bulk_insert_mappings(
-            NoticeAttachment,
+            NoticeAttachment,  # type: ignore[arg-type]
             [
                 {
                     "tenant_id": tenant_id,
